@@ -6,7 +6,7 @@
 // clipped to the 3D combiner glass. Square tactical radar (bottom-left), stores
 // list + F-15C silhouette with per-pylon AIM-9 reload icons (bottom-right),
 // open-corner target brackets, edge pointers, minimal top-left telemetry.
-import { SPW } from './loadout.js?v=s76a';
+import { SPW } from './loadout.js?v=s77a';
 
 export function createHUD(THREE, A) {
   const canvas = A.canvas;
@@ -36,10 +36,11 @@ export function createHUD(THREE, A) {
   const P_RDR = '[ Z ] CHAFF / NOTCH 90°', P_IR = '[ X ] FLARES', P_RTB = '[ CARRIER RTB ]',
     P_MCAM = '[ HOLD FIRE ] MISSILE CAM', P_WING = '[ G ] WINGMEN ENGAGE';
   const CHEAT_ROWS = [
-    ['MOUSE', 'Pitch/roll'], ['LMB/F', 'Gun'], ['RMB/M', 'Missile / SPW'],
-    ['1-3/R', 'Weapon'], ['C', 'Lock'], ['X', 'Flares'],
-    ['Z', 'Chaff'], ['J', 'ECM'], ['G', 'Wingmen'],
-    ['L', 'Gear'], ['B', 'Brake'], ['Q', 'Roll'],
+    ['MOUSE', 'Pitch/roll'], ['WASD', 'Pitch / roll'], ['LMB/F', 'Gun'],
+    ['RMB/M', 'Missile / SPW'], ['1-3/R', 'Weapon'], ['C', 'Lock'],
+    ['X', 'Flares'], ['Z', 'Chaff'], ['J', 'ECM'], ['G', 'Wingmen'],
+    ['L', 'Gear'], ['B', 'Brake'], ['V', 'Roll'], ['Q/E', 'Yaw'],
+    ['SHIFT/CTRL/UP/DN/WHEEL', 'Throttle'],
     ['SPACE', 'View'], ['[ ]', 'MFD'], ['ALT', 'Free look'],
     ['TABx2', 'Debrief'], ['F1', 'This sheet'],
     ['B+SHIFT <290KT', 'PSM: Cobra / Kulbit'],

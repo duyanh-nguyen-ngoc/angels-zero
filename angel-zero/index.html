@@ -512,18 +512,18 @@
           <div class="bind-grid">
             <div class="bind"><span class="k"><kbd>MOUSE</kbd></span><span class="a">Pitch / roll</span></div>
             <div class="bind"><span class="k"><kbd>LMB</kbd> <kbd>F</kbd></span><span class="a">Vulcan cannon (engine fire: F = Halon bottle, hold F = relight)</span></div>
-            <div class="bind"><span class="k"><kbd>W</kbd> <kbd>S</kbd></span><span class="a">Throttle / brake</span></div>
+            <div class="bind"><span class="k"><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></span><span class="a">Pitch / roll (W = nose-down, invert option available)</span></div>
             <div class="bind"><span class="k"><kbd>RMB</kbd> <kbd>M</kbd></span><span class="a">Fire MSL / special weapon &middot; hold = missile cam</span></div>
-            <div class="bind"><span class="k"><kbd>SHIFT</kbd></span><span class="a">Afterburner / Hi-G</span></div>
+            <div class="bind"><span class="k"><kbd>SHIFT</kbd> <kbd>CTRL</kbd> <kbd>&uarr;</kbd> <kbd>&darr;</kbd> <kbd>WHEEL</kbd></span><span class="a">Throttle &plusmn; (AB at full with SHIFT, Hi-G)</span></div>
             <div class="bind"><span class="k"><kbd>R</kbd> <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></span><span class="a">Cycle MSL / special weapon (4AAM &middot; UGB &middot; QAAM &mdash; pick in hangar)</span></div>
-            <div class="bind"><span class="k"><kbd>A</kbd> <kbd>D</kbd></span><span class="a">Rudder yaw</span></div>
+            <div class="bind"><span class="k"><kbd>Q</kbd> <kbd>E</kbd></span><span class="a">Rudder yaw</span></div>
             <div class="bind"><span class="k"><kbd>AUTO</kbd></span><span class="a">Auto-Radar Designate</span></div>
             <div class="bind"><span class="k"><kbd>C</kbd></span><span class="a">Lock Missile Seeker / Cycle Target</span></div>
             <div class="bind"><span class="k"><kbd>Z</kbd></span><span class="a">Dispense chaff (RADAR decoy)</span></div>
             <div class="bind"><span class="k"><kbd>J</kbd></span><span class="a">ALQ-135 ECM Jammer</span></div>
             <div class="bind"><span class="k"><kbd>N</kbd></span><span class="a">Toggle Night Vision (NVG)</span></div>
             <div class="bind"><span class="k"><kbd>K</kbd></span><span class="a">Combat music on / off</span></div>
-            <div class="bind"><span class="k"><kbd>Q</kbd></span><span class="a">Barrel roll</span></div>
+            <div class="bind"><span class="k"><kbd>V</kbd></span><span class="a">Barrel roll</span></div>
             <div class="bind"><span class="k"><kbd>X</kbd></span><span class="a">Deploy flares</span></div>
             <div class="bind"><span class="k"><kbd>L</kbd></span><span class="a">Landing gear up / down</span></div>
             <div class="bind"><span class="k"><kbd>G</kbd></span><span class="a">Wingmen: formation / engage</span></div>
@@ -532,7 +532,7 @@
             <div class="bind"><span class="k"><kbd>RUDDER</kbd>+<kbd>OPP ROLL</kbd></span><span class="a">Flat spin at stall (neutral + opposite rudder recovers)</span></div>
             <div class="bind"><span class="k"><kbd>SPACE</kbd></span><span class="a">Cockpit / chase view</span></div>
             <div class="bind"><span class="k"><kbd>ALT</kbd> <kbd>MMB</kbd></span><span class="a">Free Look (hold + mouse)</span></div>
-            <div class="bind"><span class="k"><kbd>E</kbd></span><span class="a">Eject bailout</span></div>
+            <div class="bind"><span class="k"><kbd>P</kbd></span><span class="a">Eject bailout</span></div>
             <div class="bind"><span class="k"><kbd>H</kbd> <kbd>ESC</kbd></span><span class="a">Tactical menu</span></div>
             <div class="bind"><span class="k"><kbd>[</kbd> <kbd>]</kbd></span><span class="a">Cockpit MFD page</span></div>
             <div class="bind"><span class="k"><kbd>F1</kbd></span><span class="a">Keybind cheat-sheet</span></div>
@@ -616,6 +616,7 @@
         <span class="keycap">ENTER / CLICK</span><span>CONFIRM</span>
         <span id="camToggle">[ CAM: <button class="camOpt active" id="sbCamOrbit" type="button">ORBIT</button> / <button class="camOpt" id="sbCamCockpit" type="button">COCKPIT</button> ]</span>
       </div>
+      <div class="hintRow" style="margin-top:6px"><span class="keycap">WASD</span><span>PITCH / ROLL</span><span class="keycap">Q/E</span><span>YAW</span><span class="keycap">SHIFT/CTRL</span><span>THROTTLE</span></div>
     </div>
   </div>
   <div id="debrief" hidden role="dialog" aria-modal="true" aria-labelledby="dbTitle">
@@ -676,30 +677,30 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s76a';
-import { createBlastFX } from './src/blastfx.js?v=s76a';
-import { createHUD } from './src/hud.js?v=s76a';
-import { createCockpit3D } from './src/cockpit3d.js?v=s76a';
-import { createCombat } from './src/combat.js?v=s76a';
-import { createEjection } from './src/eject.js?v=s76a';
-import { createAudio } from './src/audio.js?v=s76a';
-import { createRadio } from './src/radio.js?v=s76a';
-import { createProfile, LIVERIES, liveryById } from './src/profile.js?v=s76a';
-import { createLivery } from './src/livery.js?v=s76a';
-import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s76a';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s76a';
-import { createCanopyFX } from './src/canopy.js?v=s76a';
-import { createNVG } from './src/nvg.js?v=s76a';
-import { createWorld, WORLD } from './src/world.js?v=s76a';
-import { createSurfaces } from './src/surfaces.js?v=s76a';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s76a';
-import { createFreeLook } from './src/freelook.js?v=s76a';
-import { createCanopyGlass } from './src/canopyglass.js?v=s76a';
-import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s76a';
-import { SPW, SQUADRON, MODES, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode } from './src/loadout.js?v=s76a';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s76a';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO } from './src/radioScript.js?v=s76a';
-import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s76a';
+import { createVFX } from './src/vfx.js?v=s77a';
+import { createBlastFX } from './src/blastfx.js?v=s77a';
+import { createHUD } from './src/hud.js?v=s77a';
+import { createCockpit3D } from './src/cockpit3d.js?v=s77a';
+import { createCombat } from './src/combat.js?v=s77a';
+import { createEjection } from './src/eject.js?v=s77a';
+import { createAudio } from './src/audio.js?v=s77a';
+import { createRadio } from './src/radio.js?v=s77a';
+import { createProfile, LIVERIES, liveryById } from './src/profile.js?v=s77a';
+import { createLivery } from './src/livery.js?v=s77a';
+import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s77a';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s77a';
+import { createCanopyFX } from './src/canopy.js?v=s77a';
+import { createNVG } from './src/nvg.js?v=s77a';
+import { createWorld, WORLD } from './src/world.js?v=s77a';
+import { createSurfaces } from './src/surfaces.js?v=s77a';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s77a';
+import { createFreeLook } from './src/freelook.js?v=s77a';
+import { createCanopyGlass } from './src/canopyglass.js?v=s77a';
+import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s77a';
+import { SPW, SQUADRON, MODES, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode } from './src/loadout.js?v=s77a';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s77a';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO } from './src/radioScript.js?v=s77a';
+import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s77a';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -1074,11 +1075,11 @@ const contrailEm = Array.from({ length: 5 }, () => ({ pos: new THREE.Vector3(), 
 let cloudWet = 0;
 
 const mouse = { nx: 0, ny: 0 };
-const keys = { w: false, s: false, a: false, d: false, shift: false, fire: false, b: false };
+const keys = { w: false, s: false, a: false, d: false, shift: false, fire: false, b: false,
+  q: false, e: false, arrowup: false, arrowdown: false, ctrl: false };
 let uiModal = false, ctrlOpen = false, firstPerson = Q.has('cockpit');
 if (Q.has('mouse')) { const [mx, my] = Q.get('mouse').split(',').map(Number); mouse.nx = mx || 0; mouse.ny = my || 0; }
 // Debug rudder hold (?rudder=a|d) for headless post-stall scenarios (A = left, D = right).
-if (DEBUG && Q.has('rudder')) { const r = Q.get('rudder'); if (r.includes('a')) keys.a = true; if (r.includes('d')) keys.d = true; }
 
 const camVelocity = new THREE.Vector3();
 let blastShake = 0, blast = null, fxHold = false;     // fxHold: ?fxhold (with &freeze) holds the blast layers after a warp, for stills                     // blast-wave camera impulse; src/blastfx.js (assigned once the world exists)
@@ -1192,6 +1193,7 @@ function resetAircraft() {
   combatSys.resetPlayer();
   roll.left = 0;
   gearAutoLock = false; gearCheckT = 0; state.assist = 0;
+  resetKB();
   vfx.clearTrails(); if (blast) blast.clear(); hud.resetMaxG();
   jet.visible = true;
   camera.position.copy(CAM_OFFSET).applyQuaternion(state.quaternion).add(state.position);
@@ -1204,6 +1206,7 @@ let flightMode = 'FLY', viewBeforeEject = false;
 function triggerEject(reason) {
   if (flightMode !== 'FLY' || !modelReady) return;
   flightMode = 'EJECT';
+  clearFlightInput();
   state.onGround = false; state.pit.active = false;
   combat.dead = true; combat.deaths++; combat.lockTarget = null;
   sortie.failReason = reason === 'crash' ? 'AIRCRAFT LOST — IMPACT' : reason === 'damage' ? 'SHOT DOWN — PILOT EJECTED'
@@ -1227,16 +1230,15 @@ function finishEject() {
   combatSys.say('ALPHA 1 BACK IN THE FIGHT', 2);
 }
 
-// Evasive 360-degree barrel roll (Q only — the double-tap A / D trigger was removed:
-// rapid rudder taps for gun aiming kept firing accidental rolls).
+// Evasive 360-degree barrel roll (V — Q/E are rudder, A/D roll).
 const roll = { left: 0, dir: 1 };
 const ROLL_RATE = 2 * Math.PI / 1.15;
 // Keyboard rudder ramp: a tap starts at 25 % authority, smoothstep to 100 % after
 // 0.22 s of hold, so taps are surgical nudges and holds still give full rate.
 const rudderHold = { a: 0, d: 0 };
 function rudderInput(dt) {
-  rudderHold.a = keys.a ? rudderHold.a + dt : 0;
-  rudderHold.d = keys.d ? rudderHold.d + dt : 0;
+  rudderHold.a = keys.q ? rudderHold.a + dt : 0;
+  rudderHold.d = keys.e ? rudderHold.d + dt : 0;
   const amt = t => (t > 0 ? 0.25 + 0.75 * THREE.MathUtils.smoothstep(t, 0, 0.22) : 0);
   return amt(rudderHold.a) - amt(rudderHold.d);
 }
@@ -1393,7 +1395,7 @@ function showMenu(kind) {
   }
   launchBtn.textContent = pause ? '[ RESUME SORTIE ]' : '[ LAUNCH SORTIE ]';
   launchBtn.classList.toggle('pulse', !pause);
-  document.getElementById('menuHint').textContent = pause ? 'H / ESC / ENTER TO RESUME' : 'CLICK LAUNCH OR PRESS ENTER';
+  document.getElementById('menuHint').textContent = pause ? 'WASD PITCH / ROLL · SHIFT/CTRL THROTTLE · H / ESC / ENTER RESUME' : 'CLICK LAUNCH OR PRESS ENTER';
   showMenuEl();
   syncAudioUI();
   syncSBMenu(pause);
@@ -1457,6 +1459,7 @@ function watchSortie() {
 function endSortie(outcome) {
   if (!sortie.active) return;
   sortie.active = false;
+  clearFlightInput();
   if (outcome === 'CLEARED') radioEvent('ON_MISSION_CLEAR');
   const st = sortieStats();
   st.rankInfo = computeRank(st, outcome);
@@ -1655,6 +1658,7 @@ function replaySortie(equipId) {
   if (equipId && profile.select(equipId)) setLivery(equipId);
   debriefEl.hidden = true;
   const fp = viewBeforeEject || firstPerson;
+  clearFlightInput();
   resetMission();
   appMode = 'PLAY';
   syncCrtVisible();
@@ -1670,6 +1674,7 @@ function replaySortie(equipId) {
 }
 function debriefToBriefing() {
   if (appMode !== 'DEBRIEF') return;
+  clearFlightInput();
   stopDebriefMap();
   debriefEl.hidden = true;
   resetMission();
@@ -1760,7 +1765,7 @@ renderHangar();
 function pauseSim() {
   if (appMode !== 'PLAY') return;
   appMode = 'PAUSED';
-  for (const k in keys) keys[k] = false;
+  clearFlightInput();
   audio.suspend();
   showMenu('pause');
 }
@@ -1797,9 +1802,24 @@ for (const el of [menuEl, hBadge]) el.addEventListener('mousedown', e => e.stopP
 // Free look (hold Alt / MMB): mouse turns the view, stick frozen, keyboard flight live (src/freelook.js).
 const freeLook = createFreeLook(THREE, { mouse, canvas: renderer.domElement,
   isEnabled: () => appMode === 'PLAY' && flightMode === 'FLY' && !uiModal, isFirstPerson: () => firstPerson });
+// WASD flight keyboard: physical codes only (AZERTY safe), preallocated state, no per-frame allocations.
+const kbAxis = { pitch: 0, roll: 0 }, kbHeld = new Set(), KB_RATE = 4.0, KB_BLEND_OUT = 0.35;
+let kbActive = false, kbHold = 0, invertPitch = false;
+try { invertPitch = localStorage.getItem('angelsZero_invertPitch') === '1'; } catch (e) { /* storage unavailable */ }
+function resetKB() {
+  kbHeld.clear(); kbAxis.pitch = kbAxis.roll = 0; kbHold = 0; kbActive = false;
+  keys.q = keys.e = keys.arrowup = keys.arrowdown = keys.ctrl = false;
+}
+function throttleDelta(dt) {
+  const up = !!(keys.shift || keys.arrowup), down = !!(keys.ctrl || keys.arrowdown);
+  return (up ? 1 : 0) - (down ? 1 : 0) ? ((up ? 1 : 0) - (down ? 1 : 0)) * 0.5 * dt : 0;
+}
 addEventListener('mousemove', e => {
   if (uiModal || appMode !== 'PLAY') return;
   if (freeLook.onMouseMove(e)) return;
+  // While WASD flies the jet the mouse-aim target stays centred on the nose, so
+  // releasing the keys blends back in without a stick snap.
+  if (kbActive) { mouse.nx = 0; mouse.ny = 0; return; }
   mouse.nx = (e.clientX / innerWidth) * 2 - 1;
   mouse.ny = -((e.clientY / innerHeight) * 2 - 1);
 });
@@ -1854,12 +1874,20 @@ addEventListener('keydown', e => {
   }
   if ((k === 'h' || k === 'escape') && !e.repeat) { pauseSim(); return; }
   if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) setView(!firstPerson); return; }
-  // (A / D are rudder only: the old double-tap AA / DD barrel-roll macro is gone; Q rolls.)
-  if (k === 'w') keys.w = true;
-  if (k === 's') keys.s = true;
-  if (k === 'a') keys.a = true;
-  if (k === 'd') keys.d = true;
-  if (k === 'shift') keys.shift = true;
+  // WASD fly the jet; Q/E are rudder, Shift/Ctrl and arrows set throttle.
+  if (['KeyW', 'KeyS', 'KeyA', 'KeyD', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
+  if (e.code === 'ControlLeft' || e.code === 'ControlRight') e.preventDefault();
+  if (!e.repeat && ['KeyW', 'KeyS', 'KeyA', 'KeyD'].includes(e.code)) kbHeld.add(e.code);
+  if (e.code === 'KeyW') keys.w = true;
+  if (e.code === 'KeyS') keys.s = true;
+  if (e.code === 'KeyA') keys.a = true;
+  if (e.code === 'KeyD') keys.d = true;
+  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.shift = true;
+  if (e.code === 'ControlLeft' || e.code === 'ControlRight') keys.ctrl = true;
+  if (e.code === 'ArrowUp') keys.arrowup = true;
+  if (e.code === 'ArrowDown') keys.arrowdown = true;
+  if (e.code === 'KeyQ') keys.q = true;
+  if (e.code === 'KeyE') keys.e = true;
   // F: Vulcan cannon -- except during an engine emergency, when it is the Halon fire
   // bottle (press) / windmill relight switch (hold 2.5 s). LMB always fires the gun.
   if (k === 'f') {
@@ -1887,18 +1915,24 @@ addEventListener('keydown', e => {
   if (k === 'c' && !e.repeat) combatSys.designateInSight();
   if (k === 'n' && !e.repeat) setNVG(!nvg.active);
   if (k === 'k' && !e.repeat) toggleMusic();
-  if (k === 'q' && !e.repeat) startRoll(-1);
-  if (k === 'e' && !e.repeat) triggerEject('manual');
+  if (e.code === 'KeyV' && !e.repeat) startRoll(-1);                 // barrel roll moved off Q (now yaw)
+  if (e.code === 'KeyP' && !e.repeat) triggerEject('manual');        // eject moved off E (now yaw)
   if (k === 'backspace' && flightMode === 'FLY') { e.preventDefault(); resetAircraft(); }
 });
 addEventListener('keyup', e => {
   if (freeLook.onKey(e, false)) return;
   const k = keyOf(e);
-  if (k === 'w') keys.w = false;
-  if (k === 's') keys.s = false;
-  if (k === 'a') keys.a = false;
-  if (k === 'd') keys.d = false;
-  if (k === 'shift') keys.shift = false;
+  kbHeld.delete(e.code);
+  if (e.code === 'KeyW') keys.w = false;
+  if (e.code === 'KeyS') keys.s = false;
+  if (e.code === 'KeyA') keys.a = false;
+  if (e.code === 'KeyD') keys.d = false;
+  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.shift = false;
+  if (e.code === 'ControlLeft' || e.code === 'ControlRight') keys.ctrl = false;
+  if (e.code === 'ArrowUp') keys.arrowup = false;
+  if (e.code === 'ArrowDown') keys.arrowdown = false;
+  if (e.code === 'KeyQ') keys.q = false;
+  if (e.code === 'KeyE') keys.e = false;
   if (k === 'f') { keys.fire = false; if (fKeyEngine) { fKeyEngine = false; combatSys.fireKey(false); } }
   if (k === 'm') { combatSys.pickleUp(); mcam.held = false; }
   if (k === 'b') {
@@ -1921,7 +1955,16 @@ addEventListener('mouseup', e => {
 });
 addEventListener('auxclick', e => { if (e.button === 1) e.preventDefault(); });
 addEventListener('contextmenu', e => e.preventDefault());
-addEventListener('blur', () => { for (const k in keys) keys[k] = false; mcam.held = false; freeLook.release(); });
+function clearFlightInput() {
+  for (const k in keys) keys[k] = false;
+  resetKB(); mcam.held = false; freeLook.release();
+}
+addEventListener('blur', clearFlightInput);
+addEventListener('visibilitychange', () => { if (document.hidden) clearFlightInput(); });
+addEventListener('beforeunload', e => {
+  if (appMode !== 'PLAY') return;
+  e.preventDefault(); e.returnValue = ''; return '';
+});
 
 const patchButton = document.getElementById('patchButton');
 const patchOverlay = document.getElementById('patchOverlay');
@@ -2057,8 +2100,7 @@ function updateCarrierOp(dt) {
     place(); state.onGround = true; state.throttle = 0.2; state.afterburner = 0;
     if (carrier.t >= 3) { carrier.phase = 'CAT'; carrier.t = 0; }
   } else if (carrier.phase === 'CAT') {
-    if (keys.w) state.throttle = Math.min(1, state.throttle + dt * 0.5);
-    if (keys.s) state.throttle = Math.max(0.15, state.throttle - dt * 0.5);
+    state.throttle = THREE.MathUtils.clamp(state.throttle + throttleDelta(dt), 0.15, 1);
     place(); state.onGround = true; state.afterburner = 0;
     if (state.throttle >= 0.95) {
       carrier.phase = 'LAUNCH'; carrier.t = 0;
@@ -2093,8 +2135,19 @@ function updatePhysics(dt) {
   const q = state.quaternion;
   // ---- PSM entry (air data from the last integrated velocity; one frame of lag is fine)
   const kts = Math.max(1, state.velocity.length()) * 1.94384;
-  const pitchIn0 = shaped(mouse.ny), rollIn0 = shaped(mouse.nx);
-  const highG0 = ((keys.w && keys.s) || keys.shift || (DEBUG && Q.has('highg'))) && Math.abs(pitchIn0) > 0.6;
+  // WASD keyboard axes: ramped, blended with the mouse over KB_BLEND_OUT after release.
+  if (kbHeld.size) kbHold = KB_BLEND_OUT; else kbHold = Math.max(0, kbHold - dt);
+  kbActive = kbHold > 0;
+  const mouseW = 1 - kbHold / KB_BLEND_OUT;
+  const tP = (kbHeld.has('KeyW') ? 1 : 0) - (kbHeld.has('KeyS') ? 1 : 0);
+  const tR = (kbHeld.has('KeyD') ? 1 : 0) - (kbHeld.has('KeyA') ? 1 : 0);
+  kbAxis.pitch += clamp(tP * (invertPitch ? -1 : 1) - kbAxis.pitch, -KB_RATE * dt, KB_RATE * dt);
+  kbAxis.roll += clamp(tR - kbAxis.roll, -KB_RATE * dt, KB_RATE * dt);
+  // While keys are held the mouse aim stays centred on the nose; no auto-leveler chase.
+  if (kbActive) { mouse.nx = 0; mouse.ny = 0; }
+  const pitchIn0 = shaped(mouse.ny) * mouseW - kbAxis.pitch;
+  const rollIn0 = shaped(mouse.nx) * mouseW + kbAxis.roll;
+  const highG0 = (keys.shift || (DEBUG && Q.has('highg'))) && Math.abs(pitchIn0) > 0.6;
   let psmActive = flightMode === 'FLY' && !state.onGround && kts < PSM_KT &&
     ((keys.b && keys.shift) || (highG0 && Math.abs(mouse.ny) > 0.8)) || (DEBUG && Q.has('psm'));
   state.psm = psmActive;
@@ -2496,14 +2549,13 @@ let brakeTap = null, overspeedCaution = false;
 const _wp = new THREE.Vector3(), _gq = new THREE.Quaternion(), _ge = new THREE.Euler(0, 0, 0, 'YXZ');
 function configDrag() { return GEAR_DCD * state.gear + BRAKE_DCD * state.ctl.airbrake; }
 function updateAirbrake(dt, mach) {
-  const want = keys.s || state.brakeLatch || state.brakeHeld || mach > 1.25 || (state.onGround && state.wheelBrake);
+  const want = state.brakeLatch || state.brakeHeld || mach > 1.25 || (state.onGround && state.wheelBrake);
   state.ctl.airbrake += ((want ? 1 : 0) - state.ctl.airbrake) * Math.min(1, 3 * dt);
 }
 function updateThrottle(dt) {
-  if (keys.w) state.throttle += 0.5 * dt;
-  if (keys.s) state.throttle -= 0.5 * dt;
-  state.throttle = THREE.MathUtils.clamp(state.throttle, 0, 1);
-  const abWanted = (keys.shift || Q.has('ab')) ? 1 : 0;
+  state.throttle = THREE.MathUtils.clamp(state.throttle + throttleDelta(dt), 0, 1);
+  // AB engages only when Shift is held and the throttle is already at the stop.
+  const abWanted = ((keys.shift && state.throttle >= 0.999) || Q.has('ab')) ? 1 : 0;
   state.afterburner += (abWanted - state.afterburner) * Math.min(1, 4 * dt);
   // Internal fuel: 13,455 lb; per-engine burn 700 pph idle + 4,300 x throttle + 17,000 x AB (cockpit gauges, FUEL LOW cautions).
   state.fuelFlow = (combat.engineOut ? 1 : 2) * (700 + 4300 * state.throttle + 17000 * state.afterburner);
@@ -2565,7 +2617,7 @@ function updateGround(dt) {
   const clamp = THREE.MathUtils.clamp, sstep = THREE.MathUtils.smoothstep, R = world.runway;
   const kts = state.groundSpeed * 1.94384;
   const pitchIn = shaped(mouse.ny), rudderIn = rudderInput(dt);   // same tap ramp for nose-wheel steering
-  state.wheelBrake = !!(keys.s || keys.b || state.brakeHeld || state.brakeLatch);
+  state.wheelBrake = !!(keys.ctrl || keys.b || state.brakeHeld || state.brakeLatch);
   updateAirbrake(dt, 0);
   updateThrottle(dt);
   // Nose-wheel steering: sharp while taxiing, a few deg/s at rotation speed.
@@ -3027,7 +3079,14 @@ audio.preload().then(st => console.log('[ANGELS_ZERO] sfx', JSON.stringify(st)))
 // Unlock / resume the AudioContext inside every user gesture (browsers keep it
 // suspended until one); the LAUNCH click still creates it as well.
 for (const ev of ['pointerdown', 'mousedown', 'keydown', 'touchstart']) addEventListener(ev, () => { audio.init(); audio.resume(); preloadRadioOnce(); }, { capture: true, passive: true });
+// Mouse wheel trims throttle in flight; modal / menu scrolling stays untouched.
+renderer.domElement.addEventListener('wheel', e => {
+  if (uiModal || appMode !== 'PLAY') return;      // modals and pause keep their own wheel guards
+  e.preventDefault();
+  state.throttle = THREE.MathUtils.clamp(state.throttle - Math.sign(e.deltaY) * 0.05, 0, 1);
+}, { passive: false });
 if (DEBUG) window.__dbgInput = (nx, ny, k = {}) => { mouse.nx = nx; mouse.ny = ny; Object.assign(keys, k); };   // debug: hold stick / keys
+if (DEBUG) window.__kbDebug = () => ({ held: [...kbHeld], pitch: kbAxis.pitch, roll: kbAxis.roll, hold: kbHold, active: kbActive, throttle: state.throttle });
 // debug: advance the sim + audio mix n frames (for checks in a throttled / hidden tab)
 // debug: one complete synchronous frame (sim + camera + render + HUD), GPU-finished, returns ms.
 // Used by the toggle-freeze benchmark: shader compiles / texture uploads show up here.
@@ -3531,6 +3590,14 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
         renderer.render(scene, camera); snap('restart' + i);
       }
     })();
+  }
+  if (DEBUG && Q.has('rudder')) {
+    const r = Q.get('rudder');
+    if (r.includes('a') || r.includes('q')) keys.q = true;
+    if (r.includes('d') || r.includes('e')) keys.e = true;
+  }
+  if (DEBUG && Q.has('kb')) {                        // hold WASD for headless control checks
+    for (const c of Q.get('kb').split(',')) { const code = 'Key' + c.trim().toUpperCase(); kbHeld.add(code); keys[c.trim().toLowerCase()] = true; }
   }
   if (DEBUG && Q.has('bogey')) combatSys.placeAhead(0, Number(Q.get('bogey')) || 1500);
   if (DEBUG && Q.has('msl')) { combatSys.update(0, 0, { playerActive: true, firing: false }); combatSys.fireMissile(); }

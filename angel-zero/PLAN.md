@@ -1573,6 +1573,11 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   - Return Line at z = 8000 with 21 pulsing cyan pylons; crossing resets stores/health on a 25 s cooldown, shows the rearm banner and an edge chevron to the nearest Return Line / carrier / AFB when winchester or badly damaged.
   - Chaff now breaks radar locks beyond 2.5 km and plays its own SFX; bandit launch callouts distinguish `RADAR MISSILE — CHAFF / NOTCH!` from `IR MISSILE — FLARES! BREAK!`, RWR task-force paints carry `g: 'RADAR'`. Keybind list refreshed. Every `?v=` tag bumped to s76a.
 
+- [x] **WASD flight controls** *(build `s77a`, `index.html`, `src/hud.js`, `src/patchnotes.js`)*
+  - `W/S` pitch (W nose-down, optional `angelsZero_invertPitch`) and `A/D` roll ramp at 4/s into the existing G-limited/PSM command path. Mouse aim is suppressed while keys are held and blends back over 0.35 s, with no snap-back. All input state is preallocated; no per-frame allocations.
+  - Throttle moved off W/S to Shift, Ctrl, arrow keys and a non-passive canvas wheel handler; AB engages only at full throttle with Shift. Rudder moved to Q/E, barrel roll to V and eject to P; blur, visibilitychange, pause, eject and menu transitions clear all held keys and axes. A `beforeunload` guard warns during PLAY (Ctrl+W can still close the tab).
+  - F1 sheet, Controls & Audio matrix, STANDBY hints and pause legend updated; `?kb=` / `?rudder=` debug hooks and `__kbDebug` added. Verified headless: W/S pitch to -0.999 elevator, A/D roll to -0.999 aileron, Q/E yaw, throttle keys/wheel/AB, key-release + blur reset, mouse aim restored after release, zero JS/WebGL errors. Every `?v=` tag bumped to s77a.
+
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.

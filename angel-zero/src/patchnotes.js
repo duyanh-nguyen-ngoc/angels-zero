@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.9', title: 'WASD FLIGHT CONTROLS', bullets: [
+    'W/S pitch and A/D roll on the keyboard, ramped and smoothly blended back to mouse aim on release.',
+    'Throttle moves to Shift/Ctrl, arrow keys or the mouse wheel; Q/E take over rudder and Shift at full throttle lights the afterburner.',
+    'Barrel roll is now V and eject is P. All key legends and release guards updated.'
+  ] },
   { version: 'v1.1.8', title: 'FORGIVING RECOVERY', bullets: [
     'Forgiving runway and carrier touchdowns, automatic gear deployment and a gentle ILS heading/bank assist on final.',
     'Return Line resupply at the southern map edge, with a 25 s cooldown and a HUD rearm banner.',
