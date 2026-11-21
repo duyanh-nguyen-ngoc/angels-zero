@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.12', title: 'CATAPULT LAUNCH OPENING', bullets: [
+    'Carrier missions now open locked on the bow catapult at 0 kt with the jet blast deflector raised, rolling deck steam and the Overlord arming call.',
+    'Hold full afterburner to slingshot from 0 to 175 kt off the bow with camera rattle and a steam eruption, then climb out with Warden-2 and Warden-3.',
+    'The soundtrack holds the catapult cue through the stroke and crossfades to the mission score the instant the wheels leave the deck.'
+  ] },
   { version: 'v1.1.11', title: 'MISSION SELECT + DUAL RTB + MISSION BGM', bullets: [
     'Five selectable missions with dedicated maps, spawns, targets and pooled actor resets on switch.',
     'BASE missions autobrake to a stop on AFB Runway; CARRIER missions offer an [L] cinematic autoland onto USS Enterprise.',

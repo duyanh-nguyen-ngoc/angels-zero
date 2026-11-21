@@ -677,32 +677,32 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s80a';
-import { createBlastFX } from './src/blastfx.js?v=s80a';
-import { createHUD } from './src/hud.js?v=s80a';
-import { createCockpit3D } from './src/cockpit3d.js?v=s80a';
-import { createCombat } from './src/combat.js?v=s80a';
-import { createEjection } from './src/eject.js?v=s80a';
-import { createAudio } from './src/audio.js?v=s80a';
-import { createRadio } from './src/radio.js?v=s80a';
-import { createProfile, LIVERIES, liveryById } from './src/profile.js?v=s80a';
-import { createLivery } from './src/livery.js?v=s80a';
-import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s80a';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s80a';
-import { createCanopyFX } from './src/canopy.js?v=s80a';
-import { createNVG } from './src/nvg.js?v=s80a';
-import { createWorld, WORLD } from './src/world.js?v=s80a';
-import { createSurfaces } from './src/surfaces.js?v=s80a';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s80a';
-import { createFreeLook } from './src/freelook.js?v=s80a';
-import { createCanopyGlass } from './src/canopyglass.js?v=s80a';
-import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s80a';
-import { SPW, SQUADRON, MODES, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode } from './src/loadout.js?v=s80a';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s80a';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO } from './src/radioScript.js?v=s80a';
-import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s80a';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s80a';
-import { MAPS } from './src/maps.js?v=s80a';
+import { createVFX } from './src/vfx.js?v=s81a';
+import { createBlastFX } from './src/blastfx.js?v=s81a';
+import { createHUD } from './src/hud.js?v=s81a';
+import { createCockpit3D } from './src/cockpit3d.js?v=s81a';
+import { createCombat, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s81a';
+import { createEjection } from './src/eject.js?v=s81a';
+import { createAudio } from './src/audio.js?v=s81a';
+import { createRadio } from './src/radio.js?v=s81a';
+import { createProfile, LIVERIES, liveryById } from './src/profile.js?v=s81a';
+import { createLivery } from './src/livery.js?v=s81a';
+import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s81a';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s81a';
+import { createCanopyFX } from './src/canopy.js?v=s81a';
+import { createNVG } from './src/nvg.js?v=s81a';
+import { createWorld, WORLD } from './src/world.js?v=s81a';
+import { createSurfaces } from './src/surfaces.js?v=s81a';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s81a';
+import { createFreeLook } from './src/freelook.js?v=s81a';
+import { createCanopyGlass } from './src/canopyglass.js?v=s81a';
+import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s81a';
+import { SPW, SQUADRON, MODES, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode } from './src/loadout.js?v=s81a';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s81a';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO } from './src/radioScript.js?v=s81a';
+import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s81a';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s81a';
+import { MAPS } from './src/maps.js?v=s81a';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -1082,6 +1082,8 @@ const wingmen = [
 for (const w of wingmen) {
   w.pos = new THREE.Vector3(); w.vel = new THREE.Vector3(); w.quat = new THREE.Quaternion();
   w.alive = true; w.friendly = true; w.cd = 7 + 4 * Math.random();
+  w.cat = { ph: 'NONE', t: 0, delay: 0, track: CAT_BOW[0], fired: false, blend: 4 };
+  w.catPos = new THREE.Vector3(); w.catVel = new THREE.Vector3(); w.catQ = new THREE.Quaternion();
 }
 const _ws = new THREE.Vector3();                   // wingman formation scratch
 // Reused contrail emitter descriptors (lead, WARDEN-2/3, CRIMSON-1/2): filled in place each frame.
@@ -1124,6 +1126,10 @@ const AUTOLAND_R = 3500, GS_DEG = 3.5, GS_GATES = 6;
 const AL_CAPTURE_T = 2.5, AL_VAPP = 70, AL_FLARE_H = 8, AL_FLARE_DEG = 2, AL_ROLLOUT_DECEL = 25;
 const DECK_HALF_W = 26, DECK_HALF_L = 175;
 const carrier = { phase: null, t: 0, v0: 0, wire: 0, cool: 0, pitDone: false };
+// Bow catapult launch opening: HOLD -> LAUNCH -> AIRBORNE. Preallocated scratch: no per-frame allocations.
+const cat = { ph: 'NONE', t: 0, arm: 0, trackIdx: 0, grace: 0, forceAB: false };
+const _catFwd = new THREE.Vector3(), _catPos = new THREE.Vector3(), _catQ = new THREE.Quaternion();
+const _catYaw = new THREE.Quaternion(), _catAxisY = new THREE.Vector3(0, 1, 0);
 const _lp = new THREE.Vector3(), _qInv = new THREE.Quaternion(), _cq = new THREE.Quaternion();
 const _carrierPos = new THREE.Vector3(), _carrierVel = new THREE.Vector3();
 const flyShake = { t: 0.35, k: 0 };                   // preallocated near-miss rattle state
@@ -1456,6 +1462,8 @@ function loadMissionScene(m) {
   combat.missionPhase = 1; combat.rtb = null; combat.done = false;
   state.autobrake = false;
   autoland.on = false; autoland.ph = '';
+  cat.ph = 'NONE'; cat.t = 0; cat.arm = 0; cat.grace = 0; cat.forceAB = false;
+  for (const w of wingmen) { w.cat.ph = 'NONE'; w.cat.t = 0; w.cat.delay = 0; }
 }
 const autoland = { on: false, ph: '', t: 0, q0: new THREE.Quaternion(), p0: new THREE.Vector3(), target: null };
 const _alDest = new THREE.Vector3(), _alDir = new THREE.Vector3(), _alQ = new THREE.Quaternion(), _alE = new THREE.Euler();
@@ -1514,20 +1522,135 @@ function updateAutoland(dt) {
   state.bank *= Math.exp(-2 * dt);
   state.onGround = false;
 }
+/* --------------------------------------------------------------------------
+   Bow catapult opening (CVN-ALLY "OVERLORD"). HOLD freezes the jet on the
+   track, LAUNCH slings it to 175 kt along 108 m, AIRBORNE hands control back.
+   All scratch vectors are module-level; no per-frame allocations.
+   -------------------------------------------------------------------------- */
+function catTrackWorld(track, out) {
+  const a = combat.ally;
+  return out.set(track.x, a.deckY + GEAR_H, track.z).applyQuaternion(a.g.quaternion).add(a.pos);
+}
+function catTrackQuat(track, out) {
+  const a = combat.ally;
+  _catYaw.setFromAxisAngle(_catAxisY, (track.yaw || 0) * D2R);
+  return out.copy(a.g.quaternion).multiply(_catYaw);
+}
+function catEnter() {
+  const a = combat.ally;
+  if (!a) return;
+  cat.ph = 'HOLD'; cat.t = 0; cat.arm = 0; cat.trackIdx = 0; cat.grace = 0;
+  state.onGround = true; state.gearDown = true; state.gear = 1; gearAutoLock = true;
+  state.speed = 0; state.velocity.copy(a.vel);
+  state.pitchRate = state.rollRate = state.yawRate = 0;
+  combatSys.updateJbd(a, true, 1);
+  vfx.catSteam.reset();
+  if (!radioEvent('CAT_ARMED')) onWing('Deck is clear. Catapult armed. Go when ready, Lead.', 'AWACS', '#00ff66', true);
+  for (let i = 0; i < wingmen.length; i++) {
+    const w = wingmen[i], wc = w.cat;
+    wc.ph = 'HOLD'; wc.t = 0; wc.delay = WING_CAT_DT[i]; wc.fired = false; wc.blend = 4;
+    wc.track = i === 0 ? CAT_BOW[1] : CAT_WAIST[0];
+  }
+}
+function catFire() {
+  cat.ph = 'LAUNCH'; cat.t = 0;
+  audio.catapult(); blastShake = Math.max(blastShake, 0.6);
+  flyShake.k = 0.35; flyShake.t = 0;
+}
+function catRelease() {
+  const a = combat.ally;
+  cat.ph = 'AIRBORNE'; cat.t = 0; cat.grace = 0.5;
+  _catFwd.set(0, 0, -1).applyQuaternion(state.quaternion);
+  state.velocity.copy(_catFwd).multiplyScalar(CAT_VEND).add(a.vel);
+  state.speed = CAT_VEND; state.onGround = false; gearAutoLock = false;
+  audio.bumpBgmDwell();                                  // switch to the mission track on this frame
+}
+function updateWingCat(dt, a) {
+  for (let i = 0; i < wingmen.length; i++) {
+    const w = wingmen[i], wc = w.cat, trk = wc.track;
+    if (wc.ph === 'NONE' || wc.ph === 'AIRBORNE') continue;
+    if (wc.ph === 'HOLD') {
+      wc.t += dt;
+      catTrackWorld(trk, w.catPos); catTrackQuat(trk, w.catQ); w.catVel.copy(a.vel);
+      _catFwd.set(0, 0, -1).applyQuaternion(w.catQ);
+      if (cat.ph !== 'NONE') vfx.catSteam.hold(w.catPos, _catFwd, dt * 0.5);
+      if (cat.ph === 'LAUNCH') { wc.ph = 'LAUNCH'; wc.t = -wc.delay; }
+    } else if (wc.ph === 'LAUNCH') {
+      wc.t += dt;
+      if (wc.t < 0) { catTrackWorld(trk, w.catPos); catTrackQuat(trk, w.catQ); w.catVel.copy(a.vel); continue; }
+      if (!wc.fired) { wc.fired = true; onSfx('catapult', w.catPos, 0.7); if (i === 0) radioEvent('ON_CATAPULT'); }
+      const t = Math.min(wc.t, CAT_T), rel = 0.5 * CAT_ACC * t * t, v = Math.min(CAT_VEND, CAT_ACC * t);
+      w.catPos.set(trk.x, a.deckY + GEAR_H, trk.z - rel).applyQuaternion(a.g.quaternion).add(a.pos);
+      catTrackQuat(trk, w.catQ);
+      if (t > CAT_T - 0.3) {
+        _catQ.setFromAxisAngle(AX_X, CAT_ROT_DEG * D2R * THREE.MathUtils.smoothstep((t - CAT_T + 0.3) / 0.3, 0, 1));
+        w.catQ.multiply(_catQ);
+      }
+      _catFwd.set(0, 0, -1).applyQuaternion(w.catQ);
+      w.catVel.copy(_catFwd).multiplyScalar(v).add(a.vel);
+      vfx.catSteam.stroke(w.catPos, _catFwd, v / CAT_VEND, dt);
+      if (wc.t >= CAT_T) {
+        wc.ph = 'AIRBORNE'; wc.blend = 0;
+        w.pos.copy(w.catPos); w.vel.copy(w.catVel); w.quat.copy(w.catQ);
+      }
+    }
+  }
+}
+function catTick(dt) {
+  const a = combat.ally;
+  if (!a) return;
+  updateThrottle(dt);                                    // throttle + afterburner stay live in HOLD
+  if (cat.forceAB) { state.throttle = 1; state.afterburner = 1; }
+  if (cat.grace > 0) cat.grace = Math.max(0, cat.grace - dt);
+  const trk = CAT_BOW[cat.trackIdx];
+  if (cat.ph === 'HOLD') {
+    cat.t += dt;
+    cat.arm = (state.throttle >= 1 && state.afterburner) ? cat.arm + dt : 0;
+    if (cat.arm >= CAT_ARM_T) catFire();
+    catTrackWorld(trk, state.position); catTrackQuat(trk, state.quaternion);
+    state.velocity.copy(a.vel); state.speed = 0; state.onGround = true;
+    state.pitchRate = state.rollRate = state.yawRate = 0;
+    state.gearDown = true; state.gear = 1; gearAutoLock = true;
+    _catFwd.set(0, 0, -1).applyQuaternion(state.quaternion);
+    vfx.catSteam.hold(state.position, _catFwd, dt);
+  } else if (cat.ph === 'LAUNCH') {
+    cat.t += dt;
+    const t = Math.min(cat.t, CAT_T), rel = 0.5 * CAT_ACC * t * t, v = Math.min(CAT_VEND, CAT_ACC * t);
+    _catPos.set(trk.x, a.deckY + GEAR_H, trk.z - rel).applyQuaternion(a.g.quaternion).add(a.pos);
+    state.position.copy(_catPos); catTrackQuat(trk, state.quaternion);
+    if (t > CAT_T - 0.3) {
+      _catQ.setFromAxisAngle(AX_X, CAT_ROT_DEG * D2R * THREE.MathUtils.smoothstep((t - CAT_T + 0.3) / 0.3, 0, 1));
+      state.quaternion.multiply(_catQ);
+    }
+    _catFwd.set(0, 0, -1).applyQuaternion(state.quaternion);
+    state.velocity.copy(_catFwd).multiplyScalar(v).add(a.vel);
+    state.speed = v; state.onGround = true;
+    state.pitchRate = state.rollRate = state.yawRate = 0;
+    blastShake = Math.max(blastShake, 0.6 * (1 - t / CAT_T));
+    flyShake.t = 0;
+    vfx.catSteam.stroke(state.position, _catFwd, v / CAT_VEND, dt);
+    if (cat.t >= CAT_T) catRelease();
+  }
+}
 function startSortie() {
   const m = mission();
   loadMissionScene(m);
-  radioReset(); preloadRadioOnce(); radioEvent('ON_TAKEOFF');
+  radioReset(); preloadRadioOnce();
+  if (m.launch === 'CATAPULT' || m.launchType === 'CARRIER') catEnter();
+  else radioEvent('ON_TAKEOFF');
   combat.styleCounts = {}; combat.comboPeak = 1;
   Object.assign(sortie, { active: true, t0: simTime, ace0: combat.aceDowns || 0, endAt: null, failReason: '' });
-  if (m.launch === 'CATAPULT' && combat.ally) {
+  if (cat.ph === 'HOLD') {
     const a = combat.ally;
-    _lp.set(8, a.deckLocalY * a.g.scale.x + GEAR_H, -a.len / 2 + 45).applyQuaternion(a.g.quaternion).add(a.pos);
-    state.position.copy(_lp); state.quaternion.copy(a.g.quaternion);
-    state.velocity.copy(a.vel); state.speed = a.vel.length();
-    state.gearDown = true; state.gear = 1; state.onGround = true; state.throttle = 1;
-    state.groundSpeed = state.speed; state.groundYaw = 0; state.groundPitch = 0;
-    carrier.phase = 'CAT'; carrier.t = 0; carrier.pitDone = true; combat.carrierPhase = 'CAT';
+    catTrackWorld(CAT_BOW[0], state.position); catTrackQuat(CAT_BOW[0], state.quaternion);
+    state.velocity.copy(a.vel); state.speed = 0; state.onGround = true;
+    state.throttle = 0.15; state.afterburner = 0;
+    state.groundSpeed = 0; state.groundYaw = 0; state.groundPitch = 0;
+    for (const w of wingmen) {
+      catTrackWorld(w.cat.track, w.pos); catTrackQuat(w.cat.track, w.quat);
+      w.vel.copy(a.vel); w.mesh && w.mesh.position.copy(w.pos);
+    }
+    combat.wingOrder = 'FORM';                           // silent reset: keep the AWACS arming call on the CRT
   } else if (m.launch === 'RUNWAY') {
     const R = world.runway;
     state.position.set(R.x, R.elev + GEAR_H, R.z1 - 120);
@@ -2218,34 +2341,9 @@ function updateCarrierOp(dt) {
     _lp.x += (8 - _lp.x) * Math.min(1, dt * 3);
     _lp.z += (targetZ - _lp.z) * Math.min(1, dt * 2);
     place(); state.onGround = true; state.throttle = 0.2; state.afterburner = 0;
-    if (carrier.t >= 3) { carrier.phase = 'CAT'; carrier.t = 0; }
-  } else if (carrier.phase === 'CAT') {
-    state.throttle = THREE.MathUtils.clamp(state.throttle + throttleDelta(dt), 0.15, 1);
-    place(); state.onGround = true; state.afterburner = 0;
-    if (state.throttle >= 0.95) {
-      carrier.phase = 'LAUNCH'; carrier.t = 0;
-      radioEvent('ON_CATAPULT');
-      onSfx('catapult'); blastShake = Math.max(blastShake, 0.5);
-      for (let i = 0; i < 26; i++) {
-        const localZ = -60 - i * 2.2, side = i % 2 ? 8 : -8;
-        _lp.set(side, ally.deckY - ally.pos.y + 1.2, localZ).applyQuaternion(qc).add(ally.pos);
-        combatSys.emitSmoke({ x: _lp.x, y: _lp.y, z: _lp.z, vx: (Math.random() - 0.5) * 3,
-          vy: 4 + Math.random() * 5, vz: (Math.random() - 0.5) * 3,
-          life: 1.6 + Math.random() * 0.8, s0: 3, s1: 18, r: 0.92, g: 0.92, b: 0.92, a: 0.6, drag: 1.2 });
-      }
-    }
-  } else if (carrier.phase === 'LAUNCH') {
-    const v = 85.0 * sstep(carrier.t, 0, 1.4);
-    _lp.z -= v * dt;
-    place();
-    _carrierVel.copy(fwd).multiplyScalar(v).add(ally.vel);
-    state.velocity.copy(_carrierVel);
-    if (Math.floor(carrier.t / 0.35) !== Math.floor((carrier.t - dt) / 0.35)) blastShake = Math.max(blastShake, 0.25);
-    if (carrier.t >= 1.4) {
-      state.velocity.copy(fwd).multiplyScalar(85).add(ally.vel);
-      state.onGround = false;
-      state.pitch = 3 * D2R;
-      carrier.phase = null; carrier.cool = 1.0; carrier.t = 0; combat.carrierPhase = null;
+    if (carrier.t >= 3) {                                // trap -> deck turnaround -> new bow catapult hold
+      carrier.phase = null; carrier.t = 0; carrier.cool = 0; combat.carrierPhase = null;
+      catEnter();
     }
   }
 }
@@ -2254,6 +2352,11 @@ function updatePhysics(dt) {
   const clamp = THREE.MathUtils.clamp, sstep = THREE.MathUtils.smoothstep;
   const q = state.quaternion;
   if (autoland.on) { updateAutoland(dt); return; }
+  if (combat.ally) {
+    updateWingCat(dt, combat.ally);                        // wingmen finish their stroke after lead releases
+    combatSys.updateJbd(combat.ally, cat.ph === 'HOLD' || cat.ph === 'LAUNCH', dt);
+  }
+  if (cat.ph === 'HOLD' || cat.ph === 'LAUNCH') { catTick(dt); return; }
   // ---- PSM entry (air data from the last integrated velocity; one frame of lag is fine)
   const kts = Math.max(1, state.velocity.length()) * 1.94384;
   // WASD keyboard axes: ramped, blended with the mouse over KB_BLEND_OUT after release.
@@ -2612,8 +2715,8 @@ function updatePhysics(dt) {
     if (state.gear > 0.05 && lowestWheelY() <= ground + 0.02) {
       const td = touchdownCheck(ground);
       if (td.ok) enterGround(td); else { if (DEBUG) console.log('[ANGELS_ZERO] touchdown rejected:', td.why); triggerEject('crash'); }
-    } else if (state.radalt <= 0.5) triggerEject('crash');
-    else if (combatSys.allyCollision() || world.collide(state.position, 3)) triggerEject('crash');   // carrier deck/hull + island, then static obstacles
+    } else if (cat.grace <= 0 && state.radalt <= 0.5) triggerEject('crash');
+    else if (cat.grace <= 0 && (combatSys.allyCollision() || world.collide(state.position, 3))) triggerEject('crash');   // carrier deck/hull + island, then static obstacles
   }
   // ---- post-stall maneuver detection: accumulators only, no per-frame allocation.
   man.t += dt;
@@ -2879,9 +2982,17 @@ function updateCameraAndVisuals(dt, now) {
   for (let i = 0; i < wingmen.length; i++) {
     const w = wingmen[i];
     if (!w.mesh) continue;
+    if (w.cat && w.cat.ph !== 'AIRBORNE' && w.cat.ph !== 'NONE') {
+      w.mesh.position.copy(w.catPos);
+      w.mesh.quaternion.copy(w.catQ);
+      w.mesh.visible = modelReady && flightMode === 'FLY' && w.alive;
+      continue;
+    }
     _ws.copy(w.off).applyQuaternion(q).add(state.position);
     if (!w.pos.lengthSq()) w.pos.copy(_ws);
-    w.pos.lerp(_ws, 1 - Math.exp(-dt * 2.2));
+    const blendK = w.cat && w.cat.blend < 4 ? 0.9 : 2.2;
+    if (w.cat && w.cat.blend < 4) w.cat.blend += dt;
+    w.pos.lerp(_ws, 1 - Math.exp(-dt * blendK));
     w.pos.y += 1.5 * Math.sin(now * 0.7 + i) * dt;
     w.quat.slerp(q, 1 - Math.exp(-dt * 3));
     w.vel.copy(state.velocity);
@@ -3249,8 +3360,8 @@ function getMusicCtx() {
   musicCtx.landed = !!C.done;
   musicCtx.rtb = !!(C.rtb && C.rtb.on);
   musicCtx.app = appMode;
-  musicCtx.onGround = !!state.onGround;
-  musicCtx.launched = !!sortie.active;
+  musicCtx.onGround = cat.ph === 'HOLD' || cat.ph === 'LAUNCH' || !!state.onGround;
+  musicCtx.launched = cat.ph === 'AIRBORNE' || (cat.ph === 'NONE' && !!sortie.active);
   musicCtx.inCombat = appMode === 'PLAY' && S.enemies.some(e => e.alive);
   musicCtx.dmg = Math.max(0, (100 - C.health) / 100);
   musicCtx.msl = C.missiles || 0;
@@ -3341,7 +3452,7 @@ function onSfx(type, pos, scale = 1) {
   else if (type === 'mfd') audio.mfdClick();
   else if (type === 'aceWarn') audio.aceWarning();
   else if (type === 'trap') audio.cableScreech();
-  else if (type === 'catapult') audio.catapult();
+  else if (type === 'catapult') audio.catapult(scale);
   else if (type === 'slowmo') audio.slowMo();
   else if (type === 'style') audio.styleChime(scale);
   else if (type === 'whoosh') audio.missileWhoosh();
@@ -3592,6 +3703,7 @@ const hud = createHUD(THREE, {
   getMissileCam: () => (mcam.active && mcam.m) ? { dist: mcam.m.target ? mcam.m.mesh.position.distanceTo(mcam.m.target.pos) : 0, k: mcam.k } : null,
   getStrikeTargets: () => combatSys.strikeTargets,
   getPrimary: () => combatSys.primaryTargets(),
+  getCat: () => cat, getCatArmT: () => CAT_ARM_T,
   getCombinerOutline: () => (cockpit.active ? cockpit.glassOutlineWorld() : null),
   missionClock: () => cockpit.missionClock(simTime)
 });
@@ -3818,6 +3930,7 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
     const mslAt = Q.has('mslat') ? Number(Q.get('mslat')) : -1, rollAt = Q.has('rollat') ? Number(Q.get('rollat')) : -1;
     const aceWingAt = Q.has('acewingat') ? Number(Q.get('acewingat')) : -1;
     const trapAt = Q.has('trapat') ? Number(Q.get('trapat')) : -1, catAt = Q.has('catat') ? Number(Q.get('catat')) : -1;
+    const catLaunchAt = Q.has('catlaunchat') ? Number(Q.get('catlaunchat')) : -1;
     const strikeKillAt = Q.has('strikekillat') ? Number(Q.get('strikekillat')) : -1;
     const debriefAt = Q.has('debriefat') ? Number(Q.get('debriefat')) : -1;
     const mphaseAt = Q.has('mphaseat') ? Q.get('mphaseat').split(',').map(Number) : null;
@@ -3892,14 +4005,12 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
         console.log('[ANGELS_ZERO] trap wire @', t1.toFixed(2), state.position.toArray());
       }
       if (catAt >= t0 && catAt < t1 && combat.ally) {
-        const a = combat.ally;
-        _lp.set(8, a.deckLocalY * a.g.scale.x + GEAR_H, -a.len / 2 + 45);
-        state.position.copy(_lp).applyQuaternion(a.g.quaternion).add(a.pos);
-        state.quaternion.copy(a.g.quaternion); state.velocity.copy(a.vel);
-        state.gearDown = true; state.gear = 1; state.onGround = true; state.throttle = 1;
-        carrier.phase = 'CAT'; carrier.t = 0; carrier.pitDone = true;
-        combat.carrierPhase = 'CAT';
-        console.log('[ANGELS_ZERO] catapult @', t1.toFixed(2));
+        catEnter();
+        console.log('[ANGELS_ZERO] catapult hold @', t1.toFixed(2), cat.ph);
+      }
+      if (catLaunchAt >= t0 && catLaunchAt < t1 && cat.ph === 'HOLD') {
+        cat.forceAB = true; state.throttle = 1; state.afterburner = 1;
+        console.log('[ANGELS_ZERO] cat launch input @', t1.toFixed(2));
       }
       if (Q.has('cloudon')) {                         // ?cloudon=t:i -> drop a debug cumulus onto bandit i's path at warp time t
         const [ct, ci] = Q.get('cloudon').split(':').map(Number), e = combatSys.enemies[ci];
@@ -3977,7 +4088,7 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
     console.log('[ANGELS_ZERO] combat', JSON.stringify(combatSys.stats()), 'psm', JSON.stringify({ active: state.psm, alphaPk: +(state.alphaPk * 57.2958).toFixed(1), spin: state.spin, lastMan: man.lastMan }), 'lock', combat.lockTarget ? combat.lockTarget.label : '-',
       'score', combat.score, 'kills', combat.kills, 'gun', combat.ammo, 'msl', combat.missiles, 'hp', combat.health, 'mode', flightMode,
       'eject', JSON.stringify(eject.info));
-    console.log('[ANGELS_ZERO] warp', Q.get('warp'), 's: speed', state.speed.toFixed(1), 'alt', state.position.y.toFixed(0),
+    console.log('[ANGELS_ZERO] warp', Q.get('warp'), 's: cat', cat.ph, 'catT', +cat.t.toFixed(2), 'wing', wingmen.map(w => w.cat.ph).join(','), 'speed', state.speed.toFixed(1), 'alt', state.position.y.toFixed(0),
       'G', state.gLoad.toFixed(2), 'hdg', state.heading.toFixed(0), 'mach', state.mach.toFixed(2), 'contrail pts', vfx.trailPoints, 'vapor', vfx.vaporLevel.toFixed(2), 'contrails', JSON.stringify(vfx.contrailStats),
       'cone', vfx.coneOpacity.toFixed(2), 'spray', vfx.sprayCount, 'mist', vfx.mist.toFixed(2), 'dead', combat.dead,
       'bank', (state.bank * 180 / Math.PI).toFixed(0), 'pitch', (state.pitch * 180 / Math.PI).toFixed(0), 'highG', !!state.highG,
@@ -4085,7 +4196,9 @@ if (DEBUG) {
     triggerEject, startRoll, stepSim, profile, toggleGear, placeOnRunway, get landingGear() { return landingGear; }, get livery() { return livery; }, endSortie, sortie, renderHangar, replaySortie, debriefToBriefing,
     get mode() { return flightMode; }, get enemies() { return combatSys.enemies; }, get model() { return model; }, get ready() { return modelReady; },
     get missionId() { return missionId; }, get mission() { return mission(); }, cycleMission, loadMissionScene, startSortie, launchSortie,
-    get autoland() { return autoland; }, autolandPrompt, engageAutoland, getMusicCtx, get debrief() { return !debriefEl.hidden; } };
+    get autoland() { return autoland; }, autolandPrompt, engageAutoland, getMusicCtx, get debrief() { return !debriefEl.hidden; },
+    get cat() { return cat; }, catEnter, catTick, catFire, get carrier() { return carrier; },
+    radioEvent, get radioEvents() { return Object.keys(RADIO_BY_EVENT); }, get radioCh() { return radioCh; } };
 }
 /* ============================================================================
    BORDERLESS STANDBY HANGAR MENU

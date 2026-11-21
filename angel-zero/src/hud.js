@@ -6,7 +6,7 @@
 // clipped to the 3D combiner glass. Square tactical radar (bottom-left), stores
 // list + F-15C silhouette with per-pylon AIM-9 reload icons (bottom-right),
 // open-corner target brackets, edge pointers, minimal top-left telemetry.
-import { SPW } from './loadout.js?v=s80a';
+import { SPW } from './loadout.js?v=s81a';
 
 export function createHUD(THREE, A) {
   const canvas = A.canvas;
@@ -1585,6 +1585,8 @@ export function createHUD(THREE, A) {
     }
   }
   function drawObjective(ctx) {
+    const cat = A.getCat && A.getCat();
+    if (cat && (cat.ph === 'HOLD' || cat.ph === 'LAUNCH')) return;
     ctx.save();
     ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
     if (C.mode === 'FURBALL') {
@@ -1668,6 +1670,23 @@ export function createHUD(THREE, A) {
 
   function drawPrompt(ctx) {
     if (C.dead) return;
+    const cat = A.getCat && A.getCat();
+    if (cat && cat.ph === 'HOLD') {
+      const txt = '[HOLD FULL AFTERBURNER / SHIFT] LAUNCH';
+      const cx = HW / 2, cy = HH - 96, w = 430, h = 44, armT = A.getCatArmT ? A.getCatArmT() : 0.35;
+      ctx.save();
+      ctx.font = f(14, true); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      noGlow(ctx); ctx.fillStyle = 'rgba(0, 14, 8, 0.72)';
+      ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
+      glow(ctx, AMBER, 6); ctx.lineWidth = 1.5; ctx.strokeStyle = AMBER; ctx.strokeRect(cx - w / 2, cy - h / 2, w, h);
+      labelText(ctx, txt, cx, cy - 8, AMBER, 5);
+      const k = Math.min(1, (cat.arm || 0) / armT);
+      noGlow(ctx); ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(cx - 170, cy + 8, 340, 5);
+      ctx.fillStyle = k >= 1 ? G : AMBER; ctx.fillRect(cx - 170, cy + 8, 340 * k, 5);
+      ctx.restore();
+      return;
+    }
+    if (cat && cat.ph === 'LAUNCH') { promptKey = ''; promptT = 0; return; }
     let txt = '', prio = 0;
     if (C.rtb && C.rtb.on && C.rtb.type === 'CARRIER' && C.ally && C.ally.pos) {
       const sternX = C.ally.pos.x - C.ally.fwd.x * C.ally.len / 2;

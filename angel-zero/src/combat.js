@@ -8,13 +8,22 @@
 // burning wrecks that splash, scoring, waves, lock-on and threat warnings.
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { DIFFICULTY_PRESETS } from './difficulty.js?v=s80a';
-import { SPW } from './loadout.js?v=s80a';
+import { DIFFICULTY_PRESETS } from './difficulty.js?v=s81a';
+import { SPW } from './loadout.js?v=s81a';
 
 const NM = 1852, FT = 0.3048, G0 = 9.81;
 // Allied CVN model: same 360 m deck as the procedural ship, re-anchored to the GLB.
 const CARRIER_GLB = 'assets/models/uss_enterprise.glb', CARRIER_RAW_LEN = 476.85, CARRIER_LEN = 360,
   CARRIER_SCALE = CARRIER_LEN / CARRIER_RAW_LEN, CARRIER_DECK_Y = 18, DECK_HALF_W = 26, DECK_HALF_L = 175;
+// Bow catapult opening: 0 -> 175 kt (90 m/s) in 2.4 s along a 108 m stroke.
+// CAT_ACC * CAT_T = CAT_VEND and 0.5 * CAT_ACC * CAT_T^2 = CAT_LEN.
+export const CAT_VEND = 90, CAT_T = 2.4, CAT_ACC = 37.5, CAT_LEN = 108;
+export const CAT_ARM_T = 0.35, CAT_ROT_DEG = 4, CAT_JBD_DZ = 14;
+const CAT_Z0 = -CARRIER_LEN / 2 + CAT_LEN;             // -72 m: stroke ends at the bow edge (-180 m)
+export const CAT_BOW = [{ x: -6, z: CAT_Z0, yaw: 0 }, { x: 6, z: CAT_Z0, yaw: 0 }];
+export const CAT_WAIST = [{ x: -22, z: CAT_Z0, yaw: -9 }];
+export const WING_CAT_DT = [0.6, 1.3];
+const CAT_JBD_UP = -55 * Math.PI / 180;
 // Strike campaign: four jammer bunkers, one-shot-per-sortie, altitude-gated EW field.
 const STRIKE_N = 4, STRIKE_HP_K = 2.2, STRIKE_SPLASH = 35, STRIKE_PTS = 1200, JAM_ALT = 500 * FT, JAM_R = 2800;
 const LOG_V = '#include <common>\n#include <logdepthbuf_pars_vertex>\n';
@@ -2069,6 +2078,7 @@ export function createCombat(THREE, env) {
     if (!ws || !ws.length) return;
     for (const w of ws) {
       if (!w || !w.alive) continue;
+      if (w.cat && w.cat.ph !== 'AIRBORNE') continue;    // no combat AI until the wingman clears the bow
       w.cd -= dt;
       if (C.wingOrder !== 'ENGAGE' || !env.isReady()) continue;
       let best = null, bestD = Infinity;
@@ -3055,7 +3065,31 @@ export function createCombat(THREE, env) {
     t.g.visible = C.carrierVisible !== false;
     const cp = C.missionCarrier;
     if (cp) { pos.set(cp.pos[0], cp.pos[1], cp.pos[2]); C.ally.startZ = cp.pos[2]; }
+    // Jet blast deflectors: one hinged plate per bow track, built once and never disposed.
+    const jbdGeo = new THREE.BoxGeometry(11, 0.25, 4.5);
+    jbdGeo.translate(0, 0, 2.25);                       // pivot on the deck-hinge edge
+    const jbdMat = new THREE.MeshStandardMaterial({ color: 0x4a4d51, roughness: 0.9, metalness: 0.15 });
+    C.ally.jbd = [];
+    for (const trk of [CAT_BOW[0], CAT_BOW[1], CAT_WAIST[0]]) {
+      const j = new THREE.Mesh(jbdGeo, jbdMat);
+      j.position.set(trk.x, C.ally.deckY - pos.y, trk.z + CAT_JBD_DZ);
+      j.rotation.x = 0;
+      t.g.add(j); C.ally.jbd.push(j);
+    }
+    mountJbd(C.ally);
     return C.ally;
+  }
+  // The GLB swap replaces the carrier group; re-parent the shared JBD plates to it.
+  function mountJbd(a) {
+    if (!a || !a.jbd) return;
+    const s = 1 / (a.g.scale.x || 1);
+    for (const j of a.jbd) { j.visible = true; j.scale.setScalar(s); j.position.y = a.deckY - a.pos.y; a.g.add(j); }
+  }
+  // Damped JBD fold. `up` raises the plate during the catapult hold / stroke.
+  function updateJbd(a, up, dt) {
+    if (!a || !a.jbd) return;
+    const target = up ? CAT_JBD_UP : 0;
+    for (const j of a.jbd) j.rotation.x += (target - j.rotation.x) * Math.min(1, dt * 4);
   }
   // Return Line: twenty-one cyan pylons every kilometre across the southern edge.
   // Always in the scene so gpuWarm compiles the material, opacity pulses in update().
@@ -3137,6 +3171,7 @@ export function createCombat(THREE, env) {
       a.g = model; a.pos = model.position;
       model.visible = C.carrierVisible !== false;
       scene.add(model);
+      mountJbd(a);
       placeAllyLights(model, CARRIER_SCALE, deckLocalY);
       if (old) {
         const mats = new Set();
@@ -4028,7 +4063,7 @@ export function createCombat(THREE, env) {
     get difficulty() { return C.difficulty; },
     fireSelected, pickleUp, dropBomb, setWeapon, toggleWeapon, dispenseFlares, dispenseChaff, fireAAM4, activateECM, setWingOrder, spawnAceFlight,
     repairEngines() { resetEngines(); return C.engState; },
-    get surface() { return surface; }, awardStyle, loadCarrier, allyCollision, CARRIER_GLB, RETURN_Z,
+    get surface() { return surface; }, awardStyle, loadCarrier, allyCollision, updateJbd, CARRIER_GLB, RETURN_Z,
     get strikeTargets() { return strikeTargets; },
     killStrikes() { for (const t of strikeTargets) if (t.alive) destroySurface(t); return strikeTargets.filter(t => t.alive).length; },
     get lockables() { return lockables(); },               // bandits + live task-force ships (HUD target boxes)

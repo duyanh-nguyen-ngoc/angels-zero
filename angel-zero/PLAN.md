@@ -1589,6 +1589,11 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   - Phase flow is now PRIMARY → RTB → DONE. BASE missions touch down on RWY 36 and autobrake to a stop; CARRIER missions re-anchor six glide-slope gates in the moving carrier frame and complete with a cinematic `[L]` ILS autoland (CAPTURE → GLIDE → FLARE → TRAP → ROLLOUT) onto USS Enterprise. `[L]` engages autoland only while the `[L] ENGAGE AUTOLAND` prompt is visible, otherwise it still toggles gear. `?debug&rtbat=s` and `?debug&autolandat=s` force each ending.
   - `resolveScenario()` now resolves from the mission registry plus dynamic state priority in one preallocated context: debrief/landed → RTB → hangar → catapult → last stand → storm/night (only for `wxOverride` missions) → `bgmScenario`. MIN_DWELL is 4 s except debrief/hangar/RTB. CANYON_RUN, NAVAL_BATTLE and ACE_DUEL keep their own score under `tod=NIGHT`. Every `?v=` tag bumped to s80a.
 
+- [x] **Catapult launch opening** *(build `s81a`, `src/combat.js`, `src/vfx.js`, `src/audio.js`, `src/hud.js`, `src/radioScript.js`, `index.html`)*
+  - Carrier sorties open in `CATAPULT_HOLD` on the bow track at 0 kt with the JBD raised and deck steam rolling; the existing `cat_awacs_01` clip fires as `CAT_ARMED` (CRT-text fallback). The HUD shows `[HOLD FULL AFTERBURNER / SHIFT] LAUNCH` with an arm bar while the objective card stays hidden.
+  - Full throttle + afterburner held for 0.35 s fires `CATAPULT_LAUNCH`: a 108 m / 2.4 s stroke to 90 m/s (175 kt) with a 4 deg nose-up rotation, camera rattle, pooled steam eruption and no deck collision snags. `catRelease` returns control after a 0.5 s grace, lowers the JBD and bumps the BGM dwell so `02_catapult` crossfades to the mission score on that frame.
+  - WARDEN-2 (bow) and WARDEN-3 (waist) hold on their own tracks, launch 0.6 s and 1.3 s behind lead with their own steam and a 0.7-gain catapult call, then climb out and blend into echelon over 4 s. Old v0.9.6 `carrier.phase` cat path is gone; `?catat` routes through `cat`, with `?debug&catlaunchat=s` forcing the launch input. Every `?v=` tag bumped to s81a.
+
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.
@@ -1672,7 +1677,7 @@ MSL / UGB (briefing, radio call, CCIP reload cue, stores list).
 · `ab` · `highg` · `alt=m` · `spd=m/s` · `at=x,y,z,hdg|airbase|canyon|bridgeA|
 bridgeB|volcano|wind|harbor` · `overview[=h]` · `tod=NAME&az=deg` ·
 `todto=NAME:t` · `rolls=n` · `nvg` / `nvgat=s` · `camat=x,y,z` ·
-`bogey=m` · `six=m` · `place=i:az:el:dist,...` · `cat=s` · `killat=s` ·
+`bogey=m` · `six=m` · `place=i:az:el:dist,...` · `cat=s` · `catat=s` · `catlaunchat=s` · `killat=s` ·
 `mslat=s` · `bshot=soft|full` · `wpn=bomb` · `bomb=n` · `bombat=s` ·
 `flare` / `flareat=s` · `breakat=m` · `cloudpos=az:el:dist` · `cloudon=t:i` ·
 `look=yaw,pitch` (hold free look, degrees) · `lookoff=s` (release at s) ·

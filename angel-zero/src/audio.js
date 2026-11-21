@@ -720,15 +720,15 @@ export function createAudio() {
     th.connect(tg).connect(N.body); th.start(t); th.stop(t + 0.34);
   }
   // Steam catapult: low-pass noise sweep + 55 Hz bed.
-  function catapult() {
+  function catapult(k = 1) {
     if (!ready) return;
-    const t = ctx.currentTime;
+    const t = ctx.currentTime, vol = Math.min(1, Math.max(0, k));
     const n = ctx.createBufferSource(); n.buffer = N.white;
     const lp = filt('lowpass', 900, 0.8); lp.frequency.setValueAtTime(900, t); lp.frequency.exponentialRampToValueAtTime(300, t + 1.4);
-    const g = gain(0); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.5, t + 0.05); g.gain.exponentialRampToValueAtTime(0.001, t + 1.4);
+    const g = gain(0); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.5 * vol, t + 0.05); g.gain.exponentialRampToValueAtTime(0.001, t + 1.4);
     n.connect(lp).connect(g).connect(N.body); n.start(t, Math.random()); n.stop(t + 1.45);
     const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 55;
-    const og = gain(0); og.gain.setValueAtTime(0, t); og.gain.linearRampToValueAtTime(0.22, t + 0.1); og.gain.exponentialRampToValueAtTime(0.001, t + 1.4);
+    const og = gain(0); og.gain.setValueAtTime(0, t); og.gain.linearRampToValueAtTime(0.22 * vol, t + 0.1); og.gain.exponentialRampToValueAtTime(0.001, t + 1.4);
     o.connect(og).connect(N.body); o.start(t); o.stop(t + 1.45);
   }
 
@@ -1473,7 +1473,7 @@ export function createAudio() {
   }
 
   return {
-    init, resume, suspend, update, updateMusic, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, setBgmPause, setBgmForce: v => { bgmForce = v || ''; }, radioSquelch, preloadRadio, playRadio, stopRadio, preload,
+    init, resume, suspend, update, updateMusic, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, setBgmPause, bumpBgmDwell() { dwell = MIN_DWELL; }, setBgmForce: v => { bgmForce = v || ''; }, radioSquelch, preloadRadio, playRadio, stopRadio, preload,
     toggleMusic() { setMusic(!musicOn); return musicOn; },
     get musicOn() { return musicOn; }, setMusicVolume,
     get musicVolume() { return musicVol; },

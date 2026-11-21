@@ -21,7 +21,7 @@ export const RADIO_SPEAKERS = {
 };
 
 export const RADIO_EVENTS = [
-  'ON_TAKEOFF', 'ON_CATAPULT', 'ON_MACH_1', 'ON_NEAR_MISS', 'ON_PHASE_2_CANYON', 'ON_CANYON_LOW',
+  'ON_TAKEOFF', 'CAT_ARMED', 'ON_CATAPULT', 'ON_MACH_1', 'ON_NEAR_MISS', 'ON_PHASE_2_CANYON', 'ON_CANYON_LOW',
   'ON_ACE_INBOUND', 'ON_ACE_KILL', 'ON_CARRIER_TRAP', 'ON_WINGMAN_ENGAGE', 'ON_LOW_HP', 'ON_MISSION_CLEAR'
 ];
 
@@ -36,8 +36,10 @@ export const RADIO_LINES = [
   L('takeoff_w3_01',      'WARDEN-3',  'ON_TAKEOFF', 3, 'Warden Three airborne. Let\'s keep this one boring, shall we?'),
   L('takeoff_awacs_02',   'AWACS',     'ON_TAKEOFF', 2, 'Bandits massing over the strait. Climb to angels twenty and hold formation.'),
 
+  // CAT_ARMED (bow catapult hold) — existing AWACS clip, no new file.
+  L('cat_awacs_01',       'AWACS',     'CAT_ARMED', 2, 'Deck is clear. Catapult armed. Go when ready, Lead.'),
   // ON_CATAPULT
-  L('cat_awacs_01',       'AWACS',     'ON_CATAPULT', 2, 'Deck is clear. Catapult armed. Go when ready, Lead.'),
+
   L('cat_w2_01',          'WARDEN-2',  'ON_CATAPULT', 3, 'Whoa, what a shot! Off the deck and climbing!'),
   L('cat_w3_01',          'WARDEN-3',  'ON_CATAPULT', 3, 'Nice clean stroke. The deck crew earned their coffee.'),
 

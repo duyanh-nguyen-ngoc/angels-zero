@@ -522,6 +522,88 @@ export function createVFX(THREE, env) {
     spMat.uniforms.uScale.value = renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
   }
 
+  /* ------------------------------------------- bow catapult steam (pooled) */
+  // 48 deck-roll puffs (HOLD) + 64 stroke plumes (LAUNCH) share one Points draw.
+  const STEAM_LOW_N = 48, STEAM_PLUME_N = 64, STEAM_N = STEAM_LOW_N + STEAM_PLUME_N;
+  const csGeo = new THREE.BufferGeometry();
+  const csPos = new Float32Array(STEAM_N * 3), csAlpha = new Float32Array(STEAM_N), csSize = new Float32Array(STEAM_N);
+  csGeo.setAttribute('position', new THREE.BufferAttribute(csPos, 3).setUsage(THREE.DynamicDrawUsage));
+  csGeo.setAttribute('aAlpha', new THREE.BufferAttribute(csAlpha, 1).setUsage(THREE.DynamicDrawUsage));
+  csGeo.setAttribute('aSize', new THREE.BufferAttribute(csSize, 1).setUsage(THREE.DynamicDrawUsage));
+  const csMat = new THREE.ShaderMaterial({
+    uniforms: { uScale: { value: 400 } },
+    vertexShader: LOG_V + `
+      attribute float aAlpha; attribute float aSize; uniform float uScale; varying float vA;
+      void main() { vA = aAlpha; vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = aSize * uScale / max(1.0, -mv.z);
+        gl_Position = projectionMatrix * mv;
+        #include <logdepthbuf_vertex>
+      }`,
+    fragmentShader: LOG_F + `
+      varying float vA;
+      void main() {
+        #include <logdepthbuf_fragment>
+        float d = length(gl_PointCoord - 0.5) * 2.0;
+        float a = vA * pow(clamp(1.0 - d, 0.0, 1.0), 1.6);
+        if (a < 0.004) discard;
+        gl_FragColor = vec4(0.90, 0.95, 1.0, a);
+      }`,
+    transparent: true, depthWrite: false
+  });
+  const catSteamPoints = new THREE.Points(csGeo, csMat);
+  catSteamPoints.frustumCulled = false; catSteamPoints.visible = false;
+  scene.add(catSteamPoints);
+  const steamP = Array.from({ length: STEAM_N }, () => ({ on: false, age: 0, life: 1, s0: 1, s1: 8,
+    x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0 }));
+  let steamLowNext = 0, steamPlumeNext = STEAM_LOW_N, steamLowAcc = 0;
+  const catSteam = {
+    hold(start, fwd, dt) {
+      steamLowAcc += 24 * dt;
+      const lx = -fwd.z, lz = fwd.x;
+      while (steamLowAcc >= 1) {
+        steamLowAcc -= 1;
+        const q = steamP[steamLowNext]; steamLowNext = (steamLowNext + 1) % STEAM_LOW_N;
+        const side = steamLowNext & 1 ? 1 : -1, lat = (2 + rand() * 7) * side;
+        q.on = true; q.age = 0; q.life = 2.5; q.s0 = 1.6 + rand(); q.s1 = 7 + rand() * 4;
+        q.x = start.x + lx * lat; q.z = start.z + lz * lat; q.y = start.y + 0.3;
+        q.vx = lx * 1.5 * side + (rand() - 0.5); q.vz = lz * 1.5 * side + (rand() - 0.5); q.vy = 1.2 + rand();
+      }
+    },
+    stroke(pos, fwd, k, dt) {
+      for (let i = 0; i < 6; i++) {
+        const q = steamP[steamPlumeNext]; steamPlumeNext = steamPlumeNext + 1 >= STEAM_N ? STEAM_LOW_N : steamPlumeNext + 1;
+        const lat = (rand() - 0.5) * 9;
+        q.on = true; q.age = 0; q.life = 1.2; q.s0 = 2 + 2 * k; q.s1 = 9 + 7 * k;
+        q.x = pos.x - fwd.z * lat; q.z = pos.z + fwd.x * lat; q.y = pos.y + 0.4 + rand() * 1.2;
+        q.vx = -fwd.x * 25 + (rand() - 0.5) * 4; q.vz = -fwd.z * 25 + (rand() - 0.5) * 4; q.vy = 4 + rand() * 3;
+      }
+    },
+    update(dt) {
+      let live = 0;
+      for (let i = 0; i < STEAM_N; i++) {
+        const q = steamP[i];
+        if (!q.on) { csAlpha[i] = 0; continue; }
+        q.age += dt;
+        if (q.age >= q.life) { q.on = false; csAlpha[i] = 0; continue; }
+        q.x += q.vx * dt; q.y += q.vy * dt; q.z += q.vz * dt;
+        const drag = 1 - 1.1 * dt; q.vx *= drag; q.vz *= drag; q.vy *= 1 - 0.5 * dt;
+        const f = q.age / q.life;
+        csPos[i * 3] = q.x; csPos[i * 3 + 1] = q.y; csPos[i * 3 + 2] = q.z;
+        csAlpha[i] = Math.pow(1 - f, 1.25) * Math.min(1, q.age * 8) * 0.7;
+        csSize[i] = q.s0 + (q.s1 - q.s0) * f;
+        live++;
+      }
+      catSteamPoints.visible = live > 0;
+      if (!live) return;
+      csGeo.attributes.position.needsUpdate = true;
+      csGeo.attributes.aAlpha.needsUpdate = true;
+      csGeo.attributes.aSize.needsUpdate = true;
+      csMat.uniforms.uScale.value = renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+    },
+    reset() { for (let i = 0; i < STEAM_N; i++) steamP[i].on = false; steamLowAcc = 0; catSteamPoints.visible = false; },
+    get count() { let n = 0; for (let i = 0; i < STEAM_N; i++) if (steamP[i].on) n++; return n; }
+  };
+
   /* ------------- hybrid clouds: raymarched sky deck + lit 3-D cumulus banks */
   // (1) SKY DECK 9,000-13,000 ft: a camera-centred back-faced dome whose
   //     fragment shader raymarches a 2.5-D volumetric cumulus layer (20 steps,
@@ -1148,6 +1230,7 @@ export function createVFX(THREE, env) {
     updateSpeedLines(s, dt, opts.firstPerson);
     updateMachCone(dt, s.mach, opts.firstPerson);
     updateSpray(s, dt, opts.visible);
+    catSteam.update(dt);
     updateWind(dt);
     updateMist(dt);
     sortClouds(dt, false);
@@ -1156,7 +1239,8 @@ export function createVFX(THREE, env) {
   return {
     attachPlume,
     setWingtips(l, r) { tipL.copy(l); tipR.copy(r); buildVapor(); },
-    clearTrails() { for (const r of ribbons) r.clear(); for (const r of contrails) r.clear(); contrailStats.active = contrailStats.live = 0; vaporTarget = lexTarget = 0; for (const q of sprayP) q.on = false; vaporLevel = 0; },
+    clearTrails() { for (const r of ribbons) r.clear(); for (const r of contrails) r.clear(); contrailStats.active = contrailStats.live = 0; vaporTarget = lexTarget = 0; for (const q of sprayP) q.on = false; vaporLevel = 0; catSteam.reset(); },
+    catSteam,
     updateContrails,
     get contrailStats() { return contrailStats; },
     update,
