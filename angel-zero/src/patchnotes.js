@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.6', title: 'DOGFIGHT ORCHESTRA', bullets: [
+    'New soundtrack performed by a recorded orchestra: galloping strings, trumpets, horns, trombones, timpani and cymbals at 164 BPM.',
+    'The music follows the mission: Air Superiority, a tense Canyon Run, a Crimson Ace boss theme and a noble Carrier RTB that resolves to D major.',
+    'Patrol flying thins the brass and drums; bandits inside 3 km bring in the full orchestra. Samples: VSCO 2 Community Edition (CC0).'
+  ] },
   { version: 'v1.1.5', title: 'MEMORY OPTIMIZATION', bullets: [
     'Carrier GLB recompressed with meshopt + WebP at 1.9 MB: 56% less GPU texture memory, deck markings stay crisp.',
     'Renderer DPR and shadow maps stay capped, and sortie restarts reuse every texture, geometry and render target.',

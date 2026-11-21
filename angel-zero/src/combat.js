@@ -8,8 +8,8 @@
 // burning wrecks that splash, scoring, waves, lock-on and threat warnings.
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { DIFFICULTY_PRESETS } from './difficulty.js?v=s73a';
-import { SPW } from './loadout.js?v=s73a';
+import { DIFFICULTY_PRESETS } from './difficulty.js?v=s74a';
+import { SPW } from './loadout.js?v=s74a';
 
 const NM = 1852, FT = 0.3048, G0 = 9.81;
 // Allied CVN model: same 360 m deck as the procedural ship, re-anchored to the GLB.
