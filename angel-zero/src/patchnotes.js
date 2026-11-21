@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.8', title: 'FORGIVING RECOVERY', bullets: [
+    'Forgiving runway and carrier touchdowns, automatic gear deployment and a gentle ILS heading/bank assist on final.',
+    'Return Line resupply at the southern map edge, with a 25 s cooldown and a HUD rearm banner.',
+    'Chaff SFX and radar/IR launch callouts; radar trackers beyond 2.5 km now break on chaff.'
+  ] },
   { version: 'v1.1.7', title: 'SOUNDTRACK ROLLBACK', bullets: [
     'The sampled orchestra from v1.1.6 is withdrawn while a new score is produced.',
     'The original adaptive synth soundtrack is back: patrol, furball and ace layers, with the K toggle and music-volume slider unchanged.'

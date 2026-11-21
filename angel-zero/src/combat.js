@@ -8,8 +8,8 @@
 // burning wrecks that splash, scoring, waves, lock-on and threat warnings.
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { DIFFICULTY_PRESETS } from './difficulty.js?v=s75a';
-import { SPW } from './loadout.js?v=s75a';
+import { DIFFICULTY_PRESETS } from './difficulty.js?v=s76a';
+import { SPW } from './loadout.js?v=s76a';
 
 const NM = 1852, FT = 0.3048, G0 = 9.81;
 // Allied CVN model: same 360 m deck as the procedural ship, re-anchored to the GLB.
@@ -1247,12 +1247,13 @@ export function createCombat(THREE, env) {
         // Full lock: aggressive, accurate shot.
         if (launch(e.pos.clone().addScaledVector(e.fwd, 6), e.quat, e.vel, target, true, BANDIT_FULL, undefined, dist > 2500 ? 'RADAR' : 'IR')) {
           e.mslCD = e.aceFlight ? 9 + rand() * 4 : e.ace ? 8 + rand() * 4 : 14 + rand() * 8;
-          say(e.ace ? `${e.label} — FOX TWO! BREAK! BREAK!` : 'MISSILE LAUNCH — BREAK! BREAK!', 2.2, '#ff4d3d');
+          say(e.ace ? `${e.label} — FOX ${dist > 2500 ? 'THREE' : 'TWO'}! BREAK! BREAK!`
+            : dist > 2500 ? 'RADAR MISSILE — CHAFF / NOTCH!' : 'IR MISSILE — FLARES! BREAK!', 2.2, '#ff4d3d');
         }
       } else if (e.bLock >= B_SOFT && e.bLock < 1 && e.mslCD <= 0 && dist > 900 && rand() < 0.12 * dt) {
         // Impatient bandit fires early on a soft lock: weak, easily defeated shot.
         if (launch(e.pos.clone().addScaledVector(e.fwd, 6), e.quat, e.vel, target, true, BANDIT_SOFT, undefined, dist > 2500 ? 'RADAR' : 'IR')) {
-          e.mslCD = 12 + rand() * 6; say('MISSILE LAUNCH — LOW-QUALITY TRACK', 1.8, '#ffbf3f');
+          e.mslCD = 12 + rand() * 6; say(`${dist > 2500 ? 'RADAR' : 'IR'} MISSILE — LOW-QUALITY TRACK`, 1.8, '#ffbf3f');
         }
       }
     }
@@ -2002,7 +2003,7 @@ export function createCombat(THREE, env) {
         if (!t.alive) continue;
         const d = t.pos.distanceTo(S.position);
         if (d > 9000 || occluded(t.pos, S.position)) continue;
-        list.push({ b: relBearing(t.pos), kind: 'paint', d, id: t.id });
+        list.push({ b: relBearing(t.pos), kind: 'paint', d, id: t.id, g: 'RADAR' });
         level = Math.max(level, 1);
       }
     }
@@ -2561,8 +2562,10 @@ export function createCombat(THREE, env) {
         vx: cloud.vel.x + (rand() - 0.5) * 14, vy: cloud.vel.y + (rand() - 0.5) * 8, vz: cloud.vel.z + (rand() - 0.5) * 14,
         life: 0.45 + rand() * 0.75, s0: 0.7, s1: 0.25, r: 0.7, g: 0.7, b: 0.7, a: 0.7, drag: 3 });
     }
+    // Radar trackers beyond 2.5 km lose the picture (mirrors the flare rule close in).
+    for (const e of enemies) if (e.alive && e.pos.distanceTo(S.position) > 2500) e.bLock = 0;
     say('CHAFF — ' + C.chaff + ' LEFT', 1.0, '#d8e4ee');
-    if (env.onSfx) env.onSfx('flare', S.position, 1);
+    if (env.onSfx) env.onSfx('chaff', S.position, 1);
     return true;
   }
   function updateChaff(dt) {
@@ -3013,6 +3016,8 @@ export function createCombat(THREE, env) {
   }
   // Friendly CVN: same carrier geometry, but never a surface target / emitter.
   // Procedural ship is the default; the detailed GLB swaps in asynchronously later.
+  const RETURN_Z = 8000, RETURN_CD = 25;
+  let lastReturn = -1e9, prevReturnZ = S.position.z;
   const _allyScratch = new THREE.Vector3(), _lpLocal = new THREE.Vector3(), _allyInvQ = new THREE.Quaternion();
   const _allyBox = new THREE.Box3(), _allySize = new THREE.Vector3(), _allyCenter = new THREE.Vector3();
   const _ray = new THREE.Raycaster(), _rayDown = new THREE.Vector3(0, -1, 0), _rayOrigin = new THREE.Vector3();
@@ -3044,6 +3049,17 @@ export function createCombat(THREE, env) {
     C.ally = { g: t.g, fwd, pos, vel, deckY: t.aimH, len: t.len, beam: t.beam,
       spin: t.spin, startZ, ciws: t.ciws, sams: t.sams, glb: false, island: null, yaw0: 0, deckLocalY: t.aimH };
     return C.ally;
+  }
+  // Return Line: twenty-one cyan pylons every kilometre across the southern edge.
+  // Always in the scene so gpuWarm compiles the material, opacity pulses in update().
+  const returnGeo = new THREE.CylinderGeometry(3, 3, 650, 8, 1, true);
+  const returnMat = new THREE.MeshBasicMaterial({ color: 0x2fd8ff, transparent: true, opacity: 0.3, depthWrite: false, fog: true });
+  const beacons = new THREE.InstancedMesh(returnGeo, returnMat, 21);
+  beacons.frustumCulled = false; beacons.visible = true; scene.add(beacons);
+  {
+    const m = new THREE.Matrix4(), p = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3(1, 1, 1);
+    for (let i = 0; i < 21; i++) { p.set(-10000 + i * 1000, 325, RETURN_Z); m.compose(p, q, s); beacons.setMatrixAt(i, m); }
+    beacons.instanceMatrix.needsUpdate = true;
   }
   // Async GLB swap: env.loadCarrier() fetches + precompiles the scene; everything
   // below (measurement, orientation, light placement) runs once, never per frame.
@@ -3152,7 +3168,7 @@ export function createCombat(THREE, env) {
     new THREE.BoxGeometry(1.5, 30, 1.5).translate(30, 0, 0)
   ]);
   const gateMat = new THREE.MeshBasicMaterial({ color: 0x00cc55, transparent: true, opacity: 0, depthWrite: false, toneMapped: true });
-  const gates = new THREE.InstancedMesh(gateGeo, gateMat, 3);
+  const gates = new THREE.InstancedMesh(gateGeo, gateMat, 6);
   gates.frustumCulled = false; gates.visible = true; scene.add(gates);
   const _gateM = new THREE.Matrix4(), _gateP = new THREE.Vector3(), _gateQ = new THREE.Quaternion(),
     _gateE = new THREE.Euler(), _gateS = new THREE.Vector3(1, 1, 1);
@@ -3171,8 +3187,19 @@ export function createCombat(THREE, env) {
         _gateM.compose(_gateP, _gateQ, _gateS);
         gates.setMatrixAt(i, _gateM);
       }
-      gates.instanceMatrix.needsUpdate = true;
     }
+    // RWY 36 final: north-bound gates 400/800/1200 m beyond R.z1, 3 degree slope.
+    const R = env.runway;
+    if (R) {
+      for (let i = 0; i < 3; i++) {
+        const d = 400 * (i + 1);
+        _gateP.set(R.x, R.elev + d * Math.tan(3 * D2R), R.z1 + d);
+        _gateE.set(0, 0, 0); _gateQ.setFromEuler(_gateE);
+        _gateM.compose(_gateP, _gateQ, _gateS);
+        gates.setMatrixAt(3 + i, _gateM);
+      }
+    }
+    gates.instanceMatrix.needsUpdate = true;
     const target = show ? 0.32 + 0.08 * Math.sin(now * 3) : 0;
     gateMat.opacity += (target - gateMat.opacity) * Math.min(1, dt * 3);
   }
@@ -3729,6 +3756,8 @@ export function createCombat(THREE, env) {
       reload: 0, missileReload: 0, gunHeat: 0, gunOverheat: false, engineOut: null, engineFire: false, hydraulic: false, health: 100, hitFlash: 0 });
     resetEngines();                                         // both F100s back to HEALTHY
     director.reset();
+    C.score += 1000;
+    pushEvent('BONUS', 'TRAP BONUS', 1000, '#ffd45a');
   }
   function resetPlayer() {
     aceFlightDone = false;
@@ -3813,6 +3842,18 @@ export function createCombat(THREE, env) {
     const playerActive = opts.playerActive;
     updateAlly(dt);
     updateGates(dt, now);
+    // Return Line: crossing south-to-north resupplies the jet; 25 s re-arm cooldown.
+    returnMat.opacity = 0.22 + 0.16 * (0.5 + 0.5 * Math.sin(now * 2.2));
+    if (!S.onGround && prevReturnZ < RETURN_Z && S.position.z >= RETURN_Z && styleClock - lastReturn > RETURN_CD) {
+      lastReturn = styleClock;
+      rearm('msl'); rearm('bomb');
+      C.aam4 = AAM4_MAX; C.qaam = QAAM_MAX; C.flares = FLR_MAX; C.chaff = C.chaffMax;
+      C.health += 0.5 * (100 - C.health);
+      C.returnT = performance.now();
+      if (env.debug) console.log('[ANGELS_ZERO] RETURN REARM');
+      if (env.onWing) env.onWing('Overlord: Warden One, rearmed and patched. Get back in the fight.', 'AWACS');
+    }
+    prevReturnZ = S.position.z;
     updateSafe(playerActive);
     C.hitFlash = Math.max(0, C.hitFlash - dt);
     C.missileWarning = Math.max(0, C.missileWarning - dt);
@@ -3939,6 +3980,8 @@ export function createCombat(THREE, env) {
     setMissionPhase(p) { setMissionPhase(p); return C.missionPhase; },
     primaryTargets,
     onCarrierTrap() {
+      C.health = 100; C.score += 1000;
+      pushEvent('BONUS', 'TRAP BONUS', 1000, '#ffd45a');
       if (C.mode === 'FURBALL' || C.missionPhase !== 4) return;
       C.missionPhase = 5; C.obj = { done: 1, total: 1 }; C.mpT = performance.now();
       if (env.onMissionComplete) env.onMissionComplete();
@@ -3946,7 +3989,7 @@ export function createCombat(THREE, env) {
     get difficulty() { return C.difficulty; },
     fireSelected, pickleUp, dropBomb, setWeapon, toggleWeapon, dispenseFlares, dispenseChaff, fireAAM4, activateECM, setWingOrder, spawnAceFlight,
     repairEngines() { resetEngines(); return C.engState; },
-    get surface() { return surface; }, awardStyle, loadCarrier, allyCollision, CARRIER_GLB,
+    get surface() { return surface; }, awardStyle, loadCarrier, allyCollision, CARRIER_GLB, RETURN_Z,
     get strikeTargets() { return strikeTargets; },
     killStrikes() { for (const t of strikeTargets) if (t.alive) destroySurface(t); return strikeTargets.filter(t => t.alive).length; },
     get lockables() { return lockables(); },               // bandits + live task-force ships (HUD target boxes)
@@ -4058,6 +4101,7 @@ export function createCombat(THREE, env) {
           kills: C.furballKills || 0, nextAce: FURBALL_ACE_EVERY - (C.furballKills || 0) % FURBALL_ACE_EVERY },
         loadout: { spw: C.spw, wpn: C.weapon, qaam: C.qaam, livery: env.getLivery ? env.getLivery() : null },
         psm: { active: !!S.psm, alphaPk: +(S.alphaPk * D2R).toFixed(1), spin: S.spin || 0, lastMan: C.manLabel || '—' },
+        assist: S.assist || 0, returnT: C.returnT || 0,
         strike: { alive: strikeAlive() ? strikeTargets.filter(t => t.alive).length : 0,
           labels: strikeTargets.filter(t => t.alive).map(t => t.label).join(','),
           jamming: +(C.jamming || 0).toFixed(2), sectorLow: !!C.sectorLow },

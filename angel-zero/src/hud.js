@@ -6,7 +6,7 @@
 // clipped to the 3D combiner glass. Square tactical radar (bottom-left), stores
 // list + F-15C silhouette with per-pylon AIM-9 reload icons (bottom-right),
 // open-corner target brackets, edge pointers, minimal top-left telemetry.
-import { SPW } from './loadout.js?v=s75a';
+import { SPW } from './loadout.js?v=s76a';
 
 export function createHUD(THREE, A) {
   const canvas = A.canvas;
@@ -31,7 +31,7 @@ export function createHUD(THREE, A) {
   const inertia = { x: 0, y: 0, vx: 0, vy: 0 };
   const fpvDir = new THREE.Vector3(0, 0, -1);
   const _wv = new THREE.Vector3();
-  const _ov = new THREE.Vector3();
+  const _ov = new THREE.Vector3(), _rl = new THREE.Vector3();
   const MP_LABELS = ['', 'SWEEP BANDITS', 'CANYON/BRIDGE STRIKE', 'CRIMSON ACE INTERCEPT', 'CARRIER RTB'];
   const P_RDR = '[ Z ] CHAFF / NOTCH 90°', P_IR = '[ X ] FLARES', P_RTB = '[ CARRIER RTB ]',
     P_MCAM = '[ HOLD FIRE ] MISSILE CAM', P_WING = '[ G ] WINGMEN ENGAGE';
@@ -1173,6 +1173,7 @@ export function createHUD(THREE, A) {
     if (C.flares !== undefined) rows.push(['  FLR', String(C.flares), C.flares > 0 ? G : AMBER]);
     if (C.chaff !== undefined) rows.push(['  CHF', String(C.chaff), C.chaff > 0 ? G : AMBER]);
     if (C.jamming > 0) rows.push(['  JAM', 'ON', AMBER]);
+    if (S.assist) rows.push(['  ILS ASSIST', 'ON', '#5fe8ff']);
     rows.push(['  DMG', Math.round(100 - C.health) + '%', C.health < 45 ? WARN : C.health < 75 ? AMBER : G]);
     if (S.gear > 0 || S.gearDown) rows.push(['  GEAR', S.gear >= 1 ? (S.onGround ? 'WOW' : 'DOWN') : 'TRANSIT', S.gear >= 1 ? G : AMBER]);
     if (S.ctl && S.ctl.airbrake > 0.05) rows.push(['  S/BRK', `${Math.round(48 * S.ctl.airbrake)}°`, S.brakeLatch ? GB : G]);
@@ -1364,6 +1365,9 @@ export function createHUD(THREE, A) {
     if (C.aceFlightT && now - C.aceFlightT < 3000) {
       const age = now - C.aceFlightT;
       drawBanner(ctx, cx, upperY + 36, '[ WARNING // ACE SQUADRON INBOUND ]', WARN, 380, pulseAlpha(200) * (1 - age / 3000));
+    }
+    if (C.returnT && now - C.returnT < 2200) {
+      drawBanner(ctx, cx, upperY, '[ RETURN LINE // REARMED & PATCHED ]', '#5fe8ff', 380, 1 - (now - C.returnT) / 2200);
     }
     if (C.manT && now - C.manT < 1800) {
       const age = now - C.manT;
@@ -1628,6 +1632,34 @@ export function createHUD(THREE, A) {
         ctx.moveTo(px + 5, py + 10); ctx.lineTo(px, py + 10); ctx.lineTo(px, py + 5);
         ctx.moveTo(px - 5, py - 10); ctx.lineTo(px, py - 10); ctx.lineTo(px, py - 5);
         ctx.stroke(); ctx.restore();
+      }
+    }
+    // Recovery chevron: nearest of Return Line / carrier / AFB when winchester or damaged.
+    const dmg = 100 - C.health;
+    const spw0 = SPW[C.spw] || SPW['4AAM'];
+    const ammo0 = spw0.wpn === 'AAM4' ? C.aam4 : spw0.wpn === 'BOMB' ? C.bombs : C.qaam;
+    if ((C.missiles === 0 && ammo0 === 0) || dmg > 50) {
+      const col = dmg > 50 ? AMBER : '#5fe8ff';
+      let best = null, bd = Infinity;
+      const consider = (p, name) => {
+        const d = Math.hypot(p.x - S.position.x, p.y - S.position.y, p.z - S.position.z);
+        if (d < bd) { bd = d; _rl.copy(p); best = name; }
+      };
+      const rz = A.returnZ || 8000;
+      _ov.set(Math.max(-10000, Math.min(10000, Math.round(S.position.x / 1000) * 1000)), 325, rz); consider(_ov, 'RETURN LINE');
+      if (C.ally && C.ally.pos) consider(C.ally.pos, 'CARRIER');
+      if (A.runway) { _ov.set(A.runway.x, A.runway.elev, A.runway.z1); consider(_ov, 'AFB'); }
+      if (best) {
+        _ov.copy(_rl).project(cam);
+        const ox = _ov.x, oy = _ov.y, oz = _ov.z;
+        let x = ox, y = oy, z = oz;
+        if (z > 1) { x = -x; y = -y; }
+        const a = Math.atan2(y, x), ex = HW / 2 + Math.cos(a) * HW * 0.42, ey = HH / 2 - Math.sin(a) * HH * 0.38;
+        ctx.save(); ctx.translate(ex, ey); ctx.rotate(-a);
+        glow(ctx, col, 5); ctx.fillStyle = col; ctx.beginPath();
+        ctx.moveTo(12, 0); ctx.lineTo(-7, -7); ctx.lineTo(-7, 7); ctx.closePath(); ctx.fill(); ctx.restore();
+        ctx.font = f(11, true); ctx.textAlign = 'center';
+        labelText(ctx, `${best} ▼ ${(bd / 1000).toFixed(1)} KM`, ex - Math.cos(a) * 20, ey + Math.sin(a) * 20, col, 3);
       }
     }
     ctx.restore();

@@ -411,6 +411,27 @@ export function createAudio() {
     s.connect(hp).connect(sg).connect(cockpitLP); s.start(t, Math.random()); s.stop(t + 2.3); lfo.start(t); lfo.stop(t + 2.3);
   }
 
+  // Chaff cartridge: two low pops plus a long, chopped foil hiss in the VHF band.
+  function chaff(intensity = 1) {
+    if (!ready) return;
+    const t = ctx.currentTime, k = Math.min(1, Math.max(0.1, intensity));
+    for (let i = 0; i < 2; i++) {
+      const at = t + i * 0.06;
+      const o = ctx.createOscillator(); o.type = 'sine';
+      o.frequency.setValueAtTime(190, at); o.frequency.exponentialRampToValueAtTime(58, at + 0.09);
+      const g = gain(0); g.gain.setValueAtTime(0.4 * k, at); g.gain.exponentialRampToValueAtTime(0.001, at + 0.09);
+      o.connect(g).connect(cockpitLP); o.start(at); o.stop(at + 0.1);
+    }
+    const s = ctx.createBufferSource(); s.buffer = N.white;
+    const sg = gain(0); sg.gain.setValueAtTime(0, t); sg.gain.linearRampToValueAtTime(0.14 * k, t + 0.02);
+    sg.gain.exponentialRampToValueAtTime(0.001, t + 1.4);
+    const lfo = ctx.createOscillator(); lfo.type = 'square';
+    lfo.frequency.setValueAtTime(31, t); lfo.frequency.linearRampToValueAtTime(17, t + 1.4);
+    const depth = gain(0.07 * k); lfo.connect(depth).connect(sg.gain);
+    s.connect(filt('bandpass', 6500, 0.7)).connect(sg).connect(cockpitLP);
+    s.start(t, Math.random()); s.stop(t + 1.45); lfo.start(t); lfo.stop(t + 1.45);
+  }
+
   // Lock-drop chirp: a short descending two-tone when cloud cover breaks a lock.
   function lockDrop() {
     if (!ready) return;
@@ -1334,7 +1355,7 @@ export function createAudio() {
   }
 
   return {
-    init, resume, suspend, update, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, hit, bombRelease, bombDetonation, flare, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, radioSquelch, preloadRadio, playRadio, stopRadio, preload,
+    init, resume, suspend, update, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, radioSquelch, preloadRadio, playRadio, stopRadio, preload,
     toggleMusic() { setMusic(!musicOn); return musicOn; },
     get musicOn() { return musicOn; }, setMusicVolume,
     get musicVolume() { return musicVol; },

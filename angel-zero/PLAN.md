@@ -1567,6 +1567,11 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
     plateau at 175. Zero JS/WebGL errors; frame cost 3.6-5.4 ms (median 4.5 ms).
     Every `?v=` tag bumped to s73a.
 - [x] **Soundtrack rollback** *(build `s75a`)*: v1.1.6 (`ae0fa0d`, a sampled VSCO 2 CE orchestra) was reverted; a new score is being produced in Google Flow Music. The s32a adaptive synth soundtrack is restored unchanged. Every `?v=` tag bumped to s75a so no cached s74a module pairs with the restored page.
+- [x] **Forgiving recovery** *(build `s76a`, `index.html`, `src/combat.js`, `src/audio.js`, `src/hud.js`)*
+  - Trap/touchdown limits now 220 kt / -12 deg pitch / 20 deg bank / 9 m/s sink / 22 m lateral; firm legal touchdowns clamp the sink and seat the jet on the surface with no impact damage. `TRAP BONUS` (+1000, full health) fires on carrier traps and runway pit stops.
+  - Auto-gear every 0.25 s inside 1600 m / 128 m AGL / 250 kt, re-armed past 3000 m or 300 kt; a manual `L` press locks it out. A light-stick ILS corridor (45 m lateral, 1300 m along, 70 m vertical) eases heading, cancels bank and sets `state.assist` for the `ILS ASSIST` HUD row. Runway 36 joins the carrier in six approach-gate instances.
+  - Return Line at z = 8000 with 21 pulsing cyan pylons; crossing resets stores/health on a 25 s cooldown, shows the rearm banner and an edge chevron to the nearest Return Line / carrier / AFB when winchester or badly damaged.
+  - Chaff now breaks radar locks beyond 2.5 km and plays its own SFX; bandit launch callouts distinguish `RADAR MISSILE — CHAFF / NOTCH!` from `IR MISSILE — FLARES! BREAK!`, RWR task-force paints carry `g: 'RADAR'`. Keybind list refreshed. Every `?v=` tag bumped to s76a.
 
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
