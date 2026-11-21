@@ -674,30 +674,30 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s74a';
-import { createBlastFX } from './src/blastfx.js?v=s74a';
-import { createHUD } from './src/hud.js?v=s74a';
-import { createCockpit3D } from './src/cockpit3d.js?v=s74a';
-import { createCombat } from './src/combat.js?v=s74a';
-import { createEjection } from './src/eject.js?v=s74a';
-import { createAudio } from './src/audio.js?v=s74a';
-import { createRadio } from './src/radio.js?v=s74a';
-import { createProfile, LIVERIES, liveryById } from './src/profile.js?v=s74a';
-import { createLivery } from './src/livery.js?v=s74a';
-import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s74a';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s74a';
-import { createCanopyFX } from './src/canopy.js?v=s74a';
-import { createNVG } from './src/nvg.js?v=s74a';
-import { createWorld, WORLD } from './src/world.js?v=s74a';
-import { createSurfaces } from './src/surfaces.js?v=s74a';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s74a';
-import { createFreeLook } from './src/freelook.js?v=s74a';
-import { createCanopyGlass } from './src/canopyglass.js?v=s74a';
-import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s74a';
-import { SPW, SQUADRON, MODES, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode } from './src/loadout.js?v=s74a';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s74a';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO } from './src/radioScript.js?v=s74a';
-import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s74a';
+import { createVFX } from './src/vfx.js?v=s75a';
+import { createBlastFX } from './src/blastfx.js?v=s75a';
+import { createHUD } from './src/hud.js?v=s75a';
+import { createCockpit3D } from './src/cockpit3d.js?v=s75a';
+import { createCombat } from './src/combat.js?v=s75a';
+import { createEjection } from './src/eject.js?v=s75a';
+import { createAudio } from './src/audio.js?v=s75a';
+import { createRadio } from './src/radio.js?v=s75a';
+import { createProfile, LIVERIES, liveryById } from './src/profile.js?v=s75a';
+import { createLivery } from './src/livery.js?v=s75a';
+import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s75a';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s75a';
+import { createCanopyFX } from './src/canopy.js?v=s75a';
+import { createNVG } from './src/nvg.js?v=s75a';
+import { createWorld, WORLD } from './src/world.js?v=s75a';
+import { createSurfaces } from './src/surfaces.js?v=s75a';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s75a';
+import { createFreeLook } from './src/freelook.js?v=s75a';
+import { createCanopyGlass } from './src/canopyglass.js?v=s75a';
+import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s75a';
+import { SPW, SQUADRON, MODES, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode } from './src/loadout.js?v=s75a';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s75a';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO } from './src/radioScript.js?v=s75a';
+import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s75a';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -3010,7 +3010,7 @@ function updateAudio() {
     gLoad: flightMode === 'FLY' ? state.gLoad : 1, aoa: flightMode === 'FLY' ? state.alpha * 180 / Math.PI : 0,
     gStrain: flightMode === 'FLY' ? state.gStrain : 0, glocWarn: flightMode === 'FLY' && state.gStrain > 0.72,
     kts: state.speed * 1.94384,
-    music: { airborne: flightMode === 'FLY', banditDist: nearestBandit(), combo: combat.comboMult || 1, ace: !!(combat.ace && combat.ace.alive), mission: combat.missionPhase || 1 },
+    music: { airborne: flightMode === 'FLY', banditDist: nearestBandit(), combo: combat.comboMult || 1, ace: !!(combat.ace && combat.ace.alive) },
     airbrake: flightMode === 'FLY' ? state.ctl.airbrake : 0, gear: flightMode === 'FLY' ? state.gear : 0,
     rolling: flightMode === 'FLY' && state.onGround ? state.groundSpeed : 0
   });

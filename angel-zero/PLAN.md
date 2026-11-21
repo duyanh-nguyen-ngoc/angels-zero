@@ -1566,30 +1566,7 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
     on every sample; heap 64 -> 77 -> 79 -> 74 -> 76 MB (no growth), programs
     plateau at 175. Zero JS/WebGL errors; frame cost 3.6-5.4 ms (median 4.5 ms).
     Every `?v=` tag bumped to s73a.
-- [x] **Dogfight orchestra soundtrack** *(build `s74a`, new `src/orchestra.js`, `src/audio.js`,
-  `index.html`, new `assets/music/orch/`, new `scripts/build_orch.py`)*: replaces the s32a synth sequencer.
-  - 224 recorded clips from Versilian VSCO 2 Community Edition (CC0), 3.2 MB of MP3s. `build_orch.py` keeps the loudest velocity and one or two round-robins per note, then trims each clip to its attack, cuts and fades it to the length the score uses, and normalises it per section; it also writes `manifest.json` with MIDI pitches.
-  - Decoded at 32 kHz mono the first time music is needed: 261 s of audio, about 33 MB of RAM.
-  - 164 BPM D minor, four 4-bar phases switched on the next bar.
-    - 1 AIR SUPERIORITY: 3-3-3-3-2-2 galloping spiccato, trumpets plus violins on the theme, brass and tuba hits, snare.
-    - 2 CANYON RUN: low cello ostinato with a half-step neighbour, violin tremolo, timpani heartbeat, horn swells.
-    - 3 CRIMSON ACE: trumpets in octaves, six brass hits per bar, violin runs, snare, timpani and bass-drum barrage.
-    - 4 CARRIER RTB: cello melody, violins an octave up, glockenspiel, horn chords, timpani roll into D major.
-  - Phase follows `combat.missionPhase` (5 maps to RTB). The Ace alive or combo >= x3.0 forces phase 3.
-  - Intensity (same 3 km / x1.5 rules and 4 s hold as before): 0 on deck fades out; 1 patrol mixes strings 0.85, brass 0.5, percussion 0.3; 2 and up is the full orchestra.
-  - Chain: sections -> buses + 2.6 s convolution hall -> per-phase gain -> 7 kHz +3 dB shelf -> glue compressor -> limiter -> trim, then the existing musicGain (K x music level) -> radio duck -> musicBus 0.62 -> master -> G-LOC tunnel.
-  - Mastered against the bitwize-music 7-point QC (video-game-music preset: -14 LUFS, -1 dBTP).
-    - Phases measure -13.9 / -14.5 / -13.1 / -14.8 LUFS with at least 3 dB of true-peak headroom; phase, mono and clipping all pass.
-    - The spectral check warns that highs are low (0.1-0.3 % above 6 kHz). That is the natural sound of the recorded string sections, so it was left as is.
-  - The source has no horn samples between C4 and D5, so trumpets and cellos carry the melodies and horns play chords and swells.
-  - `__audioDebug().music` reports load state, samples, phase, pending phase, level, section buses, bar and step, notes and lookahead.
-  - Verified:
-    - The module was driven in the page through patrol, furball, the Ace (switch lands on the next bar), RTB and level 0 (fade-out).
-    - In flight it runs at level 1 with all 224 samples loaded.
-    - Scheduler cost is 0.14 ms average per 25 ms tick (about 5.7 ms per second) in the boss phase.
-    - Zero JS/WebGL errors in the headless `warp=3` run.
-    - No 60 FPS sample was taken: the in-app pane was not rendering animation frames.
-  - Every `?v=` tag bumped to s74a.
+- [x] **Soundtrack rollback** *(build `s75a`)*: v1.1.6 (`ae0fa0d`, a sampled VSCO 2 CE orchestra) was reverted; a new score is being produced in Google Flow Music. The s32a adaptive synth soundtrack is restored unchanged. Every `?v=` tag bumped to s75a so no cached s74a module pairs with the restored page.
 
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /

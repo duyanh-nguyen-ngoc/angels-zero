@@ -8,9 +8,6 @@
 // decodeAudioData and modulated live; any file that fails to load falls back
 // to the procedural layers below. A master "hearing tunnel" low-pass sweeps
 // 12 kHz -> 550 Hz as the pilot approaches G-LOC.
-// The adaptive soundtrack is a sampled orchestra (src/orchestra.js, assets/music/orch/).
-
-import { createOrchestra } from './orchestra.js?v=s74a';
 
 export function createAudio() {
   let ctx = null, master = null, cockpitLP = null, ready = false;
@@ -856,46 +853,162 @@ export function createAudio() {
     duckWorld(0.5, 0.3); o.start(t); o.stop(t + 0.7);
   }
 
-  /* ------------------------------------------- adaptive orchestral soundtrack */
-  // src/orchestra.js: 164 BPM D-minor dogfight orchestra built from recorded VSCO 2 CE (CC0)
-  // samples, lookahead-scheduled on ctx.currentTime (25 ms timer + every audio frame), so
-  // frame-rate dips never move a note. Phase follows the mission (1 sweep, 2 canyon strike,
-  // 3 Crimson Ace, 4/5 RTB); the Ace alive or combo >= x3.0 forces the boss phase. Intensity:
-  // 0 off (on deck), 1 patrol (thin brass / percussion), 2 furball (bandit < 3 km or x1.5), 3 climax.
-  // Bus: orchestra -> musicGain (K toggle x music level) -> musicDuck (radio) -> musicBus -> master
-  // -> G-LOC tunnel, so the music muffles with blackout and follows master volume / mute.
-  let musicOn = true, mLvl = 0, mLvlT = 0, mNear = false, mIdleT = 0, mPhase = 1, mTimer = null, orch = null;
+  /* ------------------------------------------- adaptive 3-layer soundtrack */
+  // 136 BPM D-minor synth-rock step sequencer, lookahead-scheduled on
+  // ctx.currentTime (a 25 ms timer + every audio frame top up 0.3 s of notes),
+  // so frame-rate dips never move a note. 8-bar loop Dm | Dm | Bb | Bb | C | C | A | A
+  // (bass D2 -> Bb1 -> C2 -> A1).
+  //   L1 PATROL  pulsing sub-bass, dark filtered stereo pad, sonar ping (airborne)
+  //   L2 FURBALL kick + gated snare, driving 16th saw arp bass (bandit < 3 km or x1.5)
+  //   L3 ACE     detuned brass lead w/ vibrato + dotted-8th delay, 16th hats (x3.0 or Ace alive)
+  // Layers crossfade with setTargetAtTime(0.6 s). Bus: layers -> musicGain (K
+  // toggle) -> musicDuck (radio -35 %) -> master -> G-LOC tunnel, so the music
+  // muffles with blackout and follows master volume / mute.
+  const BPM = 136, STEP = 60 / BPM / 4, LOOK = 0.3, LOOP = 128;
+  const ROOTS = [38, 34, 36, 33];                                        // D2 Bb1 C2 A1 (per 2 bars)
+  const CHORDS = [[50, 53, 57], [46, 50, 53], [48, 52, 55], [45, 49, 52]]; // Dm Bb C A (pad voicings)
+  const ARP = [0, 0, 12, 0, 7, 0, 12, 0, 0, 0, 12, 0, 7, 12, 10, 7];
+  const MELODY = [                                                       // [step, midi, len] per bar
+    [[0, 69, 4], [4, 74, 4], [8, 76, 2], [10, 77, 2], [12, 76, 2], [14, 74, 2]],
+    [[0, 81, 8], [8, 79, 4], [12, 77, 4]],
+    [[0, 74, 4], [4, 77, 4], [8, 82, 6], [14, 81, 2]],
+    [[0, 79, 8], [8, 77, 4], [12, 74, 4]],
+    [[0, 76, 4], [4, 79, 4], [8, 84, 6], [14, 82, 2]],
+    [[0, 81, 8], [8, 79, 4], [12, 76, 4]],
+    [[0, 73, 4], [4, 76, 4], [8, 81, 4], [12, 85, 4]],
+    [[0, 86, 12], [12, 85, 4]]
+  ];
+  const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+  let musicOn = true, mStep = 0, mNext = 0, mLvl = 0, mLvlT = 0, mNear = false, mIdleT = 0, mNotes = 0, mTimer = null;
   function initMusic() {
     N.music = gain(musicOn ? musicVol : 0);                              // K toggle × music-bed level
     N.musicDuck = gain(1);                                               // radio transmission duck
     N.musicBus = gain(0.62);                                             // sits under engine / gun / RWR
     N.music.connect(N.musicDuck).connect(N.musicBus).connect(master);
-    orch = createOrchestra(ctx, N.music);
-    if (musicOn) orch.load();                                            // ~3.2 MB, decoded once; silent until ready
+    N.mDelay = ctx.createDelay(1); N.mDelay.delayTime.value = STEP * 3;  // dotted 8th
+    N.mFb = gain(0.34); N.mWet = gain(0.3); N.mDelayLP = filt('lowpass', 3200, 0.5);
+    N.mDelay.connect(N.mDelayLP).connect(N.mFb).connect(N.mDelay); N.mDelayLP.connect(N.mWet).connect(N.music);
+    N.mL = [gain(0), gain(0), gain(0)];
+    for (const g of N.mL) g.connect(N.music);
+    N.mSend = [gain(0.22), gain(0), gain(0.45)];                         // per-layer delay sends
+    N.mL.forEach((g, i) => g.connect(N.mSend[i]).connect(N.mDelay));
+    // L1 pad: shared dark low-pass with a slow sweep.
+    N.padLP = filt('lowpass', 750, 1.1); N.padLP.connect(N.mL[0]);
+    N.padLFO = osc('sine', 0.07); N.padLFOAmt = gain(380); N.padLFO.connect(N.padLFOAmt).connect(N.padLP.frequency);
     if (!mTimer) mTimer = setInterval(musicTick, 25);
   }
-  function musicTick() {
-    if (!ready || !orch) return;
-    orch.tick(musicOn && (mLvl > 0 || ctx.currentTime < mIdleT));
+  function env(g, at, peak, a, d, sus = 0.0008) {
+    g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(peak, at + a); g.gain.exponentialRampToValueAtTime(Math.max(sus, 0.0008), at + a + d);
   }
+  function voice(type, f, at, len, peak, out, a = 0.005, detune = 0, pan = 0) {
+    const o = ctx.createOscillator(); o.type = type; o.frequency.value = f; o.detune.value = detune;
+    const g = gain(0); env(g, at, peak, a, len);
+    let node = o.connect(g);
+    if (pan && ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = pan; node = node.connect(p); }
+    node.connect(out); o.start(at); o.stop(at + a + len + 0.05); mNotes++;
+    return o;
+  }
+  function noiseHit(at, len, peak, out, type, f, q = 0.8) {
+    const s = ctx.createBufferSource(); s.buffer = N.whiteBuf;
+    const b = filt(type, f, q), g = gain(0); env(g, at, peak, 0.002, len);
+    s.connect(b).connect(g).connect(out); s.start(at, Math.random() * 3); s.stop(at + len + 0.05); mNotes++;
+  }
+  function scheduleStep(s, t) {
+    const bar = (s >> 4) & 7, st = s & 15, ci = bar >> 1, root = ROOTS[ci];
+    const on = N.mL.map(g => g.gain.value > 0.003 || N.mTgt[N.mL.indexOf(g)] > 0);
+    if (on[0]) {
+      if (!(st & 1)) {                                                   // pulsing 8th-note sub-bass
+        voice('sine', mtof(root), t, STEP * 1.7, st % 4 === 0 ? 0.36 : 0.24, N.mL[0], 0.004);
+        voice('triangle', mtof(root + 12), t, STEP * 0.9, 0.05, N.mL[0], 0.004);
+      }
+      if (st === 0 && !(bar & 1)) {                                      // dark stereo pad, one chord per 2 bars
+        const len = STEP * 32;
+        for (const m of CHORDS[ci]) for (const [dt, pn] of [[-8, -0.6], [8, 0.6]]) {
+          const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = mtof(m); o.detune.value = dt;
+          const g = gain(0), p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+          g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.028, t + 0.9);
+          g.gain.setValueAtTime(0.028, t + len - 0.5); g.gain.linearRampToValueAtTime(0, t + len + 0.6);
+          if (p) { p.pan.value = pn; o.connect(g).connect(p).connect(N.padLP); } else o.connect(g).connect(N.padLP);
+          o.start(t); o.stop(t + len + 0.7); mNotes++;
+        }
+      }
+      if (st === 0 || st === 10) voice('sine', mtof(root + 48 + (st ? 7 : 0)), t, 1.1, st ? 0.022 : 0.04, N.mL[0], 0.003);   // sonar ping
+    }
+    if (on[1]) {
+      if (st % 4 === 0 || st === 14) {                                   // kick
+        const o = ctx.createOscillator(); o.type = 'sine';
+        o.frequency.setValueAtTime(155, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.13);
+        const g = gain(0); env(g, t, st === 14 ? 0.5 : 0.85, 0.002, 0.26);
+        o.connect(g).connect(N.mL[1]); o.start(t); o.stop(t + 0.32); mNotes++;
+        noiseHit(t, 0.012, 0.18, N.mL[1], 'highpass', 3000);            // beater click
+      }
+      if (st === 4 || st === 12) {                                       // gated snare
+        const s2 = ctx.createBufferSource(); s2.buffer = N.whiteBuf;
+        const b = filt('bandpass', 1900, 0.7), g = gain(0);
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.42, t + 0.002); g.gain.setValueAtTime(0.34, t + 0.09); g.gain.linearRampToValueAtTime(0, t + 0.11);
+        s2.connect(b).connect(g).connect(N.mL[1]); s2.start(t, Math.random() * 3); s2.stop(t + 0.14);
+        voice('triangle', 196, t, 0.08, 0.22, N.mL[1], 0.002); mNotes++;
+      }
+      {                                                                  // 16th saw arp bass with filter pluck
+        const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = mtof(root + 12 + ARP[st]);
+        const lp = filt('lowpass', 2400, 4), g = gain(0);
+        lp.frequency.setValueAtTime(2600, t); lp.frequency.exponentialRampToValueAtTime(420, t + STEP * 0.9);
+        env(g, t, st % 4 === 0 ? 0.11 : 0.08, 0.003, STEP * 0.95);
+        o.connect(lp).connect(g).connect(N.mL[1]); o.start(t); o.stop(t + STEP + 0.05); mNotes++;
+      }
+    }
+    if (on[2]) {
+      noiseHit(t, st & 1 ? 0.022 : 0.035, st & 1 ? 0.05 : 0.085, N.mL[2], 'highpass', 8200, 1.2);   // double-time closed hats
+      for (const [ns, m, ln] of MELODY[bar]) if (ns === st) {            // brass lead
+        const len = ln * STEP;
+        const lp = filt('lowpass', 700, 1.6), g = gain(0);
+        lp.frequency.setValueAtTime(700, t); lp.frequency.linearRampToValueAtTime(3600, t + 0.07); lp.frequency.setTargetAtTime(2100, t + 0.07, 0.15);
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.075, t + 0.05);
+        g.gain.setValueAtTime(0.068, t + Math.max(0.06, len - 0.06)); g.gain.linearRampToValueAtTime(0, t + len + 0.08);
+        lp.connect(g).connect(N.mL[2]);
+        let vib = null;
+        if (len > 0.3) {                                                 // delayed 5.6 Hz vibrato on held notes (own LFO, stops with the note)
+          const v = ctx.createOscillator(); v.frequency.value = 5.6; vib = gain(0);
+          vib.gain.setValueAtTime(0, t); vib.gain.linearRampToValueAtTime(9, t + 0.3);
+          v.connect(vib); v.start(t); v.stop(t + len + 0.12);
+        }
+        for (const [type, dt] of [['sawtooth', -9], ['sawtooth', 9], ['square', 0]]) {
+          const o = ctx.createOscillator(); o.type = type; o.frequency.value = mtof(m) * (type === 'square' ? 0.5 : 1); o.detune.value = dt;
+          if (vib) vib.connect(o.detune);
+          const og = gain(type === 'square' ? 0.35 : 1);
+          o.connect(og).connect(lp); o.start(t); o.stop(t + len + 0.12); mNotes++;
+        }
+      }
+    }
+  }
+  function musicTick() {
+    if (!ready || ctx.state !== 'running' || !N.mL) return;
+    const live = musicOn && (N.mTgt.some(v => v > 0) || ctx.currentTime < mIdleT);
+    if (!live) { mNext = 0; return; }
+    const now = ctx.currentTime;
+    if (mNext < now - 0.2 || mNext === 0) mNext = now + 0.06;          // (re)start or recover after a stall
+    while (mNext < now + LOOK) { scheduleStep(mStep, mNext); mNext += STEP; mStep = (mStep + 1) % LOOP; }
+  }
+  // Intensity: 0 off / 1 patrol (airborne) / 2 furball (bandit < 3 km, leaves
+  // > 3.4 km, or combo >= x1.5) / 3 ace (combo >= x3.0 or the PHASE 3 Ace alive); 4 s hold before dropping.
+  N.mTgt = [0, 0, 0];
   function updateMusic(p) {
-    if (!orch) return;
+    if (!N.mL) return;
     const d = p.banditDist ?? Infinity, combo = p.combo || 1;
     mNear = mNear ? d < 3400 : d < 3000;
     let lvl = 0;
-    if (p.airborne) { lvl = 1; if (mNear || combo >= 1.5) lvl = 2; if (combo >= 3 || p.ace) lvl = 3; }
+    if (p.airborne) { lvl = 1; if (mNear || combo >= 1.5) lvl = 2; if (combo >= 3 || p.ace) lvl = 3; }   // Ace phase = climax
     const now = ctx.currentTime;
-    if (lvl >= mLvl || now - mLvlT > 4) { if (lvl !== mLvl) mLvlT = now; mLvl = lvl; }   // 4 s hold before dropping
-    const mp = p.mission || 1;
-    mPhase = (p.ace || combo >= 3) ? 3 : mp >= 4 ? 4 : mp === 2 ? 2 : mp === 3 ? 3 : 1;
-    orch.setState(mPhase, mLvl);
+    if (lvl >= mLvl || now - mLvlT > 4) { if (lvl !== mLvl) mLvlT = now; mLvl = lvl; }
+    const tg = [mLvl >= 1 ? 0.9 : 0, mLvl >= 2 ? 1 : 0, mLvl >= 3 ? 1 : 0];
+    tg.forEach((v, i) => { if (v !== N.mTgt[i]) { N.mTgt[i] = v; set(N.mL[i].gain, v, 0.6); } });
     if (mLvl > 0) mIdleT = now + 4;                                      // keep scheduling through the fade-out
     musicTick();
   }
   function setMusic(on) {
     musicOn = !!on;
     if (N.music) set(N.music.gain, musicOn ? musicVol : 0, 0.25);
-    if (musicOn && orch) orch.load();                                    // first K-on loads the samples if they were skipped
+    if (musicOn) mNext = 0;
   }
   // Music-bed level: 0..1, persisted separately from the master volume and the K toggle.
   function setMusicVolume(v) {
@@ -1225,10 +1338,11 @@ export function createAudio() {
     toggleMusic() { setMusic(!musicOn); return musicOn; },
     get musicOn() { return musicOn; }, setMusicVolume,
     get musicVolume() { return musicVol; },
-    // Orchestra state for __audioDebug: sample load, phase, intensity layer, section buses, loop position, notes played.
+    // Music sequencer state for __audioDebug: intensity layer, live layer gains, loop position, notes scheduled.
     get music() {
-      return { on: musicOn, layer: mLvl, target: mPhase, ...(orch ? orch.debug : { load: 'not started' }),
-        duck: N.musicDuck ? +N.musicDuck.gain.value.toFixed(2) : 1, gain: N.music ? +N.music.gain.value.toFixed(2) : 0 };
+      return { on: musicOn, layer: mLvl, gains: N.mL ? N.mL.map(g => +g.gain.value.toFixed(2)) : [0, 0, 0],
+        bar: (mStep >> 4) + 1, step: mStep, notes: mNotes, duck: N.musicDuck ? +N.musicDuck.gain.value.toFixed(2) : 1,
+        bus: N.music ? +N.music.gain.value.toFixed(2) : 0, ahead: mNext && ctx ? +(mNext - ctx.currentTime).toFixed(3) : 0 };
     }, get radio() { return { ...radioState, duck: N.duck ? +N.duck.gain.value.toFixed(2) : 1 }; }, setVolume, setMuted,
     get sfxStatus() { return { ...sfxState }; },
     toggleMute() { setMuted(!muted); return muted; },
