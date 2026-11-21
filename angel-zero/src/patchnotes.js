@@ -3,6 +3,15 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.11', title: 'MISSION SELECT + DUAL RTB + MISSION BGM', bullets: [
+    'Five selectable missions with dedicated maps, spawns, targets and pooled actor resets on switch.',
+    'BASE missions autobrake to a stop on AFB Runway; CARRIER missions offer an [L] cinematic autoland onto USS Enterprise.',
+    'Scenario music now follows the mission registry and dynamic combat state, keeping canyon/naval/ace tracks clear of night and storm overrides.'
+  ] },
+  { version: 'v1.1.10', title: 'STREAMING SOUNDTRACK', bullets: [
+    'Twelve normalized scenario pairs stream from cached Ogg Vorbis decks with a 1.5 s equal-power crossfade and alternating tracks on replays.',
+    'Music ducks 5 dB under radio calls, follows combat intensity, and keeps the original synth score on browsers without Ogg Vorbis.'
+  ] },
   { version: 'v1.1.9', title: 'WASD FLIGHT CONTROLS', bullets: [
     'W/S pitch and A/D roll on the keyboard, ramped and smoothly blended back to mouse aim on release.',
     'Throttle moves to Shift/Ctrl, arrow keys or the mouse wheel; Q/E take over rudder and Shift at full throttle lights the afterburner.',

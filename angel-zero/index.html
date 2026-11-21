@@ -588,7 +588,7 @@
       <button class="sbRow active" data-k="launch" type="button"><span class="sbLabel">LAUNCH SORTIE</span><span class="sbValue"></span></button>
       <button class="sbRow" data-k="resume" type="button" hidden><span class="sbLabel">RESUME SORTIE</span><span class="sbValue"></span></button>
       <button class="sbRow" data-k="restart" type="button" hidden><span class="sbLabel">RESTART</span><span class="sbValue"></span></button>
-      <button class="sbRow" data-k="mode" type="button"><span class="sbLabel">MODE</span><span class="sbValue" id="sbModeVal"></span></button>
+      <button class="sbRow" data-k="mission" type="button"><span class="sbLabel">MISSION</span><span class="sbValue" id="sbMissionVal"></span></button>
       <button class="sbRow" data-k="diff" type="button"><span class="sbLabel">DIFFICULTY</span><span class="sbValue" id="sbDiffVal"></span></button>
       <button class="sbRow" data-k="spw" type="button"><span class="sbLabel">SPECIAL WEAPON</span><span class="sbValue" id="sbSpwVal"></span></button>
       <button class="sbRow" data-k="liv" type="button"><span class="sbLabel">AIRFRAME LIVERY</span><span class="sbValue" id="sbLivVal"></span></button>
@@ -677,30 +677,32 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s77a';
-import { createBlastFX } from './src/blastfx.js?v=s77a';
-import { createHUD } from './src/hud.js?v=s77a';
-import { createCockpit3D } from './src/cockpit3d.js?v=s77a';
-import { createCombat } from './src/combat.js?v=s77a';
-import { createEjection } from './src/eject.js?v=s77a';
-import { createAudio } from './src/audio.js?v=s77a';
-import { createRadio } from './src/radio.js?v=s77a';
-import { createProfile, LIVERIES, liveryById } from './src/profile.js?v=s77a';
-import { createLivery } from './src/livery.js?v=s77a';
-import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s77a';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s77a';
-import { createCanopyFX } from './src/canopy.js?v=s77a';
-import { createNVG } from './src/nvg.js?v=s77a';
-import { createWorld, WORLD } from './src/world.js?v=s77a';
-import { createSurfaces } from './src/surfaces.js?v=s77a';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s77a';
-import { createFreeLook } from './src/freelook.js?v=s77a';
-import { createCanopyGlass } from './src/canopyglass.js?v=s77a';
-import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s77a';
-import { SPW, SQUADRON, MODES, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode } from './src/loadout.js?v=s77a';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s77a';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO } from './src/radioScript.js?v=s77a';
-import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s77a';
+import { createVFX } from './src/vfx.js?v=s80a';
+import { createBlastFX } from './src/blastfx.js?v=s80a';
+import { createHUD } from './src/hud.js?v=s80a';
+import { createCockpit3D } from './src/cockpit3d.js?v=s80a';
+import { createCombat } from './src/combat.js?v=s80a';
+import { createEjection } from './src/eject.js?v=s80a';
+import { createAudio } from './src/audio.js?v=s80a';
+import { createRadio } from './src/radio.js?v=s80a';
+import { createProfile, LIVERIES, liveryById } from './src/profile.js?v=s80a';
+import { createLivery } from './src/livery.js?v=s80a';
+import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s80a';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s80a';
+import { createCanopyFX } from './src/canopy.js?v=s80a';
+import { createNVG } from './src/nvg.js?v=s80a';
+import { createWorld, WORLD } from './src/world.js?v=s80a';
+import { createSurfaces } from './src/surfaces.js?v=s80a';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s80a';
+import { createFreeLook } from './src/freelook.js?v=s80a';
+import { createCanopyGlass } from './src/canopyglass.js?v=s80a';
+import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s80a';
+import { SPW, SQUADRON, MODES, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode } from './src/loadout.js?v=s80a';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s80a';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO } from './src/radioScript.js?v=s80a';
+import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s80a';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s80a';
+import { MAPS } from './src/maps.js?v=s80a';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -711,6 +713,18 @@ const DEBUG = Q.has('debug');
 let selectedSPW = DEBUG && Q.has('spw') && SPW[Q.get('spw')] ? Q.get('spw') : loadSPW();
 let selectedLivery = DEBUG && Q.has('livery') && SQUADRON[Q.get('livery')] ? Q.get('livery') : loadLivery();
 let selectedMode = DEBUG && Q.has('mode') && MODES.includes(Q.get('mode')) ? Q.get('mode') : loadMode();
+let missionId = DEBUG && Q.has('mission') && MISSIONS[Q.get('mission')] ? Q.get('mission') : loadMission();
+const mission = () => MISSIONS[missionId] || MISSIONS.AIR_SUPERIORITY;
+if (missionId === 'FURBALL') selectedMode = 'FURBALL';
+function cycleMission(dir = 1) {
+  const i = MISSION_ORDER.indexOf(missionId);
+  missionId = MISSION_ORDER[(i + (dir || 1) + MISSION_ORDER.length) % MISSION_ORDER.length];
+  saveMission(missionId);
+  selectedMode = missionId === 'FURBALL' ? 'FURBALL' : 'MISSION';
+  saveMode(selectedMode);
+  combatSys.setMode(selectedMode);
+  if (typeof syncModeUI === 'function') syncModeUI();
+}
 
 /* ============================================================================
    0. RENDERER / SCENE / CAMERA / LIGHTS
@@ -1104,6 +1118,10 @@ function advanceTimeScale(realDt) {
 function triggerSlowMo() { slowMo.t = 0; timeScale = slowMo.MIN; audio.slowMo(); }
 // Allied carrier arrest / catapult constants (world-relative to CVN-ALLY).
 const TRAP_X = 22, TRAP_DY = 5.5, TRAP_KT = 220, TRAP_PITCH = -12 * D2R, ARREST_T = 1.6;
+// Dual RTB + carrier autoland constants.
+const BASE_VS_MAX = 6, BASE_LAT_TOL = 30, CENTERLINE_K = 0.8, AUTOBRAKE_DECEL = 9;
+const AUTOLAND_R = 3500, GS_DEG = 3.5, GS_GATES = 6;
+const AL_CAPTURE_T = 2.5, AL_VAPP = 70, AL_FLARE_H = 8, AL_FLARE_DEG = 2, AL_ROLLOUT_DECEL = 25;
 const DECK_HALF_W = 26, DECK_HALF_L = 175;
 const carrier = { phase: null, t: 0, v0: 0, wire: 0, cool: 0, pitDone: false };
 const _lp = new THREE.Vector3(), _qInv = new THREE.Quaternion(), _cq = new THREE.Quaternion();
@@ -1206,7 +1224,9 @@ let flightMode = 'FLY', viewBeforeEject = false;
 function triggerEject(reason) {
   if (flightMode !== 'FLY' || !modelReady) return;
   flightMode = 'EJECT';
+  autoland.on = false;
   clearFlightInput();
+  audio.setBgmPause(false);
   state.onGround = false; state.pit.active = false;
   combat.dead = true; combat.deaths++; combat.lockTarget = null;
   sortie.failReason = reason === 'crash' ? 'AIRCRAFT LOST — IMPACT' : reason === 'damage' ? 'SHOT DOWN — PILOT EJECTED'
@@ -1425,11 +1445,97 @@ function launchSortie() {
    counters still bank, no rank).
    --------------------------------------------------------------------------- */
 const sortie = { active: false, t0: 0, ace0: 0, endAt: null, failReason: '' };
-function startSortie() {
+// Mission scene setup: pooled actors return to their pools, the terrain is rebuilt
+// in place (same geometry/material) and collision sets are reset.
+function loadMissionScene(m) {
+  combatSys.resetMission();
+  world.rebuild(MAPS[m.mapTag] || MAPS.ARCHIPELAGO);
+  vfx.clearTrails();
   tele.reset();
+  combatSys.configureMission(m, MAPS[m.mapTag] || MAPS.ARCHIPELAGO);
+  combat.missionPhase = 1; combat.rtb = null; combat.done = false;
+  state.autobrake = false;
+  autoland.on = false; autoland.ph = '';
+}
+const autoland = { on: false, ph: '', t: 0, q0: new THREE.Quaternion(), p0: new THREE.Vector3(), target: null };
+const _alDest = new THREE.Vector3(), _alDir = new THREE.Vector3(), _alQ = new THREE.Quaternion(), _alE = new THREE.Euler();
+function autolandPrompt() {
+  const a = combat.ally;
+  if (!a || !combat.rtb || !combat.rtb.on || combat.rtb.type !== 'CARRIER' || !sortie.active) return false;
+  _carrierPos.copy(a.pos).addScaledVector(a.fwd, -a.len / 2);
+  return state.position.distanceTo(_carrierPos) < AUTOLAND_R;
+}
+function engageAutoland() {
+  if (autoland.on || !combat.ally) return;
+  if (!combat.rtb) { combat.missionPhase = 4; combat.rtb = { on: true, type: 'CARRIER', t0: performance.now() }; }
+  autoland.on = true; autoland.ph = 'CAPTURE'; autoland.t = 0;
+  autoland.q0.copy(state.quaternion); autoland.p0.copy(state.position);
+  state.gearDown = true; gearAutoLock = true;
+  combatSys.say('AUTOLAND ENGAGED — USS ENTERPRISE', 2, '#5fe8ff');
+}
+function updateAutoland(dt) {
+  const a = combat.ally;
+  if (!a || combat.dead) { autoland.on = false; return; }
+  autoland.t += dt;
+  const s = a.g.scale.x, qc = a.g.quaternion;
+  _lp.set(0, a.deckLocalY * s + GEAR_H, a.len / 2 - 78);
+  _alDest.copy(_lp).applyQuaternion(qc).add(a.pos);
+  _alDir.copy(_alDest).sub(state.position);
+  const dist = _alDir.length();
+  if (dist > 1) _alDir.multiplyScalar(1 / dist);
+  const targetYaw = Math.atan2(-a.fwd.x, -a.fwd.z);
+  _alE.set(0, targetYaw, 0); _alQ.setFromEuler(_alE);
+  if (autoland.ph === 'CAPTURE') {
+    const k = THREE.MathUtils.smoothstep(Math.min(1, autoland.t / AL_CAPTURE_T), 0, 1);
+    state.quaternion.slerpQuaternions(autoland.q0, _alQ, k);
+    if (autoland.t >= AL_CAPTURE_T) autoland.ph = 'GLIDE';
+  } else if (autoland.ph === 'GLIDE') {
+    state.quaternion.slerp(_alQ, Math.min(1, dt * 1.4));
+    if (dist < AL_FLARE_H + TRAP_DY) autoland.ph = 'FLARE';
+  } else if (autoland.ph === 'FLARE') {
+    state.quaternion.slerp(_alQ, Math.min(1, dt * 1.4));
+    state.quaternion.multiply(_dq.setFromAxisAngle(AX_X, AL_FLARE_DEG * D2R * dt));
+    if (Math.abs(_lp.y - (a.deckLocalY * s + GEAR_H)) < TRAP_DY && dist < TRAP_X) {
+      audio.cableScreech(); combatSys.onCarrierTrap(); autoland.ph = 'TRAP'; autoland.t = 0;
+    }
+  } else if (autoland.ph === 'TRAP') {
+    state.position.copy(_alDest); state.velocity.set(0, 0, 0);
+    if (autoland.t > 1.6) autoland.ph = 'ROLLOUT';
+  } else if (autoland.ph === 'ROLLOUT') {
+    state.velocity.set(0, 0, 0); state.speed = 0;
+    if (autoland.t > 1.2) { autoland.on = false; missionComplete('CARRIER'); }
+    return;
+  }
+  const step = Math.min(dist, AL_VAPP * dt);
+  state.position.addScaledVector(_alDir, step);
+  state.velocity.copy(_alDir).multiplyScalar(AL_VAPP);
+  state.speed = AL_VAPP;
+  state.pitchRate = state.rollRate = state.yawRate = 0;
+  state.bank *= Math.exp(-2 * dt);
+  state.onGround = false;
+}
+function startSortie() {
+  const m = mission();
+  loadMissionScene(m);
   radioReset(); preloadRadioOnce(); radioEvent('ON_TAKEOFF');
   combat.styleCounts = {}; combat.comboPeak = 1;
   Object.assign(sortie, { active: true, t0: simTime, ace0: combat.aceDowns || 0, endAt: null, failReason: '' });
+  if (m.launch === 'CATAPULT' && combat.ally) {
+    const a = combat.ally;
+    _lp.set(8, a.deckLocalY * a.g.scale.x + GEAR_H, -a.len / 2 + 45).applyQuaternion(a.g.quaternion).add(a.pos);
+    state.position.copy(_lp); state.quaternion.copy(a.g.quaternion);
+    state.velocity.copy(a.vel); state.speed = a.vel.length();
+    state.gearDown = true; state.gear = 1; state.onGround = true; state.throttle = 1;
+    state.groundSpeed = state.speed; state.groundYaw = 0; state.groundPitch = 0;
+    carrier.phase = 'CAT'; carrier.t = 0; carrier.pitDone = true; combat.carrierPhase = 'CAT';
+  } else if (m.launch === 'RUNWAY') {
+    const R = world.runway;
+    state.position.set(R.x, R.elev + GEAR_H, R.z1 - 120);
+    state.quaternion.identity(); state.velocity.set(0, 0, -m.spawn.spd);
+    state.speed = m.spawn.spd; state.gearDown = true; state.gear = 1; state.onGround = true;
+    state.groundSpeed = state.speed; state.groundYaw = 0; state.groundPitch = 0;
+    state.throttle = 0.6;
+  }
   if (combat.mode === 'FURBALL') {
     state.position.set(0, 1829, -3000);                       // cloud-sea centre, 6,000 ft, above the 5,800 ft tops
     state.quaternion.identity(); state.velocity.set(0, 0, -216);
@@ -1456,10 +1562,17 @@ function watchSortie() {
   // MISSION now ends via the phase-4 carrier trap (combat.onCarrierTrap → onMissionComplete).
   // FURBALL ends only via the Tab / pause-menu debrief.
 }
+function missionComplete(type) {
+  if (!sortie.active) return;
+  combat.done = true; combat.rtb = null; autoland.on = false;
+  if (DEBUG) console.log('[ANGELS_ZERO] mission complete', type, mission().id);
+  endSortie('CLEARED');
+}
 function endSortie(outcome) {
   if (!sortie.active) return;
   sortie.active = false;
   clearFlightInput();
+  audio.setBgmPause(false);
   if (outcome === 'CLEARED') radioEvent('ON_MISSION_CLEAR');
   const st = sortieStats();
   st.rankInfo = computeRank(st, outcome);
@@ -1719,7 +1832,9 @@ function syncSBBenchmark() {
   if (ag) ag.style.width = Math.round(f[1] * 100) + '%';
   const line = document.getElementById('bmRankLine');
   const p = profile.data;
-  if (line) line.innerHTML = `RANK ${p.bestRank || '—'}&nbsp;&nbsp; SCORE ${String(p.bestScore).padStart(6, '0')}&nbsp;&nbsp; KILLS ${p.totalKills}`;
+  const m = typeof mission === 'function' ? mission() : null;
+  if (line) line.innerHTML = `RANK ${p.bestRank || '—'}&nbsp;&nbsp; SCORE ${String(p.bestScore).padStart(6, '0')}&nbsp;&nbsp; KILLS ${p.totalKills}` +
+    (m ? `<br>${m.title} // ${m.rtbType || 'NO RTB'}` : '');
 }
 const SPW_LABEL = { '4AAM': '4AAM // MULTI-LOCK', UGB: 'UGB // HEAVY BOMBS + CCIP', QAAM: 'QAAM // HIGH-OFF-BORESIGHT' };
 function renderHangar() {
@@ -1766,6 +1881,7 @@ function pauseSim() {
   if (appMode !== 'PLAY') return;
   appMode = 'PAUSED';
   clearFlightInput();
+  audio.setBgmPause(true);
   audio.suspend();
   showMenu('pause');
 }
@@ -1773,6 +1889,7 @@ function resumeSim() {
   if (appMode !== 'PAUSED') return;
   appMode = 'PLAY';
   lastTime = performance.now();
+  audio.setBgmPause(false);
   audio.resume();
   hideMenu();
 }
@@ -1902,7 +2019,10 @@ addEventListener('keydown', e => {
   if (k === 'z' && !e.repeat) combatSys.dispenseChaff();
   if (k === 'j' && !e.repeat) combatSys.activateECM();
   if (k === 'x' && !e.repeat) combatSys.dispenseFlares();
-  if (k === 'l' && !e.repeat) { gearAutoLock = true; toggleGear(); }   // manual gear suppresses auto-deploy
+  if (k === 'l' && !e.repeat) {
+    if (autolandPrompt() && !autoland.on) engageAutoland();
+    else { gearAutoLock = true; toggleGear(); }
+  }
   if (k === 'g' && !e.repeat) combatSys.setWingOrder();
   if ((k === '[' || k === ']') && !e.repeat && firstPerson && flightMode === 'FLY' && !slowActive()) {
     mfdPage = (mfdPage + (k === ']' ? 1 : 2)) % 3;
@@ -2133,6 +2253,7 @@ function updateCarrierOp(dt) {
 function updatePhysics(dt) {
   const clamp = THREE.MathUtils.clamp, sstep = THREE.MathUtils.smoothstep;
   const q = state.quaternion;
+  if (autoland.on) { updateAutoland(dt); return; }
   // ---- PSM entry (air data from the last integrated velocity; one frame of lag is fine)
   const kts = Math.max(1, state.velocity.length()) * 1.94384;
   // WASD keyboard axes: ramped, blended with the mouse over KB_BLEND_OUT after release.
@@ -2591,6 +2712,10 @@ function enterGround(td) {
   if (fwdH.lengthSq() < 1e-6) fwdH.set(0, 0, -1);
   fwdH.normalize();
   state.onGround = true;
+  if (combat.rtb && combat.rtb.type === 'BASE' && td.vy > -BASE_VS_MAX &&
+      Math.abs(state.position.x - world.runway.x) < BASE_LAT_TOL) {
+    state.autobrake = true; state.throttle = 0;                 // BASE RTB: autobrake on centreline
+  }
   // Firm but legal touchdowns: no impact damage — kill the sink and seat the jet
   // on the deck / runway surface instead of letting it keep falling through.
   state.velocity.y = Math.max(0, state.velocity.y);
@@ -2637,6 +2762,11 @@ function updateGround(dt) {
   const brake = state.wheelBrake && v > 0.3 ? 0.5 * N : 0;
   let a = (thrust - drag - 0.025 * N - brake) / mass;
   state.groundSpeed = Math.max(0, v + a * dt);
+  if (state.autobrake && combat.rtb && combat.rtb.type === 'BASE') {
+    state.position.x += (R.x - state.position.x) * Math.min(1, CENTERLINE_K * dt);
+    state.groundSpeed = Math.max(0, state.groundSpeed - AUTOBRAKE_DECEL * dt);
+    if (state.groundSpeed < 0.5) missionComplete('BASE');
+  }
   if (state.groundSpeed < 0.25 && thrust < 0.025 * N + brake) state.groundSpeed = 0;
   // Attitude + position: main tyres on the runway, pivoting about them.
   _ge.set(state.groundPitch, state.groundYaw, 0, 'YXZ');
@@ -2960,6 +3090,7 @@ let glFilter = '';
    8. VFX + HUD MODULES (src/vfx.js, src/hud.js)
    ============================================================================ */
 const audio = createAudio();
+if (DEBUG && Q.has('bgm')) audio.setBgmForce(Q.get('bgm'));   // force a soundtrack scenario for headless checks
 /* ---- CRT radio portrait: preloaded images, CSS animation, zero per-frame work ---- */
 const crtBox = document.getElementById('crtBox'), activePortrait = document.getElementById('activePortrait');
 const crtCap = document.getElementById('crtCap'), crtTag = document.getElementById('crtTag');
@@ -3093,18 +3224,48 @@ if (DEBUG) window.__kbDebug = () => ({ held: [...kbHeld], pitch: kbAxis.pitch, r
 if (DEBUG) window.__frame = (dt = 1 / 60) => {
   const t0 = performance.now();
   simTime += dt; if (appMode === 'PLAY') stepSim(dt); updateCameraAndVisuals(dt, simTime);
+  audio.updateMusic(getMusicCtx(), dt);
   nvg.render(scene, camera, simTime, firstPerson); hud.draw();
   renderer.getContext().finish();
   return performance.now() - t0;
 };
-if (DEBUG) window.__step = (n = 30) => { for (let i = 0; i < n; i++) { simTime += 1 / 60; stepSim(1 / 60); updateCameraAndVisuals(1 / 60, simTime); if (appMode === 'PLAY') updateAudio(); } };
+if (DEBUG) window.__step = (n = 30) => { for (let i = 0; i < n; i++) { simTime += 1 / 60; stepSim(1 / 60); updateCameraAndVisuals(1 / 60, simTime); if (appMode === 'PLAY') updateAudio(); audio.updateMusic(getMusicCtx(), 1 / 60); } };
 window.__audioDebug = () => ({ state: audio.state, rms: +audio.rms.toFixed(4), muted: audio.muted, volume: audio.volume, layers: audio.layers,
   canopyRain: audio.canopyRain, wind: audio.wind, blast: audio.blast, blastFx: blast ? blast.stats : null, shake: +blastShake.toFixed(3), ribbons: vfx.ribbons, canopyGlass: canopyGlass.stats, rainCulled: weather.rainCulled,
-  music: audio.music, slowMo: audio.slowMoDebug, mist: audio.mist, radio: audio.radio,
+  music: audio.music, bgm: audio.bgm, slowMo: audio.slowMoDebug, mist: audio.mist, radio: audio.radio,
   crtRadio: combat.radio ? { call: combat.radio.call, text: combat.radio.text, age: +combat.radio.age.toFixed(2) } : null,
   gLoad: +state.gLoad.toFixed(2), gStrain: +state.gStrain.toFixed(2), throttle: +state.throttle.toFixed(2), afterburner: +state.afterburner.toFixed(2) });
 // Seeker / alert / gun state -> procedural audio mix, once per frame.
 const _audioFwd = new THREE.Vector3();
+// Preallocated music context: one object, updated in place every frame (no allocations).
+const musicCtx = { debrief: false, landed: false, rtb: false, app: 'MENU', onGround: false, launched: false,
+  inCombat: false, dmg: 0, msl: 0, storm: false, rain: 0, night: false, nvg: false,
+  wxOverride: false, bgmScenario: '03_air_superiority',
+  // Legacy synth fallback fields (no per-frame allocation; kept for browsers w/o Ogg).
+  airborne: false, banditDist: Infinity, combo: 1, ace: false };
+function getMusicCtx() {
+  const C = combat, S = combatSys, M = mission();
+  musicCtx.debrief = !debriefEl.hidden;
+  musicCtx.landed = !!C.done;
+  musicCtx.rtb = !!(C.rtb && C.rtb.on);
+  musicCtx.app = appMode;
+  musicCtx.onGround = !!state.onGround;
+  musicCtx.launched = !!sortie.active;
+  musicCtx.inCombat = appMode === 'PLAY' && S.enemies.some(e => e.alive);
+  musicCtx.dmg = Math.max(0, (100 - C.health) / 100);
+  musicCtx.msl = C.missiles || 0;
+  musicCtx.rain = weather.rainHere || 0;
+  musicCtx.storm = !!(weather.active && (weather.active.storm || /RAIN|STORM/.test(weather.active.label))) || musicCtx.rain > 0.3;
+  musicCtx.night = todMode === 'NIGHT';
+  musicCtx.nvg = !!nvg.active;
+  musicCtx.wxOverride = !!M.wxOverride;
+  musicCtx.bgmScenario = M.bgmScenario;
+  musicCtx.airborne = flightMode === 'FLY' && appMode === 'PLAY';
+  musicCtx.banditDist = musicCtx.airborne ? nearestBandit() : Infinity;
+  musicCtx.combo = C.comboMult || 1;
+  musicCtx.ace = !!(C.ace && C.ace.alive);
+  return musicCtx;
+}
 function updateAudio() {
   const fwd = _audioFwd.set(0, 0, -1).applyQuaternion(state.quaternion);
   let seeker = 'OFF';
@@ -3125,7 +3286,6 @@ function updateAudio() {
     gLoad: flightMode === 'FLY' ? state.gLoad : 1, aoa: flightMode === 'FLY' ? state.alpha * 180 / Math.PI : 0,
     gStrain: flightMode === 'FLY' ? state.gStrain : 0, glocWarn: flightMode === 'FLY' && state.gStrain > 0.72,
     kts: state.speed * 1.94384,
-    music: { airborne: flightMode === 'FLY', banditDist: nearestBandit(), combo: combat.comboMult || 1, ace: !!(combat.ace && combat.ace.alive) },
     airbrake: flightMode === 'FLY' ? state.ctl.airbrake : 0, gear: flightMode === 'FLY' ? state.gear : 0,
     rolling: flightMode === 'FLY' && state.onGround ? state.groundSpeed : 0
   });
@@ -3229,7 +3389,7 @@ const combatSys = createCombat(THREE, { scene, camera, renderer, state, combat, 
       else resolve(gltf.scene);
     }, undefined, reject);
   }),
-  onMissionComplete: () => endSortie('CLEARED'),
+  onMissionComplete: () => { combat.done = true; combat.rtb = null; endSortie('CLEARED'); },
   onTele: (type, p) => tele.event(EV[type], p.x, p.z, simTime),
   getTeleStats: () => ({ n: tele.n, ne: tele.ne }),
   getCarrierStats: () => ({ phase: carrier.phase, wire: carrier.wire, t: +carrier.t.toFixed(2), localZ: +_lp.z.toFixed(1) }),
@@ -3395,7 +3555,8 @@ if (DEBUG && Q.has('diffcycle')) for (let i = 0; i < (Number(Q.get('diffcycle'))
 
 const modeChip = document.getElementById('modeChip'), modeBtn = document.getElementById('modeBtn');
 function syncModeUI() {
-  const fur = selectedMode === 'FURBALL';
+  const fur = mission().id === 'FURBALL';
+  selectedMode = fur ? 'FURBALL' : 'MISSION';
   modeBtn.textContent = fur ? '[ MODE: FURBALL // INSTANT ACTION ]' : '[ MODE: MISSION ]';
   modeChip.textContent = fur ? 'MODE: FURBALL // ENDLESS' : 'MODE: MISSION';
   modeChip.classList.toggle('hot', fur);
@@ -3403,10 +3564,7 @@ function syncModeUI() {
 modeBtn.addEventListener('click', e => {
   e.stopPropagation();
   if (appMode !== 'MENU') return;
-  selectedMode = selectedMode === 'FURBALL' ? 'MISSION' : 'FURBALL';
-  saveMode(selectedMode);
-  combatSys.setMode(selectedMode);
-  syncModeUI();
+  cycleMission(1);
 });
 syncModeUI();
 
@@ -3576,7 +3734,7 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
     launchSortie();
     if (Q.has('fire')) setTimeout(() => console.log('[ANGELS_ZERO] audio', audio.state, 'firing', combat.gunFiring, 'ammo', combat.ammo), 1500);
   }
-  if (DEBUG && Q.has('memtest')) {                     // log GPU resources + heap across 3 restarts
+  if (DEBUG && Q.has('memtest')) {                     // 3 scene loads x 5 missions: geometry/texture delta must be 0
     (async () => {
       const snap = tag => console.log('[ANGELS_ZERO] MEM', tag, JSON.stringify({
         geo: renderer.info.memory.geometries, tex: renderer.info.memory.textures,
@@ -3584,10 +3742,12 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
         heapMB: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null }));
       const wait = ms => new Promise(r => setTimeout(r, ms));
       await wait(3500); snap('startup'); renderer.render(scene, camera); snap('inflight');
-      for (let i = 1; i <= 3; i++) {
-        endSortie('ABORTED'); await wait(120);
-        replaySortie(); await wait(350);
-        renderer.render(scene, camera); snap('restart' + i);
+      for (const id of MISSION_ORDER) {
+        for (let i = 1; i <= 3; i++) {
+          loadMissionScene(MISSIONS[id]);
+          renderer.render(scene, camera);
+          snap(id + '_r' + i);
+        }
       }
     })();
   }
@@ -3652,6 +3812,7 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
   if (DEBUG && Q.has('eject')) triggerEject('manual');
   if (DEBUG && Q.has('warp')) {                       // headless test hook: fast-forward the sim
     await carrierLoadPromise;                         // deterministic: swap the CVN before sampling state
+    if (Q.has('nointro')) startSortie();               // re-seed spawn/deck anchors now that the carrier exists
     const h = 1 / 60;
     const logAt = (Q.get('logat') || '').split(',').filter(Boolean).map(Number);
     const mslAt = Q.has('mslat') ? Number(Q.get('mslat')) : -1, rollAt = Q.has('rollat') ? Number(Q.get('rollat')) : -1;
@@ -3667,6 +3828,8 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
     const killAts = Q.has('killat') ? Q.get('killat').split(',').map(Number) : [];
     const returnAts = Q.has('returnat') ? Q.get('returnat').split(',').map(Number) : [];
     const approachAt = Q.has('approachat') ? Number(Q.get('approachat')) : -1;
+    const rtbAt = Q.has('rtbat') ? Number(Q.get('rtbat')) : -1;
+    const autoAt = Q.has('autolandat') ? Number(Q.get('autolandat')) : -1;
     for (let i = 0, n = Number(Q.get('warp')) * 60; i < n; i++) {
       const t0 = i * h, t1 = t0 + h;
       advanceTimeScale(h);                               // time scale runs on real warp time too
@@ -3692,6 +3855,12 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
       if (mslAt >= t0 && mslAt < t1) { console.log('[ANGELS_ZERO] fire @', t1.toFixed(2), combat.lockState, combat.lockProgress.toFixed(2)); combatSys.fireMissile(); }
       if (rollAt >= t0 && rollAt < t1) startRoll(1);
       if (aceWingAt >= t0 && aceWingAt < t1) { console.log('[ANGELS_ZERO] ace flight @', t1.toFixed(2), combatSys.spawnAceFlight()); }
+      if (rtbAt >= t0 && rtbAt < t1 && !combat.rtb) {
+        combat.missionPhase = 4;
+        combat.rtb = { on: true, type: mission().rtbType || 'BASE', t0: performance.now() };
+        console.log('[ANGELS_ZERO] rtb @', t1.toFixed(2), combat.rtb.type);
+      }
+      if (autoAt >= t0 && autoAt < t1) { engageAutoland(); console.log('[ANGELS_ZERO] autoland @', t1.toFixed(2)); }
       if (returnAts.some(rt => rt >= t0 && rt < t1)) {
         const rz = combatSys.RETURN_Z;
         state.position.set(0, 600, rz - 50);
@@ -3887,6 +4056,7 @@ function animate() {
   else if (appMode === 'PLAY' && modelReady && !FREEZE) stepSim(sdt);
   if (appMode !== 'PAUSED') updateCameraAndVisuals(sdt, simTime);
   if (appMode === 'PLAY') updateAudio();
+  audio.updateMusic(getMusicCtx());                          // BGM scenario resolve (one preallocated object)
   oceanUniforms.uTime.value = simTime;
   const t0 = performance.now();
   renderer.info.reset();
@@ -3913,7 +4083,9 @@ if (DEBUG) {
   window.__az = { scene, camera, renderer, state, combat, combatSys, eject, audio, mouse, keys, vfx, blast, get blastShake() { return blastShake; }, flyShake, onFlyby, onWing, wingmen, hud, cockpit, perf, jet, cockpitHidden, terrainHeight, setView, freeLook, world, nvg, setNVG, gpuWarm, mcam, slowMo, get timeScale() { return timeScale; }, triggerSlowMo, get selectedSPW() { return selectedSPW; }, get selectedLivery() { return selectedLivery; }, loadSPW, loadLivery, saveSPW, saveLivery, SQUADRON, SPW, get firstPerson() { return firstPerson; },
     get appMode() { return appMode; },
     triggerEject, startRoll, stepSim, profile, toggleGear, placeOnRunway, get landingGear() { return landingGear; }, get livery() { return livery; }, endSortie, sortie, renderHangar, replaySortie, debriefToBriefing,
-    get mode() { return flightMode; }, get enemies() { return combatSys.enemies; }, get model() { return model; }, get ready() { return modelReady; } };
+    get mode() { return flightMode; }, get enemies() { return combatSys.enemies; }, get model() { return model; }, get ready() { return modelReady; },
+    get missionId() { return missionId; }, get mission() { return mission(); }, cycleMission, loadMissionScene, startSortie, launchSortie,
+    get autoland() { return autoland; }, autolandPrompt, engageAutoland, getMusicCtx, get debrief() { return !debriefEl.hidden; } };
 }
 /* ============================================================================
    BORDERLESS STANDBY HANGAR MENU
@@ -3924,7 +4096,7 @@ const SB_DESC = {
   launch: 'Sortie using the current setup.',
   resume: 'Resume the current sortie.',
   restart: 'Restart the current mission.',
-  mode: 'MISSION: 4-phase campaign. FURBALL: endless instant dogfight.',
+  mission: 'Select a mission.',
   diff: 'Missile cap, lock forgiveness and damage.',
   spw: 'Special weapon carried beside the AIM-9s.',
   liv: 'Squadron paint, applied to Warden-2 and Warden-3 too.',
@@ -3940,7 +4112,11 @@ function sbSetActive(i) {
   const vis = sbVisibleRows(); if (!vis.length) return;
   sbActive = ((i % vis.length) + vis.length) % vis.length;
   sbRows.forEach(r => r.classList.toggle('active', r === vis[sbActive]));
-  document.getElementById('sbDesc').textContent = SB_DESC[vis[sbActive].dataset.k] || '';
+  const key = vis[sbActive].dataset.k;
+  const m = mission();
+  document.getElementById('sbDesc').textContent = key === 'mission'
+    ? `${m.title} — ${m.brief}  MAP: ${m.mapTag}  RTB: ${m.rtbType || '—'}`
+    : SB_DESC[key] || '';
 }
 function sbMove(dir) { sbSetActive(sbActive + dir); }
 function syncSBCam() {
@@ -3953,7 +4129,7 @@ function syncSBMenu(paused) {
   sbMenuEl.querySelector('[data-k="launch"]').hidden = isPause;
   sbMenuEl.querySelector('[data-k="resume"]').hidden = !isPause;
   sbMenuEl.querySelector('[data-k="restart"]').hidden = !isPause;
-  document.getElementById('sbModeVal').textContent = selectedMode;
+  document.getElementById('sbMissionVal').textContent = mission().title;
   document.getElementById('sbDiffVal').textContent = DIFFICULTY_PRESETS[diffMode] ? diffMode : 'NORMAL';
   document.getElementById('sbSpwVal').textContent = selectedSPW;
   document.getElementById('sbLivVal').textContent = selectedLivery;
@@ -3968,7 +4144,7 @@ function sbAction(k, dir) {
     case 'launch': launchSortie(); break;
     case 'resume': resumeSim(); break;
     case 'restart': restartBtn.click(); break;
-    case 'mode': modeBtn.click(); break;
+    case 'mission': cycleMission(dir || 1); break;
     case 'diff': diffBtn.click(); break;
     case 'spw': {
       const ids = Object.keys(SPW), i = ids.indexOf(selectedSPW);

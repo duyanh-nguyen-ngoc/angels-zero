@@ -20,6 +20,15 @@ export function createAudio() {
   try { const mv = parseFloat(localStorage.getItem('angelsZero_musicVol')); if (!Number.isNaN(mv) && mv >= 0 && mv <= 1) musicVol = mv; } catch (e) { /* storage unavailable */ }
 
   const N = {};                                            // live nodes
+  // --- streamed scenario soundtrack -------------------------------------------------
+  const BGM_DIR = 'assets/audio/bgm/', XFADE = 1.5, DUCK_DB = -5, DUCK_GAIN = 0.5623, DUCK_T = 0.25, MIN_DWELL = 4.0;
+  const BGM_OK = typeof Audio !== 'undefined' && new Audio().canPlayType('audio/ogg; codecs="vorbis"') !== '';
+  const decks = [];                                        // two reusable MediaElementAudioSourceNodes
+  const sinCurve = new Float32Array(64), cosCurve = new Float32Array(64);
+  for (let i = 0; i < 64; i++) { const t = i / 63 * Math.PI / 2; sinCurve[i] = Math.sin(t); cosCurve[i] = Math.cos(t); }
+  const lastIdx = Object.create(null);                     // scenario -> last track index
+  let manifest = null, active = 0, curScn = '01_hangar', pendScn = '', dwell = 0, bgmUnlocked = false, lastTickT = 0, switchSeq = 0;
+  let bgmForce = '', bgmCtx = null;
   const radioBufs = Object.create(null);                   // decoded voice clips, cached by line id
   const radioState = { plays: 0, lastId: '', loaded: 0, playing: false };
   const tc = 0.06;                                         // param smoothing time-constant
@@ -282,6 +291,8 @@ export function createAudio() {
   // the rolling brown-noise body.
   function explosion(intensity = 1, delay = 0.02) {
     if (!ready) return;
+    if (!Number.isFinite(intensity)) intensity = 1;          // corrupt scale must never poison an AudioParam
+    if (!Number.isFinite(delay)) delay = 0.02;
     const t = ctx.currentTime, k = Math.min(1.4, Math.max(0.05, intensity)), tb = t + Math.max(0, delay);
     const cn = ctx.createBufferSource(); cn.buffer = N.white;
     const cbp = filt('bandpass', 3000, 1.6); cbp.frequency.setValueAtTime(3000, t); cbp.frequency.exponentialRampToValueAtTime(850, t + 0.11);
@@ -902,21 +913,89 @@ export function createAudio() {
   const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
   let musicOn = true, mStep = 0, mNext = 0, mLvl = 0, mLvlT = 0, mNear = false, mIdleT = 0, mNotes = 0, mTimer = null;
   function initMusic() {
-    N.music = gain(musicOn ? musicVol : 0);                              // K toggle × music-bed level
-    N.musicDuck = gain(1);                                               // radio transmission duck
-    N.musicBus = gain(0.62);                                             // sits under engine / gun / RWR
+    if (BGM_OK) {
+      // src -> g -> musicBus -> duckG -> musicVolG -> master (all created once).
+      N.musicBus = gain(0.62); N.duckG = gain(1); N.musicVolG = gain(musicOn ? musicVol : 0);
+      N.musicBus.connect(N.duckG).connect(N.musicVolG).connect(master);
+      for (let i = 0; i < 2; i++) {
+        const el = new Audio();
+        el.loop = true; el.preload = 'none'; el.crossOrigin = 'anonymous';
+        decks.push({ el, src: ctx.createMediaElementSource(el), g: gain(0) });
+        decks[i].src.connect(decks[i].g).connect(N.musicBus);
+      }
+      // The manifest is the ONLY network request; the .ogg files stream through Audio().
+      fetch(BGM_DIR + 'manifest.json').then(r => r.ok ? r.json() : null).then(m => { manifest = m; }).catch(() => {});
+      unlockBgm();
+      return;
+    }
+    // --- legacy synth fallback (older Safari without Ogg Vorbis) ---
+    N.music = gain(musicOn ? musicVol : 0);
+    N.musicDuck = gain(1);
+    N.musicBus = gain(0.62);
     N.music.connect(N.musicDuck).connect(N.musicBus).connect(master);
-    N.mDelay = ctx.createDelay(1); N.mDelay.delayTime.value = STEP * 3;  // dotted 8th
+    N.mDelay = ctx.createDelay(1); N.mDelay.delayTime.value = STEP * 3;
     N.mFb = gain(0.34); N.mWet = gain(0.3); N.mDelayLP = filt('lowpass', 3200, 0.5);
     N.mDelay.connect(N.mDelayLP).connect(N.mFb).connect(N.mDelay); N.mDelayLP.connect(N.mWet).connect(N.music);
     N.mL = [gain(0), gain(0), gain(0)];
     for (const g of N.mL) g.connect(N.music);
-    N.mSend = [gain(0.22), gain(0), gain(0.45)];                         // per-layer delay sends
+    N.mSend = [gain(0.22), gain(0), gain(0.45)];
     N.mL.forEach((g, i) => g.connect(N.mSend[i]).connect(N.mDelay));
-    // L1 pad: shared dark low-pass with a slow sweep.
     N.padLP = filt('lowpass', 750, 1.1); N.padLP.connect(N.mL[0]);
     N.padLFO = osc('sine', 0.07); N.padLFOAmt = gain(380); N.padLFO.connect(N.padLFOAmt).connect(N.padLP.frequency);
     if (!mTimer) mTimer = setInterval(musicTick, 25);
+  }
+  // Autoplay unlock: one gesture resumes the context and starts the pending scenario.
+  function unlockBgm() {
+    if (!BGM_OK || bgmUnlocked) return;
+    const evt = ['pointerdown', 'keydown', 'touchend'];
+    const go = () => {
+      if (ctx && ctx.state !== 'running') ctx.resume().catch(() => {});
+      bgmUnlocked = true;
+      if (musicOn) switchTo(pendScn || curScn);
+    };
+    for (const name of evt) window.addEventListener(name, go, { once: true, capture: true });
+    if (ctx) go();   // init() itself runs inside a gesture; start without waiting for another one
+  }
+  // Equal-power crossfade between the two decks; re-entering a scenario alternates tracks.
+  function switchTo(scn) {
+    if (!BGM_OK || !decks.length) return;
+    const files = manifest && manifest.scenarios && manifest.scenarios[scn];
+    if (!files || !files.length) { pendScn = scn; return; }
+    if (!bgmUnlocked) { pendScn = scn; return; }
+    if (scn === curScn && !pendScn && decks[active].el.src) return;
+    const i = 1 - (lastIdx[scn] ?? 1);
+    lastIdx[scn] = i;
+    const idle = 1 - active, out = active, seq = ++switchSeq;
+    const d = decks[idle], o = decks[out];
+    d.el.src = BGM_DIR + files[i]; d.el.currentTime = 0;
+    d.g.gain.cancelScheduledValues(ctx.currentTime); d.g.gain.setValueAtTime(0, ctx.currentTime);
+    const now = ctx.currentTime;
+    d.g.gain.setValueCurveAtTime(sinCurve, now, XFADE);
+    o.g.gain.cancelScheduledValues(now); o.g.gain.setValueAtTime(o.g.gain.value, now);
+    o.g.gain.setValueCurveAtTime(cosCurve, now, XFADE);
+    d.el.play().then(() => {
+      active = idle; curScn = scn; pendScn = ''; dwell = 0;
+      setTimeout(() => {
+        if (seq !== switchSeq) return;
+        try { o.el.pause(); o.el.removeAttribute('src'); o.el.load(); } catch (e) { /* already released */ }
+        o.g.gain.value = 0;
+      }, (XFADE + 0.1) * 1000);
+    }).catch(() => { pendScn = scn; });
+  }
+  // Priority-ordered resolver: first matching scenario wins.
+  // Mission-aware priority: dynamic overrides first, then the mission's own track.
+  // wxOverride gates night/storm so CANYON_RUN / NAVAL_BATTLE / ACE_DUEL keep their score.
+  function resolveScenario(c) {
+    if (bgmForce) return bgmForce;
+    if (!c) return '01_hangar';
+    if (c.debrief || c.landed) return '12_debrief';
+    if (c.rtb) return '11_rtb';
+    if (c.app === 'MENU') return '01_hangar';
+    if (c.onGround && !c.launched) return '02_catapult';
+    if (c.inCombat && (c.dmg >= 0.75 || c.msl === 0)) return '10_last_stand';
+    if (c.wxOverride && (c.storm || c.rain > 0.3)) return '04_storm';
+    if (c.wxOverride && (c.night || c.nvg)) return '05_night';
+    return c.bgmScenario || '03_air_superiority';
   }
   function env(g, at, peak, a, d, sus = 0.0008) {
     g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(peak, at + a); g.gain.exponentialRampToValueAtTime(Math.max(sus, 0.0008), at + a + d);
@@ -1002,8 +1081,24 @@ export function createAudio() {
       }
     }
   }
-  function musicTick() {
-    if (!ready || ctx.state !== 'running' || !N.mL) return;
+  function musicTick(dtOverride) {
+    if (!ready || ctx.state !== 'running') return;
+    if (BGM_OK) {
+      // Once per frame: resolve the scenario, enforce dwell, start crossfades.
+      // Debug stepping may pass its own dt; production uses the wall clock.
+      let dt = dtOverride;
+      if (dt === undefined) {
+        const nowMs = performance.now();
+        dt = lastTickT ? Math.min(0.1, (nowMs - lastTickT) / 1000) : 0;
+        lastTickT = nowMs;
+      }
+      dwell += dt;
+      const scn = resolveScenario(bgmCtx);
+      const wait = (scn === '12_debrief' || scn === '01_hangar' || scn === '11_rtb') ? 0 : MIN_DWELL;
+      if ((scn !== curScn || pendScn) && dwell >= wait) switchTo(scn);
+      return;
+    }
+    if (!N.mL) return;
     const live = musicOn && (N.mTgt.some(v => v > 0) || ctx.currentTime < mIdleT);
     if (!live) { mNext = 0; return; }
     const now = ctx.currentTime;
@@ -1013,7 +1108,9 @@ export function createAudio() {
   // Intensity: 0 off / 1 patrol (airborne) / 2 furball (bandit < 3 km, leaves
   // > 3.4 km, or combo >= x1.5) / 3 ace (combo >= x3.0 or the PHASE 3 Ace alive); 4 s hold before dropping.
   N.mTgt = [0, 0, 0];
-  function updateMusic(p) {
+  function updateMusic(p, dtOverride) {
+    bgmCtx = p;
+    if (BGM_OK) { musicTick(dtOverride); return; }
     if (!N.mL) return;
     const d = p.banditDist ?? Infinity, combo = p.combo || 1;
     mNear = mNear ? d < 3400 : d < 3000;
@@ -1028,6 +1125,16 @@ export function createAudio() {
   }
   function setMusic(on) {
     musicOn = !!on;
+    if (BGM_OK) {
+      if (N.musicVolG) N.musicVolG.gain.setTargetAtTime(musicOn ? musicVol : 0, ctx.currentTime, 0.25);
+      if (!musicOn) setTimeout(() => { if (!musicOn) for (const d of decks) { try { d.el.pause(); } catch (e) { /* noop */ } } }, 300);
+      else if (bgmUnlocked) {
+        const d = decks[active];
+        if (d && d.el.src) d.el.play().catch(() => { pendScn = curScn; });
+        else switchTo(pendScn || curScn);
+      }
+      return;
+    }
     if (N.music) set(N.music.gain, musicOn ? musicVol : 0, 0.25);
     if (musicOn) mNext = 0;
   }
@@ -1035,12 +1142,24 @@ export function createAudio() {
   function setMusicVolume(v) {
     musicVol = Math.min(1, Math.max(0, v));
     try { localStorage.setItem('angelsZero_musicVol', String(musicVol)); } catch (e) { /* ignore */ }
+    if (BGM_OK) { if (N.musicVolG) N.musicVolG.gain.setTargetAtTime(musicOn ? musicVol : 0, ctx.currentTime, 0.05); return; }
     if (N.music) set(N.music.gain, musicOn ? musicVol : 0, 0.08);
   }
-  // Voiced radio: duck music -9 dB and combat SFX about -4 dB while a line plays.
+  // Voiced radio: duck the music bed -5 dB and combat SFX about -4 dB while a line plays.
   function setRadio(active) {
-    if (N.musicDuck) set(N.musicDuck.gain, active ? 0.35 : 1, 0.08);
+    if (BGM_OK && N.duckG) {
+      const gp = N.duckG.gain, t = ctx.currentTime, cur = gp.value;
+      gp.cancelScheduledValues(t); gp.setValueAtTime(cur, t);
+      gp.linearRampToValueAtTime(active ? DUCK_GAIN : 1, t + DUCK_T);
+    } else if (N.musicDuck) set(N.musicDuck.gain, active ? 0.35 : 1, 0.08);
     if (N.duck) set(N.duck.gain, active ? 0.63 : 1, 0.08);
+  }
+  // PAUSED keeps the stream alive but ducks it; the world SFX bus stays untouched.
+  function setBgmPause(active) {
+    if (!BGM_OK || !N.duckG) return;
+    const gp = N.duckG.gain, t = ctx.currentTime, cur = gp.value;
+    gp.cancelScheduledValues(t); gp.setValueAtTime(cur, t);
+    gp.linearRampToValueAtTime(active ? DUCK_GAIN : 1, t + DUCK_T);
   }
   // 45 ms static squelch click at 1800 Hz on transmission start / end.
   function radioClick() {
@@ -1287,7 +1406,6 @@ export function createAudio() {
     const heartK = sm(gs, 0.35, 0.8) * live;
     if (heartK > 0.02 && tNow >= N.nextBeat) { heartbeat(0.5 + 0.5 * heartK); N.nextBeat = tNow + 60 / (95 + 60 * sm(gs, 0.35, 1.0)); }
     N.dbg = { groanK: +groanK.toFixed(2), lugK: +lugK.toFixed(2), buffK: +buffK.toFixed(2), breathK: +breathK.toFixed(2), heartK: +heartK.toFixed(2), tunnel: Math.round(N.tunnel.frequency.value) };
-    if (p.music) updateMusic(p.music);
     if (p.glocWarn && (!N.chimeT || ctx.currentTime - N.chimeT > 2.4)) { glocChime(); N.chimeT = ctx.currentTime; }
     if (!p.glocWarn) N.chimeT = 0;
 
@@ -1355,16 +1473,24 @@ export function createAudio() {
   }
 
   return {
-    init, resume, suspend, update, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, radioSquelch, preloadRadio, playRadio, stopRadio, preload,
+    init, resume, suspend, update, updateMusic, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, setBgmPause, setBgmForce: v => { bgmForce = v || ''; }, radioSquelch, preloadRadio, playRadio, stopRadio, preload,
     toggleMusic() { setMusic(!musicOn); return musicOn; },
     get musicOn() { return musicOn; }, setMusicVolume,
     get musicVolume() { return musicVol; },
-    // Music sequencer state for __audioDebug: intensity layer, live layer gains, loop position, notes scheduled.
+    // Music state for __audioDebug: streamed decks when available, legacy sequencer otherwise.
     get music() {
+      if (BGM_OK) return { on: musicOn, layer: 0, gains: decks.map(d => +d.g.gain.value.toFixed(2)),
+        bar: 0, step: 0, notes: 0, duck: N.duckG ? +N.duckG.gain.value.toFixed(3) : 1,
+        bus: N.musicVolG ? +N.musicVolG.gain.value.toFixed(2) : 0, ahead: 0, scn: curScn };
       return { on: musicOn, layer: mLvl, gains: N.mL ? N.mL.map(g => +g.gain.value.toFixed(2)) : [0, 0, 0],
         bar: (mStep >> 4) + 1, step: mStep, notes: mNotes, duck: N.musicDuck ? +N.musicDuck.gain.value.toFixed(2) : 1,
         bus: N.music ? +N.music.gain.value.toFixed(2) : 0, ahead: mNext && ctx ? +(mNext - ctx.currentTime).toFixed(3) : 0 };
-    }, get radio() { return { ...radioState, duck: N.duck ? +N.duck.gain.value.toFixed(2) : 1 }; }, setVolume, setMuted,
+    },
+    get bgm() { return BGM_OK ? { scn: curScn, curScn, idx: lastIdx[curScn] ?? 0, dwell: +dwell.toFixed(2),
+      deckT: +decks[active]?.el.currentTime.toFixed(2) || 0, duck: N.duckG ? +N.duckG.gain.value.toFixed(3) : 1,
+      unlocked: bgmUnlocked, ok: BGM_OK, pending: pendScn || '' } : { ok: false, scn: '', idx: 0, dwell: 0 }; },
+    resolveScenario,
+    get radio() { return { ...radioState, duck: N.duck ? +N.duck.gain.value.toFixed(2) : 1 }; }, setVolume, setMuted,
     get sfxStatus() { return { ...sfxState }; },
     toggleMute() { setMuted(!muted); return muted; },
     get volume() { return volume; }, get muted() { return muted; },

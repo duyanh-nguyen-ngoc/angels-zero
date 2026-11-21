@@ -6,7 +6,7 @@
 // clipped to the 3D combiner glass. Square tactical radar (bottom-left), stores
 // list + F-15C silhouette with per-pylon AIM-9 reload icons (bottom-right),
 // open-corner target brackets, edge pointers, minimal top-left telemetry.
-import { SPW } from './loadout.js?v=s77a';
+import { SPW } from './loadout.js?v=s80a';
 
 export function createHUD(THREE, A) {
   const canvas = A.canvas;
@@ -1669,6 +1669,11 @@ export function createHUD(THREE, A) {
   function drawPrompt(ctx) {
     if (C.dead) return;
     let txt = '', prio = 0;
+    if (C.rtb && C.rtb.on && C.rtb.type === 'CARRIER' && C.ally && C.ally.pos) {
+      const sternX = C.ally.pos.x - C.ally.fwd.x * C.ally.len / 2;
+      const sternZ = C.ally.pos.z - C.ally.fwd.z * C.ally.len / 2;
+      if (Math.hypot(sternX - S.position.x, sternZ - S.position.z) < 3500) { txt = '[L] ENGAGE AUTOLAND'; prio = 0; }
+    }
     const rwr = C.rwr || [];
     for (let i = 0; i < rwr.length; i++) if (rwr[i].kind === 'msl' && rwr[i].g === 'RADAR') { txt = P_RDR; prio = 1; break; }
     if (!txt) for (let i = 0; i < rwr.length; i++) if (rwr[i].kind === 'msl') { txt = P_IR; prio = 2; break; }

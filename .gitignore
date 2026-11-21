@@ -8,5 +8,8 @@ __pycache__/
 *.rar
 .edge_tmp*/
 
+# Raw music sources stay outside the deployed folder
+raw_bgm/
+
 # Sketchfab source model (>50 MB, supplied separately per angel-zero/AGENTS.md)
 angel-zero/assets/mcdonnell_douglas_f-15_eagle_fighter_jet.glb

@@ -8,8 +8,8 @@
 // burning wrecks that splash, scoring, waves, lock-on and threat warnings.
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { DIFFICULTY_PRESETS } from './difficulty.js?v=s77a';
-import { SPW } from './loadout.js?v=s77a';
+import { DIFFICULTY_PRESETS } from './difficulty.js?v=s80a';
+import { SPW } from './loadout.js?v=s80a';
 
 const NM = 1852, FT = 0.3048, G0 = 9.81;
 // Allied CVN model: same 360 m deck as the procedural ship, re-anchored to the GLB.
@@ -1977,7 +1977,11 @@ export function createCombat(THREE, env) {
     } else if (p === 3) {
       let aces = 0; for (const e of enemies) if (e.alive && e.aceFlight) aces++;
       C.obj = { done: 2 - aces, total: 2 };
-      if (aces === 0 && aceFlightDone) setMissionPhase(4);
+      if (aces === 0 && aceFlightDone) {
+        setMissionPhase(4);
+        C.rtb = { on: true, type: C.rtbType || 'BASE', t0: performance.now() };
+        if (env.onRadio) env.onRadio('RTB');
+      }
     } else if (p === 4) C.obj = { done: 0, total: 1 };
   }
 
@@ -3048,6 +3052,9 @@ export function createCombat(THREE, env) {
     placeAllyLights(t.g, 1, t.aimH);
     C.ally = { g: t.g, fwd, pos, vel, deckY: t.aimH, len: t.len, beam: t.beam,
       spin: t.spin, startZ, ciws: t.ciws, sams: t.sams, glb: false, island: null, yaw0: 0, deckLocalY: t.aimH };
+    t.g.visible = C.carrierVisible !== false;
+    const cp = C.missionCarrier;
+    if (cp) { pos.set(cp.pos[0], cp.pos[1], cp.pos[2]); C.ally.startZ = cp.pos[2]; }
     return C.ally;
   }
   // Return Line: twenty-one cyan pylons every kilometre across the southern edge.
@@ -3128,6 +3135,7 @@ export function createCombat(THREE, env) {
       a.yaw0 = model.rotation.y;
       a.deckY = CARRIER_DECK_Y; a.len = CARRIER_LEN; a.glb = true; a.spin = null; a.deckLocalY = deckLocalY;
       a.g = model; a.pos = model.position;
+      model.visible = C.carrierVisible !== false;
       scene.add(model);
       placeAllyLights(model, CARRIER_SCALE, deckLocalY);
       if (old) {
@@ -3148,7 +3156,7 @@ export function createCombat(THREE, env) {
   // landing lane over the angled deck and centreline stays clear.
   function allyCollision() {
     const a = C.ally;
-    if (!a) return false;
+    if (!a || C.carrierVisible === false) return false;
     _lpLocal.copy(S.position).sub(a.pos).applyQuaternion(_allyInvQ.copy(a.g.quaternion).invert());
     const y = _lpLocal.y;
     // Gear down / a live carrier state machine means this is a deck surface, not a wall.
@@ -3978,6 +3986,37 @@ export function createCombat(THREE, env) {
     setSPW,
     setMode(id) { C.mode = id === 'FURBALL' ? 'FURBALL' : 'MISSION'; C.furballKills = 0; furT = 0; return C.mode; },
     setMissionPhase(p) { setMissionPhase(p); return C.missionPhase; },
+    configureMission(m, mapDef) {
+      C.missionTitle = m.title; C.rtbType = m.rtbType; C.missionBgm = m.bgmScenario;
+      MP[1].label = m.title;
+      MP[2].label = m.rtbType === 'CARRIER' ? 'NAVAL STRIKE' : 'SECTOR STRIKE';
+      MP[3].label = m.id === 'ACE_DUEL' ? 'CRIMSON DUEL' : 'ACE INTERCEPT';
+      MP[4].label = m.rtbType === 'CARRIER' ? 'CARRIER RTB' : 'AFB RTB';
+      // The carrier is loaded once and cached; a mission switch only toggles it.
+      const need = m.launch === 'CATAPULT' || m.rtbType === 'CARRIER';
+      C.carrierVisible = need;
+      C.missionCarrier = mapDef && mapDef.carrier ? mapDef.carrier : null;
+      if (C.ally) {
+        C.ally.g.visible = need;
+        const cp = C.missionCarrier;
+        if (cp) {
+          C.ally.pos.set(cp.pos[0], cp.pos[1], cp.pos[2]);
+          C.ally.g.position.copy(C.ally.pos);
+          C.ally.startZ = cp.pos[2];
+          C.ally.fwd.set(0, 0, -1); C.ally.g.rotation.y = C.ally.yaw0 || 0;
+        }
+      }
+      return C;
+    },
+    // Mission switch: return every pooled actor to its pool without allocating.
+    resetMission() {
+      for (const e of enemies) { e.alive = false; e.wreck = null; if (e.g) e.g.visible = false; }
+      for (const m of missiles) { m.active = false; if (m.mesh) m.mesh.visible = false; }
+      for (const t of surface) { t.alive = false; if (t.g) t.g.visible = false; }
+      for (const t of taskForce) { t.alive = false; if (t.g) t.g.visible = false; }
+      ripple.length = 0; aamRack = 0;
+      return { enemies, missiles, surface, taskForce };
+    },
     primaryTargets,
     onCarrierTrap() {
       C.health = 100; C.score += 1000;

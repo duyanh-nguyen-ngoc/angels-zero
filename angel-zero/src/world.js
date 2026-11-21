@@ -1095,8 +1095,40 @@ export function createWorld(THREE, env) {
     return null;
   }
 
+  // --- map switching: reuse the terrain geometry and materials, reset collision sets.
+  const baseBoxes = boxes.slice(), baseCyls = cyls.slice();
+  let activeMap = null;
+  function rebuild(def) {
+    activeMap = def || null;
+    const mode = def ? def.heightFn : 'archipelago';
+    const amp = def && def.canyonAmp ? def.canyonAmp : 1;
+    const fn = mode === 'sea' ? (x, z) => -150 - 12 * (fbm(nSea, x * 0.0004, z * 0.0004, 2) * 0.5 + 0.5)
+      : mode === 'strait' ? (x, z) => {
+        let h = -150;
+        for (const [ix, iz, r] of (def.islands || [])) { const d = Math.hypot(x - ix, z - iz); if (d < r) h = Math.max(h, 120 * (1 - d / r)); }
+        return h;
+      }
+      : mode === 'gorge' ? (x, z) => analyticHeight(x, z) * amp
+        : analyticHeight;
+    for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) grid[j * (N + 1) + i] = fn(X0 + i * STEP, Z0 + j * STEP);
+    for (let i = 0; i < pos.count; i++) {
+      const gi = Math.round((pos.getX(i) + WORLD.SIZE / 2) / STEP), gj = Math.round((pos.getZ(i) + WORLD.SIZE / 2) / STEP);
+      pos.setY(i, grid[gj * (N + 1) + gi]);
+    }
+    geo.computeVertexNormals();
+    geo.attributes.position.needsUpdate = true;
+    geo.attributes.normal.needsUpdate = true;
+    geo.attributes.color.needsUpdate = true;
+    boxes.length = 0; cyls.length = 0;
+    if (mode === 'archipelago') { for (const b of baseBoxes) boxes.push(b); for (const q of baseCyls) cyls.push(q); }
+    for (const [ix, iz, r] of (def && def.islands) || []) addCyl(ix, iz, -200, 130, r * 0.85);
+    for (const child of props.children) child.visible = !!(def && def.runway);
+    return def;
+  }
+
   return {
-    terrain, props, heightAt, analyticHeight, collide, addBox, update,
+    terrain, props, heightAt, analyticHeight, collide, addBox, update, rebuild,
+    get map() { return activeMap; },
     forest: trees.mesh, farmEdge: FARM.edge,
     get treeStats() { const { mesh, ...s } = trees; return s; },
     runway: RWY, bridges: bridgeInfo, obstacleCount: () => boxes.length + cyls.length,
