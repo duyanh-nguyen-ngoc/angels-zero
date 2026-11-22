@@ -8,11 +8,11 @@
 // burning wrecks that splash, scoring, waves, lock-on and threat warnings.
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { DIFFICULTY_PRESETS } from './difficulty.js?v=s90a';
-import { SPW } from './loadout.js?v=s90a';
-import { missionConfig } from './missions.js?v=s90a';
+import { DIFFICULTY_PRESETS } from './difficulty.js?v=s91a';
+import { SPW } from './loadout.js?v=s91a';
+import { missionConfig } from './missions.js?v=s91a';
 import { gorgeCentreX, gorgeSlope, gorgeHeading, gorgeDist, GORGE_GATE_Z, GORGE_GATE_N, GORGE_FLOOR_Y, GORGE_RIM_Y,
-  GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, CEIL_M } from './maps.js?v=s90a';
+  GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_FORT, CEIL_M } from './maps.js?v=s91a';
 
 const NM = 1852, FT = 0.3048, G0 = 9.81;
 // Allied CVN model: same 360 m deck as the procedural ship, re-anchored to the GLB.
@@ -39,10 +39,13 @@ const STRIKE_N = 4, STRIKE_HP_K = 2.2, STRIKE_SPLASH = 35, STRIKE_PTS = 1200, JA
 const SHIP_HP = { DDG: 3, CG: 5, CV_FLAG: 10 }, SHIP_SCALE = { DDG: 1, CG: 1.25, CV_FLAG: 1.9 };
 const SHIP_SAM_CD = 9;
 const AA_RANGE = 3200, AA_ALT = 3000, AA_CD = 1.4, AA_DMG = 0.015;
-const CEIL_WARN_S = 3.0, CEIL_SAM_CD = 2.5, CEIL_HYST_M = 10, CEIL_SAM_MIN_D = 1800, CEIL_ARM_DELAY = 8.0;
-const CEIL_MASK_M = CEIL_M - 30;
+const CANYON_SAM_MAX = 24, CEIL_ARM_DELAY = 8.0, CEIL_HYST_M = 10;
+const CEIL_WARN_S = 1.5, CEIL_SALVO_MIN = 4, CEIL_SALVO_MAX = 6, CEIL_SALVO_CD = 1.8, CEIL_STAGGER = 0.12;
+const CEIL_SAM_MIN_D = 250, CEIL_MASK_M = CEIL_M - 30;
 const CANYON_GATE_N = GORGE_GATE_N;
-const CLIMB_SAMS = 3, CLIMB_TMAX = 25;
+const CLIMB_WALL_T = 12, CLIMB_SALVO_MIN = 6, CLIMB_SALVO_MAX = 8, CLIMB_SALVO_CD = 2.0;
+const SAM_V = 620, SAM_G = 22, SAM_LIFE = 14;
+const SAM_SITE_PER_GATE = 2, CRATER_SITE_N = 8;
 const ENEMY_GUN = { range: 900, cone: 0.99813, burst: 0.6, cd: 1.4, rps: 50, dmg: 0.006, spread: 0.6 * 0.01745 };
 const ACE_DUEL_HP = 100;                       // same airframe HP as any fighter (no boss pool)
 // Duel AI: gun-defence trigger (player nose within 14 deg inside 1.5 km) and loop entry speed.
@@ -97,8 +100,10 @@ export function createCombat(THREE, env) {
   // Stores: weapon select (>MSL / >BOMB), bombs, CCIP solution, flares.
   Object.assign(C, { weapon: 'MSL', bombs: 0, bombMax: 0, bombReload: 0, ccip: null, ccipTof: 0, flares: FLR_MAX, flareMax: FLR_MAX, chaff: 0, chaffMax: 0, notchT: 0,
     wingOrder: 'FORM', wingOrderT: 0, gunRounds: 0, gunHitsP: 0, mslFiredP: 0, mslHitsP: 0, maxDmg: 0, traps: 0 });
-  Object.assign(C, { mcfg: missionConfig({}), stage: 0, stageT: 0, ceil: { armed: false, phase: 'CLEAR', warnT: 0, lastSam: 0, live: true },
-    climb: { on: false, t: 0, sams: 0 }, gateIdx: 0, weaponsLock: { msl: false, spw: false } });
+  Object.assign(C, { mcfg: missionConfig({}), stage: 0, stageT: 0,
+    ceil: { st: 'CLEAR', phase: 'CLEAR', armed: false, t: 0, warnT: 0, salvoT: 0, rail: 0, railT: 0, fired: 0, lastSam: 0, live: true, belowT: 0 },
+    climb: { on: false, t: 0, sams: 0, salvoT: 0, rail: 0, railT: 0 }, gateIdx: 0, weaponsLock: { msl: false, spw: false },
+    samSitesOn: false, samLive: 0, samLaunched: 0, samFlared: 0, samMasked: 0, samHit: 0 });
 
   const say = (text, secs = 2.5, color = '#4dff91') => {
     C.comms = C.comms.filter(c => c.text !== text);
@@ -384,7 +389,10 @@ export function createCombat(THREE, env) {
       if (env.debug) console.log('[ANGELS_ZERO] bandit launch', quality.tag);
     }
     const hostileAtPlayer = enemy && target && target.isPlayer;
-    if (hostileAtPlayer && !director.canLaunch()) { director.denied++; return null; }
+    const isSam = who === 'SAM';
+    // CANYON SAM batteries own their own salvo scheduler + CANYON_SAM_MAX pool cap;
+    // they must bypass the one-at-a-time fighter-missile director budget.
+    if (hostileAtPlayer && !isSam && !director.canLaunch()) { director.denied++; return null; }
     const m = missiles.find(x => !x.active); if (!m) return null;
     m.active = true; m.enemy = enemy; m.target = target; m.age = 0; m.motor = false; m.life = enemy ? 10 : 12; m.smokeAcc = 0;
     m.q = quality || MSL_FULL; m.lostTrack = false; m.breakChecked = false; m.flareSalvo = -1;
@@ -414,7 +422,7 @@ export function createCombat(THREE, env) {
     }
     if (target) m.losPrev.copy(target.pos).sub(fromPos).normalize();
     if (!enemy) C.lastPlayerMsl = m;                    // missile cam tracks the most recent player shot
-    if (hostileAtPlayer) director.noteLaunch();
+    if (hostileAtPlayer && !isSam) director.noteLaunch();
     if (env.onSfx) env.onSfx('launch', fromPos, 1);
     return m;
   }
@@ -2194,7 +2202,7 @@ export function createCombat(THREE, env) {
       for (const t of stagedShips) if (t.alive) return false;
       return true;
     }
-    if (st.clear === 'TARGETS') return !strikeAlive();
+    if (st.clear === 'TARGETS') return !strikeAlive() && !C.climb.on;
     if (st.clear === 'ACE') {
       if (!aceFlightDone) return false;
       for (const e of enemies) if (e.alive && e.aceFlight) return false;
@@ -2203,13 +2211,32 @@ export function createCombat(THREE, env) {
     return false;
   }
   // --- CANYON_RUN: radar ceiling, sequential gates, fortified target, climb-out ---
-  // Rim SAM sites: one per gate, alternating sides, 300 m off the centreline (perpendicular).
-  const RIM_SITES = Array.from({ length: CANYON_GATE_N }, () => new THREE.Vector3());
-  const _rimSrc = new THREE.Vector3();
-  for (let i = 0; i < CANYON_GATE_N; i++) {
-    const z = GORGE_GATE_Z[i], side = i & 1 ? 1 : -1, s = gorgeSlope(z), n = Math.sqrt(1 + s * s);
-    RIM_SITES[i].set(gorgeCentreX(z) + side * 300 / n, GORGE_RIM_Y, z - side * 300 * s / n);
+  // Pre-allocated SAM battery pool: 2 rims per gate + a crater ring. Positions are
+  // shared between the Float32Array (debug / instancing) and the Vector3s (fire logic).
+  const SAM_SITE_N = CANYON_GATE_N * SAM_SITE_PER_GATE + CRATER_SITE_N;
+  const SITE_POS = new Float32Array(SAM_SITE_N * 3), SITE_ON = new Int8Array(SAM_SITE_N);
+  const RIM_SITES = Array.from({ length: SAM_SITE_N }, () => new THREE.Vector3());
+  const _rimSrc = new THREE.Vector3(), _siteIdx = new Int16Array(3);
+  function buildSamSites() {
+    let k = 0;
+    for (let i = 0; i < CANYON_GATE_N; i++) {
+      const z = GORGE_GATE_Z[i], s = gorgeSlope(z), n = Math.sqrt(1 + s * s), cx = gorgeCentreX(z);
+      for (let sideI = 0; sideI < SAM_SITE_PER_GATE; sideI++) {
+        const side = sideI ? 1 : -1;
+        const x = cx + side * 300 / n, zz = z - side * 300 * s / n, y = Math.max(terrainHeight(x, zz), GORGE_RIM_Y - 20);
+        SITE_POS[k * 3] = x; SITE_POS[k * 3 + 1] = y; SITE_POS[k * 3 + 2] = zz; SITE_ON[k] = 1;
+        RIM_SITES[k].set(x, y, zz); k++;
+      }
+    }
+    for (let i = 0; i < CRATER_SITE_N; i++) {
+      const a = i / CRATER_SITE_N * Math.PI * 2;
+      const x = GORGE_FORT[0] + Math.cos(a) * GORGE_CRATER_R * 0.95;
+      const z = GORGE_FORT[2] + Math.sin(a) * GORGE_CRATER_R * 0.95;
+      SITE_POS[k * 3] = x; SITE_POS[k * 3 + 1] = GORGE_CRATER_WALL_Y; SITE_POS[k * 3 + 2] = z; SITE_ON[k] = 1;
+      RIM_SITES[k].set(x, GORGE_CRATER_WALL_Y, z); k++;
+    }
   }
+  buildSamSites();
   // Gate frames face down the trench; matrices are static, so they are written once.
   const _cgM = new THREE.Matrix4(), _cgP = new THREE.Vector3(), _cgQ = new THREE.Quaternion(), _cgS = new THREE.Vector3(55 / 30, 3, 55 / 30);
   let canyonGatesBuilt = false;
@@ -2237,77 +2264,129 @@ export function createCombat(THREE, env) {
       if (env.onRadio && C.gateIdx % 3 === 0) env.onRadio('GATE', { n: C.gateIdx });
     }
   }
+  const _siteDist = new Float32Array(SAM_SITE_N), SALVO_Q = new Int16Array(CANYON_SAM_MAX);
+  let ceilDiagT = 0;
   function ceilLog(from, to) {
     if (env.debug) console.log('[ANGELS_ZERO] ceil ' + from + '->' + to + ' y=' + S.position.y.toFixed(1) +
       ' t=' + (env.getMissionT ? env.getMissionT() : 0).toFixed(2));
   }
+  // Fill the reused Int16Array with the nearest active (optionally unmasked) sites.
+  function pickSamSites(out, want, checkMask) {
+    let n = 0;
+    for (let i = 0; i < SAM_SITE_N; i++) {
+      if (!SITE_ON[i]) continue;
+      _siteDist[i] = RIM_SITES[i].distanceTo(S.position);
+      if (checkMask && occluded(RIM_SITES[i], S.position)) continue;
+      let at = n;
+      while (at > 0 && _siteDist[out[at - 1]] > _siteDist[i]) { out[at] = out[at - 1]; at--; }
+      out[at] = i; if (n < want) n++;
+    }
+    return n;
+  }
   function updateCeiling(dt, now) {
     const cfg = C.mcfg.ceiling;
-    if (!cfg || !C.ceil.live || C.rtb || C.climb.on) return;
+    if (!cfg || !C.ceil.live || !C.samSitesOn || C.rtb || C.climb.on) return;
     const missionT = env.getMissionT ? env.getMissionT() : 0;
     const allowed = missionT >= CEIL_ARM_DELAY && !(env.inCutscene && env.inCutscene());
+    ceilDiagT -= dt;
     if (!allowed) {
       C.ceil.armed = false;
-      if (C.ceil.phase !== 'CLEAR') { ceilLog(C.ceil.phase, 'CLEAR'); C.ceil.phase = 'CLEAR'; C.ceil.warnT = 0; }
+      if (C.ceil.st !== 'CLEAR') { ceilLog(C.ceil.st, 'CLEAR'); C.ceil.st = C.ceil.phase = 'CLEAR'; C.ceil.warnT = 0; C.ceil.rail = 0; }
       return;
     }
     C.ceil.armed = true;
     const y = S.position.y;                                  // metres above sea level, one source
-    if (C.ceil.phase === 'CLEAR' && y > cfg.m) {
-      C.ceil.phase = 'WARN'; C.ceil.warnT = CEIL_WARN_S;
+    const st = C.ceil.st;
+    if (st === 'CLEAR' && y > cfg.m + CEIL_HYST_M) {
+      C.ceil.st = C.ceil.phase = 'WARN'; C.ceil.t = CEIL_WARN_S; C.ceil.warnT = CEIL_WARN_S;
+      C.ceil.belowT = 0;
       if (env.onSfx) env.onSfx('caution');
       if (env.onRadio) env.onRadio('SAM_LOCK');
       ceilLog('CLEAR', 'WARN');
-    } else if (C.ceil.phase === 'WARN' && y < cfg.m - CEIL_HYST_M) {
-      C.ceil.phase = 'CLEAR'; C.ceil.warnT = 0; ceilLog('WARN', 'CLEAR');
+    } else if ((st === 'WARN' || st === 'BARRAGE') && y < cfg.m - CEIL_HYST_M) {
+      C.ceil.belowT += dt;
+      if (C.ceil.belowT >= 1.0 || st === 'WARN') {
+        C.ceil.st = C.ceil.phase = 'CLEAR'; C.ceil.warnT = 0; C.ceil.rail = 0;
+        ceilLog(st, 'CLEAR');
+      }
+    } else C.ceil.belowT = 0;
+    if (C.ceil.st === 'WARN') {
+      C.ceil.t = Math.max(0, C.ceil.t - dt);
+      C.ceil.warnT = C.ceil.t;
+      if (C.ceil.t <= 0) {
+        C.ceil.st = C.ceil.phase = 'BARRAGE'; C.ceil.salvoT = 0; C.ceil.rail = 0; C.ceil.fired = 0;
+        ceilLog('WARN', 'BARRAGE');
+      }
     }
-    if (C.ceil.phase === 'WARN') {
-      C.ceil.warnT = Math.max(0, C.ceil.warnT - dt);
-      if (C.ceil.warnT <= 0) {
-        let best = null, bd = Infinity;
-        for (const s of RIM_SITES) {
-          const d = s.distanceTo(S.position);
-          if (d < CEIL_SAM_MIN_D) continue;
-          _dv.copy(s).sub(S.position);
-          if (_dv.z < -300) continue;                        // behind or abeam, never head-on
-          if (d < bd) { bd = d; best = s; }
+    if (C.ceil.st === 'BARRAGE') {
+      C.ceil.salvoT -= dt;
+      if (C.ceil.rail > 0) {
+        C.ceil.railT -= dt;
+        if (C.ceil.railT <= 0 && C.ceil.fired < C.ceil.rail) {
+          const idx = SALVO_Q[C.ceil.fired++];
+          if (SITE_ON[idx] && surfaceSAM(RIM_SITES[idx], 'CEIL')) {
+            if (env.debug) console.log('[ANGELS_ZERO] ceil barrage rail ' + idx + '/' + C.ceil.rail);
+          }
+          C.ceil.railT = CEIL_STAGGER;
         }
-        if (!best) best = RIM_SITES[0];
-        _rimSrc.copy(best);
-        if (surfaceSAM(_rimSrc, 'CEIL')) {
-          C.ceil.phase = 'LAUNCH'; C.ceil.lastSam = now;
+        if (C.ceil.fired >= C.ceil.rail) C.ceil.rail = 0;
+      }
+      if (C.ceil.salvoT <= 0 && C.samLive < CANYON_SAM_MAX) {
+        const sites = pickSamSites(_siteIdx, 3, true);
+        if (sites > 0) {
+          const n = Math.min(CANYON_SAM_MAX - C.samLive, CEIL_SALVO_MIN + (rand() * (CEIL_SALVO_MAX - CEIL_SALVO_MIN + 1) | 0));
+          for (let i = 0; i < n; i++) SALVO_Q[i] = _siteIdx[i % sites];
+          C.ceil.rail = n; C.ceil.fired = 0; C.ceil.railT = 0; C.ceil.salvoT = CEIL_SALVO_CD;
           C.ceilLaunchBanner = performance.now();
-          ceilLog('WARN', 'LAUNCH');
-        }
+          if (env.debug) console.log('[ANGELS_ZERO] ceil barrage salvo n=' + n + ' sites=' + sites);
+          if (env.onSfx) env.onSfx('sam', null, C.samLive);
+        } else C.ceil.salvoT = 0.4;
       }
-    } else if (C.ceil.phase === 'LAUNCH') {
-      if (y < cfg.m - CEIL_HYST_M) { C.ceil.phase = 'CLEAR'; ceilLog('LAUNCH', 'CLEAR'); }
-      else if (now - C.ceil.lastSam > CEIL_SAM_CD * 1000) {
-        let best = RIM_SITES[0], bd = Infinity;
-        for (const s of RIM_SITES) { const d = s.distanceTo(S.position); if (d >= CEIL_SAM_MIN_D && d < bd) { bd = d; best = s; } }
-        _rimSrc.copy(best);
-        if (surfaceSAM(_rimSrc, 'CEIL')) { C.ceil.lastSam = now; ceilLog('LAUNCH', 'LAUNCH'); }
-      }
+    }
+    if (env.debug && ceilDiagT <= 0) {
+      ceilDiagT = 1;
+      const near = pickSamSites(_siteIdx, 1, false) ? +_siteDist[_siteIdx[0]].toFixed(0) : -1;
+      let masked = 0;
+      for (let i = 0; i < SAM_SITE_N; i++) if (SITE_ON[i] && occluded(RIM_SITES[i], S.position)) masked++;
+      console.log('[ANGELS_ZERO] ceil st=' + C.ceil.st + ' alt=' + y.toFixed(1) + ' sites=' +
+        SITE_ON.reduce((a, b) => a + b, 0) + ' nearest=' + near + ' masked=' + masked +
+        ' launched=' + C.samLaunched + ' blocked=' + (C.samLive >= CANYON_SAM_MAX ? 1 : 0));
     }
   }
   function updateClimb(dt, now) {
     if (!C.climb.on) return;
-    C.climb.t += dt;
-    const times = [0.8, 2.0, 3.4];
-    while (C.climb.sams < CLIMB_SAMS && C.climb.t >= times[C.climb.sams]) {
-      director.cooldown = 0;                               // climb SAM sequence is scripted
-      _rimSrc.set(gorgeCentreX(GORGE_CRATER_Z), 20, GORGE_CRATER_Z);
-      const m = launch(_da.copy(_rimSrc), _q.setFromUnitVectors(MSL_NOSE, UP), _db.copy(UP).multiplyScalar(70), PLAYER_TGT, true,
-        { turn: 18 * D2R, fov: 50 * D2R, N: 3.0, noise: 0.3, tag: 'CLIMB' }, undefined, 'RADAR');
-      if (m) { m.sam = true; C.climb.sams++; if (env.debug) console.log('[ANGELS_ZERO] climb SAM', C.climb.sams); }
-      else break;
+    C.climb.t -= dt;
+    C.climb.salvoT -= dt;
+    if (C.climb.rail > 0) {
+      C.climb.railT -= dt;
+      if (C.climb.railT <= 0 && C.climb.fired < C.climb.rail) {
+        const idx = SALVO_Q[C.climb.fired++];
+        if (SITE_ON[idx] && surfaceSAM(RIM_SITES[idx], 'CLIMB')) {
+          if (env.debug) console.log('[ANGELS_ZERO] climb wall rail ' + idx + '/' + C.climb.rail);
+        }
+        C.climb.railT = 0.15;
+      }
+      if (C.climb.fired >= C.climb.rail) C.climb.rail = 0;
     }
-    const d = Math.hypot(S.position.x - gorgeCentreX(GORGE_CRATER_Z), S.position.z - GORGE_CRATER_Z);
-    if (C.climb.sams >= CLIMB_SAMS && ((S.position.y > GORGE_CRATER_WALL_Y + 150 && d > 2500) || C.climb.t > CLIMB_TMAX)) {
+    if (C.climb.salvoT <= 0 && C.samLive < CANYON_SAM_MAX) {
+      // 8 crater batteries + the last 4 rim batteries.
+      let avail = 0;
+      for (let i = SAM_SITE_N - CRATER_SITE_N; i < SAM_SITE_N; i++) if (SITE_ON[i]) SALVO_Q[avail++] = i;
+      const rimEnd = SAM_SITE_N - CRATER_SITE_N;
+      for (let i = Math.max(0, rimEnd - 4); i < rimEnd && avail < CANYON_SAM_MAX; i++) if (SITE_ON[i]) SALVO_Q[avail++] = i;
+      if (avail) {
+        const n = Math.min(avail, CANYON_SAM_MAX - C.samLive, CLIMB_SALVO_MIN + (rand() * (CLIMB_SALVO_MAX - CLIMB_SALVO_MIN + 1) | 0));
+        C.climb.rail = n; C.climb.fired = 0; C.climb.railT = 0; C.climb.salvoT = CLIMB_SALVO_CD;
+        if (env.debug) console.log('[ANGELS_ZERO] climb wall salvo n=' + n + ' t=' + C.climb.t.toFixed(1) + ' live=' + C.samLive);
+      }
+    }
+    if (env.debug && ceilDiagT <= 0) console.log('[ANGELS_ZERO] climb wall t=' + C.climb.t.toFixed(1) + ' live=' + C.samLive);
+    const d = Math.hypot(S.position.x - GORGE_FORT[0], S.position.z - GORGE_FORT[2]);
+    if (C.climb.t <= 0 || (d > 4000 && S.position.y > CEIL_M + 600)) {
       C.climb.on = false;
       C.rtb = { on: true, type: C.rtbType || 'BASE', t0: performance.now() };
-      C.missionPhase = 4; C.mpT = performance.now();
-      if (env.debug) console.log('[ANGELS_ZERO] rtb on (climb)');
+      C.missionPhase = 4;
+      if (env.debug) console.log('[ANGELS_ZERO] rtb on (climb wall)');
       if (env.onRadio) env.onRadio('RTB');
     }
   }
@@ -2521,6 +2600,7 @@ export function createCombat(THREE, env) {
   const _mLosRate = new THREE.Vector3(), _mRelVel = new THREE.Vector3(), _mAcc = new THREE.Vector3();
   const _mJit = new THREE.Vector3(), _mTail = new THREE.Vector3(), _mDir = new THREE.Vector3();
   function updateMissiles(dt, playerActive) {
+    if (env.samFx) env.samFx(missiles, camera.position, performance.now() / 1000);
     for (const m of missiles) {
       if (!m.active) continue;
       m.age += dt;
@@ -2542,9 +2622,17 @@ export function createCombat(THREE, env) {
         if (tgt && m.enemy && tgt.isPlayer && !m.lostTrack && playerActive) {
           m.maskT = (m.maskT || 0) - dt;
           if (m.maskT <= 0) {
-            m.maskT = 0.1;
-            if (occluded(pos, S.position)) { m.lostTrack = true; m.terrainLost = true; C.missileWarning = 0; terrainMaskBreak('MISSILE'); }
+            m.maskT = m.sam ? 0.1 : 0.1;
+            if (occluded(pos, S.position)) {
+              m.maskHold = (m.maskHold || 0) + 0.1;
+              if (!m.sam || m.maskHold >= 0.6) { m.lostTrack = true; m.terrainLost = true; C.missileWarning = 0; terrainMaskBreak('MISSILE'); if (m.sam) C.samMasked++; }
+            } else m.maskHold = 0;
           }
+        }
+        // SAMs detonate on any terrain contact (a hard dive into the trench kills them).
+        if (m.sam && pos.y <= terrainHeight(pos.x, pos.z) + 1) {
+          explosion(pos, 0.8, { kind: 'ground' }); m.active = false; m.mesh.visible = false; C.samLive = Math.max(0, C.samLive - 1);
+          continue;
         }
         if (tgt && m.enemy && tgt.isPlayer && !m.lostTrack && playerActive && (C.playerCloud > CLOUD_T || m.cloud > CLOUD_T)) {
           // The F-15 (or the missile) is in thick cloud: seeker loses lock, flies its
@@ -2622,6 +2710,7 @@ export function createCombat(THREE, env) {
               else if (tgt.fleet) { explosion(pos, 1.3, { kind: 'ship' }); damageSurface(tgt, 90); }          // ship: multi-hit
               else { explosion(pos, 0.8, { vel: tgt.vel }); heavyHit(tgt, m.wingman ? 'WINGMAN' : m.aam ? 'AAM4' : m.friendly ? 'BASE' : undefined); }
               logShot(m, tgt.isChaff ? 'CHAFF' : tgt.isFlare ? 'FLARE' : 'HIT');
+              if (m.sam) { C.samLive = Math.max(0, C.samLive - 1); if (m.target && m.target.isPlayer) C.samHit++; }
               m.active = false; m.mesh.visible = false; continue;
             }
             // Near-miss: closest approach already passed and the missile is receding.
@@ -2657,6 +2746,7 @@ export function createCombat(THREE, env) {
       if (m.age > m.life || pos.y < groundLevel(pos.x, pos.z)) {
         if (pos.y < groundLevel(pos.x, pos.z) && terrainHeight(pos.x, pos.z) < 0) splash(pos, 0.5); else explosion(pos, 0.5);
         logShot(m, m.cloudLost ? 'CLOUD' : m.terrainLost ? 'TERRAIN' : m.lostTrack ? 'LOST' : m.target ? 'MISS' : 'DUMB');
+        if (m.sam) C.samLive = Math.max(0, C.samLive - 1);
         m.active = false; m.mesh.visible = false;
       }
     }
@@ -3072,13 +3162,16 @@ export function createCombat(THREE, env) {
     });
     // Decoy roll for bandit missiles near any burning flare (once per missile per salvo).
     for (const m of missiles) {
-      if (!m.active || !m.enemy || !m.target || !m.target.isPlayer || m.lostTrack || m.guidance !== 'IR') continue;
+      if (!m.active || !m.enemy || !m.target || !m.target.isPlayer || m.lostTrack) continue;
+      const samDecoy = !!m.sam && !!m.samFlared;
+      if (!samDecoy && m.guidance !== 'IR') continue;
       const near = flares.find(f => f.alive && !f.owner && f.age >= 0 && f.salvo !== m.flareSalvo && f.pos.distanceTo(m.mesh.position) < FLR_DECOY_RANGE);
       if (!near) continue;
       m.flareSalvo = near.salvo;
       if (rand() < DIFF.flareDecoyP) {
         m.target = near; m.losPrev.copy(near.pos).sub(m.mesh.position).normalize();
         C.decoyed = (C.decoyed || 0) + 1; C.score += 250;
+        if (samDecoy) C.samFlared++;
         pushEvent('EVADED', 'MISSILE EVADED', 250, '#52ff9c');
         say('MISSILE EVADED', 1.8, '#4dff91');
       }
@@ -3274,7 +3367,9 @@ export function createCombat(THREE, env) {
       if (env.onTele) env.onTele('STRIKE_KILL', t.pos);
       pushEvent('DESTROYED', (t.kind === 'FORT' ? 'BUNKER DOWN // ' : 'JAMMER DOWN // ') + t.label, STRIKE_PTS, '#ffbf3f');
       if (t.kind === 'FORT') {
-        C.ceil.live = false; C.climb.on = true; C.climb.t = 0; C.climb.sams = 0;
+        C.ceil.live = false; C.climb.on = true; C.climb.t = CLIMB_WALL_T; C.climb.sams = 0;
+        C.climb.salvoT = 0; C.climb.rail = 0; C.climb.railT = 0;
+        if (env.onWing) env.onWing('SAM WALL — FLARES, FLARES!', 'WARDEN-2');
         C.climbBanner = performance.now();
         if (env.onSlowMo) env.onSlowMo();
         if (env.onRadio) env.onRadio('CLIMB_OUT');
@@ -3379,7 +3474,7 @@ export function createCombat(THREE, env) {
   const lockList = [];
   const FLEET_SPEED = 13, FLEET_A = 3500, FLEET_B = 1000, WAKE_L = 760;
   const SLOTS = [{ kind: 'CVN', along: 0, lat: 0 }, { kind: 'DDG', along: 950, lat: 0 }, { kind: 'DDG', along: -700, lat: -760 }, { kind: 'DDG', along: -700, lat: 760 }];
-  const SAM_Q = { turn: 22 * D2R, fov: 60 * D2R, N: 3.4, noise: 0.15, tag: 'SAM' };
+  const SAM_Q = { turn: SAM_G * D2R, fov: 60 * D2R, N: 3.5, noise: 0.12, tag: 'SAM' };
   let fleetTh = 0, fleetClock = 0, fleetSpotted = false, fleetHitSaid = false;
   const _fu = new THREE.Vector3(), _fn = new THREE.Vector3(), _fp = new THREE.Vector3(), _ft = new THREE.Vector3(), _flat = new THREE.Vector3();
   const _da = new THREE.Vector3(), _db = new THREE.Vector3(), _dv = new THREE.Vector3();
@@ -3870,12 +3965,17 @@ export function createCombat(THREE, env) {
   function samsInAir() { let n = 0; for (const m of missiles) if (m.active && m.sam) n++; return n; }
   // Surface-to-air launch from a mount: boost up and toward the player.
   function surfaceSAM(from, label) {
-    if (samsInAir() >= 2) return false;
+    if (C.samLive >= CANYON_SAM_MAX) return false;
     _dv.copy(S.position).sub(from).normalize().lerp(UP, 0.45).normalize();
     _q.setFromUnitVectors(MSL_NOSE, _dv);
-    const m = launch(_da.copy(from), _q, _db.copy(_dv).multiplyScalar(70), PLAYER_TGT, true, SAM_Q, undefined, 'RADAR');
+    const m = launch(_da.copy(from), _q, _db.copy(_dv).multiplyScalar(SAM_V), PLAYER_TGT, true, SAM_Q, undefined, 'PN', 'SAM');
     if (!m) return false;
-    m.sam = true;
+    m.sam = true; m.kind = 'SAM'; m.life = SAM_LIFE; m.samLabel = label;
+    m.samFlared = rand() < 0.55;                          // one decoy decision per missile
+    m.maskT = 0;
+    C.samLive++; C.samLaunched++;
+    if (env.samPuff) env.samPuff(_da.copy(from));
+    if (env.onSfx) env.onSfx('sam', null, C.samLive);
     say(`SAM LAUNCH — ${label}! BREAK!`, 2.0, '#ff4d3d');
     return true;
   }
@@ -4574,8 +4674,12 @@ export function createCombat(THREE, env) {
       C.missionTitle = m.title; C.rtbType = m.rtbType; C.missionBgm = m.bgmScenario;
       C.mcfg = missionConfig(m);
       C.stage = 0; C.stageT = 0; C.gateIdx = 0;
-      C.ceil.armed = false; C.ceil.phase = 'CLEAR'; C.ceil.warnT = 0; C.ceil.lastSam = 0; C.ceil.live = !!C.mcfg.ceiling;
-      C.climb.on = false; C.climb.t = 0; C.climb.sams = 0;
+      C.samSitesOn = C.mcfg.gatesPath === 'CANYON';
+      C.samLive = 0; C.samLaunched = 0; C.samFlared = 0; C.samMasked = 0; C.samHit = 0;
+      C.ceil.st = C.ceil.phase = 'CLEAR'; C.ceil.armed = false; C.ceil.t = 0;
+      C.ceil.warnT = 0; C.ceil.salvoT = 0; C.ceil.rail = 0; C.ceil.railT = 0; C.ceil.fired = 0;
+      C.ceil.lastSam = 0; C.ceil.live = !!C.mcfg.ceiling; C.ceil.belowT = 0;
+      C.climb.on = false; C.climb.t = 0; C.climb.sams = 0; C.climb.salvoT = 0; C.climb.rail = 0; C.climb.railT = 0; C.climb.fired = 0;
       C.weaponsLock.msl = !C.mcfg.weapons.msl || C.mcfg.gunsOnly; C.weaponsLock.spw = !C.mcfg.weapons.spw || C.mcfg.gunsOnly;
       if (C.weaponsLock.msl && C.weapon === 'MSL') C.weapon = 'GUN';
       if (C.weaponsLock.spw && C.weapon === 'BOMB') C.weapon = 'GUN';
@@ -4771,6 +4875,7 @@ export function createCombat(THREE, env) {
           hits: DBG_HITS.join(' '), crip: enemies[0].crippled, vy: Math.round(enemies[0].vel.y), eng: enemies[0].engineFire, zone: enemies[0].zoneLog, debris: debris.length } : null,
         tracers: playerTracers.list.length, enemyTracers: enemyTracers.list.length, missiles: missiles.filter(m => m.active).length, wave: C.wave,
         aceRounds: C.aceRounds || 0, aceHits: C.aceHits || 0, blockedLaunches: C.blockedLaunches || 0,
+        samLaunched: C.samLaunched || 0, samFlared: C.samFlared || 0, samMasked: C.samMasked || 0, samHit: C.samHit || 0, samLive: C.samLive || 0,
         tgt: { armed: C.seekerArmed, wpn: C.weapon, multi: C.multi.map((e, i) => e.label.slice(-2) + ':' + C.multiState[i][0]).join(' '), locked: C.multiLocked,
           aam4: C.aam4, aamRld: +C.aam4Reload.toFixed(1), aamFired: C.aamFired || 0, ripple: ripple.length,
           aamLive: missiles.filter(m => m.active && m.aam).map(m => (m.target && m.target.label ? m.target.label.slice(-2) : 'dumb') + '@' + (m.target && m.target.pos ? Math.round(m.target.pos.distanceTo(m.mesh.position)) : '-')).join(' ') },

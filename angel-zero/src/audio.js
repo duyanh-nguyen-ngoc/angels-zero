@@ -611,6 +611,24 @@ export function createAudio() {
       o.connect(g).connect(master); o.start(t + dt); o.stop(t + dt + 0.06);
     }
   }
+  // SAM salvo alert: a short rising RWR launch warble. Pitch climbs with the
+  // number of live SAMs on the nose; the voice count is capped at four.
+  function samLaunch(count = 1) {
+    if (!ready) return;
+    const t = ctx.currentTime;
+    const voices = Math.min(4, Math.max(1, count | 0));
+    const base = 1150 + Math.min(4, count) * 210;
+    for (let i = 0; i < voices; i++) {
+      const at = t + i * 0.02, f0 = base + i * 180;
+      const o = ctx.createOscillator(); o.type = 'square';
+      o.frequency.setValueAtTime(f0, at); o.frequency.linearRampToValueAtTime(f0 * 1.18, at + 0.09);
+      const lp = filt('lowpass', 3200, 0.7);
+      const g = gain(0);
+      g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(0.04, at + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, at + 0.12);
+      o.connect(lp).connect(g).connect(master); o.start(at); o.stop(at + 0.14);
+    }
+  }
   // ALQ-135 jammer engage: a buzzing noise sweep plus a rising square whine.
   function ecm(on = true) {
     if (!ready) return;
@@ -1707,7 +1725,7 @@ export function createAudio() {
   }
 
   return {
-    init, resume, suspend, update, updateMusic, setSpray, enemyGun, gunhit, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, setBgmPause, bumpBgmDwell() { dwell = MIN_DWELL; }, setBgmForce: v => { bgmForce = v || ''; }, selectTrack, skip, setAuto, onBgmChange, get bgmTracks() { return allTracks() || []; }, radioSquelch, preloadRadio, playRadio, stopRadio, txOpen, txTail, txClose, preload,
+    init, resume, suspend, update, updateMusic, setSpray, enemyGun, gunhit, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, samLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, setBgmPause, bumpBgmDwell() { dwell = MIN_DWELL; }, setBgmForce: v => { bgmForce = v || ''; }, selectTrack, skip, setAuto, onBgmChange, get bgmTracks() { return allTracks() || []; }, radioSquelch, preloadRadio, playRadio, stopRadio, txOpen, txTail, txClose, preload,
     get radioAnalyser() { return N.rAnalyser || null; }, get radioFreq() { return N.rFreq || null; }, get radioTime() { return N.rTime || null; },
     get radioCh() { return RADIO_CH; },
     get radioDsp() { return { pttOpen: !!N.pttOpen, pttTail: !!N.pttTail, static: !!N.rStatic, hp: N.rHP ? N.rHP.frequency.value : 0,

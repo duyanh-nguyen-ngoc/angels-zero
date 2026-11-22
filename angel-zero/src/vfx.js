@@ -776,6 +776,88 @@ export function createVFX(THREE, env) {
     get count() { let n = 0; for (let i = 0; i < STEAM_N; i++) if (steamP[i].on) n++; return n; }
   };
 
+  /* -------------------------------- SAM smoke trails + motor glow (pooled) */
+  const SAM_TRAIL_N = 24, SAM_GLOW_N = 24;
+  const samTrails = Array.from({ length: SAM_TRAIL_N }, () => {
+    const r = new Ribbon({ w0: 2.2, w1: 9, life: 3.2, alpha: 0.55, wisp: 1, step: 6, far: [900, 9000] });
+    r.mat.uniforms.uCol.value.set(0xdfe4e8);
+    r.mesh.visible = false;
+    return r;
+  });
+  const glowGeo = new THREE.BufferGeometry();
+  const glowPos = new Float32Array(SAM_GLOW_N * 3), glowSize = new Float32Array(SAM_GLOW_N), glowAlpha = new Float32Array(SAM_GLOW_N);
+  glowGeo.setAttribute('position', new THREE.BufferAttribute(glowPos, 3).setUsage(THREE.DynamicDrawUsage));
+  glowGeo.setAttribute('aSize', new THREE.BufferAttribute(glowSize, 1).setUsage(THREE.DynamicDrawUsage));
+  glowGeo.setAttribute('aAlpha', new THREE.BufferAttribute(glowAlpha, 1).setUsage(THREE.DynamicDrawUsage));
+  const glowMat = new THREE.ShaderMaterial({
+    uniforms: { uScale: { value: 400 } },
+    vertexShader: LOG_V + `
+      attribute float aSize; attribute float aAlpha; uniform float uScale; varying float vA;
+      void main() { vA = aAlpha; vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = aSize * uScale / max(1.0, -mv.z);
+        gl_Position = projectionMatrix * mv;
+        #include <logdepthbuf_vertex>
+      }`,
+    fragmentShader: LOG_F + `
+      varying float vA;
+      void main() {
+        #include <logdepthbuf_fragment>
+        float d = length(gl_PointCoord - 0.5) * 2.0;
+        float a = vA * pow(clamp(1.0 - d, 0.0, 1.0), 1.5);
+        if (a < 0.004) discard;
+        gl_FragColor = vec4(1.0, 0.62, 0.28, a);
+      }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+  });
+  const glowPoints = new THREE.Points(glowGeo, glowMat);
+  glowPoints.frustumCulled = false; glowPoints.visible = false; scene.add(glowPoints);
+  // Stable per-missile slot ownership: SAM objects are pooled and can live at any
+  // index of `missiles`, so bind each one to a ribbon slot by identity, not array index.
+  const samOwner = new Array(SAM_TRAIL_N).fill(null);
+  const samFx = {
+    update(missiles, camPos, now) {
+      // Retire slots whose owner is no longer a live SAM.
+      for (let i = 0; i < SAM_TRAIL_N; i++) {
+        const o = samOwner[i];
+        if (o && (!o.active || !o.sam)) {
+          samOwner[i] = null; samTrails[i].clear(); samTrails[i].mesh.visible = false;
+        }
+      }
+      // Bind each live SAM to a free slot, then feed its ribbon + motor glow.
+      let glow = 0, live = 0;
+      for (let mi = 0; mi < missiles.length; mi++) {
+        const m = missiles[mi];
+        if (!m || !m.active || !m.sam) continue;
+        let slot = -1;
+        for (let i = 0; i < SAM_TRAIL_N; i++) if (samOwner[i] === m) { slot = i; break; }
+        if (slot < 0) {
+          for (let i = 0; i < SAM_TRAIL_N; i++) if (!samOwner[i]) { slot = i; samOwner[i] = m; samTrails[i].clear(); break; }
+          if (slot < 0) continue;                    // pool saturated (should never exceed 24)
+        }
+        const r = samTrails[slot];
+        if (!r.mesh.visible) r.mesh.visible = true;
+        r.emit(m.mesh.position, 1, now);
+        r.update(camPos, now);
+        live++;
+        glowPos[glow * 3] = m.mesh.position.x; glowPos[glow * 3 + 1] = m.mesh.position.y; glowPos[glow * 3 + 2] = m.mesh.position.z;
+        glowSize[glow] = 9 + 2 * Math.sin(now * 31 + slot); glowAlpha[glow] = 0.9;
+        glow++;
+      }
+      for (let i = 0; i < SAM_TRAIL_N; i++) if (!samOwner[i]) samTrails[i].mesh.visible = false;
+      for (let i = glow; i < SAM_GLOW_N; i++) glowAlpha[i] = 0;
+      glowPoints.visible = glow > 0;
+      if (glow) {
+        glowGeo.attributes.position.needsUpdate = true;
+        glowGeo.attributes.aSize.needsUpdate = true;
+        glowGeo.attributes.aAlpha.needsUpdate = true;
+        glowMat.uniforms.uScale.value = renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+      }
+      return live;
+    },
+    clear() { samOwner.fill(null); for (const r of samTrails) { r.clear(); r.mesh.visible = false; } glowPoints.visible = false; },
+    get stats() { return { trails: samTrails.filter(r => r.mesh.visible).length }; }
+  };
+
   /* ----------------------------------- ship AAA / enemy gun tracers (pooled) */
   const AA_TRACER_N = 128;
   const aaGeo = new THREE.BufferGeometry();
@@ -1486,8 +1568,8 @@ export function createVFX(THREE, env) {
   return {
     attachPlume,
     setWingtips(l, r) { tipL.copy(l); tipR.copy(r); buildVapor(); },
-    clearTrails() { for (const r of ribbons) r.clear(); for (const r of contrails) r.clear(); contrailStats.active = contrailStats.live = 0; vaporTarget = lexTarget = 0; for (const q of sprayP) q.on = false; vaporLevel = 0; vaporPoints.visible = false; catSteam.reset(); rooster.reset(); wake.reset(); },
-    catSteam, aaTracer, spray: rooster, wake,
+    clearTrails() { for (const r of ribbons) r.clear(); for (const r of contrails) r.clear(); contrailStats.active = contrailStats.live = 0; vaporTarget = lexTarget = 0; for (const q of sprayP) q.on = false; vaporLevel = 0; vaporPoints.visible = false; catSteam.reset(); rooster.reset(); wake.reset(); samFx.clear(); },
+    catSteam, aaTracer, spray: rooster, wake, samFx,
     updateContrails,
     get contrailStats() { return contrailStats; },
     update,

@@ -1651,6 +1651,11 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   - Rounds are hitscan closest-approach tests against a 9 m player sphere with a 0.35° spread; every fourth round draws an `aaTracer`. Hits run `damagePlayer(4)`, `gunhit` audio and a small camera bump. Counters `C.aceRounds` / `C.aceHits` feed `DUEL_OK`.
   - `enemyGun()` / `gunhit()` reuse persistent nodes. `?duelbehind=s` places the ace on the player's six. Every `?v=` tag bumped to s90a.
 
+- [x] **Heavy SAM barrage** *(build `s91a`, v1.1.22, `src/combat.js`, `src/vfx.js`, `src/hud.js`, `index.html`)*
+  - Diagnosed the silent ceiling: `lastSam` (seconds) was compared to `CEIL_SAM_CD * 1000`, `CEIL_SAM_MIN_D = 1800` rejected every rim battery, and `surfaceSAM` capped all SAMs at 2. The new state machine uses a 38-site preallocated battery pool, a nearest-3 partial sort, 1.5 s WARN and rolling 4–6 salvos every 1.8 s with 0.12 s rail stagger.
+  - 24 pooled SAMs fly with `SAM_V/SAM_G/SAM_LIFE`, PN guidance, flare/chaff decoys, terrain collision and a 0.6 s mask break. `vfx.samFx` draws 24 smoke ribbons and 24 additive motor glows; launch puffs reuse the steam pool.
+  - Fort destruction starts a 12 s climb-out wall of 6–8 SAMs every 2 s from the crater ring plus the last four rim sites, then hands off to RTB. `?ceilat` / `?flareauto` and once-per-second `ceil` logs make the barrage observable. Every `?v=` tag bumped to s91a.
+
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.
