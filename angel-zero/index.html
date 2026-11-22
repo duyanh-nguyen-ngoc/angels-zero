@@ -720,34 +720,35 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s91a';
-import { createBlastFX } from './src/blastfx.js?v=s91a';
-import { createHUD } from './src/hud.js?v=s91a';
-import { createCockpit3D } from './src/cockpit3d.js?v=s91a';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s91a';
-import { createEjection } from './src/eject.js?v=s91a';
-import { createAudio } from './src/audio.js?v=s91a';
-import { createRadio } from './src/radio.js?v=s91a';
-import { createProfile, LIVERIES, liveryById } from './src/profile.js?v=s91a';
-import { createLivery } from './src/livery.js?v=s91a';
-import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s91a';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s91a';
-import { createCanopyFX } from './src/canopy.js?v=s91a';
-import { createNVG } from './src/nvg.js?v=s91a';
-import { createWorld, WORLD } from './src/world.js?v=s91a';
-import { createSurfaces } from './src/surfaces.js?v=s91a';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s91a';
-import { createFreeLook } from './src/freelook.js?v=s91a';
-import { createCanopyGlass } from './src/canopyglass.js?v=s91a';
-import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s91a';
-import { SPW, SQUADRON, MODES, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode } from './src/loadout.js?v=s91a';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s91a';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s91a';
-import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s91a';
-import { createRadioQueue } from './src/radioQueue.js?v=s91a';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s91a';
+import { createVFX } from './src/vfx.js?v=s92a';
+import { createAmbient } from './src/ambient.js?v=s92a';
+import { createBlastFX } from './src/blastfx.js?v=s92a';
+import { createHUD } from './src/hud.js?v=s92a';
+import { createCockpit3D } from './src/cockpit3d.js?v=s92a';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s92a';
+import { createEjection } from './src/eject.js?v=s92a';
+import { createAudio } from './src/audio.js?v=s92a';
+import { createRadio } from './src/radio.js?v=s92a';
+import { createProfile, LIVERIES, liveryById } from './src/profile.js?v=s92a';
+import { createLivery } from './src/livery.js?v=s92a';
+import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s92a';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s92a';
+import { createCanopyFX } from './src/canopy.js?v=s92a';
+import { createNVG } from './src/nvg.js?v=s92a';
+import { createWorld, WORLD } from './src/world.js?v=s92a';
+import { createSurfaces } from './src/surfaces.js?v=s92a';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s92a';
+import { createFreeLook } from './src/freelook.js?v=s92a';
+import { createCanopyGlass } from './src/canopyglass.js?v=s92a';
+import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s92a';
+import { SPW, SQUADRON, MODES, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode } from './src/loadout.js?v=s92a';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s92a';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s92a';
+import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s92a';
+import { createRadioQueue } from './src/radioQueue.js?v=s92a';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s92a';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
-  GORGE_HALF_W, RUNWAY_BBOX } from './src/maps.js?v=s91a';
+  GORGE_HALF_W, RUNWAY_BBOX } from './src/maps.js?v=s92a';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -933,7 +934,9 @@ const oceanUniforms = {
   uCam: { value: new THREE.Vector3() },
   uLevel: { value: 1 },                              // time-of-day water / foam brightness
   uGlitter: { value: 1 },                            // sun / moon glitter-path width & strength
-  uChop: { value: 0 }                                // weather: wind-chopped sea + whitecaps 0..1
+  uChop: { value: 0 },                               // weather: wind-chopped sea + whitecaps 0..1
+  uSwell: { value: 1 },                              // ambient: calm -> storm swell amplitude
+  uScroll: { value: new THREE.Vector2() }            // ambient: wind-driven normal-octave scroll
 };
 const ocean = new THREE.Mesh(new THREE.PlaneGeometry(OCEAN_SPAN, OCEAN_SPAN, 1, 1), new THREE.ShaderMaterial({
   uniforms: oceanUniforms,
@@ -951,6 +954,7 @@ const ocean = new THREE.Mesh(new THREE.PlaneGeometry(OCEAN_SPAN, OCEAN_SPAN, 1, 
     uniform vec3 uTerr; uniform vec3 uSun; uniform vec3 uSunColor; uniform vec3 uSky;
     uniform vec3 uFog; uniform float uFogD; uniform vec2 uFade; uniform vec3 uCam;
     uniform float uLevel; uniform float uGlitter; uniform float uChop;
+    uniform float uSwell; uniform vec2 uScroll;
     uniform vec3 uDeep; uniform vec3 uShallow;
     // One directional deep-water wave: accumulates its surface slope (Gerstner-style
     // dispersion w = sqrt(g k), so long swells travel faster than short chop).
@@ -963,7 +967,7 @@ const ocean = new THREE.Mesh(new THREE.PlaneGeometry(OCEAN_SPAN, OCEAN_SPAN, 1, 
       vec2 p = vWorldPos.xz;
       float dist = length(uCam - vWorldPos);
       float tw = uTime * (1.0 + 0.9 * uChop);                       // wind drives the sea faster
-      float sw = 1.0 + 0.8 * uChop;
+      float sw = (1.0 + 0.8 * uChop) * uSwell;                      // ambient phase: calm -> storm swell
       // Broad swell: 4 analytic octaves crossing at different headings (no tiling).
       // Each octave fades out once its wavelength nears the pixel footprint, so the
       // short waves never alias into moire stripes in the middle distance.
@@ -977,8 +981,8 @@ const ocean = new THREE.Mesh(new THREE.PlaneGeometry(OCEAN_SPAN, OCEAN_SPAN, 1, 
       float nearK = 1.0 - smoothstep(350.0, 4000.0, dist);
       float midK = 1.0 - smoothstep(2500.0, 22000.0, dist);
       vec3 nB = texture2D(uN1, p * 0.00031 + vec2(tw * 0.0011, -tw * 0.0008)).rgb * 2.0 - 1.0;
-      vec3 n1 = texture2D(uN1, p * 0.0016 + vec2(tw * 0.006, tw * 0.008)).rgb * 2.0 - 1.0;
-      vec3 n2 = texture2D(uN2, p * 0.0043 + vec2(-tw * 0.011, tw * 0.007)).rgb * 2.0 - 1.0;
+      vec3 n1 = texture2D(uN1, p * 0.0016 + uScroll + vec2(tw * 0.006, tw * 0.008)).rgb * 2.0 - 1.0;
+      vec3 n2 = texture2D(uN2, p * 0.0043 - uScroll * 0.65 + vec2(-tw * 0.011, tw * 0.007)).rgb * 2.0 - 1.0;
       vec3 n3 = texture2D(uN2, p * 0.021 + vec2(tw * 0.03, -tw * 0.021)).rgb * 2.0 - 1.0;
       vec3 n4 = texture2D(uN1, p * 0.067 + vec2(-tw * 0.05, -tw * 0.04)).rgb * 2.0 - 1.0;   // micro ripples (100 ft skim)
       float rough = 1.0 + 1.5 * uChop;
@@ -1549,8 +1553,10 @@ function loadMissionScene(m) {
   world.rebuild(MAPS[m.mapTag] || MAPS.ARCHIPELAGO);
   applyMapProps(MAPS[m.mapTag] || MAPS.ARCHIPELAGO);
   vfx.clearTrails();
+  ambient.reset();
   tele.reset();
   combatSys.configureMission(m, MAPS[m.mapTag] || MAPS.ARCHIPELAGO);
+  ambient.configure(m.id);
   combat.missionPhase = 1; combat.rtb = null; combat.done = false;
   state.autobrake = false;
   autoland.on = false; autoland.ph = ''; autoland.prevLz = Infinity; combat.allyHold = false;
@@ -2235,6 +2241,7 @@ function debriefToBriefing() {
   stopDebriefMap();
   debriefEl.hidden = true;
   resetMission();
+  ambient.reset(); ambient.configure('');
   appMode = 'MENU';
   showMenu('brief');
   setView(menuPreviewCockpit);
@@ -3526,6 +3533,7 @@ function updateCameraAndVisuals(dt, now) {
     for (let i = 3 + aces; i < 5; i++) { contrailEm[i].pos.copy(state.position); contrailEm[i].quat.copy(state.quaternion); contrailEm[i].on = false; }
     vfx.updateContrails(contrailEm, now);
   }
+  ambient.update(dt, now);
   // Cloud droplets on the canopy: ease in/out so a cloud pass streaks the glass, then clears.
   {
     const cd = flightMode === 'FLY' ? Math.max(combat.playerCloud || 0, vfx.mist) : 0;
@@ -3540,7 +3548,7 @@ function updateCameraAndVisuals(dt, now) {
   // Cloud fly-through: white-out fog + sky horizon around the camera (src/atmosphere.js).
   atmosphere.update(dt, vfx.mist, nvg.active);
   // 3D bubble canopy glass: glare / sheen lighting + water driven by rain, cloud and airspeed.
-  canopyGlass.update({ dt, time: simTime, rain: flightMode === 'FLY' ? Math.max(weather.rainHere, cloudWet) : 0,
+  canopyGlass.update({ dt, time: simTime, rain: flightMode === 'FLY' ? Math.max(weather.rainHere, cloudWet, ambient.rain) : 0,
     cloud: flightMode === 'FLY' ? Math.max(combat.playerCloud || 0, vfx.mist) : 0, kts: state.speed * 1.94384, rollRate: state.rollRate,
     sunCol: sunLight.color, sunK: Math.min(1.3, sunLight.intensity / 3.4) * atmosphere.sunVisible, sky: atmosphere.sky.material.uniforms.uMid.value,
     gain: 0.15 + 0.85 * Math.min(1, hemiLight.intensity / 1.5), nvg: nvg.active, visible: firstPerson && flightMode === 'FLY' });
@@ -3769,7 +3777,7 @@ function updateAudio() {
     throttle: state.throttle, afterburner: state.afterburner, engineOn: flightMode === 'FLY', cockpit: firstPerson,
     firing: flightMode === 'FLY' && (keys.fire || DEBUG_FIRE) && combat.ammo > 0 && combat.reload <= 0,
     seeker, alert: flightMode === 'FLY' && (combat.incoming || 0) > 0, rwr: flightMode === 'FLY' ? combat.rwrLevel || 0 : 0, whistle: bombWhistle(),
-    cloud: flightMode === 'FLY' ? Math.max(combat.playerCloud || 0, vfx.mist) : 0,
+    cloud: flightMode === 'FLY' ? Math.max(combat.playerCloud || 0, vfx.mist, ambient.mistGain) : 0,
     rain: weather.rainHere,
     gLoad: flightMode === 'FLY' ? state.gLoad : 1, aoa: flightMode === 'FLY' ? state.alpha * 180 / Math.PI : 0,
     gStrain: flightMode === 'FLY' ? state.gStrain : 0, glocWarn: flightMode === 'FLY' && state.gStrain > 0.72,
@@ -3870,6 +3878,7 @@ function onRadio(kind, d) {
 blast = createBlastFX(THREE, { scene, camera, terrainHeight, sunDir: SUN_DIR, wind: vfx.wind, sunLight, hemiLight });
 const DIFF_FORCED = DEBUG && Q.has('difficulty') && DIFFICULTY_PRESETS[Q.get('difficulty').toUpperCase()] ? Q.get('difficulty').toUpperCase() : null;
 const tele = createTelemetry();                             // one fixed buffer set for the whole session
+let ambient = null;                                     // set after combatSys exists; onSmoke closure reads it later
 const combatSys = createCombat(THREE, { scene, camera, renderer, state, combat, jet, groundLevel, terrainHeight, onRadio, runway: world.runway, blast,
   difficulty: DIFF_FORCED || loadDifficulty(),
   cloudDensity: p => vfx.cloudDensity(p),
@@ -3880,6 +3889,7 @@ const combatSys = createCombat(THREE, { scene, camera, renderer, state, combat, 
   aaTracer: (pos, dir, life, red) => vfx.aaTracer.add(pos, dir, life, red),
   samPuff: p => vfx.catSteam.stroke(p, _samPuffFwd, 0.6, 0.06),
   samFx: (list, camPos, now) => vfx.samFx.update(list, camPos, now),
+  onSmoke: (p, n) => ambient && ambient.claimColumn(p.x, p.z, n),
   ilsVisible: () => ilsVisible(), inCutscene: () => inCutscene(), getMissionT: () => missionT + ceilClockBias,
   getMapProps: () => (world.map && world.map.props) || null,
   debug: DEBUG, isCarrierActive: () => !!carrier.phase,
@@ -3895,6 +3905,10 @@ const combatSys = createCombat(THREE, { scene, camera, renderer, state, combat, 
   getTeleStats: () => ({ n: tele.n, ne: tele.ne }),
   getCarrierStats: () => ({ phase: carrier.phase, wire: carrier.wire, t: +carrier.t.toFixed(2), localZ: +_lp.z.toFixed(1) }),
   getLivery: () => livery ? livery.current : null });
+// Living-world layer: all pools built once here; per-mission flags in configure().
+ambient = createAmbient(THREE, { scene, camera, renderer, state, combat, world, vfx, maps: MAPS, atmo: atmosphere,
+  combatSys, ocean: oceanUniforms, debug: DEBUG, ambientOff: DEBUG && Q.has('ambient') && Q.get('ambient') === '0',
+  explicitTod: DEBUG && Q.has('tod') });
 combatReady = true;
 // Boot-time carrier load: the 1.9 MB GLB is mounted and ray-cast before any launch path.
 carrierLoadPromise = Promise.resolve(gpuWarm.pending).then(() => combatSys.loadCarrier(combatSys.CARRIER_GLB)).then(() => carrierReady);
@@ -4643,7 +4657,8 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
       'nav', JSON.stringify({ level: +navLevel.toFixed(2), lights: navLights.length, strobe: +navStat.strobe.toFixed(2), beacon: +navStat.beacon.toFixed(2),
         lit: navLights.filter(n => n.sp.visible).length }), 'look', JSON.stringify(freeLook.stats), 'canopy', JSON.stringify({ glass: canopyGlass.stats, rainCulled: weather.rainCulled,
         nearestRain: +weather.nearestVisible().toFixed(2), audio: audio.canopyRain }), 'fleet', JSON.stringify(combatSys.fleetStats()),
-        'mcam', JSON.stringify({ active: mcam.active, k: +mcam.k.toFixed(2) }), 'slowmo', +timeScale.toFixed(2));
+        'mcam', JSON.stringify({ active: mcam.active, k: +mcam.k.toFixed(2) }), 'slowmo', +timeScale.toFixed(2),
+        'ambient', JSON.stringify(ambient.stats()));
   }
   if (DEBUG && Q.has('pause')) pauseSim();
   if (DEBUG && Q.has('fxhold')) fxHold = true;
@@ -4767,7 +4782,7 @@ addEventListener('resize', () => {
   hud.resize();
 });
 if (DEBUG) {
-  window.__az = { scene, camera, renderer, state, combat, combatSys, eject, audio, mouse, keys, vfx, blast, get blastShake() { return blastShake; }, flyShake, onFlyby, onWing, wingmen, hud, cockpit, perf, jet, cockpitHidden, terrainHeight, setView, freeLook, world, nvg, setNVG, gpuWarm, mcam, slowMo, get timeScale() { return timeScale; }, triggerSlowMo, get selectedSPW() { return selectedSPW; }, get selectedLivery() { return selectedLivery; }, loadSPW, loadLivery, saveSPW, saveLivery, SQUADRON, SPW, get firstPerson() { return firstPerson; },
+  window.__az = { scene, camera, renderer, state, combat, combatSys, ambient, eject, audio, mouse, keys, vfx, blast, get blastShake() { return blastShake; }, flyShake, onFlyby, onWing, wingmen, hud, cockpit, perf, jet, cockpitHidden, terrainHeight, setView, freeLook, world, nvg, setNVG, gpuWarm, mcam, slowMo, get timeScale() { return timeScale; }, triggerSlowMo, get selectedSPW() { return selectedSPW; }, get selectedLivery() { return selectedLivery; }, loadSPW, loadLivery, saveSPW, saveLivery, SQUADRON, SPW, get firstPerson() { return firstPerson; },
     get appMode() { return appMode; },
     triggerEject, startRoll, stepSim, profile, toggleGear, placeOnRunway, get landingGear() { return landingGear; }, get livery() { return livery; }, endSortie, sortie, renderHangar, replaySortie, debriefToBriefing,
     get mode() { return flightMode; }, get enemies() { return combatSys.enemies; }, get model() { return model; }, get ready() { return modelReady; },

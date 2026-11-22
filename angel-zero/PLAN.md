@@ -1656,6 +1656,12 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   - 24 pooled SAMs fly with `SAM_V/SAM_G/SAM_LIFE`, PN guidance, flare/chaff decoys, terrain collision and a 0.6 s mask break. `vfx.samFx` draws 24 smoke ribbons and 24 additive motor glows; launch puffs reuse the steam pool.
   - Fort destruction starts a 12 s climb-out wall of 6–8 SAMs every 2 s from the crater ring plus the last four rim sites, then hands off to RTB. `?ceilat` / `?flareauto` and once-per-second `ceil` logs make the barrage observable. Every `?v=` tag bumped to s91a.
 
+- [x] **Living battlefields** *(build `s92a`, v1.1.23, `src/ambient.js`, `src/atmosphere.js`, `src/vfx.js`, `src/combat.js`, `index.html`)*
+  - New `createAmbient(THREE, env)` factory with `configure/update/reset/stats`: one prebuilt pool per effect, module scratch only and no `new` in `update`. Every mission switch calls `reset()` then `configure(id)` and only toggles flags / visibility, so AFB, canyon and ocean props never leak across maps.
+  - Clouds drift on a wrapped wind offset (`vfx.setWind`), CLOUD_ARENA deck punch-through feeds `vfx.mist`, canopy rain and audio mist. `atmosphere.blendTo(name, secs)` adds STORM / SUNBREAK and phase/RTB-driven sky changes (golden hour on `11_rtb`, explicit `?tod=` suppresses blends). The ocean lerps `uSwell` calm→storm and scrolls two normal octaves.
+  - 96 instanced ship-wake quads from the ally carrier and all live fleet vessels, a 40-point flak pool with orange-core→grey-puff shader, and 6 persistent oil-fire columns (32 points each) claimed from `env.onSmoke` on ship damage/sinking and fort kills. CANYON gets 12 sweeping searchlight cones plus 10 gorge mist sprites; AIR SUPERIORITY gets spinning radar dishes, 16 blinking beacons and 4 racetrack jets with pooled ribbon contrails and distant tracers.
+  - `?ambient=0` kill switch, once-per-second `ambient` log and ambient data in the warp dump. Headless checks confirm sky/flak/wakes/search/beacons/traffic counts, full reset on mission switch, zero errors and ~8 ms p95. Every `?v=` tag bumped to s92a.
+
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.
@@ -1735,7 +1741,7 @@ toggle, ejection, bridge fly-under. User-facing weapon labels unified to
 MSL / UGB (briefing, radio call, CCIP reload cue, stores list).
 
 ## Debug URL flags (require `?debug`)
-`hold=s,a,...` (hold keys) · `keyat=s:key,...` (real keydown/keyup) · `carrierfinalat=s` (carrier final, 450 m behind the stern) · `duelahead=s` (CRIMSON 800 m ahead) · `nointro` · `cockpit` · `freeze` · `warp=s` · `pose=bank,pitch` · `mouse=x,y`
+`ambient=0` (kill all living-world effects) · `hold=s,a,...` (hold keys) · `keyat=s:key,...` (real keydown/keyup) · `carrierfinalat=s` (carrier final, 450 m behind the stern) · `duelahead=s` (CRIMSON 800 m ahead) · `nointro` · `cockpit` · `freeze` · `warp=s` · `pose=bank,pitch` · `mouse=x,y`
 · `ab` · `highg` · `alt=m` · `spd=m/s` · `at=x,y,z,hdg|airbase|canyon|bridgeA|
 bridgeB|volcano|wind|harbor` · `overview[=h]` · `tod=NAME&az=deg` ·
 `todto=NAME:t` · `rolls=n` · `nvg` / `nvgat=s` · `camat=x,y,z` ·

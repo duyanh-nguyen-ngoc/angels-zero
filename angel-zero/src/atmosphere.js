@@ -70,6 +70,26 @@ export const PRESETS = {
     exposure: 0.8, fogK: 1.3, stars: 1.0, corona: 0.28,
     oceanSun: 0x9fb8d8, oceanSunK: 0.42, oceanSky: 0x0a1222, oceanLevel: 0.12, glitter: 0.9,
     cloudTop: 0x2a3447, cloudBelly: 0x111927, env: 0.12, nvgGain: 15, nav: 1.0
+  },
+  // Phase-reactive presets: never randomised, only driven by ambient.blendTo().
+  // STORM: visibility down to 0.55x the map's fogFar (density / 0.55), a weak
+  // 0.35x sun, slate #4a525a cloud bodies and 40 % less ambient fill.
+  STORM: {
+    label: 'STORM FRONT', sunEl: 32, lightEl: 32, moon: false, window: [12 * 60, 15 * 60],
+    horizon: 0x4a525a, mid: 0x3f4a55, zenith: 0x252d36, mie: 0x8b959f, mieK: 1.1, disc: 0xb9c2c9, discK: 0.25, discSize: 0.99992,
+    light: 0xb6c0c8, lightI: 1.2, hemiSky: 0x515d69, hemiGround: 0x232930, hemiI: 0.72, amb: 0x606a74, ambI: 0.21,
+    exposure: 0.9, fogK: 1.82, stars: 0, corona: 0.15,
+    oceanSun: 0x9aa6b0, oceanSunK: 0.55, oceanSky: 0x3b454f, oceanLevel: 0.55, glitter: 0.5,
+    cloudTop: 0x4a525a, cloudBelly: 0x2c333a, env: 0.55, nvgGain: 4.2, nav: 0.35, exact: 1
+  },
+  // SUNBREAK: a hard low sun punching through thin high cloud (ACE_DUEL opening).
+  SUNBREAK: {
+    label: 'SUNBREAK', sunEl: 14, lightEl: 14, moon: false, window: [9 * 60, 11 * 60],
+    horizon: 0xffd9b0, mid: 0x7fb0e0, zenith: 0x2f5791, mie: 0xffc477, mieK: 1.85, disc: 0xfff2d2, discK: 1.0, discSize: 0.99988,
+    light: 0xffe0ac, lightI: 4.76, hemiSky: 0xcfe1f2, hemiGround: 0x4a4636, hemiI: 1.25, amb: 0xc8d8e8, ambI: 0.3,
+    exposure: 1.05, fogK: 0.87, stars: 0, corona: 1.15,
+    oceanSun: 0xffd79a, oceanSunK: 1.5, oceanSky: 0x6288b4, oceanLevel: 1.15, glitter: 2.1,
+    cloudTop: 0xfff3dc, cloudBelly: 0x8090a4, env: 1.2, nvgGain: 2.2, nav: 0.1
   }
 };
 // Random sortie rolls (CLOUD_SEA is picked explicitly as a theatre, with its weather).
@@ -96,7 +116,10 @@ export function createAtmosphere(THREE, env) {
   };
   const cur = mkState(), tgt = mkState();
   let blend = 1;                                         // 1 = settled
+  let blendDur = 1.5;                                    // seconds; blendTo() can override
   let active = { name: 'DAYLIGHT', az: 0, clock: '12:00', mode: 'RANDOM' };
+  // Reused colour scratch — applyToScene/update run every frame, so no .clone() here.
+  const _sa = new THREE.Color(), _sb = new THREE.Color(), _sc = new THREE.Color(), _white = new THREE.Color(1, 1, 1);
 
   /* ------------------------------------------------------------ sky dome */
   const skyUniforms = {
@@ -261,10 +284,16 @@ export function createAtmosphere(THREE, env) {
       for (const k of COLOR_KEYS) cur[k].copy(tgt[k]);
       for (const k of NUM_KEYS) cur[k] = tgt[k];
       cur.skyDir.copy(tgt.skyDir); cur.lightDir.copy(tgt.lightDir);
-      blend = 1; applyToScene(false);
-    } else blend = 0;
+      blendDur = opts.blendSecs || 1.5; blend = 1; applyToScene();
+    } else { blendDur = opts.blendSecs || 1.5; blend = 0; }
     if (bound.onChange) bound.onChange(active);
     return active;
+  }
+  // Phase / RTB driven sky change. One preallocated target state; the existing
+  // update() interpolation pushes it through all of the bound callbacks.
+  function blendTo(name, secs = 1.5) {
+    if (!PRESETS[name] || name === active.name) return active;
+    return applyTimeOfDay(name, secs <= 0 ? { instant: true } : { blendSecs: secs, mode: active.mode });
   }
   function randomize(opts = {}) {
     const name = PRESET_ORDER[Math.floor(Math.random() * PRESET_ORDER.length)];
@@ -279,8 +308,8 @@ export function createAtmosphere(THREE, env) {
     slate.copy(SLATE_DAY).lerp(SLATE_NIGHT, Math.min(1, cur.nav));
     const grey = Math.min(1, oc * 1.12);
     const dk = 1 - cur.exact;                            // colour-discipline desaturation (off for exact presets)
-    skyUniforms.uMid.value.copy(cur.mid); desat(skyUniforms.uMid.value, 0.18 * dk).lerp(slate.clone().multiplyScalar(1.15), grey).lerp(FLASH, fl * 0.35);
-    skyUniforms.uZenith.value.copy(cur.zenith); desat(skyUniforms.uZenith.value, 0.12 * dk).lerp(slate.clone().multiplyScalar(0.85), grey).lerp(FLASH, fl * 0.25);
+    skyUniforms.uMid.value.copy(cur.mid); desat(skyUniforms.uMid.value, 0.18 * dk).lerp(_sa.copy(slate).multiplyScalar(1.15), grey).lerp(FLASH, fl * 0.35);
+    skyUniforms.uZenith.value.copy(cur.zenith); desat(skyUniforms.uZenith.value, 0.12 * dk).lerp(_sb.copy(slate).multiplyScalar(0.85), grey).lerp(FLASH, fl * 0.25);
     skyUniforms.uMieK.value = cur.mieK * (1 - 0.85 * oc); skyUniforms.uDiscK.value = cur.discK * (1 - 0.95 * oc);
     skyUniforms.uDiscSize.value = cur.discSize; skyUniforms.uStars.value = cur.stars * (1 - oc);
     const L = bound;
@@ -302,8 +331,8 @@ export function createAtmosphere(THREE, env) {
     }
     if (L.setCloudColors) {
       // Overcast: slate cloud bodies, darker indigo bellies; lightning floods them.
-      _ct.copy(cur.cloudTop).lerp(slate.clone().multiplyScalar(1.6), Math.min(1, oc * 0.95));
-      _cb.copy(cur.cloudBelly).lerp(slate.clone().multiplyScalar(0.5), Math.min(1, oc * 1.0));
+      _ct.copy(cur.cloudTop).lerp(_sa.copy(slate).multiplyScalar(1.6), Math.min(1, oc * 0.95));
+      _cb.copy(cur.cloudBelly).lerp(_sb.copy(slate).multiplyScalar(0.5), Math.min(1, oc * 1.0));
       // + the preset sun colour and its strength (3.4 = full daylight; overcast dims it).
       L.setCloudColors(_ct, _cb, cur.light, (cur.lightI * (1 - 0.72 * oc)) / 3.4);
     }
@@ -329,7 +358,7 @@ export function createAtmosphere(THREE, env) {
     time += dt;
     nvgOn = !!nvg;
     if (blend < 1) {
-      blend = Math.min(1, blend + dt / 1.5);
+      blend = Math.min(1, blend + dt / blendDur);
       const k = blend >= 1 ? 1 : 1 - Math.exp(-dt * 3.2);
       for (const key of COLOR_KEYS) cur[key].lerp(tgt[key], k);
       for (const key of NUM_KEYS) cur[key] += (tgt[key] - cur[key]) * k;
@@ -342,8 +371,8 @@ export function createAtmosphere(THREE, env) {
     // held ~22 % desaturated so HUD green, afterburners, trails and explosions pop.
     fogColor.copy(cur.horizon);
     desat(fogColor, 0.22 * (1 - cur.exact));
-    fogColor.lerp(slate.clone().multiplyScalar(1.3), Math.min(1, wx.overcast * 1.05))
-      .lerp(cloudWhite.clone().multiplyScalar(Math.max(0.12, cur.exposure * cur.oceanLevel * (1 - 0.5 * wx.overcast))), Math.min(1, mist * 1.15))
+    fogColor.lerp(_sa.copy(slate).multiplyScalar(1.3), Math.min(1, wx.overcast * 1.05))
+      .lerp(_sb.copy(cloudWhite).multiplyScalar(Math.max(0.12, cur.exposure * cur.oceanLevel * (1 - 0.5 * wx.overcast))), Math.min(1, mist * 1.15))
       .lerp(FLASH, wx.flash * 0.3);
     skyUniforms.uWhite.value = Math.min(1, mist * 1.1);
     // Altitude-aware aerial perspective: +15 % haze near the sea (< 1,500 ft) for
@@ -356,7 +385,7 @@ export function createAtmosphere(THREE, env) {
     corona.position.copy(skyDir).multiplyScalar(SUN_DIST).add(camera.position);
     const moon = skyUniforms.uMoon.value > 0.5;
     corona.scale.setScalar(SUN_DIST * (moon ? 0.16 : 0.34));
-    corona.material.color.copy(moon ? cur.disc : cur.light.clone().lerp(new THREE.Color(1, 1, 1), 0.5));
+    corona.material.color.copy(moon ? cur.disc : _sc.copy(cur.light).lerp(_white, 0.5));
     const target = (sunOccluded() || skyDir.y < -0.01 ? 0 : 1 - Math.min(1, mist * 1.4)) * cur.corona * (1 - wx.overcast);
     sunVis += (target - sunVis) * Math.min(1, dt * 6);
     corona.material.opacity = 0.95 * sunVis;
@@ -378,7 +407,7 @@ export function createAtmosphere(THREE, env) {
   }
 
   return {
-    sky, corona, fogColor, update, bind, applyTimeOfDay, randomize, setWeather,
+    sky, corona, fogColor, update, bind, applyTimeOfDay, blendTo, randomize, setWeather,
     get active() { return active; },
     get current() { return cur; },
     get settled() { return blend >= 1; },

@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.23', title: 'LIVING BATTLEFIELDS', bullets: [
+    'All four theatres now breathe: wind-drifted cloud decks and densest-deck mist, phase-reactive skies (STORM in NAVAL phase 3, SUNBREAK for the duel) and golden-hour RTB.',
+    'The sea rolls with a storm swell and every warship leaves a widening wake; AA fire blooms into pooled flak puffs and sinking ships keep burning with persistent smoke columns.',
+    'CANYON RUN sweeps rim searchlights and drifts gorge mist; AIR SUPERIORITY spins its radar dishes, blinks tower beacons and runs distant racetrack traffic with tracer fire.'
+  ] },
   { version: 'v1.1.22', title: 'HEAVY SAM BARRAGE', bullets: [
     'Breaching the canyon radar ceiling now calls a 1.5 s warning followed by rolling 4–6 SAM salvos from both rims every 1.8 s.',
     'Destroying the crater bunker triggers a 6–8 missile climb-out wall with smoke trails, motor glow and RWR alerts.',

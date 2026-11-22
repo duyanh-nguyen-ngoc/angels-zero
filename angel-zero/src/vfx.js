@@ -945,8 +945,10 @@ export function createVFX(THREE, env) {
   // samples the bank ellipsoids and the deck's exact JS twin of the shader
   // density -> inCloud (> 0.35 breaks bandit locks), fog ramp, canopy moisture.
   const SUN = env.sunDir || new THREE.Vector3(0, 1, 0);   // live reference (atmosphere updates it)
-  const WIND = new THREE.Vector3(5.2, 0, -4.6);          // m/s
+  const WIND = new THREE.Vector3(5.2, 0, -4.6);          // m/s (default until ambient drives it)
   const windOff = new THREE.Vector3();
+  let windDriven = false;                                 // ambient owns the drift when true
+  let mistBoost = 0;                                      // ambient's cloud-deck punch-through, 0..1
   const runway = env.runway || null;
   const cr = rng(31337);
   const ARENA = { x: 0, z: -3000, r: 12500 };
@@ -960,7 +962,7 @@ export function createVFX(THREE, env) {
   const deckWin = { k: 0, list: [] };
   let cloudSea = false;
   const NEAR0 = 40, NEAR1 = 180;
-  const sunCol = new THREE.Color(1, 1, 1);
+  const sunCol = new THREE.Color(1, 1, 1), _sunScratch = new THREE.Color();
   let sunK = 1;
 
   // --- tileable noise texture (256^2): R Perlin-style value FBM, G inverted
@@ -1468,14 +1470,14 @@ export function createVFX(THREE, env) {
   }
   let mist = 0, cloudTime = 0, frame = 0;
   function updateMist(dt) {
-    let target = cloudDensity(camera.position);
+    let target = Math.max(cloudDensity(camera.position), mistBoost);
     if (force.mist) target = 1;
     mist += (target - mist) * Math.min(1, dt * (target > mist ? 5.0 : 2.9));   // plunge ~0.2 s, clear ~0.8 s
   }
   const _sv = new THREE.Vector3(), _cf = new THREE.Vector3();
   function updateWind(dt) {
     cloudTime += dt;
-    windOff.copy(WIND).multiplyScalar(cloudTime);
+    if (!windDriven) windOff.copy(WIND).multiplyScalar(cloudTime);
     cloudMat.uniforms.uWind.value.copy(windOff);
     deckMat.uniforms.uWind.value.copy(windOff);
     deck.position.copy(camera.position);
@@ -1574,6 +1576,10 @@ export function createVFX(THREE, env) {
     get contrailStats() { return contrailStats; },
     update,
     get mist() { return mist; },
+    // ambient.js owns cloud drift + deck punch-through; both are scalar-only writes.
+    setWind(x, z) { windDriven = true; windOff.set(x, 0, z); cloudMat.uniforms.uWind.value.copy(windOff); deckMat.uniforms.uWind.value.copy(windOff); },
+    setMistBoost(k) { mistBoost = Math.max(0, Math.min(1, k)); },
+    makeRibbon(opts) { return new Ribbon(opts); },
     cloudDensity, placeDebugCloud,
     get cloudCount() { return banks.filter(b => b.on && !b.dbg).length; },
     setCloudSea, get cloudSea() { return cloudSea; },
@@ -1608,7 +1614,7 @@ export function createVFX(THREE, env) {
     setCloudColors(top, belly, sun, k = 1) {
       for (const m of [cloudMat, deckMat]) { m.uniforms.uTop.value.copy(top); m.uniforms.uBelly.value.copy(belly); }
       if (sun) { sunCol.copy(sun); sunK = k; }
-      const sc = sunCol.clone().multiplyScalar(Math.min(1.25, sunK));
+      const sc = _sunScratch.copy(sunCol).multiplyScalar(Math.min(1.25, sunK));
       cloudMat.uniforms.uSunCol.value.copy(sc); deckMat.uniforms.uSunCol.value.copy(sc);
     },
     // New sortie: random wind heading (5-9 m/s) and drift phase so the decks never repeat.

@@ -8,11 +8,11 @@
 // burning wrecks that splash, scoring, waves, lock-on and threat warnings.
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { DIFFICULTY_PRESETS } from './difficulty.js?v=s91a';
-import { SPW } from './loadout.js?v=s91a';
-import { missionConfig } from './missions.js?v=s91a';
+import { DIFFICULTY_PRESETS } from './difficulty.js?v=s92a';
+import { SPW } from './loadout.js?v=s92a';
+import { missionConfig } from './missions.js?v=s92a';
 import { gorgeCentreX, gorgeSlope, gorgeHeading, gorgeDist, GORGE_GATE_Z, GORGE_GATE_N, GORGE_FLOOR_Y, GORGE_RIM_Y,
-  GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_FORT, CEIL_M } from './maps.js?v=s91a';
+  GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_FORT, CEIL_M } from './maps.js?v=s92a';
 
 const NM = 1852, FT = 0.3048, G0 = 9.81;
 // Allied CVN model: same 360 m deck as the procedural ship, re-anchored to the GLB.
@@ -3353,6 +3353,8 @@ export function createCombat(THREE, env) {
     t.alive = false; t.burn = t.fleet ? 70 : 45;
     for (const m of t.mats) m.color.multiplyScalar(0.28);
     explosion(t.pos, t.ship ? 3.2 : 2.4, { kind: t.ship ? 'ship' : 'ground' });
+    // Persistent oil-fire column (ambient.js). FORT claims two and gets a fire burst.
+    if (env.onSmoke) env.onSmoke(t.pos, t.kind === 'FORT' ? 2 : 1);
     const pts = t.strike ? STRIKE_PTS : t.kind === 'CARRIER' ? 6000 : t.ship ? 2500 : t.kind === 'FLAK' ? 800 : 1200;
     C.score += pts; C.kills++;
     pushEvent('DESTROYED', `${t.kind} ${t.label} ${t.ship ? 'SUNK' : 'DESTROYED'}`, pts, '#52ff9c');
@@ -3384,7 +3386,12 @@ export function createCombat(THREE, env) {
   }
   function damageSurface(t, n) {
     if (!t.alive) return;
+    if (t.ship && t.hpMax === undefined) t.hpMax = t.hp;
     t.hp -= n;
+    if (t.ship && !t.smokeClaimed && t.hpMax && t.hp > 0 && t.hp < t.hpMax * 0.5) {
+      t.smokeClaimed = true;
+      if (env.onSmoke) env.onSmoke(t.pos, 1);
+    }
     if (t.fleet) fleetProvoked = true;
     if (t.fleet && !fleetHitSaid && n >= 20) { fleetHitSaid = true; if (env.onRadio) env.onRadio('FLEET_HIT'); }
     if (t.hp <= 0) destroySurface(t);
@@ -4746,6 +4753,7 @@ export function createCombat(THREE, env) {
       if (C.carrierVisible) for (let p = a.root.parent; p; p = p.parent) p.visible = true;
     },
     get allyRoot() { return C.ally ? (C.ally.root || C.ally.g) : null; },
+    get rimSites() { return RIM_SITES; },               // ambient.js searchlights (read-only)
     setBaseDefencesVisible(v) { for (const g of baseDefG) g.visible = !!v; },
     get strikeTargets() { return strikeTargets; },
     killStrikes() { for (const t of strikeTargets) if (t.alive) destroySurface(t); return strikeTargets.filter(t => t.alive).length; },
