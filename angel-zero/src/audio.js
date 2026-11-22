@@ -27,8 +27,10 @@ export function createAudio() {
   const sinCurve = new Float32Array(64), cosCurve = new Float32Array(64);
   for (let i = 0; i < 64; i++) { const t = i / 63 * Math.PI / 2; sinCurve[i] = Math.sin(t); cosCurve[i] = Math.cos(t); }
   const lastIdx = Object.create(null);                     // scenario -> last track index
+  const bag = Object.create(null), bagPos = Object.create(null);  // per-scenario shuffle bags
   let manifest = null, active = 0, curScn = '01_hangar', pendScn = '', dwell = 0, bgmUnlocked = false, lastTickT = 0, switchSeq = 0;
-  let bgmForce = '', bgmCtx = null;
+  let bgmForce = '', bgmCtx = null, currentIdx = 0;
+  let auto = true, manualId = -1, advancing = false, advTimer = null, changeCb = null, changeKey = '';
   const radioBufs = Object.create(null);                   // decoded voice clips, cached by line id
   const radioState = { plays: 0, lastId: '', loaded: 0, playing: false };
   const tc = 0.06;                                         // param smoothing time-constant
@@ -922,9 +924,25 @@ export function createAudio() {
         el.loop = true; el.preload = 'none'; el.crossOrigin = 'anonymous';
         decks.push({ el, src: ctx.createMediaElementSource(el), g: gain(0) });
         decks[i].src.connect(decks[i].g).connect(N.musicBus);
+        // Attached once per deck; auto-advance never re-registers listeners.
+        el.addEventListener('timeupdate', () => {
+          const d = decks[i];
+          if (d !== decks[active] || advancing || !musicOn) return;
+          if (isFinite(el.duration) && el.duration - el.currentTime <= XFADE) advance();
+        });
+        el.addEventListener('ended', () => { if (decks[i] === decks[active]) advance(); });
       }
       // The manifest is the ONLY network request; the .ogg files stream through Audio().
-      fetch(BGM_DIR + 'manifest.json').then(r => r.ok ? r.json() : null).then(m => { manifest = m; }).catch(() => {});
+      fetch(BGM_DIR + 'manifest.json').then(r => r.ok ? r.json() : null).then(m => {
+        if (m && m.scenarios) {
+          for (const k in m.scenarios) {
+            if (!Array.isArray(m.scenarios[k])) continue;
+            m.scenarios[k] = m.scenarios[k].map(e => typeof e === 'string'
+              ? { file: e, title: e.replace(/_0\d\.ogg$/, '').toUpperCase() } : e);
+          }
+          manifest = m;
+        }
+      }).catch(() => {});
       unlockBgm();
       return;
     }
@@ -956,25 +974,53 @@ export function createAudio() {
     for (const name of evt) window.addEventListener(name, go, { once: true, capture: true });
     if (ctx) go();   // init() itself runs inside a gesture; start without waiting for another one
   }
-  // Equal-power crossfade between the two decks; re-entering a scenario alternates tracks.
-  function switchTo(scn) {
+  // --- track catalogue + shuffle bag ----------------------------------------
+  function tracksOf(scn) {
+    const list = manifest && manifest.scenarios && manifest.scenarios[scn];
+    return list && list.length ? list : null;
+  }
+  function allTracks() { return manifest && manifest.tracks && manifest.tracks.length ? manifest.tracks : null; }
+  function nextIdx(scn) {
+    const list = tracksOf(scn);
+    if (!list) return 0;
+    const n = list.length;
+    if (!bag[scn] || (bagPos[scn] || 0) >= n) {
+      const b = new Int8Array(n);
+      for (let i = 0; i < n; i++) b[i] = i;
+      for (let i = n - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0, t = b[i]; b[i] = b[j]; b[j] = t; }
+      if (n > 1 && b[0] === (lastIdx[scn] ?? -1)) { const t = b[0]; b[0] = b[1]; b[1] = t; }
+      bag[scn] = b; bagPos[scn] = 0;
+    }
+    return bag[scn][bagPos[scn]++];
+  }
+  function emitChange() {
+    if (!changeCb) return;
+    const t = tracksOf(curScn), title = t && t[currentIdx] ? t[currentIdx].title : '';
+    const key = `${curScn}/${currentIdx}/${auto ? 1 : 0}`;
+    if (key === changeKey) return;
+    changeKey = key;
+    changeCb({ title, scn: curScn, idx: currentIdx, auto });
+  }
+  // Equal-power crossfade between the two decks. An explicit idx pins a track.
+  function crossfadeTo(scn, idx) {
     if (!BGM_OK || !decks.length) return;
-    const files = manifest && manifest.scenarios && manifest.scenarios[scn];
-    if (!files || !files.length) { pendScn = scn; return; }
+    const list = tracksOf(scn);
+    if (!list || !list.length) { pendScn = scn; return; }
     if (!bgmUnlocked) { pendScn = scn; return; }
-    if (scn === curScn && !pendScn && decks[active].el.src) return;
-    const i = 1 - (lastIdx[scn] ?? 1);
+    const i = Number.isInteger(idx) && idx >= 0 && idx < list.length ? idx : nextIdx(scn);
+    if (scn === curScn && !pendScn && decks[active].el.src && currentIdx === i) return;
     lastIdx[scn] = i;
     const idle = 1 - active, out = active, seq = ++switchSeq;
     const d = decks[idle], o = decks[out];
-    d.el.src = BGM_DIR + files[i]; d.el.currentTime = 0;
+    d.el.src = BGM_DIR + list[i].file; d.el.currentTime = 0;
+    d.el.loop = list.length === 1;
     d.g.gain.cancelScheduledValues(ctx.currentTime); d.g.gain.setValueAtTime(0, ctx.currentTime);
     const now = ctx.currentTime;
     d.g.gain.setValueCurveAtTime(sinCurve, now, XFADE);
     o.g.gain.cancelScheduledValues(now); o.g.gain.setValueAtTime(o.g.gain.value, now);
     o.g.gain.setValueCurveAtTime(cosCurve, now, XFADE);
     d.el.play().then(() => {
-      active = idle; curScn = scn; pendScn = ''; dwell = 0;
+      active = idle; curScn = scn; pendScn = ''; dwell = 0; currentIdx = i; emitChange();
       setTimeout(() => {
         if (seq !== switchSeq) return;
         try { o.el.pause(); o.el.removeAttribute('src'); o.el.load(); } catch (e) { /* already released */ }
@@ -982,6 +1028,62 @@ export function createAudio() {
       }, (XFADE + 0.1) * 1000);
     }).catch(() => { pendScn = scn; });
   }
+  function switchTo(scn) { crossfadeTo(scn, auto ? nextIdx(scn) : null); }
+  function manualNext() {
+    const list = allTracks();
+    if (!list || !list.length) return null;
+    const id = (manualId + 1 + list.length * 2) % list.length;
+    const t = list[id], own = tracksOf(t.scn);
+    return { scn: t.scn, idx: own ? own.findIndex(e => e.file === t.file) : 0, id };
+  }
+  function advance() {
+    if (advancing || !BGM_OK) return;
+    advancing = true;
+    if (auto) crossfadeTo(curScn, nextIdx(curScn));
+    else {
+      const nx = manualNext();
+      if (nx) { manualId = nx.id; crossfadeTo(nx.scn, nx.idx < 0 ? 0 : nx.idx); }
+    }
+    clearTimeout(advTimer);
+    advTimer = setTimeout(() => { advancing = false; }, (XFADE + 0.1) * 1000);
+  }
+  function selectTrack(id) {
+    const list = allTracks(), t = list && list[id];
+    if (!t) return;
+    auto = false; manualId = id;
+    const own = tracksOf(t.scn), idx = own ? own.findIndex(e => e.file === t.file) : 0;
+    crossfadeTo(t.scn, idx < 0 ? 0 : idx);
+    emitChange();
+  }
+  function skip(dir) {
+    if (!auto) {
+      const all = allTracks(), n = all ? all.length : 24;
+      selectTrack((manualId + (dir > 0 ? 1 : -1) + 2 * n) % n);
+      return;
+    }
+    const list = tracksOf(curScn);
+    if (!list) return;
+    let target;
+    if (dir > 0) target = nextIdx(curScn);
+    else {
+      const b = bag[curScn];
+      if (!b || b.length < 2) target = nextIdx(curScn);
+      else { const p = ((bagPos[curScn] || 0) - 2 + b.length * 2) % b.length; target = b[p]; bagPos[curScn] = p + 1; }
+    }
+    crossfadeTo(curScn, target);
+  }
+  function setAuto(on) {
+    auto = !!on;
+    if (auto) { manualId = -1; dwell = MIN_DWELL; }
+    else {
+      const own = tracksOf(curScn), file = own && own[currentIdx] ? own[currentIdx].file : '';
+      const all = allTracks();
+      manualId = all ? all.findIndex(t => t.scn === curScn && t.file === file) : 0;
+      if (manualId < 0) manualId = 0;
+    }
+    emitChange();
+  }
+  function onBgmChange(cb) { changeCb = cb || null; if (changeCb) emitChange(); }
   // Priority-ordered resolver: first matching scenario wins.
   // Mission-aware priority: dynamic overrides first, then the mission's own track.
   // wxOverride gates night/storm so CANYON_RUN / NAVAL_BATTLE / ACE_DUEL keep their score.
@@ -1095,7 +1197,7 @@ export function createAudio() {
       dwell += dt;
       const scn = resolveScenario(bgmCtx);
       const wait = (scn === '12_debrief' || scn === '01_hangar' || scn === '11_rtb') ? 0 : MIN_DWELL;
-      if ((scn !== curScn || pendScn) && dwell >= wait) switchTo(scn);
+      if (auto && (scn !== curScn || pendScn) && dwell >= wait) switchTo(scn);
       return;
     }
     if (!N.mL) return;
@@ -1473,7 +1575,7 @@ export function createAudio() {
   }
 
   return {
-    init, resume, suspend, update, updateMusic, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, setBgmPause, bumpBgmDwell() { dwell = MIN_DWELL; }, setBgmForce: v => { bgmForce = v || ''; }, radioSquelch, preloadRadio, playRadio, stopRadio, preload,
+    init, resume, suspend, update, updateMusic, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, setBgmPause, bumpBgmDwell() { dwell = MIN_DWELL; }, setBgmForce: v => { bgmForce = v || ''; }, selectTrack, skip, setAuto, onBgmChange, get bgmTracks() { return allTracks() || []; }, radioSquelch, preloadRadio, playRadio, stopRadio, preload,
     toggleMusic() { setMusic(!musicOn); return musicOn; },
     get musicOn() { return musicOn; }, setMusicVolume,
     get musicVolume() { return musicVol; },
@@ -1486,9 +1588,15 @@ export function createAudio() {
         bar: (mStep >> 4) + 1, step: mStep, notes: mNotes, duck: N.musicDuck ? +N.musicDuck.gain.value.toFixed(2) : 1,
         bus: N.music ? +N.music.gain.value.toFixed(2) : 0, ahead: mNext && ctx ? +(mNext - ctx.currentTime).toFixed(3) : 0 };
     },
-    get bgm() { return BGM_OK ? { scn: curScn, curScn, idx: lastIdx[curScn] ?? 0, dwell: +dwell.toFixed(2),
-      deckT: +decks[active]?.el.currentTime.toFixed(2) || 0, duck: N.duckG ? +N.duckG.gain.value.toFixed(3) : 1,
-      unlocked: bgmUnlocked, ok: BGM_OK, pending: pendScn || '' } : { ok: false, scn: '', idx: 0, dwell: 0 }; },
+    get bgm() {
+      if (!BGM_OK) return { ok: false, scn: '', idx: 0, dwell: 0, auto, manualId, file: '', title: '', bag: [], bagPos: 0 };
+      const list = tracksOf(curScn), t = list && list[currentIdx], b = bag[curScn];
+      return { scn: curScn, curScn, idx: currentIdx, dwell: +dwell.toFixed(2), auto, manualId,
+        file: t ? t.file : '', title: t ? t.title : '', bag: b ? Array.from(b) : [], bagPos: bagPos[curScn] || 0,
+        deckT: +decks[active]?.el.currentTime.toFixed(2) || 0, duck: N.duckG ? +N.duckG.gain.value.toFixed(3) : 1,
+        unlocked: bgmUnlocked, ok: BGM_OK, pending: pendScn || '' };
+    },
+    get bgmAuto() { return auto; }, get bgmDecks() { return decks; },
     resolveScenario,
     get radio() { return { ...radioState, duck: N.duck ? +N.duck.gain.value.toFixed(2) : 1 }; }, setVolume, setMuted,
     get sfxStatus() { return { ...sfxState }; },

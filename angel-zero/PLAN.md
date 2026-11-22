@@ -1594,6 +1594,11 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   - Full throttle + afterburner held for 0.35 s fires `CATAPULT_LAUNCH`: a 108 m / 2.4 s stroke to 90 m/s (175 kt) with a 4 deg nose-up rotation, camera rattle, pooled steam eruption and no deck collision snags. `catRelease` returns control after a 0.5 s grace, lowers the JBD and bumps the BGM dwell so `02_catapult` crossfades to the mission score on that frame.
   - WARDEN-2 (bow) and WARDEN-3 (waist) hold on their own tracks, launch 0.6 s and 1.3 s behind lead with their own steam and a 0.7-gain catapult call, then climb out and blend into echelon over 4 s. Old v0.9.6 `carrier.phase` cat path is gone; `?catat` routes through `cat`, with `?debug&catlaunchat=s` forcing the launch input. Every `?v=` tag bumped to s81a.
 
+- [x] **Carrier deck fix + music player** *(build `s82a`, `src/combat.js`, `src/audio.js`, `src/hud.js`, `scripts/build_bgm.py`, `assets/audio/bgm/manifest.json`, `index.html`)*
+  - `startSortie()` now awaits the CVN GLB and calls `placeCarrier(def)` before `catEnter()`, showing the loading hint while it waits. A persistent unscaled `allyRoot` is mounted once, never disposed by `resetMission()` / `world.rebuild()`, and is force-visible in carrier missions; `updateAlly(dt)` runs before `catTick` so the jet never lags the moving ship.
+  - The deck surface is raycast once per catapult / JBD / trap point (island hits rejected), and `JET_GEAR_DY` is measured from the extended GLB gear. Cat poses use `allyRoot.localToWorld()` with the measured deck height; `?debug&mission=NAVAL_BATTLE&warp=1` logs a deck gap under 0.3 m.
+  - `build_bgm.py --manifest-only` rewrites the v2 manifest with per-track titles without re-encoding. `audio.js` shuffles each scenario with a Fisher–Yates bag and crossfades to the next track on `timeupdate` / `ended`; `selectTrack`, `skip`, `setAuto` and `onBgmChange` drive the clickable `#bgmWidget` (`,` / `.` / `/` hotkeys) with a 1.2 s HUD toast. Every `?v=` tag bumped to s82a.
+
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.

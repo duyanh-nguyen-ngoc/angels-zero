@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.13', title: 'CARRIER DECK FIX + MUSIC PLAYER', bullets: [
+    'The bow catapult now waits for USS Enterprise to load, anchors the jet and both wingmen to its real deck ray height, and keeps the carrier mounted and visible in every carrier sortie.',
+    'Scenario music now shuffles through every track and auto-advances with a crossfade at the end of each clip instead of repeating the first one.',
+    'A top-right Now Playing widget shows the active title with clickable skip, selector and AUTO controls; , . and / do the same from the keyboard.'
+  ] },
   { version: 'v1.1.12', title: 'CATAPULT LAUNCH OPENING', bullets: [
     'Carrier missions now open locked on the bow catapult at 0 kt with the jet blast deflector raised, rolling deck steam and the Overlord arming call.',
     'Hold full afterburner to slingshot from 0 to 175 kt off the bow with camera rattle and a steam eruption, then climb out with Warden-2 and Warden-3.',

@@ -8,8 +8,8 @@
 // burning wrecks that splash, scoring, waves, lock-on and threat warnings.
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { DIFFICULTY_PRESETS } from './difficulty.js?v=s81a';
-import { SPW } from './loadout.js?v=s81a';
+import { DIFFICULTY_PRESETS } from './difficulty.js?v=s82a';
+import { SPW } from './loadout.js?v=s82a';
 
 const NM = 1852, FT = 0.3048, G0 = 9.81;
 // Allied CVN model: same 360 m deck as the procedural ship, re-anchored to the GLB.
@@ -20,10 +20,11 @@ const CARRIER_GLB = 'assets/models/uss_enterprise.glb', CARRIER_RAW_LEN = 476.85
 export const CAT_VEND = 90, CAT_T = 2.4, CAT_ACC = 37.5, CAT_LEN = 108;
 export const CAT_ARM_T = 0.35, CAT_ROT_DEG = 4, CAT_JBD_DZ = 14;
 const CAT_Z0 = -CARRIER_LEN / 2 + CAT_LEN;             // -72 m: stroke ends at the bow edge (-180 m)
-export const CAT_BOW = [{ x: -6, z: CAT_Z0, yaw: 0 }, { x: 6, z: CAT_Z0, yaw: 0 }];
-export const CAT_WAIST = [{ x: -22, z: CAT_Z0, yaw: -9 }];
+export const CAT_BOW = [{ x: -6, z: CAT_Z0, yaw: 0, key: 'bow0' }, { x: 6, z: CAT_Z0, yaw: 0, key: 'bow1' }];
+export const CAT_WAIST = [{ x: -22, z: CAT_Z0, yaw: -9, key: 'waist0' }];
 export const WING_CAT_DT = [0.6, 1.3];
 const CAT_JBD_UP = -55 * Math.PI / 180;
+const CAT_TRAP_X = 22;
 // Strike campaign: four jammer bunkers, one-shot-per-sortie, altitude-gated EW field.
 const STRIKE_N = 4, STRIKE_HP_K = 2.2, STRIKE_SPLASH = 35, STRIKE_PTS = 1200, JAM_ALT = 500 * FT, JAM_R = 2800;
 const LOG_V = '#include <common>\n#include <logdepthbuf_pars_vertex>\n';
@@ -3060,8 +3061,9 @@ export function createCombat(THREE, env) {
     scene.add(t.g);
     const pos = t.g.position, fwd = new THREE.Vector3(0, 0, -1), vel = new THREE.Vector3(0, 0, -4.1);
     placeAllyLights(t.g, 1, t.aimH);
-    C.ally = { g: t.g, fwd, pos, vel, deckY: t.aimH, len: t.len, beam: t.beam,
-      spin: t.spin, startZ, ciws: t.ciws, sams: t.sams, glb: false, island: null, yaw0: 0, deckLocalY: t.aimH };
+    C.ally = { g: t.g, root: t.g, fwd, pos, vel, deckY: t.aimH, len: t.len, beam: t.beam,
+      spin: t.spin, startZ, ciws: t.ciws, sams: t.sams, glb: false, island: null, yaw0: 0, deckLocalY: t.aimH,
+      deckYLocal: { bow0: t.aimH, bow1: t.aimH, waist0: t.aimH, jbd: t.aimH, trap: t.aimH } };
     t.g.visible = C.carrierVisible !== false;
     const cp = C.missionCarrier;
     if (cp) { pos.set(cp.pos[0], cp.pos[1], cp.pos[2]); C.ally.startZ = cp.pos[2]; }
@@ -3082,8 +3084,15 @@ export function createCombat(THREE, env) {
   // The GLB swap replaces the carrier group; re-parent the shared JBD plates to it.
   function mountJbd(a) {
     if (!a || !a.jbd) return;
-    const s = 1 / (a.g.scale.x || 1);
-    for (const j of a.jbd) { j.visible = true; j.scale.setScalar(s); j.position.y = a.deckY - a.pos.y; a.g.add(j); }
+    const sc = a.g.scale.x || 1, inv = 1 / sc;
+    const trks = [CAT_BOW[0], CAT_BOW[1], CAT_WAIST[0]];
+    const deck = (a.deckYLocal && a.deckYLocal.jbd) || (a.deckY - a.pos.y);
+    for (let i = 0; i < a.jbd.length; i++) {
+      const j = a.jbd[i], trk = trks[i];
+      j.visible = true; j.scale.setScalar(inv);
+      j.position.set(trk.x * inv, deck * inv, (trk.z + CAT_JBD_DZ) * inv);
+      a.g.add(j);
+    }
   }
   // Damped JBD fold. `up` raises the plate during the catapult hold / stroke.
   function updateJbd(a, up, dt) {
@@ -3134,6 +3143,12 @@ export function createCombat(THREE, env) {
       model.updateMatrixWorld(true);
       _allyBox.setFromObject(model); _allyBox.getCenter(_allyCenter);
       model.position.x -= _allyCenter.x; model.position.z -= _allyCenter.z;
+      // Persistent unscaled root: world-metre catapult coordinates can use localToWorld
+      // directly, while the GLB keeps its own scale for rendering.
+      const root = new THREE.Group();
+      root.name = 'CVN-ALLY-ROOT';
+      root.add(model); scene.add(root);
+      model.updateMatrixWorld(true);
       // Deck height: median of five downward centreline ray hits at the real deck.
       const hits = [];
       for (const z of [-120, -60, 0, 60, 120]) {
@@ -3147,6 +3162,23 @@ export function createCombat(THREE, env) {
       const deckLocalY = deckModelY / CARRIER_SCALE;              // model-local deck height
       model.position.y = CARRIER_DECK_Y - deckModelY;
       model.updateMatrixWorld(true);
+      // Per-track deck surface: raycast straight down at each catapult / trap point,
+      // rejecting island and mast hits above the deck plane. All values are root-local.
+      const deckYLocal = Object.create(null);
+      const rayAt = (x, z) => {
+        _rayOrigin.set(x, _allyBox.max.y + 200, z);
+        _ray.set(_rayOrigin, _rayDown);
+        const hs = _ray.intersectObject(model, true);
+        let y = -Infinity;
+        for (const h of hs) if (h.point.y <= CARRIER_DECK_Y + 4 && h.point.y > y) y = h.point.y;
+        return Number.isFinite(y) ? y : CARRIER_DECK_Y;           // measured TRAP_DY fallback
+      };
+      deckYLocal.bow0 = rayAt(CAT_BOW[0].x, CAT_BOW[0].z);
+      deckYLocal.bow1 = rayAt(CAT_BOW[1].x, CAT_BOW[1].z);
+      deckYLocal.waist0 = rayAt(CAT_WAIST[0].x, CAT_WAIST[0].z);
+      deckYLocal.jbd = rayAt(CAT_BOW[0].x, CAT_BOW[0].z + CAT_JBD_DZ);
+      deckYLocal.trap = rayAt(CAT_TRAP_X, CARRIER_LEN / 2 - 78);
+      a.deckYLocal = deckYLocal;
       // Island hitbox from the real vertex bounds (starboard structure only).
       ix0 = Infinity; ix1 = -Infinity; iz0 = Infinity; iz1 = -Infinity; top = -Infinity;
       model.traverse(o => {
@@ -3162,15 +3194,16 @@ export function createCombat(THREE, env) {
         }
       });
       a.island = Number.isFinite(ix0) ? { x0: ix0 - 2, x1: ix1 + 2, z0: iz0 - 2, z1: iz1 + 2, y1: top + 2 } : null;
-      // Keep the ship where the procedural one was; all fitting above is local.
-      model.position.x += oldPos.x; model.position.y += oldPos.y; model.position.z += oldPos.z;
-      model.rotation.y += oldRotY;
-      model.updateMatrixWorld(true);
-      a.yaw0 = model.rotation.y;
+      // The root carries position + heading; the GLB keeps only its fitting offsets.
+      root.position.copy(oldPos);
+      root.rotation.y = oldRotY;
+      root.updateMatrixWorld(true);
+      a.root = root; a.yaw0 = oldRotY;
       a.deckY = CARRIER_DECK_Y; a.len = CARRIER_LEN; a.glb = true; a.spin = null; a.deckLocalY = deckLocalY;
-      a.g = model; a.pos = model.position;
-      model.visible = C.carrierVisible !== false;
-      scene.add(model);
+      a.g = model; a.pos = root.position;
+      root.visible = model.visible = C.carrierVisible !== false;
+      root.traverse(o => { o.frustumCulled = false; });      // one-time, on the GLB root only
+      a.cullDone = true;
       mountJbd(a);
       placeAllyLights(model, CARRIER_SCALE, deckLocalY);
       if (old) {
@@ -3246,14 +3279,34 @@ export function createCombat(THREE, env) {
     const target = show ? 0.32 + 0.08 * Math.sin(now * 3) : 0;
     gateMat.opacity += (target - gateMat.opacity) * Math.min(1, dt * 3);
   }
+  // Anchor the persistent carrier root to a mission's map definition before CATAPULT_HOLD.
+  function placeCarrier(def) {
+    const a = C.ally;
+    if (!a || !def) return null;
+    const root = a.root || a.g;
+    const hdg = def.hdg || 0;
+    root.position.set(def.pos[0], def.pos[1] || 0, def.pos[2]);
+    root.rotation.y = a.g.rotation.y = (a.yaw0 || 0) + hdg;
+    C.carrierVisible = true;
+    root.visible = a.g.visible = true;
+    if (!a.cullDone) { root.traverse(o => { o.frustumCulled = false; }); a.cullDone = true; } // one-time, GLB root only
+    a.startZ = def.pos[2];
+    a.fwd.set(-Math.sin(hdg), 0, -Math.cos(hdg));
+    a.vel.copy(a.fwd).multiplyScalar(def.spd || 4.1);
+    root.updateMatrixWorld(true);
+    return root;
+  }
   function updateAlly(dt) {
     const a = C.ally;
     if (!a) return;
     const step = 4.1 * dt;
     a.pos.addScaledVector(a.fwd, step);
     const yaw0 = a.yaw0 || 0;
-    if (a.fwd.z < 0 && a.pos.z < a.startZ - 3000) { a.fwd.set(0, 0, 1); a.g.rotation.y = yaw0 + Math.PI; }
-    else if (a.fwd.z > 0 && a.pos.z > a.startZ) { a.fwd.set(0, 0, -1); a.g.rotation.y = yaw0; }
+    if (a.fwd.z < 0 && a.pos.z < a.startZ - 3000) {
+      a.fwd.set(0, 0, 1); a.root.rotation.y = a.g.rotation.y = yaw0 + Math.PI;
+    } else if (a.fwd.z > 0 && a.pos.z > a.startZ) {
+      a.fwd.set(0, 0, -1); a.root.rotation.y = a.g.rotation.y = yaw0;
+    }
     a.vel.copy(a.fwd).multiplyScalar(4.1);
     if (a.spin) a.spin.rotation.z += dt * 0.6;
   }
@@ -3776,7 +3829,7 @@ export function createCombat(THREE, env) {
   }
 
   /* ================================================================ API */
-  let ready = false, waveTimer = 0;
+  let ready = false, waveTimer = 0, allyStepped = false;
   function init(model, nozzleLocal) {
     collectStores(model);
     buildFleet(model, nozzleLocal);
@@ -3883,7 +3936,8 @@ export function createCombat(THREE, env) {
 
   function update(dt, now, opts) {
     const playerActive = opts.playerActive;
-    updateAlly(dt);
+    if (!allyStepped) updateAlly(dt);
+    allyStepped = false;
     updateGates(dt, now);
     // Return Line: crossing south-to-north resupplies the jet; 25 s re-arm cooldown.
     returnMat.opacity = 0.22 + 0.16 * (0.5 + 0.5 * Math.sin(now * 2.2));
@@ -4032,14 +4086,9 @@ export function createCombat(THREE, env) {
       C.carrierVisible = need;
       C.missionCarrier = mapDef && mapDef.carrier ? mapDef.carrier : null;
       if (C.ally) {
-        C.ally.g.visible = need;
-        const cp = C.missionCarrier;
-        if (cp) {
-          C.ally.pos.set(cp.pos[0], cp.pos[1], cp.pos[2]);
-          C.ally.g.position.copy(C.ally.pos);
-          C.ally.startZ = cp.pos[2];
-          C.ally.fwd.set(0, 0, -1); C.ally.g.rotation.y = C.ally.yaw0 || 0;
-        }
+        const root = C.ally.root || C.ally.g;
+        root.visible = C.ally.g.visible = need;
+        if (C.missionCarrier) placeCarrier(C.missionCarrier);
       }
       return C;
     },
@@ -4063,7 +4112,9 @@ export function createCombat(THREE, env) {
     get difficulty() { return C.difficulty; },
     fireSelected, pickleUp, dropBomb, setWeapon, toggleWeapon, dispenseFlares, dispenseChaff, fireAAM4, activateECM, setWingOrder, spawnAceFlight,
     repairEngines() { resetEngines(); return C.engState; },
-    get surface() { return surface; }, awardStyle, loadCarrier, allyCollision, updateJbd, CARRIER_GLB, RETURN_Z,
+    get surface() { return surface; }, awardStyle, loadCarrier, placeCarrier, allyCollision, updateJbd, CARRIER_GLB, RETURN_Z,
+    stepAlly(dt) { updateAlly(dt); allyStepped = true; },
+    get allyRoot() { return C.ally ? (C.ally.root || C.ally.g) : null; },
     get strikeTargets() { return strikeTargets; },
     killStrikes() { for (const t of strikeTargets) if (t.alive) destroySurface(t); return strikeTargets.filter(t => t.alive).length; },
     get lockables() { return lockables(); },               // bandits + live task-force ships (HUD target boxes)

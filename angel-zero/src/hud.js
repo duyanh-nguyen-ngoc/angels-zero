@@ -6,7 +6,7 @@
 // clipped to the 3D combiner glass. Square tactical radar (bottom-left), stores
 // list + F-15C silhouette with per-pylon AIM-9 reload icons (bottom-right),
 // open-corner target brackets, edge pointers, minimal top-left telemetry.
-import { SPW } from './loadout.js?v=s81a';
+import { SPW } from './loadout.js?v=s82a';
 
 export function createHUD(THREE, A) {
   const canvas = A.canvas;
@@ -43,6 +43,7 @@ export function createHUD(THREE, A) {
     ['SHIFT/CTRL/UP/DN/WHEEL', 'Throttle'],
     ['SPACE', 'View'], ['[ ]', 'MFD'], ['ALT', 'Free look'],
     ['TABx2', 'Debrief'], ['F1', 'This sheet'],
+    [', . /', 'Music prev / next / AUTO'],
     ['B+SHIFT <290KT', 'PSM: Cobra / Kulbit'],
     ['RUDDER+OPP ROLL @STALL', 'Flat spin (neutral+opp rudder recovers)']
   ];
@@ -1340,11 +1341,15 @@ export function createHUD(THREE, A) {
     ctx.restore();
   }
 
+  const musicToast = { t: 0, text: '' };
   function drawCenterBanners(ctx, g) {
     const now = performance.now();
     const cx = g ? g.cx : HW / 2;
     const upperY = Math.max(g ? Math.max(30, g.minY - 24) : HH * 0.21, radioBottom ? radioBottom + 20 : 0);
     const lowerY = g ? g.cy + g.boxH * 0.27 : HH * 0.75;
+    if (musicToast.t && now - musicToast.t < 1200) {
+      drawBanner(ctx, cx, upperY + 108, musicToast.text, '#00ff66', 340, 1 - (now - musicToast.t) / 1200);
+    }
 
     if (C.mach1T && now - C.mach1T < 1400) {
       const age = now - C.mach1T;
@@ -2195,6 +2200,7 @@ export function createHUD(THREE, A) {
     get inertia() { return { x: inertia.x, y: inertia.y }; },
     get stallWarn() { return stallOn(); },
     get hudAlertState() { return alertState; },
-    setAlertState(s) { alertOverride = s; }
+    setAlertState(s) { alertOverride = s; },
+    setMusicToast(text) { musicToast.text = text || ''; musicToast.t = musicToast.text ? performance.now() : 0; }
   };
 }
