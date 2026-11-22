@@ -26,8 +26,25 @@ export const RADIO_EVENTS = [
 ];
 
 const DIR = 'assets/voicelines/radio/';
-const L = (id, speaker, event, priority, text, trailerHero = false) =>
-  ({ id, speaker, text, event, priority, file: DIR + id + '.mp3', trailerHero });
+// New queue priority scale: 3 CRITICAL, 2 STORY, 1 COMBAT, 0 AMBIENT.
+// Legacy script priority: 1 = critical, 2 = tactical, 3 = banter.
+const PRI_OF = { 1: 3, 2: 2, 3: 1 };
+const AMBIENT_EVENTS = new Set(['ON_MACH_1', 'ON_CATAPULT', 'ON_CARRIER_TRAP', 'ON_MISSION_CLEAR', 'ON_WINGMAN_ENGAGE']);
+const CH_OF = { 'AWACS': 'AWACS', 'WARDEN-2': 'WARDEN2', 'WARDEN-3': 'WARDEN3', 'CRIMSON-1': 'CRIMSON' };
+const CAT_OVERRIDE = {
+  CAT_ARMED: { pri: 3, cat: 'CAT' },
+  ON_LOW_HP: { pri: 3, cat: 'DMG' },
+  ON_NEAR_MISS: { pri: 3, cat: 'MISSILE' },
+  ON_CANYON_LOW: { pri: 3, cat: 'PULLUP' }
+};
+const L = (id, speaker, event, priority, text, trailerHero = false) => {
+  const ambient = priority === 3 && AMBIENT_EVENTS.has(event);
+  const o = CAT_OVERRIDE[event] || {};
+  return { id, speaker, text, event, priority, file: DIR + id + '.mp3', trailerHero,
+    pri: o.pri !== undefined ? o.pri : (ambient ? 0 : PRI_OF[priority]),
+    cat: o.cat || (priority === 1 ? 'CRITICAL' : priority === 2 ? 'STORY' : ambient ? 'AMBIENT' : 'COMBAT'),
+    ch: CH_OF[speaker] || 'AWACS' };
+};
 
 export const RADIO_LINES = [
   // ON_TAKEOFF

@@ -34,6 +34,19 @@ export function createAudio() {
   const radioBufs = Object.create(null);                   // decoded voice clips, cached by line id
   const radioState = { plays: 0, lastId: '', loaded: 0, playing: false };
   const tc = 0.06;                                         // param smoothing time-constant
+  // --- military radio comms chain (built once, reused for every transmission) ---
+  const PTT_OPEN_S = 0.06, PTT_TAIL_S = 0.09, DUCK_ATK = 0.2, DUCK_REL = 0.4, FADE_S = 0.4;
+  const STATIC_DB = 0.01, RADIO_DUCK = 0.5623;            // -40 dB static bed, -5 dB music duck
+  const makeCurve = k => { const c = new Float32Array(1024), d = Math.tanh(k); for (let i = 0; i < 1024; i++) { const x = i / 1023 * 2 - 1; c[i] = Math.tanh(k * x) / d; } return c; };
+  const CURVE_SOFT = makeCurve(2), CURVE_HEAVY = makeCurve(8);
+  const RADIO_CH = {
+    AWACS:   { hp: 300, lp: 3200, curve: CURVE_SOFT, drive: 0.9, pan: 0, ring: 0, col: '#3fd8ff', tag: 'AWACS // OVERLORD' },
+    WARDEN2: { hp: 380, lp: 2700, curve: CURVE_SOFT, drive: 1.1, pan: -0.25, ring: 0, col: '#00ff66', tag: 'WARDEN-2' },
+    WARDEN3: { hp: 380, lp: 2700, curve: CURVE_SOFT, drive: 1.1, pan: 0.25, ring: 0, col: '#00ff66', tag: 'WARDEN-3' },
+    CRIMSON: { hp: 360, lp: 2900, curve: CURVE_HEAVY, drive: 1.6, pan: 0, ring: 0.22, col: '#ff2a3a', tag: 'CRIMSON-1 // INTERCEPT' },
+    DEFAULT: { hp: 340, lp: 2900, curve: CURVE_SOFT, drive: 1, pan: 0, ring: 0, col: '#00ff66', tag: 'COMMS' }
+  };
+  let rxState = 'IDLE', rxT = 0, rxCur = null;
 
   function noiseBuffer(kind, seconds = 4) {
     const len = Math.floor(ctx.sampleRate * seconds), buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
@@ -80,6 +93,32 @@ export function createAudio() {
     })).then(() => sfxState);
   }
 
+  // Procedural PTT one-shots rendered once into AudioBuffers (no per-event DSP allocation).
+  function pttBuffer(kind) {
+    const dur = kind === 'open' ? PTT_OPEN_S : PTT_TAIL_S;
+    const len = Math.ceil(ctx.sampleRate * dur), buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+    let lp = 0, phase = 0, seed = 12345;
+    const a = 1 - Math.exp(-2 * Math.PI * (kind === 'open' ? 2200 : 1800) / ctx.sampleRate);
+    for (let i = 0; i < len; i++) {
+      const t = i / ctx.sampleRate;
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      const n = seed / 2147483648 - 1;
+      lp += a * (n - lp);
+      const bp = n - lp;
+      if (kind === 'open') {
+        const env = Math.min(1, t / 0.002) * Math.exp(-t / 0.016);
+        phase += 2 * Math.PI * (1800 + 800 * Math.min(1, t / 0.018)) / ctx.sampleRate;
+        d[i] = 0.19 * bp * env + 0.12 * Math.sin(phase) * env;
+      } else {
+        const env = Math.exp(-t / 0.028);
+        const blip = t > dur - 0.01 ? Math.min(1, (t - dur + 0.01) / 0.002) : 0;
+        phase += 2 * Math.PI * 1000 / ctx.sampleRate;
+        d[i] = 0.16 * bp * env + 0.08 * Math.sin(phase) * blip;
+      }
+    }
+    return buf;
+  }
+
   function init() {
     if (ready) { resume(); return true; }
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -103,8 +142,34 @@ export function createAudio() {
     N.body = gain(muted ? 0 : volume); N.body.connect(comp);
     // Voiced radio: headset bus (skips cockpit LP + G-LOC tunnel).
     N.radioBus = gain(0.95); N.radioBus.connect(N.body);
+    // Comms DSP: HP -> LP -> soft clip -> compressor -> ring-mod split -> pan -> analyser.
+    N.rHP = filt('highpass', 340, 0.7); N.rLP = filt('lowpass', 2900, 0.7);
+    N.rShaper = ctx.createWaveShaper(); N.rShaper.curve = CURVE_SOFT; N.rShaper.oversample = '2x';
+    N.rComp = ctx.createDynamicsCompressor();
+    N.rComp.threshold.value = -24; N.rComp.knee.value = 12; N.rComp.ratio.value = 6;
+    N.rComp.attack.value = 0.003; N.rComp.release.value = 0.12;
+    N.rRingSplit = gain(1); N.rDry = gain(1);
+    N.rRingDelay = ctx.createDelay(0.02); N.rRingDelay.delayTime.value = 0.004;
+    N.rRingFb = gain(0.35); N.rRingWet = gain(0);
+    N.rPan = ctx.createStereoPanner();
+    N.rAnalyser = ctx.createAnalyser(); N.rAnalyser.fftSize = 256; N.rAnalyser.smoothingTimeConstant = 0.6;
+    N.rGain = gain(1);
+    N.rHP.connect(N.rLP).connect(N.rShaper).connect(N.rComp).connect(N.rRingSplit);
+    N.rRingSplit.connect(N.rDry).connect(N.rPan);
+    N.rRingSplit.connect(N.rRingDelay); N.rRingDelay.connect(N.rRingFb).connect(N.rRingDelay);
+    N.rRingDelay.connect(N.rRingWet).connect(N.rPan);
+    N.rPan.connect(N.rAnalyser).connect(N.rGain).connect(N.radioBus);
+    // Pre-allocated one-shot PTT clips and a forever-running static bed.
+    N.pttOpen = pttBuffer('open'); N.pttTail = pttBuffer('tail');
+    N.rFreq = new Uint8Array(128); N.rTime = new Uint8Array(128);
+    N.rVoiceG = [gain(1), gain(1)]; N.voiceIdx = 0;
+    N.rVoiceG[0].connect(N.rHP); N.rVoiceG[1].connect(N.rHP);
     const white = noiseBuffer('white'), pink = noiseBuffer('pink'), brown = noiseBuffer('brown');
     N.whiteBuf = white;
+    N.rStatic = loopNoise(pink);
+    N.rStaticBP = filt('bandpass', 1500, 0.6);
+    N.rStaticG = gain(0);
+    N.rStatic.connect(N.rStaticBP).connect(N.rStaticG).connect(N.rPan);
     initMusic();
 
     // F100 turbines: filtered pink/brown body + sawtooth whine + afterburner rumble.
@@ -1247,13 +1312,9 @@ export function createAudio() {
     if (BGM_OK) { if (N.musicVolG) N.musicVolG.gain.setTargetAtTime(musicOn ? musicVol : 0, ctx.currentTime, 0.05); return; }
     if (N.music) set(N.music.gain, musicOn ? musicVol : 0, 0.08);
   }
-  // Voiced radio: duck the music bed -5 dB and combat SFX about -4 dB while a line plays.
+  // Music ducking is owned solely by the radio transmission envelope (txOpen/txClose).
+  // This legacy hook now only touches the short SFX dip; it never writes duckG.
   function setRadio(active) {
-    if (BGM_OK && N.duckG) {
-      const gp = N.duckG.gain, t = ctx.currentTime, cur = gp.value;
-      gp.cancelScheduledValues(t); gp.setValueAtTime(cur, t);
-      gp.linearRampToValueAtTime(active ? DUCK_GAIN : 1, t + DUCK_T);
-    } else if (N.musicDuck) set(N.musicDuck.gain, active ? 0.35 : 1, 0.08);
     if (N.duck) set(N.duck.gain, active ? 0.63 : 1, 0.08);
   }
   // PAUSED keeps the stream alive but ducks it; the world SFX bus stays untouched.
@@ -1263,15 +1324,46 @@ export function createAudio() {
     gp.cancelScheduledValues(t); gp.setValueAtTime(cur, t);
     gp.linearRampToValueAtTime(active ? DUCK_GAIN : 1, t + DUCK_T);
   }
-  // 45 ms static squelch click at 1800 Hz on transmission start / end.
-  function radioClick() {
-    if (!ready || !N.whiteBuf) return;
-    const t = ctx.currentTime, s = ctx.createBufferSource(); s.buffer = N.whiteBuf;
-    const bp = filt('bandpass', 1800, 2), g = gain(0);
-    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.22, t + 0.003);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
-    s.connect(bp).connect(g).connect(N.radioBus || N.body); s.start(t, Math.random() * 3); s.stop(t + 0.047);
+  // ---- PTT transmission envelope --------------------------------------------
+  function playPtt(buf) {
+    if (!ready || !buf) return;
+    const s = ctx.createBufferSource(); s.buffer = buf;
+    s.connect(N.rPan); s.start();                          // one-shot source is the only per-event node
   }
+  function rampDuck(to, secs) {
+    if (!N.duckG) return;
+    const gp = N.duckG.gain, t = ctx.currentTime;
+    gp.cancelScheduledValues(t); gp.setValueAtTime(gp.value, t);
+    gp.linearRampToValueAtTime(to, t + secs);
+  }
+  function txOpen(slot) {
+    if (!ready || !N.rHP) return;
+    const now = ctx.currentTime, cfg = RADIO_CH[slot && slot.ch] || RADIO_CH.DEFAULT;
+    rxState = 'OPEN'; rxT = now; rxCur = slot || null;
+    N.rHP.frequency.setValueAtTime(cfg.hp, now);
+    N.rLP.frequency.setValueAtTime(cfg.lp, now);
+    N.rShaper.curve = cfg.curve;
+    N.rRingWet.gain.setValueAtTime(cfg.ring, now);
+    N.rPan.pan.setValueAtTime(cfg.pan, now);
+    playPtt(N.pttOpen);
+    const sg = N.rStaticG.gain;
+    sg.cancelScheduledValues(now); sg.setValueAtTime(sg.value, now);
+    sg.linearRampToValueAtTime(STATIC_DB, now + 0.03);
+    rampDuck(RADIO_DUCK, DUCK_ATK);
+  }
+  function txTail() {
+    if (!ready || !N.rStaticG) return;
+    const now = ctx.currentTime;
+    rxState = 'TAIL'; rxT = now;
+    playPtt(N.pttTail);
+    const sg = N.rStaticG.gain;
+    sg.cancelScheduledValues(now); sg.setValueAtTime(sg.value, now);
+    sg.linearRampToValueAtTime(0, now + PTT_TAIL_S);
+    rampDuck(1, PTT_TAIL_S + DUCK_REL);
+    rxState = 'FADE';
+    setTimeout(() => { if (rxState === 'FADE') { rxState = 'IDLE'; rxCur = null; } }, FADE_S * 1000);
+  }
+  function txClose() { txTail(); }
   // Lazy clip cache: fetch + decode at most four at a time; never blocks the first sortie.
   function preloadRadio(lines) {
     if (!ready || !ctx || !Array.isArray(lines)) return Promise.resolve(0);
@@ -1291,44 +1383,43 @@ export function createAudio() {
     return Promise.all([worker(), worker(), worker(), worker()]).then(() => radioState.loaded);
   }
   // One-shot source per clip; returns duration in seconds (0 when uncached / unavailable).
-  function playRadio(id) {
+  function playRadio(id, ch) {
     if (!ready || !ctx) return 0;
     const buf = radioBufs[id];
     if (!buf) return 0;
+    const now = ctx.currentTime, cfg = RADIO_CH[ch] || RADIO_CH.DEFAULT;
+    if (N.radioSrc) { try { N.radioSrc.onended = null; N.radioSrc.stop(now + 0.04); } catch (e) { /* already ended */ } }
+    if (N.radioVg) {
+      const og = N.radioVg.gain;
+      og.cancelScheduledValues(now); og.setValueAtTime(og.value, now); og.linearRampToValueAtTime(0, now + 0.04);
+    }
+    txOpen({ ch: ch || 'AWACS' });
     const src = ctx.createBufferSource(); src.buffer = buf;
-    src.connect(N.radioBus || N.body);
-    if (N.radioSrc) { try { N.radioSrc.onended = null; N.radioSrc.stop(); } catch (e) { /* already ended */ } }
-    N.radioSrc = src;
-    radioClick(); setRadio(true);
+    const vg = N.rVoiceG[N.voiceIdx]; N.voiceIdx ^= 1;
+    vg.gain.cancelScheduledValues(now); vg.gain.setValueAtTime(cfg.drive * 0.55, now);
+    src.connect(vg);
+    N.radioSrc = src; N.radioVg = vg;
     radioState.playing = true; radioState.plays++; radioState.lastId = id;
     src.onended = () => {
-      if (N.radioSrc === src) N.radioSrc = null;
-      setRadio(false); radioClick(); radioState.playing = false; src.disconnect();
+      if (N.radioSrc === src) { N.radioSrc = null; N.radioVg = null; }
+      txClose(); radioState.playing = false; src.disconnect();
     };
-    src.start();
-    return buf.duration;
+    src.start(now + PTT_OPEN_S);
+    rxState = 'TALK'; rxT = now + PTT_OPEN_S;
+    return buf.duration + PTT_OPEN_S;
   }
-  function stopRadio() {
+  function stopRadio(fade = 0.04) {
     if (!N.radioSrc) return;
-    try { N.radioSrc.onended = null; N.radioSrc.stop(); } catch (e) { /* already ended */ }
-    N.radioSrc.disconnect(); N.radioSrc = null;
-    setRadio(false); radioState.playing = false;
+    const now = ctx.currentTime, src = N.radioSrc;
+    try { src.onended = null; src.stop(now + fade); } catch (e) { /* already ended */ }
+    if (N.radioVg) {
+      const g = N.radioVg.gain;
+      g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.linearRampToValueAtTime(0, now + fade);
+    }
+    N.radioSrc = null; N.radioVg = null; radioState.playing = false;
   }
-  // VHF squelch: high-passed static burst + a 1,850 Hz roger-beep click, on key-up and key-down.
-  function radioSquelch(open = true) {
-    if (!ready || !N.whiteBuf) return;
-    const t = ctx.currentTime;
-    const s = ctx.createBufferSource(); s.buffer = N.whiteBuf;
-    const hp = filt('highpass', 2600, 0.7), bp = filt('peaking', 4200, 1); bp.gain.value = 6;
-    const g = gain(0); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.3, t + 0.004);
-    g.gain.setValueAtTime(0.22, t + (open ? 0.05 : 0.09)); g.gain.exponentialRampToValueAtTime(0.001, t + (open ? 0.08 : 0.13));
-    s.connect(hp).connect(bp).connect(g).connect(N.body); s.start(t, Math.random() * 3); s.stop(t + 0.16);
-    const bt = t + (open ? 0.055 : 0.0), bl = open ? 0.035 : 0.075;
-    const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 1850;
-    const og = gain(0); og.gain.setValueAtTime(0, bt); og.gain.linearRampToValueAtTime(open ? 0.1 : 0.14, bt + 0.003);
-    og.gain.setValueAtTime(open ? 0.1 : 0.14, bt + bl); og.gain.linearRampToValueAtTime(0, bt + bl + 0.008);
-    o.connect(og).connect(N.body); o.start(bt); o.stop(bt + bl + 0.02);
-  }
+  // Legacy hook: PTT open click only (the box is now driven by the queue).
+  function radioSquelch() { playPtt(N.pttOpen); }
 
   // Thunder: a sharp crack (nearby) into a long rolling low rumble of brown noise
   // with random amplitude swells, k 0..1.2 by distance.
@@ -1575,7 +1666,12 @@ export function createAudio() {
   }
 
   return {
-    init, resume, suspend, update, updateMusic, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, setBgmPause, bumpBgmDwell() { dwell = MIN_DWELL; }, setBgmForce: v => { bgmForce = v || ''; }, selectTrack, skip, setAuto, onBgmChange, get bgmTracks() { return allTracks() || []; }, radioSquelch, preloadRadio, playRadio, stopRadio, preload,
+    init, resume, suspend, update, updateMusic, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, setBgmPause, bumpBgmDwell() { dwell = MIN_DWELL; }, setBgmForce: v => { bgmForce = v || ''; }, selectTrack, skip, setAuto, onBgmChange, get bgmTracks() { return allTracks() || []; }, radioSquelch, preloadRadio, playRadio, stopRadio, txOpen, txTail, txClose, preload,
+    get radioAnalyser() { return N.rAnalyser || null; }, get radioFreq() { return N.rFreq || null; }, get radioTime() { return N.rTime || null; },
+    get radioCh() { return RADIO_CH; },
+    get radioDsp() { return { pttOpen: !!N.pttOpen, pttTail: !!N.pttTail, static: !!N.rStatic, hp: N.rHP ? N.rHP.frequency.value : 0,
+      lp: N.rLP ? N.rLP.frequency.value : 0, pan: N.rPan ? N.rPan.pan.value : 0, ring: N.rRingWet ? N.rRingWet.gain.value : 0,
+      shaper: !!(N.rShaper && N.rShaper.curve), analyser: !!N.rAnalyser }; },
     toggleMusic() { setMusic(!musicOn); return musicOn; },
     get musicOn() { return musicOn; }, setMusicVolume,
     get musicVolume() { return musicVol; },
@@ -1598,7 +1694,8 @@ export function createAudio() {
     },
     get bgmAuto() { return auto; }, get bgmDecks() { return decks; },
     resolveScenario,
-    get radio() { return { ...radioState, duck: N.duck ? +N.duck.gain.value.toFixed(2) : 1 }; }, setVolume, setMuted,
+    get radio() { return { ...radioState, rxState, rxT: +rxT.toFixed(2), cur: rxCur ? { ch: rxCur.ch, id: rxCur.id } : null,
+      duck: N.duckG ? +N.duckG.gain.value.toFixed(3) : (N.duck ? +N.duck.gain.value.toFixed(2) : 1) }; }, setVolume, setMuted,
     get sfxStatus() { return { ...sfxState }; },
     toggleMute() { setMuted(!muted); return muted; },
     get volume() { return volume; }, get muted() { return muted; },

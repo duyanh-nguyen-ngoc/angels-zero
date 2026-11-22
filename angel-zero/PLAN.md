@@ -1599,6 +1599,11 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   - The deck surface is raycast once per catapult / JBD / trap point (island hits rejected), and `JET_GEAR_DY` is measured from the extended GLB gear. Cat poses use `allyRoot.localToWorld()` with the measured deck height; `?debug&mission=NAVAL_BATTLE&warp=1` logs a deck gap under 0.3 m.
   - `build_bgm.py --manifest-only` rewrites the v2 manifest with per-track titles without re-encoding. `audio.js` shuffles each scenario with a Fisher–Yates bag and crossfades to the next track on `timeupdate` / `ended`; `selectTrack`, `skip`, `setAuto` and `onBgmChange` drive the clickable `#bgmWidget` (`,` / `.` / `/` hotkeys) with a 1.2 s HUD toast. Every `?v=` tag bumped to s82a.
 
+- [x] **Comms overhaul** *(build `s84a`, `src/radioQueue.js`, `src/radioScript.js`, `src/audio.js`, `index.html`)*
+  - Voiced lines run through one pre-allocated headset chain: highpass → lowpass → soft-clip WaveShaper → compressor → ring split → pan → analyser → `radioBus`, plus a forever-running gated static bed. `RADIO_CH` presets give AWACS cyan, WARDEN-2/3 green with ±0.25 pan, and CRIMSON heavy drive with ring; PTT open/tail one-shots and the static gate are rendered once at init.
+  - `radioQueue.js` owns all voice timing: eight reused slots, priority/category cooldowns, per-line TTL, a 0.35 s inter-line gap, and CRITICAL pre-emption of combat/ambient lines while STORY is never cut off. The single `-5 dB` music duck ramps over 0.2 s at open and 0.4 s at tail; the old 0.25 s duck is gone.
+  - `#crtBox` is now a reactive Voice Box driven by `onTx`/`onIdle`: faction-coloured callsign, portrait, `#crtSub` subtitles, CSS static-flash transitions, and 24 analyser bars plus a time-domain polyline at 30 Hz. `?radiospam=1`, `?radiocrit=s` and `__audioDebug().radio` expose queue state. Every `?v=` tag bumped to s84a.
+
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.

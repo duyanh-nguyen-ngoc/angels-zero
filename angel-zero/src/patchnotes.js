@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.15', title: 'COMMS OVERHAUL', bullets: [
+    'Radio voices now run through a military headset DSP chain with per-character band shaping, soft clipping, compression, procedural PTT clicks and a live static bed.',
+    'A priority queue keeps transmissions from overlapping, enforces a 0.35 s inter-line gap and cooldowns, and lets critical calls cut in ahead of combat chatter.',
+    'The top-left Voice Box shows faction colour, callsign and a live waveform with synced subtitles, returning to STANDBY when the line ends.'
+  ] },
   { version: 'v1.1.14', title: 'PERFORMANCE & STABILITY PASS', bullets: [
     'Cut cockpit procedural crinkle VRAM ~16x (512 px atlas) and removed 175 per-frame HUD shadowBlur passes for smoother laptop/high-DPI frame times.',
     'Trimmed volumetric cloud-deck raymarcher & NVG shader taps, dropped NVG MSAA target overhead, and collapsed 42 wing-vapor sprites into one GPU Points draw call.',

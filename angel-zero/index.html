@@ -9,23 +9,33 @@
   #gl { position:fixed; inset:0; width:100vw; height:100vh; display:block; }
   #hud { position:fixed; inset:0; width:100vw; height:100vh; display:block; pointer-events:none; z-index:10; }
   #flybyPulse { position:fixed; inset:0; pointer-events:none; z-index:11; opacity:0; }
-  /* Tactical radio CRT: a CSS-only portrait tube (no canvas, no per-frame JS). */
-  #crtBox { position:fixed; left:18px; top:150px; width:110px; height:140px; z-index:11; pointer-events:none;
-    border:1px solid var(--crt, #20FF70); background:#010a05; overflow:hidden; box-sizing:border-box;
-    box-shadow:0 0 14px rgba(0,0,0,.55), inset 0 0 18px rgba(0,0,0,.55); }
+  /* Tactical Voice Box: CSS scanlines + a live analyser canvas, no per-frame DOM churn. */
+  #crtBox { --rxCol:#00ff66; position:fixed; left:18px; top:150px; width:196px; height:188px; z-index:11; pointer-events:none;
+    border:1px solid var(--rxCol); background:#010a05; overflow:hidden; box-sizing:border-box;
+    box-shadow:0 0 14px rgba(0,0,0,.55), inset 0 0 18px rgba(0,0,0,.55); transition:opacity .4s linear; }
   #crtBox[hidden] { display:none; }
-  #crtBox.crt-off { background:#000804; }
-  #crtBox.crt-off::before { content:'STANDBY / NO SIGNAL'; position:absolute; inset:auto 0 44% 0; text-align:center;
-    font:10px 'Share Tech Mono',Consolas,monospace; color:var(--crt); opacity:.55; letter-spacing:.5px; }
-  #activePortrait { display:block; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity .22s linear; }
+  #crtBox.idle { opacity:.45; }
+  #crtBox.talk { border-color:var(--rxCol); opacity:1; }
+  #crtBox.fade { opacity:.45; }
+  #crtBox.flash { animation:crtStatic .09s steps(3) 1, crtBorder .09s steps(3) 1; }
+  @keyframes crtStatic {
+    0% { filter:brightness(2.6) contrast(1.6); transform:translateX(-2px) }
+    50% { filter:brightness(.3) contrast(2); transform:translateX(2px) }
+    100% { filter:none; transform:none }
+  }
+  @keyframes crtBorder { 50% { border-color:#fff; box-shadow:0 0 20px #fff inset } }
+  #activePortrait { display:block; position:absolute; left:0; top:20px; width:110px; height:104px; object-fit:cover; opacity:0; transition:opacity .22s linear; }
   #activePortrait[hidden] { display:none; }
   #activePortrait.crt-on { animation:crtIn .28s ease-out both; }
   #activePortrait.crt-off { opacity:0; }
   .crt-scanline { position:absolute; inset:0; pointer-events:none; mix-blend-mode:screen;
     background:repeating-linear-gradient(0deg, rgba(0,0,0,0.38) 0 1px, transparent 1px 3px);
     animation:crtRoll 6s linear infinite, crtFlick 0.12s steps(2) infinite; }
-  .crt-tag { position:absolute; left:5px; bottom:3px; pointer-events:none; white-space:nowrap;
-    font:9px 'Share Tech Mono',Consolas,monospace; color:var(--crt); text-shadow:0 0 5px currentColor; }
+  .crt-tag { position:absolute; left:5px; top:4px; right:5px; pointer-events:none; white-space:nowrap; overflow:hidden;
+    font:11px 'Share Tech Mono',Consolas,monospace; color:var(--rxCol); text-shadow:0 0 5px currentColor; }
+  #crtWave { position:absolute; left:10px; top:128px; width:176px; height:40px; opacity:.95; }
+  #crtSub { position:absolute; left:6px; right:6px; top:172px; height:30px; overflow:hidden;
+    font:12px/1.2 'Share Tech Mono',Consolas,monospace; color:var(--rxCol); text-shadow:0 0 5px currentColor; }
   @keyframes crtRoll { to { background-position:0 3px } }
   @keyframes crtFlick { 50% { opacity:.86 } }
   @keyframes crtIn {
@@ -33,7 +43,6 @@
     35% { opacity:1 } 45% { opacity:.3 }
     60%, 100% { transform:none; opacity:1; filter:none }
   }
-  #crtCap { position:fixed; left:18px; top:296px; z-index:11; pointer-events:none; font-family:'Share Tech Mono',Consolas,monospace; font-size:11px; color:var(--crt, #20FF70); letter-spacing:1px; opacity:0; white-space:nowrap; transition:opacity .22s linear; }
   /* NVG: dark halo + slight lift keeps green symbology crisp over the green tube image. */
   body.nvg #hud { filter: drop-shadow(0 0 1.2px rgba(0,0,0,.95)) drop-shadow(0 0 2.5px rgba(0,8,3,.85)) brightness(1.12); }
   #status { position:fixed; z-index:25; left:50%; top:62%; transform:translateX(-50%); color:#52ff9c; font-size:13px; font-weight:600; letter-spacing:3px; pointer-events:none; text-shadow:0 0 10px rgba(0,255,110,.55); }
@@ -471,8 +480,13 @@
 <body>
   <canvas id="gl"></canvas>
   <canvas id="hud"></canvas>
-  <div id="crtBox" class="crt-box" hidden><img id="activePortrait" width="110" height="140" alt="" decoding="async" hidden><div class="crt-scanline"></div><div id="crtTag" class="crt-tag"></div></div>
-  <div id="crtCap"></div>
+  <div id="crtBox" class="crt-box idle" hidden>
+    <div id="crtTag" class="crt-tag">COMMS // STANDBY</div>
+    <img id="activePortrait" width="110" height="104" alt="" decoding="async" hidden>
+    <canvas id="crtWave" width="176" height="40"></canvas>
+    <div id="crtSub"></div>
+    <div class="crt-scanline"></div>
+  </div>
   <div id="flybyPulse"></div>
   <div id="status">LOADING F-15...</div>
   <div id="menu" role="dialog" aria-modal="true" aria-labelledby="menuTitle">
@@ -706,32 +720,33 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s83a';
-import { createBlastFX } from './src/blastfx.js?v=s83a';
-import { createHUD } from './src/hud.js?v=s83a';
-import { createCockpit3D } from './src/cockpit3d.js?v=s83a';
-import { createCombat, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s83a';
-import { createEjection } from './src/eject.js?v=s83a';
-import { createAudio } from './src/audio.js?v=s83a';
-import { createRadio } from './src/radio.js?v=s83a';
-import { createProfile, LIVERIES, liveryById } from './src/profile.js?v=s83a';
-import { createLivery } from './src/livery.js?v=s83a';
-import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s83a';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s83a';
-import { createCanopyFX } from './src/canopy.js?v=s83a';
-import { createNVG } from './src/nvg.js?v=s83a';
-import { createWorld, WORLD } from './src/world.js?v=s83a';
-import { createSurfaces } from './src/surfaces.js?v=s83a';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s83a';
-import { createFreeLook } from './src/freelook.js?v=s83a';
-import { createCanopyGlass } from './src/canopyglass.js?v=s83a';
-import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s83a';
-import { SPW, SQUADRON, MODES, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode } from './src/loadout.js?v=s83a';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s83a';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO } from './src/radioScript.js?v=s83a';
-import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s83a';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s83a';
-import { MAPS } from './src/maps.js?v=s83a';
+import { createVFX } from './src/vfx.js?v=s84a';
+import { createBlastFX } from './src/blastfx.js?v=s84a';
+import { createHUD } from './src/hud.js?v=s84a';
+import { createCockpit3D } from './src/cockpit3d.js?v=s84a';
+import { createCombat, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s84a';
+import { createEjection } from './src/eject.js?v=s84a';
+import { createAudio } from './src/audio.js?v=s84a';
+import { createRadio } from './src/radio.js?v=s84a';
+import { createProfile, LIVERIES, liveryById } from './src/profile.js?v=s84a';
+import { createLivery } from './src/livery.js?v=s84a';
+import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s84a';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s84a';
+import { createCanopyFX } from './src/canopy.js?v=s84a';
+import { createNVG } from './src/nvg.js?v=s84a';
+import { createWorld, WORLD } from './src/world.js?v=s84a';
+import { createSurfaces } from './src/surfaces.js?v=s84a';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s84a';
+import { createFreeLook } from './src/freelook.js?v=s84a';
+import { createCanopyGlass } from './src/canopyglass.js?v=s84a';
+import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s84a';
+import { SPW, SQUADRON, MODES, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode } from './src/loadout.js?v=s84a';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s84a';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s84a';
+import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s84a';
+import { createRadioQueue } from './src/radioQueue.js?v=s84a';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s84a';
+import { MAPS } from './src/maps.js?v=s84a';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -3263,10 +3278,12 @@ let glFilter = '';
    ============================================================================ */
 const audio = createAudio();
 if (DEBUG && Q.has('bgm')) audio.setBgmForce(Q.get('bgm'));   // force a soundtrack scenario for headless checks
-/* ---- CRT radio portrait: preloaded images, CSS animation, zero per-frame work ---- */
+/* ---- Tactical Voice Box: DOM state machine driven by the radio queue ---- */
 const crtBox = document.getElementById('crtBox'), activePortrait = document.getElementById('activePortrait');
-const crtCap = document.getElementById('crtCap'), crtTag = document.getElementById('crtTag');
-activePortrait.onerror = () => { activePortrait.hidden = true; };      // never show a broken-image icon
+const crtTag = document.getElementById('crtTag'), crtSub = document.getElementById('crtSub');
+const crtWave = document.getElementById('crtWave');
+const crtCtx = crtWave.getContext('2d', { willReadFrequently: true });
+activePortrait.onerror = () => { activePortrait.hidden = true; };
 const PORTRAIT = {
   'AWACS': 'assets/portraits/awacs.webp',
   'WARDEN-1': 'assets/portraits/warden1.webp',
@@ -3275,92 +3292,58 @@ const PORTRAIT = {
   'CRIMSON-1': 'assets/portraits/crimson1.webp',
   'CRIMSON-2': 'assets/portraits/crimson2.webp'
 };
-const CRT_COL = { green: '#20FF70', red: '#FF2A3B' };
-const portraitImg = {};                                       // one Image per key, created once at boot
-for (const k in PORTRAIT) {
-  const im = new Image();
-  im.onerror = () => { portraitImg[k].failed = true; };
-  portraitImg[k] = im; im.src = PORTRAIT[k];
-}
-let crtTimer = 0, calloutT = -1e4, crtLastKey = '';
+const portraitImg = {};
+for (const k in PORTRAIT) { const im = new Image(); im.onerror = () => { portraitImg[k].failed = true; }; portraitImg[k] = im; im.src = PORTRAIT[k]; }
+const CH_PORTRAIT = { AWACS: 'AWACS', WARDEN2: 'WARDEN-2', WARDEN3: 'WARDEN-3', CRIMSON: 'CRIMSON-1' };
+let crtFallbackTimer = 0, boxHoldUntil = 0;
 function syncCrtVisible() { crtBox.hidden = appMode !== 'PLAY'; }
-function onWing(text, caption, tint, force = false, hold = 2600) {
-  const now = performance.now();
-  let key = String(caption || '').toUpperCase();
-  if (key === 'OVERLORD' || key === 'OVERLORD-1') key = 'AWACS';
-  if (!force && key === crtLastKey && now - calloutT < 4000) return;      // throttle repeat calls, not a new speaker
-  calloutT = now; crtLastKey = key;
-  const red = /^CRIMSON/.test(key), col = red ? CRT_COL.red : CRT_COL.green;
-  const entry = PORTRAIT[key] ? portraitImg[key] : null;
-  crtBox.style.setProperty('--crt', col);
-  crtTag.textContent = red ? '▲ THREAT // ' + key : key;
-  crtCap.textContent = text || ''; crtCap.style.color = col; crtCap.style.opacity = '1';
-  crtBox.classList.remove('crt-off'); crtBox.classList.add('crt-on');
-  activePortrait.classList.remove('crt-on', 'crt-off');
+function clearBox() {
+  boxHoldUntil = 0;
+  crtBox.classList.remove('flash', 'talk', 'fade');
+  crtBox.classList.add('fade');
+  crtTag.textContent = 'COMMS // STANDBY';
+  crtSub.textContent = '';
+  activePortrait.hidden = true; activePortrait.classList.remove('crt-on');
+  crtCtx.clearRect(0, 0, 176, 40);
+}
+function setBox(slot, fallbackSecs, voiced) {
+  if (voiced) boxHoldUntil = performance.now() + Math.max(2600, (slot.dur || 2.6) * 1000);
+  const ch = slot.ch || 'AWACS', cfg = audio.radioCh[ch] || audio.radioCh.DEFAULT;
+  crtBox.style.setProperty('--rxCol', cfg.col);
+  crtTag.textContent = cfg.tag;
+  crtSub.textContent = slot.text || '';
+  crtBox.classList.remove('flash', 'talk', 'fade', 'idle');
+  void crtBox.offsetWidth;
+  crtBox.classList.add('flash');
+  setTimeout(() => { if (crtBox.classList.contains('flash')) { crtBox.classList.remove('flash'); crtBox.classList.add('talk'); } }, 90);
+  const key = CH_PORTRAIT[ch], entry = key && PORTRAIT[key] ? portraitImg[key] : null;
   if (entry && !entry.failed) {
     activePortrait.hidden = false; activePortrait.src = PORTRAIT[key];
-    void activePortrait.offsetWidth;                                      // restart the entrance animation
-    activePortrait.classList.add('crt-on');
-  } else {
-    activePortrait.hidden = true;                                         // text-only fallback, no broken icon
-  }
-  clearTimeout(crtTimer);
-  crtTimer = setTimeout(() => {
-    crtBox.classList.remove('crt-on'); crtBox.classList.add('crt-off');
-    activePortrait.classList.remove('crt-on'); activePortrait.classList.add('crt-off');
-    crtCap.style.opacity = '0'; crtTag.textContent = '';
-  }, Math.max(400, hold));
-  if (audio.ready) audio.radioSquelch();
+    void activePortrait.offsetWidth;
+    activePortrait.classList.remove('crt-on'); activePortrait.classList.add('crt-on');
+  } else activePortrait.hidden = true;
+  clearTimeout(crtFallbackTimer);
+  if (fallbackSecs) crtFallbackTimer = setTimeout(clearBox, fallbackSecs * 1000);
 }
-
-// ---- voiced radio dispatcher: one channel, priority + cooldown rules ----
-const radioCh = { until: 0, banter: 0, queue: [], last: Object.create(null), cd: Object.create(null), once: Object.create(null) };
-const RADIO_CD = { ON_NEAR_MISS: 20, ON_CANYON_LOW: 20 };
-const RADIO_ONCE = { ON_TAKEOFF: 1, ON_ACE_INBOUND: 1, ON_ACE_KILL: 1, ON_MISSION_CLEAR: 1 };
-function radioPlay(line) {
-  const info = RADIO_SPEAKERS[line.speaker] || { callsign: line.speaker, tint: '#00ff66' };
-  const dur = audio.playRadio(line.id);
-  radioCh.until = performance.now() + dur * 1000;
-  radioCh.last[line.event] = line.id;
-  onWing(line.text, info.callsign, info.tint, true, Math.max(2780, dur * 1000 + 300));
+// Text-only fallback: drives the box with a silent TALK window, no clip, no duck.
+function onWing(text, caption, tint, force = false, hold = 2600) {
+  const rx = audio.radio.rxState;
+  if (rx === 'OPEN' || rx === 'TALK' || rx === 'TAIL' || performance.now() < boxHoldUntil) return;  // never desync a voiced subtitle
+  let key = String(caption || '').toUpperCase();
+  if (key === 'OVERLORD' || key === 'OVERLORD-1') key = 'AWACS';
+  const ch = key === 'AWACS' ? 'AWACS' : /^CRIMSON/.test(key) ? 'CRIMSON'
+    : key === 'WARDEN-2' ? 'WARDEN2' : key === 'WARDEN-3' ? 'WARDEN3' : 'DEFAULT';
+  setBox({ ch, text: text || '', id: '' }, Math.max(1.6, String(text || '').length * 0.055));
 }
-function radioEvent(ev) {
-  if (!RADIO_BY_EVENT[ev]) return false;
-  const now = performance.now();
-  if (RADIO_ONCE[ev] && radioCh.once[ev]) return false;
-  const cd = RADIO_CD[ev] || 8;
-  if (now < (radioCh.cd[ev] || 0)) return false;
-  radioCh.cd[ev] = now + cd * 1000;
-  if (RADIO_ONCE[ev]) radioCh.once[ev] = 1;
-  const pool = RADIO_BY_EVENT[ev];
-  let pick = null;
-  for (let tries = 0; tries < 8; tries++) {
-    const c = pool[(Math.random() * pool.length) | 0];
-    if (c.id !== radioCh.last[ev]) { pick = c; break; }
-  }
-  if (!pick) pick = pool[0];
-  const busy = now < radioCh.until;
-  if (pick.priority === 1) {
-    if (busy) audio.stopRadio();                                // CRITICAL interrupts
-    radioCh.queue.length = 0;
-    radioPlay(pick);
-  } else if (pick.priority === 2) {
-    if (busy) { if (radioCh.queue.length < 2) radioCh.queue.push(pick); }
-    else radioPlay(pick);
-  } else {
-    // BANTER: only after the channel has been idle for 3 s, and never within 5 s of the last one.
-    if (!busy && now - radioCh.until >= 3000 && now >= (radioCh.banter || 0)) {
-      radioCh.banter = now + 5000;
-      radioPlay(pick);
-    }
-  }
-  return true;
+// Only the queue calls radioPlay; it owns timing and the Voice Box lifecycle.
+function radioPlay(slot) {
+  setBox(slot, 0, true);
+  return audio.playRadio(slot.id, slot.ch);
 }
-function radioPump() {
-  if (!radioCh.queue.length || performance.now() < radioCh.until) return;
-  radioPlay(radioCh.queue.shift());
-}
-function radioReset() { radioCh.until = 0; radioCh.banter = 0; radioCh.queue.length = 0; radioCh.last = Object.create(null); radioCh.cd = Object.create(null); radioCh.once = Object.create(null); }
+const rq = createRadioQueue(THREE, { audio, onTx: radioPlay, onIdle: clearBox, debug: DEBUG });
+function radioEvent(ev, opts) { return rq.say(ev, opts); }
+function radioReset() { rq.clear(); clearBox(); }
+function radioPump() { rq.update(performance.now() / 1000); }
 let radioPreloaded = false;
 function preloadRadioOnce() {
   if (radioPreloaded || !audio.ready) return;
@@ -3369,14 +3352,44 @@ function preloadRadioOnce() {
 if (DEBUG && Q.has('radiohero')) {
   audio.init(); radioPreloaded = true;
   audio.preloadRadio(RADIO_LINES).then(() => {
-    RADIO_HERO.forEach((line, i) => setTimeout(() => radioPlay(line), 400 + i * (Math.max(3, line.text.length * 0.06) * 1000 + 400)));
+    RADIO_HERO.forEach((line, i) => setTimeout(() => rq.say(line, { pri: 3, bypass: true }), 400 + i * (Math.max(3, line.text.length * 0.06) * 1000 + 400)));
   });
 }
 window.__playTrailerLine = key => {
   const line = RADIO_HERO.find(l => l.id === key || l.event === key) || RADIO_HERO[0];
-  if (line) radioPlay(line);
+  if (line) { rq.say(line, { pri: 3, bypass: true }); radioPump(); }
   return line ? line.id : null;
 };
+if (DEBUG && Q.has('radiospam')) {
+  const events = RADIO_EVENTS;
+  for (let i = 0; i < 20; i++) setTimeout(() => radioEvent(events[i % events.length]), 100 + i * 100);
+}
+if (DEBUG && Q.has('radiocrit')) {
+  const at = Number(Q.get('radiocrit')) || 3;
+  setTimeout(() => radioEvent('ON_NEAR_MISS', { pri: 3, cat: 'MISSILE' }), at * 1000);
+}
+// 30 Hz analyser bars; cleared once on the IDLE transition, never drawn while idle.
+let waveLast = 0;
+function drawCrtWave(now) {
+  const st = audio.radio.rxState;
+  if (st !== 'OPEN' && st !== 'TALK' && st !== 'TAIL') return;
+  if (now - waveLast < 33.3) return;
+  waveLast = now;
+  const an = audio.radioAnalyser, freq = audio.radioFreq, time = audio.radioTime;
+  if (!an || !freq || !time) return;
+  an.getByteFrequencyData(freq); an.getByteTimeDomainData(time);
+  const cfg = audio.radioCh[(rq.cur && rq.cur.ch) || 'AWACS'] || audio.radioCh.DEFAULT;
+  crtCtx.clearRect(0, 0, 176, 40);
+  crtCtx.fillStyle = cfg.col;
+  for (let b = 0; b < 24; b++) {
+    const v = Math.max(freq[2 + b * 2], freq[3 + b * 2]);
+    const hgt = Math.pow(v / 255, 0.8) * 40;
+    crtCtx.fillRect(b * 7 + 1, 40 - hgt, 6, hgt);
+  }
+  crtCtx.globalAlpha = 0.35; crtCtx.strokeStyle = cfg.col; crtCtx.beginPath();
+  for (let i = 0; i < 128; i++) { const x = i / 127 * 176, y = time[i] / 255 * 40; if (i) crtCtx.lineTo(x, y); else crtCtx.moveTo(x, y); }
+  crtCtx.stroke(); crtCtx.globalAlpha = 1;
+}
 // Recorded SFX (assets/sfx/): fetch + decode now so they are ready at LAUNCH; failures fall back to procedural DSP.
 audio.preload().then(st => console.log('[ANGELS_ZERO] sfx', JSON.stringify(st)));
 // Unlock / resume the AudioContext inside every user gesture (browsers keep it
@@ -3404,7 +3417,7 @@ if (DEBUG) window.__frame = (dt = 1 / 60) => {
 if (DEBUG) window.__step = (n = 30) => { for (let i = 0; i < n; i++) { simTime += 1 / 60; stepSim(1 / 60); updateCameraAndVisuals(1 / 60, simTime); if (appMode === 'PLAY') updateAudio(); audio.updateMusic(getMusicCtx(), 1 / 60); } };
 window.__audioDebug = () => ({ state: audio.state, rms: +audio.rms.toFixed(4), muted: audio.muted, volume: audio.volume, layers: audio.layers,
   canopyRain: audio.canopyRain, wind: audio.wind, blast: audio.blast, blastFx: blast ? blast.stats : null, shake: +blastShake.toFixed(3), ribbons: vfx.ribbons, canopyGlass: canopyGlass.stats, rainCulled: weather.rainCulled,
-  music: audio.music, bgm: audio.bgm, slowMo: audio.slowMoDebug, mist: audio.mist, radio: audio.radio,
+  music: audio.music, bgm: audio.bgm, slowMo: audio.slowMoDebug, mist: audio.mist, radio: { ...audio.radio, ...rq.state },
   crtRadio: combat.radio ? { call: combat.radio.call, text: combat.radio.text, age: +combat.radio.age.toFixed(2) } : null,
   gLoad: +state.gLoad.toFixed(2), gStrain: +state.gStrain.toFixed(2), throttle: +state.throttle.toFixed(2), afterburner: +state.afterburner.toFixed(2) });
 // Seeker / alert / gun state -> procedural audio mix, once per frame.
@@ -4262,6 +4275,7 @@ function menuOrbit(dt) {
 function stepSim(dt) {
   if (DEBUG_HOLD) for (const k of DEBUG_HOLD) keys[k] = true;   // test hook: ?hold=s,a,...
   if (appMode === 'PLAY' && flightMode === 'FLY') tele.tick(dt, state, simTime);
+  rq.update(performance.now() / 1000);                    // priority radio queue: no overlap, 0.35 s gaps
   if (cat.ph !== 'NONE') combatSys.stepAlly(dt);          // carrier moves before the jet rides its deck
   if (flightMode === 'FLY') updatePhysics(dt);
   combatSys.update(dt, simTime, { playerActive: flightMode === 'FLY', firing: keys.fire || DEBUG_FIRE });
@@ -4294,6 +4308,7 @@ function animate() {
   canopyFx.update(dt, appMode === 'PLAY' && flightMode === 'FLY' ? combat.playerCloud || 0 : 0, state.speed, firstPerson, appMode !== 'MENU',
     appMode === 'PLAY' && flightMode === 'FLY' ? weather.rainHere : 0);
   hud.draw();
+  drawCrtWave(now);
   const dim = !!document.pointerLockElement && appMode === 'PLAY';
   if (dim !== bgmDimmed) {
     bgmDimmed = dim;
@@ -4301,7 +4316,6 @@ function animate() {
   }
   if (dt > 0) perf.fps += ((1 / Math.max(dt, 1e-3)) - perf.fps) * 0.05;
   perf.frames++;
-  radioPump();
 }
 const perf = { fps: 60, frames: 0 };
 let bgmDimmed = false;
@@ -4320,7 +4334,7 @@ if (DEBUG) {
     get missionId() { return missionId; }, get mission() { return mission(); }, cycleMission, loadMissionScene, startSortie, launchSortie,
     get autoland() { return autoland; }, autolandPrompt, engageAutoland, getMusicCtx, get debrief() { return !debriefEl.hidden; },
     get cat() { return cat; }, catEnter, catTick, catFire, get carrier() { return carrier; }, get jetGearDY() { return JET_GEAR_DY; },
-    radioEvent, get radioEvents() { return Object.keys(RADIO_BY_EVENT); }, get radioCh() { return radioCh; } };
+    radioEvent, get radioEvents() { return Object.keys(RADIO_BY_EVENT); }, get radioQueue() { return rq; }, radioPlay, clearBox };
 }
 /* ============================================================================
    BORDERLESS STANDBY HANGAR MENU
