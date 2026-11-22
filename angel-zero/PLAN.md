@@ -1604,6 +1604,11 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   - `radioQueue.js` owns all voice timing: eight reused slots, priority/category cooldowns, per-line TTL, a 0.35 s inter-line gap, and CRITICAL pre-emption of combat/ambient lines while STORY is never cut off. The single `-5 dB` music duck ramps over 0.2 s at open and 0.4 s at tail; the old 0.25 s duck is gone.
   - `#crtBox` is now a reactive Voice Box driven by `onTx`/`onIdle`: faction-coloured callsign, portrait, `#crtSub` subtitles, CSS static-flash transitions, and 24 analyser bars plus a time-domain polyline at 30 Hz. `?radiospam=1`, `?radiocrit=s` and `__audioDebug().radio` expose queue state. Every `?v=` tag bumped to s84a.
 
+- [x] **Carrier deck spawn fix** *(build `s85a`, `src/combat.js`, `index.html`, `src/hud.js`)*
+  - `carrierReady` resolves only after the GLB is mounted under `allyRoot`, scale-verified to 360 m, waterlined with the deck at `CARRIER_DECK_ASL = 19` m, ray-cast per track, and matrix-updated. `onCarrierMounted` re-snaps any live `HOLD`/`WAIT` launch; the load now kicks off at boot.
+  - One visibility writer in `stepAlly` owns `C.carrierVisible` and `a.root.visible`, walks ancestors, and pins root Y to 0; the procedural hull stays hidden after mount. `enterCarrierLaunch()` is the only caller of `catEnter()`, used by start, `?catat`, trap turnaround and every replay/menu route; `cat.ph` is `WAIT` with a `DECK PREP` hint and frozen sim until ready.
+  - `catSnapAll()` re-poses player, wingmen, JBD and steam from `catTrackWorld()`, with a 0.5 m per-frame re-snap guard. `?debug` logs `CARRIER_OK` / `CARRIER_FAIL` at mount, `catEnter` and `catEnter+1 s`, including a downward ray hit check against the carrier vs ocean. Every `?v=` tag bumped to s85a.
+
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.

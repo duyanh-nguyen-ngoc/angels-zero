@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.16', title: 'CARRIER DECK SPAWN FIX', bullets: [
+    'USS Enterprise now mounts under one persistent root before launch, with verified 360 m scale, a deck set 19 m above the water and per-track ray heights.',
+    'Player and both wingmen snap to the real deck on mount and re-snap if the hull drifts, so CATAPULT_HOLD starts on the physical bow instead of over open ocean.',
+    'All launch paths share one async entry and a single visibility writer; a debug CARRIER_OK line proves the carrier is mounted, visible and under the jet.'
+  ] },
   { version: 'v1.1.15', title: 'COMMS OVERHAUL', bullets: [
     'Radio voices now run through a military headset DSP chain with per-character band shaping, soft clipping, compression, procedural PTT clicks and a live static bed.',
     'A priority queue keeps transmissions from overlapping, enforces a 0.35 s inter-line gap and cooldowns, and lets critical calls cut in ahead of combat chatter.',
