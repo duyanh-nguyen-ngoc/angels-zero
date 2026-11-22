@@ -1662,6 +1662,11 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   - 96 instanced ship-wake quads from the ally carrier and all live fleet vessels, a 40-point flak pool with orange-core→grey-puff shader, and 6 persistent oil-fire columns (32 points each) claimed from `env.onSmoke` on ship damage/sinking and fort kills. CANYON gets 12 sweeping searchlight cones plus 10 gorge mist sprites; AIR SUPERIORITY gets spinning radar dishes, 16 blinking beacons and 4 racetrack jets with pooled ribbon contrails and distant tracers.
   - `?ambient=0` kill switch, once-per-second `ambient` log and ambient data in the warp dump. Headless checks confirm sky/flak/wakes/search/beacons/traffic counts, full reset on mission switch, zero errors and ~8 ms p95. Every `?v=` tag bumped to s92a.
 
+- [x] **Reliable scenario score** *(build `s93d`, v1.1.24, `src/audio.js`, `index.html`)*
+  - Fixed the AudioContext unlock / manifest race: `switchTo()` now defers into `pendingScn` before `init()` has built the decks, the manifest fetch flushes that pending scenario, and `armUnlock()` retries on every gesture until a real `playing` event confirms playback. `playDeck()` handles `NotAllowedError` with a gesture re-arm and other errors with a capped 1.5 s retry; the same-scenario guard no longer skips a paused deck.
+  - One-time key audit checks the 12 `BGM_KEYS` against the manifest, the resolver and `MISSIONS`; unknown keys log and fall back to `03_air_superiority`. `setAuto(true)` is re-applied at mission start and on returning to STANDBY (`?bgmtrack=` keeps MANUAL), and `lastMusicKey` force-switches on every app/flight/cat/autoland/RTB/phase/mission transition.
+  - Deck state is committed only on the `playing` event, so the `#bgmWidget` title always equals `audio.bgm.title`. Headless checks confirm a fresh load + first gesture starts `01_hangar` un-paused, each mission's exact scenario (including catapult→`06_strike`/`08_crimson_duel`, `11_rtb` and `12_debrief`), `bgm keys ok=12`, zero JS errors and ~5–8 ms p95.
+
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.

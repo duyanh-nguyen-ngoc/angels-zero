@@ -9,7 +9,7 @@
 // disposed — configure()/reset() only toggle flags and visibility, so switching
 // missions can never leak one theatre's props into another.
 
-import { GORGE_FLOOR_Y, GORGE_GATE_Z, GORGE_GATE_N, gorgeCentreX } from './maps.js?v=s92a';
+import { GORGE_FLOOR_Y, GORGE_GATE_Z, GORGE_GATE_N, gorgeCentreX } from './maps.js?v=s93d';
 
 const WIND_X = 6.0, WIND_Z = -2.5;
 const SKY_BLEND_S = 18, RTB_BLEND_S = 25;

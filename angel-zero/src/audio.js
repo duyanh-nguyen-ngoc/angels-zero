@@ -9,6 +9,8 @@
 // to the procedural layers below. A master "hearing tunnel" low-pass sweeps
 // 12 kHz -> 550 Hz as the pilot approaches G-LOC.
 
+import { MISSIONS } from './missions.js?v=s93d';
+
 export function createAudio() {
   let ctx = null, master = null, cockpitLP = null, ready = false;
   let volume = 0.7, muted = false, musicVol = 1;
@@ -32,6 +34,16 @@ export function createAudio() {
   let manifest = null, active = 0, curScn = '01_hangar', pendScn = '', dwell = 0, bgmUnlocked = false, lastTickT = 0, switchSeq = 0;
   let bgmForce = '', bgmCtx = null, currentIdx = 0;
   let auto = true, manualId = -1, advancing = false, advTimer = null, changeCb = null, changeKey = '';
+  // Streamed-BGM startup state. All scalars: no allocation on any frame.
+  let manifestReady = false, manifestRetries = 0, pendingScn = null, pendingForce = false;
+  let unlocked = false, playConfirmed = false, retryT = 0, bgmRetries = 0;
+  let bgmPausedByUser = false, gestureArmed = false;
+  let cScn = '', cIdx = 0, cIdle = 0, cSeq = 0;          // pending crossfade commit (applied on 'playing')
+  const BGM_RETRY_S = 1.5, BGM_RETRY_MAX = 6;
+  const GESTURES = ['pointerdown', 'keydown', 'click', 'touchend'];
+  const BGM_KEYS = ['01_hangar', '02_catapult', '03_air_superiority', '04_storm', '05_night',
+    '06_strike', '07_canyon', '08_crimson_duel', '09_furball', '10_last_stand', '11_rtb', '12_debrief'];
+  const RESOLVER_KEYS = BGM_KEYS;                          // resolver literals + c.bgmScenario values
   const radioBufs = Object.create(null);                   // decoded voice clips, cached by line id
   const radioState = { plays: 0, lastId: '', loaded: 0, playing: false };
   const tc = 0.06;                                         // param smoothing time-constant
@@ -125,6 +137,13 @@ export function createAudio() {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return false;
     ctx = new AC();
+    // A suspended context (tab hidden / OS audio change) must re-arm the gesture
+    // retry, otherwise a later click cannot restart a paused deck.
+    ctx.onstatechange = () => {
+      if (ctx.state === 'suspended') armUnlock();
+      else if (pendingScn) switchTo(pendingScn, true);     // deferred scenario finally can play
+    };
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) armUnlock(); });
     master = gain(muted ? 0 : volume);
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -16; comp.knee.value = 12; comp.ratio.value = 5; comp.attack.value = 0.004; comp.release.value = 0.25;
@@ -269,8 +288,8 @@ export function createAudio() {
     N.egunNoise.connect(N.egunBP).connect(N.egunAMG).connect(N.egunG).connect(N.body);
     N.egunLFO = osc('square', 50); N.egunAMD = gain(0.5);
     N.egunLFO.connect(N.egunAMD).connect(N.egunAMG.gain);
-    N.gunHitOsc = osc('triangle', 1800); N.gunHitG = gain(0);
-    N.gunHitOsc.connect(N.gunHitG).connect(N.body); N.gunHitOsc.start();
+    N.gunHitOsc = osc('triangle', 1800); N.gunHitG = gain(0);   // osc() already started it
+    N.gunHitOsc.connect(N.gunHitG).connect(N.body);
 
     // Rain patter: band-passed pink noise (cockpit-muffled) + bright droplet ticks.
     N.rain = loopNoise(pink); N.rainBP = filt('bandpass', 2400, 0.55); N.rainGain = gain(0);
@@ -1031,6 +1050,44 @@ export function createAudio() {
   ];
   const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
   let musicOn = true, mStep = 0, mNext = 0, mLvl = 0, mLvlT = 0, mNear = false, mIdleT = 0, mNotes = 0, mTimer = null;
+  // Manifest + unlock helpers. Declared as functions so initMusic can call them
+  // before their textual definition; no per-frame work or allocation here.
+  function setPending(scn) { pendingScn = scn || null; pendScn = scn || ''; }
+  function auditBgmKeys() {
+    const man = (manifest && manifest.scenarios) || {};
+    let missing = 0;
+    for (let i = 0; i < BGM_KEYS.length; i++) {
+      const k = BGM_KEYS[i];
+      if (!man[k]) { console.log('[ANGELS_ZERO] bgm key MISSING ' + k + ' (from manifest)'); missing++; }
+      if (RESOLVER_KEYS.indexOf(k) < 0) { console.log('[ANGELS_ZERO] bgm key MISSING ' + k + ' (from resolver)'); missing++; }
+    }
+    for (const id in MISSIONS) {
+      const k = MISSIONS[id].bgmScenario;
+      if (k && !man[k]) { console.log('[ANGELS_ZERO] bgm key MISSING ' + k + ' (from missions)'); missing++; }
+    }
+    if (!missing) console.log('[ANGELS_ZERO] bgm keys ok=' + BGM_KEYS.length);
+  }
+  function fetchManifest() {
+    fetch(BGM_DIR + 'manifest.json').then(r => {
+      if (!r.ok) throw new Error('status ' + r.status);
+      return r.json();
+    }).then(m => {
+      if (m && m.scenarios) {
+        for (const k in m.scenarios) {
+          if (!Array.isArray(m.scenarios[k])) continue;
+          m.scenarios[k] = m.scenarios[k].map(e => typeof e === 'string'
+            ? { file: e, title: e.replace(/_0\d\.ogg$/, '').toUpperCase() } : e);
+        }
+        manifest = m;
+      }
+      manifestReady = true;
+      auditBgmKeys();
+      if (pendingScn) switchTo(pendingScn, true);           // manifest landed after the gesture
+    }).catch(e => {
+      console.log('[ANGELS_ZERO] bgm manifest FAIL ' + (e && e.message ? e.message : e));
+      if (manifestRetries++ < 1) setTimeout(fetchManifest, 2000);   // one retry; synth fallback untouched
+    });
+  }
   function initMusic() {
     if (BGM_OK) {
       // src -> g -> musicBus -> duckG -> musicVolG -> master (all created once).
@@ -1039,6 +1096,8 @@ export function createAudio() {
       for (let i = 0; i < 2; i++) {
         const el = new Audio();
         el.loop = true; el.preload = 'none'; el.crossOrigin = 'anonymous';
+        // The real 'playing' event is the single source of truth for playback state.
+        el.addEventListener('playing', onDeckPlaying);
         decks.push({ el, src: ctx.createMediaElementSource(el), g: gain(0) });
         decks[i].src.connect(decks[i].g).connect(N.musicBus);
         // Attached once per deck; auto-advance never re-registers listeners.
@@ -1050,17 +1109,8 @@ export function createAudio() {
         el.addEventListener('ended', () => { if (decks[i] === decks[active]) advance(); });
       }
       // The manifest is the ONLY network request; the .ogg files stream through Audio().
-      fetch(BGM_DIR + 'manifest.json').then(r => r.ok ? r.json() : null).then(m => {
-        if (m && m.scenarios) {
-          for (const k in m.scenarios) {
-            if (!Array.isArray(m.scenarios[k])) continue;
-            m.scenarios[k] = m.scenarios[k].map(e => typeof e === 'string'
-              ? { file: e, title: e.replace(/_0\d\.ogg$/, '').toUpperCase() } : e);
-          }
-          manifest = m;
-        }
-      }).catch(() => {});
-      unlockBgm();
+      fetchManifest();
+      armUnlock();
       return;
     }
     // --- legacy synth fallback (older Safari without Ogg Vorbis) ---
@@ -1079,17 +1129,26 @@ export function createAudio() {
     N.padLFO = osc('sine', 0.07); N.padLFOAmt = gain(380); N.padLFO.connect(N.padLFOAmt).connect(N.padLP.frequency);
     if (!mTimer) mTimer = setInterval(musicTick, 25);
   }
-  // Autoplay unlock: one gesture resumes the context and starts the pending scenario.
-  function unlockBgm() {
-    if (!BGM_OK || bgmUnlocked) return;
-    const evt = ['pointerdown', 'keydown', 'touchend'];
-    const go = () => {
-      if (ctx && ctx.state !== 'running') ctx.resume().catch(() => {});
-      bgmUnlocked = true;
-      if (musicOn) switchTo(pendScn || curScn);
-    };
-    for (const name of evt) window.addEventListener(name, go, { once: true, capture: true });
-    if (ctx) go();   // init() itself runs inside a gesture; start without waiting for another one
+  // Autoplay unlock: every gesture retries until a deck reports a real 'playing'
+  // event. Listeners are bound once and removed as soon as that event arrives.
+  function onGesture() {
+    unlocked = true;
+    if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+    if (pendingScn) switchTo(pendingScn, true);
+    else {
+      const d = decks[active];
+      if (d && d.el && d.el.paused && !bgmPausedByUser) playDeck(d);
+    }
+  }
+  function armUnlock() {
+    if (!BGM_OK || playConfirmed || gestureArmed) return;
+    gestureArmed = true;
+    for (let i = 0; i < GESTURES.length; i++) window.addEventListener(GESTURES[i], onGesture, { capture: true, passive: true });
+  }
+  function disarmUnlock() {
+    if (!gestureArmed) return;
+    gestureArmed = false;
+    for (let i = 0; i < GESTURES.length; i++) window.removeEventListener(GESTURES[i], onGesture, { capture: true });
   }
   // --- track catalogue + shuffle bag ----------------------------------------
   function tracksOf(scn) {
@@ -1118,14 +1177,41 @@ export function createAudio() {
     changeKey = key;
     changeCb({ title, scn: curScn, idx: currentIdx, auto });
   }
+  // Handlers bound once; no closure is created per play() call or per frame.
+  const onPlayOK = () => { retryT = 0; bgmRetries = 0; };
+  const onPlayFail = e => {
+    const name = e && e.name ? e.name : 'Error';
+    console.log('[ANGELS_ZERO] bgm play blocked ' + name);
+    if (name === 'NotAllowedError') { setPending(pendingScn || curScn); armUnlock(); }
+    else if (bgmRetries < BGM_RETRY_MAX) { bgmRetries++; retryT = BGM_RETRY_S; }
+  };
+  function playDeck(deck) {
+    if (!deck || !deck.el || !deck.el.src || bgmPausedByUser) return;
+    deck.el.play().then(onPlayOK).catch(onPlayFail);
+  }
+  function onDeckPlaying(e) {
+    let played = -1;
+    for (let i = 0; i < decks.length; i++) if (decks[i].el === e.target) { played = i; break; }
+    // Only the deck we intended to start commits the logical scenario, so the
+    // bgm getter and the widget always describe what is actually playing.
+    if (played >= 0 && played === cIdle) { active = played; curScn = cScn; currentIdx = cIdx; dwell = 0; }
+    playConfirmed = true; unlocked = true;
+    setPending(null); pendingForce = false;
+    disarmUnlock(); retryT = 0; bgmRetries = 0;
+    emitChange();                                  // the widget repaints here, not before play resolves
+  }
   // Equal-power crossfade between the two decks. An explicit idx pins a track.
-  function crossfadeTo(scn, idx) {
+  function crossfadeTo(scn, idx, force = false) {
     if (!BGM_OK || !decks.length) return;
+    if (!manifestReady || (ctx && ctx.state === 'suspended')) {
+      setPending(scn); pendingForce = pendingForce || force; armUnlock(); return;
+    }
     const list = tracksOf(scn);
-    if (!list || !list.length) { pendScn = scn; return; }
-    if (!bgmUnlocked) { pendScn = scn; return; }
+    if (!list || !list.length) { setPending(scn); pendingForce = pendingForce || force; armUnlock(); return; }
     const i = Number.isInteger(idx) && idx >= 0 && idx < list.length ? idx : nextIdx(scn);
-    if (scn === curScn && !pendScn && decks[active].el.src && currentIdx === i) return;
+    const cur = decks[active];
+    // A paused / never-started deck always falls through so a retry can restart it.
+    if (scn === curScn && !force && !pendingScn && cur.el.src && !cur.el.paused && cur.el.currentTime > 0) return;
     lastIdx[scn] = i;
     const idle = 1 - active, out = active, seq = ++switchSeq;
     const d = decks[idle], o = decks[out];
@@ -1136,16 +1222,27 @@ export function createAudio() {
     d.g.gain.setValueCurveAtTime(sinCurve, now, XFADE);
     o.g.gain.cancelScheduledValues(now); o.g.gain.setValueAtTime(o.g.gain.value, now);
     o.g.gain.setValueCurveAtTime(cosCurve, now, XFADE);
-    d.el.play().then(() => {
-      active = idle; curScn = scn; pendScn = ''; dwell = 0; currentIdx = i; emitChange();
-      setTimeout(() => {
-        if (seq !== switchSeq) return;
-        try { o.el.pause(); o.el.removeAttribute('src'); o.el.load(); } catch (e) { /* already released */ }
-        o.g.gain.value = 0;
-      }, (XFADE + 0.1) * 1000);
-    }).catch(() => { pendScn = scn; });
+    cScn = scn; cIdx = i; cIdle = idle; cSeq = seq;
+    playDeck(d);
+    setTimeout(() => {
+      if (seq !== switchSeq || active !== idle) return;
+      try { o.el.pause(); o.el.removeAttribute('src'); o.el.load(); } catch (e) { /* already released */ }
+      o.g.gain.value = 0;
+    }, (XFADE + 0.1) * 1000);
   }
-  function switchTo(scn) { crossfadeTo(scn, auto ? nextIdx(scn) : null); }
+  function switchTo(scn, force = false) {
+    if (!BGM_OK) return;
+    if (BGM_KEYS.indexOf(scn) < 0) {
+      console.log('[ANGELS_ZERO] bgm key UNKNOWN ' + scn + ' -> 03_air_superiority');
+      scn = '03_air_superiority';
+    }
+    // Defer BEFORE the decks check: the first scenario usually arrives before
+    // init() has built the two deck elements.
+    if (!manifestReady || !decks.length || (ctx && ctx.state === 'suspended')) {
+      setPending(scn); pendingForce = pendingForce || force; armUnlock(); return;
+    }
+    crossfadeTo(scn, auto ? nextIdx(scn) : null, force);
+  }
   function manualNext() {
     const list = allTracks();
     if (!list || !list.length) return null;
@@ -1156,10 +1253,10 @@ export function createAudio() {
   function advance() {
     if (advancing || !BGM_OK) return;
     advancing = true;
-    if (auto) crossfadeTo(curScn, nextIdx(curScn));
+    if (auto) crossfadeTo(curScn, nextIdx(curScn), true);
     else {
       const nx = manualNext();
-      if (nx) { manualId = nx.id; crossfadeTo(nx.scn, nx.idx < 0 ? 0 : nx.idx); }
+      if (nx) { manualId = nx.id; crossfadeTo(nx.scn, nx.idx < 0 ? 0 : nx.idx, true); }
     }
     clearTimeout(advTimer);
     advTimer = setTimeout(() => { advancing = false; }, (XFADE + 0.1) * 1000);
@@ -1169,8 +1266,7 @@ export function createAudio() {
     if (!t) return;
     auto = false; manualId = id;
     const own = tracksOf(t.scn), idx = own ? own.findIndex(e => e.file === t.file) : 0;
-    crossfadeTo(t.scn, idx < 0 ? 0 : idx);
-    emitChange();
+    crossfadeTo(t.scn, idx < 0 ? 0 : idx, true);          // widget repaints on 'playing'
   }
   function skip(dir) {
     if (!auto) {
@@ -1187,7 +1283,7 @@ export function createAudio() {
       if (!b || b.length < 2) target = nextIdx(curScn);
       else { const p = ((bagPos[curScn] || 0) - 2 + b.length * 2) % b.length; target = b[p]; bagPos[curScn] = p + 1; }
     }
-    crossfadeTo(curScn, target);
+    crossfadeTo(curScn, target, true);
   }
   function setAuto(on) {
     auto = !!on;
@@ -1312,9 +1408,21 @@ export function createAudio() {
         lastTickT = nowMs;
       }
       dwell += dt;
+      // Retry a failed play() once its timer expires (capped, no per-frame allocation).
+      if (retryT > 0) {
+        retryT -= dt;
+        if (retryT <= 0) {
+          retryT = 0;
+          if (pendingScn) switchTo(pendingScn, true);
+          else playDeck(decks[active]);
+        }
+      }
       const scn = resolveScenario(bgmCtx);
       const wait = (scn === '12_debrief' || scn === '01_hangar' || scn === '11_rtb') ? 0 : MIN_DWELL;
-      if (auto && (scn !== curScn || pendScn) && dwell >= wait) switchTo(scn);
+      if (auto && (scn !== curScn || pendingScn || pendScn) && dwell >= wait) {
+        switchTo(scn, pendingForce);
+        pendingForce = false;
+      }
       return;
     }
     if (!N.mL) return;
@@ -1347,10 +1455,10 @@ export function createAudio() {
     if (BGM_OK) {
       if (N.musicVolG) N.musicVolG.gain.setTargetAtTime(musicOn ? musicVol : 0, ctx.currentTime, 0.25);
       if (!musicOn) setTimeout(() => { if (!musicOn) for (const d of decks) { try { d.el.pause(); } catch (e) { /* noop */ } } }, 300);
-      else if (bgmUnlocked) {
+      else if (unlocked || playConfirmed) {
         const d = decks[active];
-        if (d && d.el.src) d.el.play().catch(() => { pendScn = curScn; });
-        else switchTo(pendScn || curScn);
+        if (d && d.el.src) playDeck(d);
+        else switchTo(pendingScn || pendScn || curScn, true);
       }
       return;
     }
@@ -1370,11 +1478,13 @@ export function createAudio() {
     if (N.duck) set(N.duck.gain, active ? 0.63 : 1, 0.08);
   }
   // PAUSED keeps the stream alive but ducks it; the world SFX bus stays untouched.
-  function setBgmPause(active) {
+  function setBgmPause(on) {
+    bgmPausedByUser = !!on;
     if (!BGM_OK || !N.duckG) return;
     const gp = N.duckG.gain, t = ctx.currentTime, cur = gp.value;
     gp.cancelScheduledValues(t); gp.setValueAtTime(cur, t);
-    gp.linearRampToValueAtTime(active ? DUCK_GAIN : 1, t + DUCK_T);
+    gp.linearRampToValueAtTime(on ? DUCK_GAIN : 1, t + DUCK_T);
+    if (!bgmPausedByUser) playDeck(decks[active]);        // resume does not fight the pause
   }
   // ---- PTT transmission envelope --------------------------------------------
   function playPtt(buf) {
@@ -1725,7 +1835,7 @@ export function createAudio() {
   }
 
   return {
-    init, resume, suspend, update, updateMusic, setSpray, enemyGun, gunhit, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, samLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, setBgmPause, bumpBgmDwell() { dwell = MIN_DWELL; }, setBgmForce: v => { bgmForce = v || ''; }, selectTrack, skip, setAuto, onBgmChange, get bgmTracks() { return allTracks() || []; }, radioSquelch, preloadRadio, playRadio, stopRadio, txOpen, txTail, txClose, preload,
+    init, resume, suspend, update, updateMusic, setSpray, enemyGun, gunhit, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, samLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, setBgmPause, bumpBgmDwell() { dwell = MIN_DWELL; }, setBgmForce: v => { bgmForce = v || ''; }, switchTo, selectTrack, skip, setAuto, onBgmChange, get bgmTracks() { return allTracks() || []; }, radioSquelch, preloadRadio, playRadio, stopRadio, txOpen, txTail, txClose, preload,
     get radioAnalyser() { return N.rAnalyser || null; }, get radioFreq() { return N.rFreq || null; }, get radioTime() { return N.rTime || null; },
     get radioCh() { return RADIO_CH; },
     get radioDsp() { return { pttOpen: !!N.pttOpen, pttTail: !!N.pttTail, static: !!N.rStatic, hp: N.rHP ? N.rHP.frequency.value : 0,
@@ -1749,7 +1859,9 @@ export function createAudio() {
       return { scn: curScn, curScn, idx: currentIdx, dwell: +dwell.toFixed(2), auto, manualId,
         file: t ? t.file : '', title: t ? t.title : '', bag: b ? Array.from(b) : [], bagPos: bagPos[curScn] || 0,
         deckT: +decks[active]?.el.currentTime.toFixed(2) || 0, duck: N.duckG ? +N.duckG.gain.value.toFixed(3) : 1,
-        unlocked: bgmUnlocked, ok: BGM_OK, pending: pendScn || '' };
+        unlocked: unlocked || playConfirmed, ok: BGM_OK, pending: pendingScn || pendScn || '',
+        manifestReady, ctxState: ctx ? ctx.state : 'uninitialised', paused: !!decks[active]?.el.paused,
+        pendingScn: pendingScn || pendScn || '', playConfirmed, retries: bgmRetries, force: pendingForce };
     },
     get bgmAuto() { return auto; }, get bgmDecks() { return decks; },
     resolveScenario,

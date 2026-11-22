@@ -8,11 +8,11 @@
 // burning wrecks that splash, scoring, waves, lock-on and threat warnings.
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { DIFFICULTY_PRESETS } from './difficulty.js?v=s92a';
-import { SPW } from './loadout.js?v=s92a';
-import { missionConfig } from './missions.js?v=s92a';
+import { DIFFICULTY_PRESETS } from './difficulty.js?v=s93d';
+import { SPW } from './loadout.js?v=s93d';
+import { missionConfig } from './missions.js?v=s93d';
 import { gorgeCentreX, gorgeSlope, gorgeHeading, gorgeDist, GORGE_GATE_Z, GORGE_GATE_N, GORGE_FLOOR_Y, GORGE_RIM_Y,
-  GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_FORT, CEIL_M } from './maps.js?v=s92a';
+  GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_FORT, CEIL_M } from './maps.js?v=s93d';
 
 const NM = 1852, FT = 0.3048, G0 = 9.81;
 // Allied CVN model: same 360 m deck as the procedural ship, re-anchored to the GLB.

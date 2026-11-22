@@ -720,35 +720,35 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s92a';
-import { createAmbient } from './src/ambient.js?v=s92a';
-import { createBlastFX } from './src/blastfx.js?v=s92a';
-import { createHUD } from './src/hud.js?v=s92a';
-import { createCockpit3D } from './src/cockpit3d.js?v=s92a';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s92a';
-import { createEjection } from './src/eject.js?v=s92a';
-import { createAudio } from './src/audio.js?v=s92a';
-import { createRadio } from './src/radio.js?v=s92a';
-import { createProfile, LIVERIES, liveryById } from './src/profile.js?v=s92a';
-import { createLivery } from './src/livery.js?v=s92a';
-import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s92a';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s92a';
-import { createCanopyFX } from './src/canopy.js?v=s92a';
-import { createNVG } from './src/nvg.js?v=s92a';
-import { createWorld, WORLD } from './src/world.js?v=s92a';
-import { createSurfaces } from './src/surfaces.js?v=s92a';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s92a';
-import { createFreeLook } from './src/freelook.js?v=s92a';
-import { createCanopyGlass } from './src/canopyglass.js?v=s92a';
-import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s92a';
-import { SPW, SQUADRON, MODES, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode } from './src/loadout.js?v=s92a';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s92a';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s92a';
-import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s92a';
-import { createRadioQueue } from './src/radioQueue.js?v=s92a';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s92a';
+import { createVFX } from './src/vfx.js?v=s93d';
+import { createAmbient } from './src/ambient.js?v=s93d';
+import { createBlastFX } from './src/blastfx.js?v=s93d';
+import { createHUD } from './src/hud.js?v=s93d';
+import { createCockpit3D } from './src/cockpit3d.js?v=s93d';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s93d';
+import { createEjection } from './src/eject.js?v=s93d';
+import { createAudio } from './src/audio.js?v=s93d';
+import { createRadio } from './src/radio.js?v=s93d';
+import { createProfile, LIVERIES, liveryById } from './src/profile.js?v=s93d';
+import { createLivery } from './src/livery.js?v=s93d';
+import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s93d';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s93d';
+import { createCanopyFX } from './src/canopy.js?v=s93d';
+import { createNVG } from './src/nvg.js?v=s93d';
+import { createWorld, WORLD } from './src/world.js?v=s93d';
+import { createSurfaces } from './src/surfaces.js?v=s93d';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s93d';
+import { createFreeLook } from './src/freelook.js?v=s93d';
+import { createCanopyGlass } from './src/canopyglass.js?v=s93d';
+import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s93d';
+import { SPW, SQUADRON, MODES, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode } from './src/loadout.js?v=s93d';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s93d';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s93d';
+import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s93d';
+import { createRadioQueue } from './src/radioQueue.js?v=s93d';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s93d';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
-  GORGE_HALF_W, RUNWAY_BBOX } from './src/maps.js?v=s92a';
+  GORGE_HALF_W, RUNWAY_BBOX } from './src/maps.js?v=s93d';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -1498,7 +1498,8 @@ function hideMenu() { return hideMenuEl(); }
 function launchSortie() {
   if (appMode !== 'MENU' || !modelReady) return;
   missionT = 0;
-  audio.init();                                        // AudioContext is created/resumed inside this user gesture
+  audio.init();
+  if (!(DEBUG && Q.has('bgmtrack'))) audio.setAuto(true);                                        // AudioContext is created/resumed inside this user gesture
   warmupGPUSync();                                     // no-op once the briefing-time warm-up has finished
   appMode = 'PLAY';
   for (const k in keys) keys[k] = false;
@@ -1549,6 +1550,7 @@ function applyMapProps(mapDef) {
 // Mission scene setup: pooled actors return to their pools, the terrain is rebuilt
 // in place (same geometry/material) and collision sets are reset.
 function loadMissionScene(m) {
+  if (!(DEBUG && Q.has('bgmtrack'))) audio.setAuto(true);
   combatSys.resetMission();
   world.rebuild(MAPS[m.mapTag] || MAPS.ARCHIPELAGO);
   applyMapProps(MAPS[m.mapTag] || MAPS.ARCHIPELAGO);
@@ -1905,6 +1907,8 @@ function catTick(dt) {
 }
 async function startSortie() {
   const m = mission();
+  audio.init();                                       // headless / replay paths skip launchSortie()
+  if (!(DEBUG && Q.has('bgmtrack'))) audio.setAuto(true);
   const hintEl = document.getElementById('menuHint');
   const oldHint = hintEl ? hintEl.textContent : '';
   if (hintEl) hintEl.textContent = 'LOADING CARRIER…';
@@ -2229,6 +2233,7 @@ function replaySortie(equipId) {
   for (const k in keys) keys[k] = false;
   mouse.nx = 0; mouse.ny = 0;
   audio.init(); audio.resume();
+  if (!(DEBUG && Q.has('bgmtrack'))) audio.setAuto(true);
   setView(fp);
   hBadge.style.display = 'block';
   combatSys.say('SORTIE RESTARTED — WEAPONS FREE', 2.4);
@@ -2242,6 +2247,7 @@ function debriefToBriefing() {
   debriefEl.hidden = true;
   resetMission();
   ambient.reset(); ambient.configure('');
+  if (!(DEBUG && Q.has('bgmtrack'))) audio.setAuto(true);
   appMode = 'MENU';
   showMenu('brief');
   setView(menuPreviewCockpit);
@@ -3720,11 +3726,12 @@ if (DEBUG) window.__frame = (dt = 1 / 60) => {
   const t0 = performance.now();
   simTime += dt; if (appMode === 'PLAY') stepSim(dt); updateCameraAndVisuals(dt, simTime);
   audio.updateMusic(getMusicCtx(), dt);
+  syncMusicScenario();
   nvg.render(scene, camera, simTime, firstPerson); hud.draw();
   renderer.getContext().finish();
   return performance.now() - t0;
 };
-if (DEBUG) window.__step = (n = 30) => { for (let i = 0; i < n; i++) { simTime += 1 / 60; stepSim(1 / 60); updateCameraAndVisuals(1 / 60, simTime); if (appMode === 'PLAY') updateAudio(); audio.updateMusic(getMusicCtx(), 1 / 60); } };
+if (DEBUG) window.__step = (n = 30) => { for (let i = 0; i < n; i++) { simTime += 1 / 60; stepSim(1 / 60); updateCameraAndVisuals(1 / 60, simTime); if (appMode === 'PLAY') updateAudio(); audio.updateMusic(getMusicCtx(), 1 / 60); syncMusicScenario(); } };
 window.__audioDebug = () => ({ state: audio.state, rms: +audio.rms.toFixed(4), muted: audio.muted, volume: audio.volume, layers: audio.layers,
   canopyRain: audio.canopyRain, wind: audio.wind, blast: audio.blast, blastFx: blast ? blast.stats : null, shake: +blastShake.toFixed(3), ribbons: vfx.ribbons, canopyGlass: canopyGlass.stats, rainCulled: weather.rainCulled,
   music: audio.music, bgm: audio.bgm, slowMo: audio.slowMoDebug, mist: audio.mist, spray: audio.spray, radio: { ...audio.radio, ...rq.state },
@@ -3761,6 +3768,23 @@ function getMusicCtx() {
   musicCtx.combo = C.comboMult || 1;
   musicCtx.ace = !!(C.ace && C.ace.alive);
   return musicCtx;
+}
+// Scenario transitions are state-driven, not time-driven. Scalars are compared
+// first so the composite key string is only built on a real transition (zero
+// per-frame allocations in the steady state).
+let lastMusicKey = '';
+const musicKeyParts = ['', '', '', '', false, 0, ''];
+function syncMusicScenario(force = false) {
+  const C = combat;
+  const a = appMode, f = flightMode, cp = cat.ph, ap = autoland.ph;
+  const rt = !!(C.rtb && C.rtb.on), ph = C.missionPhase | 0, mid = missionId;
+  if (!force && musicKeyParts[0] === a && musicKeyParts[1] === f && musicKeyParts[2] === cp &&
+      musicKeyParts[3] === ap && musicKeyParts[4] === rt && musicKeyParts[5] === ph && musicKeyParts[6] === mid) return;
+  musicKeyParts[0] = a; musicKeyParts[1] = f; musicKeyParts[2] = cp; musicKeyParts[3] = ap;
+  musicKeyParts[4] = rt; musicKeyParts[5] = ph; musicKeyParts[6] = mid;
+  lastMusicKey = a + '|' + f + '|' + cp + '|' + ap + '|' + rt + '|' + ph + '|' + mid;
+  // force=true bypasses MIN_DWELL exactly like the existing 11_rtb path.
+  audio.switchTo(audio.resolveScenario(getMusicCtx()), true);
 }
 function updateAudio() {
   const fwd = _audioFwd.set(0, 0, -1).applyQuaternion(state.quaternion);
@@ -4628,6 +4652,7 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
       if (appMode !== 'DEBRIEF') stepSim(h);           // same rule as animate(): the sim stops once the debrief is up
       if (DEBUG && Q.has('skimtest')) updateAudio();
       updateCameraAndVisuals(h, simTime);
+      syncMusicScenario();                               // headless warp drives BGM transitions too
       canopyFx.update(h, combat.playerCloud || 0, state.speed, firstPerson, true, weather.rainHere);
       for (const t of logAt) if (t >= t0 && t < t1) console.log('[ANGELS_ZERO] SAMPLE', t, 'A', (state.alpha * 57.3).toFixed(0), 'HT', man.hammerT.toFixed(2), 'FW', _fw.y.toFixed(2), 'RI', rudderInput(0).toFixed(2), 'YR', state.yawRate.toFixed(2), 'YA', (man.yawAcc * 57.3).toFixed(0), 'GR', state.gear.toFixed(2), 'AS', state.assist, 'M', man.lastMan);
       for (const t of logAt) if (t >= t0 && t < t1) console.log('[ANGELS_ZERO] t', t1.toFixed(2), JSON.stringify(combatSys.stats()), 'alert', hud.hudAlertState, 'hp', combat.health, 'gs', state.gStrain.toFixed(2), 'G', state.gLoad.toFixed(1), 'kts', Math.round(state.speed * 1.94384), 'aoa', (state.alpha * 57.3).toFixed(1), 'beta', (state.beta * 57.3).toFixed(1), 'p', state.rollRate.toFixed(2), 'q', state.pitchRate.toFixed(2), 'alt', Math.round(state.position.y), 'pitch', Math.round(state.pitch * 57.3), 'bank', Math.round(state.bank * 57.3), 'M', state.mach.toFixed(2), 'stall', state.stalled ? 1 : 0, 'warn', hud.stallWarn ? 1 : 0,
@@ -4753,6 +4778,7 @@ function animate() {
   if (appMode !== 'PAUSED') updateCameraAndVisuals(sdt, simTime);
   if (appMode === 'PLAY') updateAudio();
   audio.updateMusic(getMusicCtx());                          // BGM scenario resolve (one preallocated object)
+  syncMusicScenario();                                      // forced switch on app/mission/phase transitions
   oceanUniforms.uTime.value = simTime;
   const t0 = performance.now();
   renderer.info.reset();

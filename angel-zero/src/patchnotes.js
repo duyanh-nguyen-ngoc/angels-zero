@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.24', title: 'RELIABLE SCORE', bullets: [
+    'The soundtrack now unlocks on the first click without a refresh: a pending scenario survives the manifest fetch and a retrying gesture listener keeps trying until a deck really reports playing.',
+    'Every mission and state transition force-resolves its exact track — catapult hold, each mission score, golden-hour RTB and the debrief — and the Now Playing widget repaints from the real playing event.',
+    'A one-time key audit checks all 12 scenario keys against the manifest, resolver and missions, with a clear fallback for unknown keys.'
+  ] },
   { version: 'v1.1.23', title: 'LIVING BATTLEFIELDS', bullets: [
     'All four theatres now breathe: wind-drifted cloud decks and densest-deck mist, phase-reactive skies (STORM in NAVAL phase 3, SUNBREAK for the duel) and golden-hour RTB.',
     'The sea rolls with a storm swell and every warship leaves a widening wake; AA fire blooms into pooled flak puffs and sinking ships keep burning with persistent smoke columns.',
