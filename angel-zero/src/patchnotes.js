@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.18', title: 'OPEN-OCEAN OPS + TRENCH RUN FIX', bullets: [
+    'NAVAL BATTLE and ACE DUEL now launch over open ocean with no AFB, islands, trees or ILS clutter until recovery.',
+    'NAVAL BATTLE restores WARDEN-2/3 as active wingmen across three escalating fleet stages; ACE DUEL stays a strict guns-only 1v1.',
+    'CANYON RUN starts airborne centred in the trench with a grace period, a 3-second radar-lock countdown and corrected SAM ceiling banners.'
+  ] },
   { version: 'v1.1.17', title: 'NAVAL ESCALATION · TRENCH RUN · GUNS-ONLY DUEL', bullets: [
     'NAVAL BATTLE now escalates across three pooled fleet stages, from destroyer contact to a flagship battle group, with shipborne SAMs and deck AAA.',
     'CANYON_RUN is a winding low-altitude trench with a lethal radar ceiling, sequential gates, a fortified valley bunker and a dramatic climb-out escape.',

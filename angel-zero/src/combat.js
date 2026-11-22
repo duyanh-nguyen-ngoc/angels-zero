@@ -8,10 +8,10 @@
 // burning wrecks that splash, scoring, waves, lock-on and threat warnings.
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { DIFFICULTY_PRESETS } from './difficulty.js?v=s86a';
-import { SPW } from './loadout.js?v=s86a';
-import { missionConfig } from './missions.js?v=s86a';
-import { gorgeCentreX, GORGE_FLOOR_Y, GORGE_RIM_Y, GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y } from './maps.js?v=s86a';
+import { DIFFICULTY_PRESETS } from './difficulty.js?v=s87a';
+import { SPW } from './loadout.js?v=s87a';
+import { missionConfig } from './missions.js?v=s87a';
+import { gorgeCentreX, GORGE_FLOOR_Y, GORGE_RIM_Y, GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, CEIL_M } from './maps.js?v=s87a';
 
 const NM = 1852, FT = 0.3048, G0 = 9.81;
 // Allied CVN model: same 360 m deck as the procedural ship, re-anchored to the GLB.
@@ -38,7 +38,8 @@ const STRIKE_N = 4, STRIKE_HP_K = 2.2, STRIKE_SPLASH = 35, STRIKE_PTS = 1200, JA
 const SHIP_HP = { DDG: 3, CG: 5, CV_FLAG: 10 }, SHIP_SCALE = { DDG: 1, CG: 1.25, CV_FLAG: 1.9 };
 const SHIP_SAM_CD = 9;
 const AA_RANGE = 3200, AA_ALT = 3000, AA_CD = 1.4, AA_DMG = 0.015;
-const CEIL_GRACE = 1.2, CEIL_SAM_CD = 2.5, CEIL_MASK_M = 336;
+const CEIL_WARN_S = 3.0, CEIL_SAM_CD = 2.5, CEIL_HYST_M = 10, CEIL_SAM_MIN_D = 1800, CEIL_ARM_DELAY = 8.0;
+const CEIL_MASK_M = CEIL_M - 30;
 const CANYON_GATE_N = 10;
 const CLIMB_SAMS = 3, CLIMB_TMAX = 25;
 const ENEMY_GUN = { range: 900, cone: 0.99813, burst: 0.6, cd: 1.4, rps: 50, dmg: 0.006, spread: 0.6 * 0.01745 };
@@ -89,7 +90,7 @@ export function createCombat(THREE, env) {
   // Stores: weapon select (>MSL / >BOMB), bombs, CCIP solution, flares.
   Object.assign(C, { weapon: 'MSL', bombs: 0, bombMax: 0, bombReload: 0, ccip: null, ccipTof: 0, flares: FLR_MAX, flareMax: FLR_MAX, chaff: 0, chaffMax: 0, notchT: 0,
     wingOrder: 'FORM', wingOrderT: 0, gunRounds: 0, gunHitsP: 0, mslFiredP: 0, mslHitsP: 0, maxDmg: 0, traps: 0 });
-  Object.assign(C, { mcfg: missionConfig({}), stage: 0, stageT: 0, ceil: { over: 0, warned: false, lastSam: 0, live: true },
+  Object.assign(C, { mcfg: missionConfig({}), stage: 0, stageT: 0, ceil: { armed: false, phase: 'CLEAR', warnT: 0, lastSam: 0, live: true },
     climb: { on: false, t: 0, sams: 0 }, gateIdx: 0, weaponsLock: { msl: false, spw: false } });
 
   const say = (text, secs = 2.5, color = '#4dff91') => {
@@ -2015,6 +2016,7 @@ export function createCombat(THREE, env) {
     let shipN = 0, banditN = 0;
     if (st.ships) {
       st.ships.forEach((sp, k) => {
+        if (sp.chance !== undefined && rand() > sp.chance) return;
         const t = stagedShip(sp.kind, k);
         if (surface.indexOf(t) < 0) surface.push(t);
         if (taskForce.indexOf(t) < 0) taskForce.push(t);
@@ -2027,14 +2029,16 @@ export function createCombat(THREE, env) {
       });
     }
     // Pooled bandits: revive dead slots as a CAP flight for this stage.
-    if (st.bandits > 0) {
+    const banditWant = Array.isArray(st.bandits)
+      ? st.bandits[0] + Math.floor(rand() * (st.bandits[1] - st.bandits[0] + 1)) : (st.bandits || 0);
+    if (banditWant > 0) {
       for (const e of enemies) if (!e.ace && !e.bomber) { e.alive = false; e.wreck = null; }
       let n = 0;
       for (const e of enemies) {
-        if (n >= st.bandits) break;
+        if (n >= banditWant) break;
         if (e.alive || e.ace || e.bomber) continue;
         resetAI(e);
-        const ang = (n / st.bandits) * Math.PI * 2;
+        const ang = (n / Math.max(1, banditWant)) * Math.PI * 2;
         e.pos.set(S.position.x + Math.sin(ang) * 5200, Math.max(900, S.position.y + 250), S.position.z + Math.cos(ang) * 5200);
         e.fwd.copy(S.position).sub(e.pos).normalize(); e.vel.copy(e.fwd).multiplyScalar(e.speed);
         e.alive = true; e.wreck = null; e.tac = e.mode = 'ENGAGE'; e.mslCD = 5 + n; e.bLock = 0;
@@ -2053,7 +2057,8 @@ export function createCombat(THREE, env) {
       }
     }
     writeFleet();
-    if (env.debug) console.log('[ANGELS_ZERO] stage', i, st.label, 'ships', shipN, 'bandits', banditN);
+    const wingAlive = env.getWingmen ? env.getWingmen().filter(w => w && w.alive).length : 0;
+    if (env.debug) console.log('[ANGELS_ZERO] stage', i, st.label, 'ships=' + shipN, 'bandits=' + banditN, 'wing=' + wingAlive);
   }
   function stageClear(i) {
     const st = C.mcfg.stages && C.mcfg.stages[i];
@@ -2098,27 +2103,58 @@ export function createCombat(THREE, env) {
       if (env.onRadio && C.gateIdx % 3 === 0) env.onRadio('GATE', { n: C.gateIdx });
     }
   }
+  function ceilLog(from, to) {
+    if (env.debug) console.log('[ANGELS_ZERO] ceil ' + from + '->' + to + ' y=' + S.position.y.toFixed(1) +
+      ' t=' + (env.getMissionT ? env.getMissionT() : 0).toFixed(2));
+  }
   function updateCeiling(dt, now) {
     const cfg = C.mcfg.ceiling;
     if (!cfg || !C.ceil.live || C.rtb || C.climb.on) return;
-    if (S.position.y > cfg.m) {
-      if (!C.ceil.warned) {
-        C.ceil.warned = true; C.ceilBanner = now;
-        if (env.onSfx) env.onSfx('caution');
-        if (env.onRadio) env.onRadio('SAM_LOCK');
-        if (env.debug) console.log('[ANGELS_ZERO] CEIL warn');
-      }
-      C.ceil.over += dt;
-      if (C.ceil.over >= CEIL_GRACE && now - C.ceil.lastSam > CEIL_SAM_CD) {
-        let best = RIM_SITES[0], bd = Infinity;
-        for (const s of RIM_SITES) { const d = s.distanceToSquared(S.position); if (d < bd) { bd = d; best = s; } }
+    const missionT = env.getMissionT ? env.getMissionT() : 0;
+    const allowed = missionT >= CEIL_ARM_DELAY && !(env.inCutscene && env.inCutscene());
+    if (!allowed) {
+      C.ceil.armed = false;
+      if (C.ceil.phase !== 'CLEAR') { ceilLog(C.ceil.phase, 'CLEAR'); C.ceil.phase = 'CLEAR'; C.ceil.warnT = 0; }
+      return;
+    }
+    C.ceil.armed = true;
+    const y = S.position.y;                                  // metres above sea level, one source
+    if (C.ceil.phase === 'CLEAR' && y > cfg.m) {
+      C.ceil.phase = 'WARN'; C.ceil.warnT = CEIL_WARN_S;
+      if (env.onSfx) env.onSfx('caution');
+      if (env.onRadio) env.onRadio('SAM_LOCK');
+      ceilLog('CLEAR', 'WARN');
+    } else if (C.ceil.phase === 'WARN' && y < cfg.m - CEIL_HYST_M) {
+      C.ceil.phase = 'CLEAR'; C.ceil.warnT = 0; ceilLog('WARN', 'CLEAR');
+    }
+    if (C.ceil.phase === 'WARN') {
+      C.ceil.warnT = Math.max(0, C.ceil.warnT - dt);
+      if (C.ceil.warnT <= 0) {
+        let best = null, bd = Infinity;
+        for (const s of RIM_SITES) {
+          const d = s.distanceTo(S.position);
+          if (d < CEIL_SAM_MIN_D) continue;
+          _dv.copy(s).sub(S.position);
+          if (_dv.z < -300) continue;                        // behind or abeam, never head-on
+          if (d < bd) { bd = d; best = s; }
+        }
+        if (!best) best = RIM_SITES[0];
         _rimSrc.copy(best);
         if (surfaceSAM(_rimSrc, 'CEIL')) {
-          C.ceil.lastSam = now;
-          if (env.debug) console.log('[ANGELS_ZERO] CEIL sam launch');
+          C.ceil.phase = 'LAUNCH'; C.ceil.lastSam = now;
+          C.ceilLaunchBanner = performance.now();
+          ceilLog('WARN', 'LAUNCH');
         }
       }
-    } else { C.ceil.over = 0; C.ceil.warned = false; }
+    } else if (C.ceil.phase === 'LAUNCH') {
+      if (y < cfg.m - CEIL_HYST_M) { C.ceil.phase = 'CLEAR'; ceilLog('LAUNCH', 'CLEAR'); }
+      else if (now - C.ceil.lastSam > CEIL_SAM_CD * 1000) {
+        let best = RIM_SITES[0], bd = Infinity;
+        for (const s of RIM_SITES) { const d = s.distanceTo(S.position); if (d >= CEIL_SAM_MIN_D && d < bd) { bd = d; best = s; } }
+        _rimSrc.copy(best);
+        if (surfaceSAM(_rimSrc, 'CEIL')) { C.ceil.lastSam = now; ceilLog('LAUNCH', 'LAUNCH'); }
+      }
+    }
   }
   function updateClimb(dt, now) {
     if (!C.climb.on) return;
@@ -2317,6 +2353,16 @@ export function createCombat(THREE, env) {
         _wmRel.copy(e.pos).sub(w.pos).normalize();
         if (Math.acos(clamp(_wmFwd.dot(_wmRel), -1, 1)) > 35 * D2R) continue;
         best = e; bestD = d;
+      }
+      if (!best && C.mcfg.stages) {                        // no bandits: finish damaged escorts only
+        for (const t of stagedShips) {
+          if (!t.alive || t.kind === 'CV_FLAG' || t.hp > 2) continue;
+          const d = t.pos.distanceTo(w.pos);
+          if (d > 3 * NM || d >= bestD) continue;
+          _wmRel.copy(t.pos).sub(w.pos).normalize();
+          if (Math.acos(clamp(_wmFwd.dot(_wmRel), -1, 1)) > 35 * D2R) continue;
+          best = t; bestD = d;
+        }
       }
       if (!best) continue;
       // Formation slot: 600 m behind the bandit, clamped to 1,500 m from the player.
@@ -2997,6 +3043,7 @@ export function createCombat(THREE, env) {
   // Land targets (SAM sites + SEC-02 coastal flak nests); the naval task force is
   // managed separately (spawnFleet) and kept in the same `surface` list.
   function spawnSurface() {
+    if (C.mcfg.enemyMsl === false && C.mcfg.wingmen === 'NONE') return;
     for (let i = surface.length - 1; i >= 0; i--) if (!surface[i].fleet && !surface[i].strike) { scene.remove(surface[i].g); surface.splice(i, 1); }
     const { land } = siteSpots();
     land.forEach((p, i) => {
@@ -3134,6 +3181,8 @@ export function createCombat(THREE, env) {
   // Ground-map designation for >UGB: nearest live target within 45 deg of the
   // flight path and 25 km. cycle=true picks the next one by range.
   function groundCandidates() {
+    const mp = env.getMapProps && env.getMapProps();
+    if (mp && !mp.islands && !mp.terrain) return [];
     const vh = new THREE.Vector2(S.velocity.x, S.velocity.z);
     if (vh.lengthSq() < 1) vh.set(0, -1);
     vh.normalize();
@@ -3504,7 +3553,7 @@ export function createCombat(THREE, env) {
     const spw = C.spw || '4AAM';
     const ammo = spw === '4AAM' ? C.aam4 : spw === 'UGB' ? C.bombs : C.qaam;
     const winchester = C.missiles === 0 && ammo === 0;
-    const show = !!a && (100 - C.health > 45 || winchester || C.missionPhase === 4);
+    const show = !!a && (env.ilsVisible ? env.ilsVisible() : true) && (100 - C.health > 45 || winchester || C.missionPhase === 4);
     if (a) {
       for (let i = 0; i < 3; i++) {
         const d = 400 * (i + 1);
@@ -3823,6 +3872,8 @@ export function createCombat(THREE, env) {
     return best;
   }
   function updateDefences(dt) {
+    const mp = env.getMapProps && env.getMapProps();
+    if (mp && !mp.islands && !mp.terrain) return;        // open ocean: only ships fire
     const fire_ok = hostileFireOk();
     for (const t of surface) {
       if (t.fleet || !t.alive) continue;
@@ -4122,12 +4173,15 @@ export function createCombat(THREE, env) {
   // Runway pit stop (index.html, after the 4 s rearm / repair): stores, gun, flares,
   // airframe and engines restored; the combo chain, locks and score are left alone.
   function pitStop() {
-    rearm('msl'); rearm('bomb');
+    if (!C.weaponsLock.msl) rearm('msl');
+    if (!C.weaponsLock.spw) rearm('bomb');
     for (const st of stores.msl) st.aamHidden = false;
     ripple.length = 0; aamRack = 0; flareRecharge = 0;
     chaff.length = 0; chaffCD = 0; chaffRecharge = 0; C.chaff = C.chaffMax; C.notchT = 0;
     Object.assign(C, { bombs: stores.bomb.length, bombReload: 0, flares: FLR_MAX, aam4: AAM4_MAX, aam4Reload: 0, qaam: QAAM_MAX, qaamReload: 0, ammo: GUN_MAX, missiles: MSL_MAX,
       reload: 0, missileReload: 0, gunHeat: 0, gunOverheat: false, engineOut: null, engineFire: false, hydraulic: false, health: 100, hitFlash: 0 });
+    if (C.weaponsLock.msl) { C.missiles = 0; C.aam4 = 0; C.qaam = 0; }
+    if (C.weaponsLock.spw) C.bombs = 0;
     resetEngines();                                         // both F100s back to HEALTHY
     director.reset();
     C.score += 1000;
@@ -4224,8 +4278,9 @@ export function createCombat(THREE, env) {
     returnMat.opacity = 0.22 + 0.16 * (0.5 + 0.5 * Math.sin(now * 2.2));
     if (!S.onGround && prevReturnZ < RETURN_Z && S.position.z >= RETURN_Z && styleClock - lastReturn > RETURN_CD) {
       lastReturn = styleClock;
-      rearm('msl'); rearm('bomb');
-      C.aam4 = AAM4_MAX; C.qaam = QAAM_MAX; C.flares = FLR_MAX; C.chaff = C.chaffMax;
+      if (!C.weaponsLock.msl) { rearm('msl'); C.aam4 = AAM4_MAX; C.qaam = QAAM_MAX; }
+      if (!C.weaponsLock.spw) rearm('bomb');
+      C.flares = FLR_MAX; C.chaff = C.chaffMax;
       C.health += 0.5 * (100 - C.health);
       C.returnT = performance.now();
       if (env.debug) console.log('[ANGELS_ZERO] RETURN REARM');
@@ -4361,7 +4416,7 @@ export function createCombat(THREE, env) {
       C.missionTitle = m.title; C.rtbType = m.rtbType; C.missionBgm = m.bgmScenario;
       C.mcfg = missionConfig(m);
       C.stage = 0; C.stageT = 0; C.gateIdx = 0;
-      C.ceil.over = 0; C.ceil.warned = false; C.ceil.lastSam = 0; C.ceil.live = !!C.mcfg.ceiling;
+      C.ceil.armed = false; C.ceil.phase = 'CLEAR'; C.ceil.warnT = 0; C.ceil.lastSam = 0; C.ceil.live = !!C.mcfg.ceiling;
       C.climb.on = false; C.climb.t = 0; C.climb.sams = 0;
       C.weaponsLock.msl = !C.mcfg.weapons.msl; C.weaponsLock.spw = !C.mcfg.weapons.spw;
       if (C.weaponsLock.msl && C.weapon === 'MSL') C.weapon = 'GUN';
@@ -4371,6 +4426,10 @@ export function createCombat(THREE, env) {
         for (const e of enemies) if (!e.ace && !e.bomber) { e.alive = false; e.wreck = null; if (e.g) e.g.visible = false; }
         aceFlightDone = false;
         spawnStage(0);
+      }
+      if (C.mcfg.enemyMsl === false && C.mcfg.wingmen === 'NONE') {
+        for (const t of surface) if (t.fleet || t.strike) { t.alive = false; if (t.g) t.g.visible = false; }
+        for (const t of taskForce) { t.alive = false; if (t.g) t.g.visible = false; }
       }
       MP[1].label = stages && stages[0] ? stages[0].label : m.title;
       MP[2].label = stages && stages[1] ? stages[1].label : (m.rtbType === 'CARRIER' ? 'NAVAL STRIKE' : 'SECTOR STRIKE');

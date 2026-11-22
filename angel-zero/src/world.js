@@ -22,7 +22,8 @@ export const WORLD = { SIZE: 20000, CX: 0, CZ: -2500, SEG: 600 };     // 33 m gr
 const FT = 0.3048;
 export const RWY = { x: 900, z0: -1400, z1: 1600, width: 50, elev: 10 };       // runway 18/36, 3,000 m
 
-import { gorgeCentreX, GORGE_FLOOR_Y, GORGE_RIM_Y, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_CRATER_Z } from './maps.js?v=s86a';
+import { gorgeCentreX, GORGE_FLOOR_Y, GORGE_RIM_Y, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_CRATER_Z,
+  SEA_FLOOR_Y, RUNWAY_BBOX } from './maps.js?v=s87a';
 
 export function createWorld(THREE, env) {
   const { scene, createNoise2D, fbm } = env;
@@ -33,6 +34,9 @@ export function createWorld(THREE, env) {
   const nRidge = createNoise2D(1337), nSea = createNoise2D(2718), nVeg = createNoise2D(31);
   // CANYON_RUN trench: 180 m floor, 60 m ramp to 366 m rim, plateau outside.
   function gorgeHeight(x, z) {
+    // The AFB strip and everything outside the corridor bbox keep ARCHIPELAGO terrain.
+    if ((x >= RUNWAY_BBOX.x[0] && x <= RUNWAY_BBOX.x[1] && z >= RUNWAY_BBOX.z[0] && z <= RUNWAY_BBOX.z[1]) ||
+        x < -1400 || x > 1400 || z > 600 || z < -10800) return analyticHeight(x, z);
     const crDX = x - gorgeCentreX(GORGE_CRATER_Z), crDZ = z - GORGE_CRATER_Z;
     const cr = Math.hypot(crDX, crDZ);
     if (cr < GORGE_CRATER_R * 1.5) {
@@ -1122,7 +1126,8 @@ export function createWorld(THREE, env) {
     activeMap = def || null;
     const mode = def ? def.heightFn : 'archipelago';
     const amp = def && def.canyonAmp ? def.canyonAmp : 1;
-    const fn = mode === 'sea' ? (x, z) => -150 - 12 * (fbm(nSea, x * 0.0004, z * 0.0004, 2) * 0.5 + 0.5)
+    const fn = mode === 'ocean' ? (x, z) => SEA_FLOOR_Y
+      : mode === 'sea' ? (x, z) => -150 - 12 * (fbm(nSea, x * 0.0004, z * 0.0004, 2) * 0.5 + 0.5)
       : mode === 'strait' ? (x, z) => {
         let h = -150;
         for (const [ix, iz, r] of (def.islands || [])) { const d = Math.hypot(x - ix, z - iz); if (d < r) h = Math.max(h, 120 * (1 - d / r)); }
@@ -1147,8 +1152,19 @@ export function createWorld(THREE, env) {
     return def;
   }
 
+  // Registry of switchable map props, built once at boot. InstancedMeshes are
+  // only ever toggled via .visible; count / geometry are never touched.
+  const envProps = { terrain, islands: [], runway: [], baseBldg: [], radar: [], foliage: [trees.mesh] };
+  for (const o of props.children) {
+    if (radars.some(r => r.g === o)) envProps.radar.push(o);
+    else if (o === trees.mesh || o.name === 'forest') envProps.foliage.push(o);
+    else if (o.geometry && o.geometry.type === 'PlaneGeometry' && Math.abs(o.position.x - RWY.x) < 500 && o.position.y < 40) envProps.runway.push(o);
+    else if (Math.abs(o.position.x - RWY.x) < 600 && o.position.z > RWY.z0 - 600 && o.position.z < RWY.z1 + 600) envProps.baseBldg.push(o);
+    else envProps.islands.push(o);
+  }
+
   return {
-    terrain, props, heightAt, analyticHeight, collide, addBox, update, rebuild,
+    terrain, props, heightAt, analyticHeight, collide, addBox, update, rebuild, envProps,
     get map() { return activeMap; },
     forest: trees.mesh, farmEdge: FARM.edge,
     get treeStats() { const { mesh, ...s } = trees; return s; },

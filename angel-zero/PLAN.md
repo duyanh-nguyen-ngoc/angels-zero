@@ -1614,6 +1614,11 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   - `GORGE` is now a winding 366 m-rim trench with a crater, exact analytic `heightAt`, `RIM_SITES`, `CEIL_*` warnings/SAM launches with terrain masking, 10 pooled canyon gates and a bunker kill that triggers `C.climb`, three weak chase SAMs and BASE RTB.
   - `ACE_DUEL` spawns exactly one `CRIMSON-1` with doubled HP, locks player missiles/SPW (`C.weaponsLock`), hides WARDEN flight and blocks bandit missile launches in favour of a pooled gun. `?stageat`, `?fortkillat` and `at=canyonlow` hooks expose the new flows. Every `?v=` tag bumped to s86a.
 
+- [x] **Open-ocean ops + trench run fix** *(build `s87a`, `src/maps.js`, `src/world.js`, `src/missions.js`, `src/combat.js`, `src/hud.js`, `index.html`)*
+  - `props` flags and `applyMapProps()` / `envProps` hide every AFB mesh, runway, building, radar and instanced tree on `STRAIT` / `CLOUD_ARENA` with visibility-only toggles; `ILS` displays, gates, assist and recovery chevron are gated by `ilsVisible()` (`ilsOnRtbOnly`).
+  - `NAVAL_BATTLE` restores WARDEN flight with staged bandit ranges and damaged-escort targeting; `ACE_DUEL` adds per-second `DUEL_OK` asserts with all other spawn/refill paths disabled.
+  - `CANYON_RUN` uses one metres source (`FT`/`CEIL_FT`/`CEIL_M`), an airborne centred spawn with a wall-clearance assert, an 8 s ceiling arm delay, a 3 s `RADAR LOCK — DESCEND!` countdown with hysteresis and the `SAM LAUNCH — CEILING BREAK!` banner. `RUNWAY_BBOX` keeps the AFB clear of the plateau. Every `?v=` tag bumped to s87a.
+
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.

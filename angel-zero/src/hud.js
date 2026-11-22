@@ -6,7 +6,7 @@
 // clipped to the 3D combiner glass. Square tactical radar (bottom-left), stores
 // list + F-15C silhouette with per-pylon AIM-9 reload icons (bottom-right),
 // open-corner target brackets, edge pointers, minimal top-left telemetry.
-import { SPW } from './loadout.js?v=s86a';
+import { SPW } from './loadout.js?v=s87a';
 
 export function createHUD(THREE, A) {
   const canvas = A.canvas;
@@ -1185,7 +1185,7 @@ export function createHUD(THREE, A) {
     if (C.flares !== undefined) rows.push(['  FLR', String(C.flares), C.flares > 0 ? G : AMBER]);
     if (C.chaff !== undefined) rows.push(['  CHF', String(C.chaff), C.chaff > 0 ? G : AMBER]);
     if (C.jamming > 0) rows.push(['  JAM', 'ON', AMBER]);
-    if (S.assist) rows.push(['  ILS ASSIST', 'ON', '#5fe8ff']);
+    if (S.assist && (!A.ilsVisible || A.ilsVisible())) rows.push(['  ILS ASSIST', 'ON', '#5fe8ff']);
     rows.push(['  DMG', Math.round(100 - C.health) + '%', C.health < 45 ? WARN : C.health < 75 ? AMBER : G]);
     if (S.gear > 0 || S.gearDown) rows.push(['  GEAR', S.gear >= 1 ? (S.onGround ? 'WOW' : 'DOWN') : 'TRANSIT', S.gear >= 1 ? G : AMBER]);
     if (S.ctl && S.ctl.airbrake > 0.05) rows.push(['  S/BRK', `${Math.round(48 * S.ctl.airbrake)}°`, S.brakeLatch ? GB : G]);
@@ -1354,8 +1354,11 @@ export function createHUD(THREE, A) {
   const musicToast = { t: 0, text: '' };
   function drawCenterBanners(ctx, g) {
     const now = performance.now();
-    if (C.ceilBanner && now - C.ceilBanner < 2200) {
-      drawBanner(ctx, HW / 2, HH * 0.30, 'SAM LOCK — DESCEND', '#ff3b4d', 360, 1 - (now - C.ceilBanner) / 2200);
+    if (C.ceil && C.ceil.phase === 'WARN' && C.ceil.warnT !== undefined) {
+      drawBanner(ctx, HW / 2, HH * 0.30, 'RADAR LOCK — DESCEND! ' + C.ceil.warnT.toFixed(1), '#ff3b4d', 420, 1);
+    }
+    if (C.ceilLaunchBanner && now - C.ceilLaunchBanner < 2600) {
+      drawBanner(ctx, HW / 2, HH * 0.35, 'SAM LAUNCH — CEILING BREAK!', '#ff3b4d', 420, 1 - (now - C.ceilLaunchBanner) / 2600);
     }
     if (C.climbBanner && now - C.climbBanner < 3000) {
       drawBanner(ctx, HW / 2, HH * 0.34, 'PULL UP — CLEAR THE WALL', '#ffbf3f', 420, 1 - (now - C.climbBanner) / 3000);
@@ -1665,7 +1668,7 @@ export function createHUD(THREE, A) {
     const dmg = 100 - C.health;
     const spw0 = SPW[C.spw] || SPW['4AAM'];
     const ammo0 = spw0.wpn === 'AAM4' ? C.aam4 : spw0.wpn === 'BOMB' ? C.bombs : C.qaam;
-    if ((C.missiles === 0 && ammo0 === 0) || dmg > 50) {
+    if (((C.missiles === 0 && ammo0 === 0) || dmg > 50) && (!A.ilsVisible || A.ilsVisible())) {
       const col = dmg > 50 ? AMBER : '#5fe8ff';
       let best = null, bd = Infinity;
       const consider = (p, name) => {
@@ -1913,6 +1916,7 @@ export function createHUD(THREE, A) {
   //   3 deg glide path from the touchdown point (full scale +/-0.7 deg).
   //   Needles show where the path is: fly toward them.
   function ilsState() {
+    if (A.ilsVisible && !A.ilsVisible()) return null;
     const R = A.runway; if (!R || C.dead || S.onGround) return null;
     const along = S.position.z - R.z1, dx = S.position.x - R.x;
     const dist = Math.hypot(dx, along), aglFt = S.radalt * 3.28084;
