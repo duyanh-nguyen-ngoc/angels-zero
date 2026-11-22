@@ -5,7 +5,7 @@
 **Ace Combat-style 3D F-15C Eagle dogfight & strike simulator — playable right in your browser, zero installs.**
 
 [![Play Live](https://img.shields.io/badge/Play%20Live-angels--zero.pages.dev-00ff66?style=for-the-badge&logo=cloudflarepages&logoColor=white)](https://angels-zero.pages.dev/)
-[![Build](https://img.shields.io/badge/Version-v1.1.3-52ff9c?style=for-the-badge)](angel-zero/src/patchnotes.js)
+[![Build](https://img.shields.io/badge/Version-v1.1.14-52ff9c?style=for-the-badge)](angel-zero/src/patchnotes.js)
 [![Three.js](https://img.shields.io/badge/Three.js-r160%20WebGL2-black?style=for-the-badge&logo=threedotjs)](https://threejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-lightgrey?style=for-the-badge)](LICENSE)
 
@@ -21,7 +21,7 @@
 
 | System | Capabilities |
 | :--- | :--- |
-| **Game Modes** | 4-phase campaign (*Sweep -> Canyon Strike -> Crimson Ace -> Carrier Trap*) + endless **FURBALL** instant dogfights |
+| **Game Modes** | 5 selectable missions (*Air Superiority, Naval Battle, Canyon Run, Ace Duel, endless Furball*) + USS Enterprise bow catapult launch & arrestor recovery |
 | **Post-Stall Maneuvering** | Decoupled AoA for **Cobra**, **Kulbit**, **Hammerhead**, flat spins, Mach-1 shock cones & pilot G-LOC |
 | **3D F-15C Cockpit** | Live 16-dial analog panel, animated HOTAS, bubble canopy rain/glare & cyclable VSD MFDs (`[` / `]`) |
 | **Voiced Radio & CRT Portraits** | 45 radio-filtered voice lines across **AWACS Overlord**, **Warden** wingmen & **Crimson** aces |
@@ -67,9 +67,9 @@
 
 | Input | Action | Input | Action |
 | :--- | :--- | :--- | :--- |
-| **Mouse** | Pitch & roll | **C** | Lock missile seeker / cycle target |
-| **W / S** | Throttle up / down (airbrake) | **X / Z** | Deploy flares / chaff |
-| **Shift** | Afterburner / High-G pull | **Space** | Toggle 3D Cockpit / Chase camera |
+| **Mouse / WASD** | Pitch & roll | **C** | Lock missile seeker / cycle target |
+| **Shift / Ctrl / Wheel** | Throttle ± & Afterburner | **X / Z** | Deploy flares / chaff |
+| **Q / E** | Rudder yaw | **Space** | Toggle 3D Cockpit / Chase camera |
 | **LMB / RMB** | Vulcan cannon / Fire missile *(hold: Missile Cam)* | **N / H** | Night Vision (NVG) / Pause & Controls |
 
 <details>
@@ -78,13 +78,12 @@
 #### Flight & Post-Stall Maneuvering
 | Input | Action |
 | :--- | :--- |
-| **Mouse** | Pitch / roll (rate-command stick) |
-| **W / S** | Throttle up / down (airbrake) |
-| **Shift** | Afterburner (`Shift` or `W+S` + pull = High-G turn; `B+Shift` below `290 kt` = PSM Cobra/Kulbit) |
-| **A / D** | Rudder yaw (and parachute steering after ejection) |
-| **Q** | Evasive `360°` barrel roll |
+| **Mouse / W A S D** | Pitch & roll (`W/S` pitch, `A/D` roll, smoothly blends with mouse aim) |
+| **Shift / Ctrl / ↑ / ↓ / Wheel** | Throttle up / down; `Shift` at full throttle lights Afterburner & assists High-G pulls (`B+Shift` < `290 kt` = PSM Cobra/Kulbit) |
+| **Q / E** | Rudder yaw (and parachute steering after ejection) |
+| **V** | Evasive `360°` barrel roll |
 | **B** | Dorsal speedbrake / wheel brakes |
-| **L** | Landing gear up / down (`< 175 kt` on carrier deck to catch arrestor wires) |
+| **L** | Landing gear / tailhook toggle (`[L]` autoland on carrier finals; forgiving deck/runway traps) |
 
 #### Combat, Weapons & Wingmen
 | Input | Action |
@@ -93,7 +92,7 @@
 | **Right-Click / M** | Fire selected weapon (`MSL` / `4AAM` / `QAAM` / drop `UGB`; hold = Missile Cam) |
 | **R · 1 / 2 / 3** | Cycle or select `MSL` / `4AAM` / `UGB` / `QAAM` |
 | **C** | Lock missile seeker / cycle target inside sight cone |
-| **X / Z / J** | Flares (`X`) · Chaff (`Z`) · ALQ-135 ECM Jammer (`J`) |
+| **X / Z / J** | Flares (`X`, IR decoys) · Chaff (`Z`, >2.5 km radar decoys) · ALQ-135 ECM Jammer (`J`) |
 | **G** | Toggle Warden wingmen formation / engage |
 
 #### Camera, Avionics & Sortie Controls
@@ -102,9 +101,10 @@
 | **Space** | Toggle 1st-person 3D Cockpit / 3rd-person Chase camera |
 | **Alt / Middle-Click** | Free Look (hold + drag mouse; springs back on release) |
 | **[ / ]** | Cycle cockpit VSD MFD page (`TACTICAL RADAR` / `STORES & DMG` / `RWR THREAT SCOPE`) |
-| **N / K** | Toggle Night Vision (`N`) / Adaptive combat music (`K`) |
+| **N / K** | Toggle Night Vision (`N`) / Combat music on-off (`K`) |
+| **, / . / /** | Music previous track / next track / toggle AUTO shuffle |
 | **F1 / Tab Tab** | In-flight keybind cheat-sheet (`F1`) / End sortie to Debrief (`Tab` twice) |
-| **E / H / Backspace** | Eject (`E`) · Pause & Settings (`H` / `Esc`) · Reset (`Backspace`) |
+| **P / H / Backspace** | Eject (`P`) · Pause & Settings (`H` / `Esc`) · Reset (`Backspace`) |
 
 </details>
 

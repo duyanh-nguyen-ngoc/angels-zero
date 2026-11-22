@@ -330,12 +330,56 @@ export function createVFX(THREE, env) {
   // fuselage strakes (LERX-like blend ahead of the root). Each puff streams aft
   // along its lane (turbulent drift) and recycles at the lane's front, so the
   // sheet appears anchored to the airframe while flowing backward.
+  const VP = 42;
   const vapor = [];
   const vaporTint = new THREE.Color(1, 1, 1);
+  const vpPos = new Float32Array(VP * 3), vpAlpha = new Float32Array(VP), vpSize = new Float32Array(VP), vpRot = new Float32Array(VP);
+  const vpGeo = new THREE.BufferGeometry();
+  vpGeo.setAttribute('position', new THREE.BufferAttribute(vpPos, 3).setUsage(THREE.DynamicDrawUsage));
+  vpGeo.setAttribute('aAlpha', new THREE.BufferAttribute(vpAlpha, 1).setUsage(THREE.DynamicDrawUsage));
+  vpGeo.setAttribute('aSize', new THREE.BufferAttribute(vpSize, 1).setUsage(THREE.DynamicDrawUsage));
+  vpGeo.setAttribute('aRot', new THREE.BufferAttribute(vpRot, 1));
+  const vpMat = new THREE.ShaderMaterial({
+    uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
+      uTex: { value: vaporTex }, uCol: { value: new THREE.Color(1, 1, 1) }, uScale: { value: 400 }
+    }]),
+    vertexShader: LOG_V + `#include <fog_pars_vertex>
+      attribute float aAlpha; attribute float aSize; attribute float aRot;
+      uniform float uScale; varying float vA; varying float vRot;
+      void main() {
+        vA = aAlpha; vRot = aRot;
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = aSize * uScale / max(1.0, -mvPosition.z);
+        gl_Position = projectionMatrix * mvPosition;
+        #include <logdepthbuf_vertex>
+        #include <fog_vertex>
+      }`,
+    fragmentShader: LOG_F + `#include <fog_pars_fragment>
+      uniform sampler2D uTex; uniform vec3 uCol; varying float vA; varying float vRot;
+      void main() {
+        #include <logdepthbuf_fragment>
+        if (vA < 0.003) discard;
+        vec2 p = gl_PointCoord - 0.5;
+        float r2 = dot(p, p);
+        if (r2 > 0.25) discard;
+        float c = cos(vRot), s = sin(vRot);
+        vec2 uv = vec2(p.x * c - p.y * s, p.x * s + p.y * c) + 0.5;
+        vec4 t = texture2D(uTex, vec2(uv.x, 1.0 - uv.y));
+        float edge = 1.0 - smoothstep(0.16, 0.25, r2);
+        gl_FragColor = vec4(uCol * t.rgb, t.a * vA * edge);
+        #include <fog_fragment>
+      }`,
+    transparent: true, depthWrite: false, fog: true
+  });
+  const vaporPoints = new THREE.Points(vpGeo, vpMat);
+  vaporPoints.frustumCulled = false;
+  vaporPoints.renderOrder = 4;
+  vaporPoints.visible = false;
+  jet.add(vaporPoints);
   function buildVapor() {
-    for (const v of vapor) jet.remove(v.sp);
     vapor.length = 0;
     const rv = rng(4711);
+    let idx = 0;
     for (const sgn of [-1, 1]) {
       const lanes = [
         // [x0, x1, zFront, zAft, yTop]   — strake / wing-root lanes (model metres)
@@ -345,15 +389,13 @@ export function createVFX(THREE, env) {
       ];
       for (const [x0, x1, zf, za, yt] of lanes) {
         for (let i = 0; i < 7; i++) {
-          const mat = new THREE.SpriteMaterial({ map: vaporTex, color: 0xffffff, transparent: true, depthWrite: false, opacity: 0, fog: true, rotation: rv() * 6.28 });
-          const sp = new THREE.Sprite(mat);
-          sp.renderOrder = 4;
-          jet.add(sp);
-          vapor.push({ sp, x: sgn * THREE.MathUtils.lerp(x0, x1, rv()), y: yt + 0.12 + rv() * 0.18, zf, za,
+          vpRot[idx++] = rv() * 6.28;
+          vapor.push({ x: sgn * THREE.MathUtils.lerp(x0, x1, rv()), y: yt + 0.12 + rv() * 0.18, zf, za,
             u: rv(), speed: 0.5 + rv() * 0.6, base: 1.6 + rv() * 1.6, phase: rv() * 6.28, wob: rv() * 6.28 });
         }
       }
     }
+    vpGeo.attributes.aRot.needsUpdate = true;
   }
   buildVapor();
   let vaporLevel = 0;
@@ -483,6 +525,7 @@ export function createVFX(THREE, env) {
   spray.frustumCulled = false;
   scene.add(spray);
   const sprayP = Array.from({ length: SP }, () => ({ on: false, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, age: 0, life: 1, s0: 1, s1: 6 }));
+  const _spDir = new THREE.Vector3();
   let sprayAcc = 0, sprayNext = 0;
   function updateSpray(s, dt, visible) {
     const p = s.position;
@@ -490,7 +533,7 @@ export function createVFX(THREE, env) {
     const agl = p.y;                                       // height above the sea surface
     const k = (visible && overWater && agl < 150 * FT) ? Math.pow(1 - agl / (150 * FT), 1.4) * smooth(s.speed, 50, 170) : 0;
     sprayAcc += 320 * k * dt;
-    const vdir = s.velocity.clone().setY(0).normalize();
+    const vdir = _spDir.copy(s.velocity).setY(0).normalize();
     while (sprayAcc >= 1) {
       sprayAcc -= 1;
       const q = sprayP[sprayNext]; sprayNext = (sprayNext + 1) % SP;
@@ -810,10 +853,10 @@ export function createVFX(THREE, env) {
         }
         if (t1 <= t0) discard;
         float len = min(t1 - t0, 8000.0);
-        const int STEPS = 32;
-        // Geometric steps: fine (~25 m) where the ray enters the cloud skin, growing
-        // 12 % per step to cover the whole span -> no depth-banding streaks.
-        const float GROW = 1.12;
+        const int STEPS = 18;
+        // Geometric steps: fine where the ray enters the cloud skin, growing
+        // 18 % per step to cover the whole span cleanly at lower fragment cost.
+        const float GROW = 1.18;
         float stepL = len * (GROW - 1.0) / (pow(GROW, float(STEPS)) - 1.0);
         // Interleaved gradient noise ray-offset dither (no row-correlated streaks), rotated per frame.
         vec2 fc = gl_FragCoord.xy + vec2(5.588238, 5.588238) * uFrame;
@@ -833,11 +876,10 @@ export function createVFX(THREE, env) {
           float d = deckDensity(p) * near;
           if (d > 0.01) {
             if (tHit < 0.0) tHit = t;
-            // Light march toward the sun on blurred (coarser-mip) noise with jittered taps:
-            // soft self-shadowing without fine detail aliasing into streaks.
+            // Single jittered light march tap on coarse mip for smooth self-shadowing.
             float lodV = gLod;
             gLod = lodV + 2.5;
-            float od = deckDensity(p + sunL * (110.0 + 80.0 * jit)) * 160.0 + deckDensity(p + sunL * (380.0 + 160.0 * jit)) * 300.0;
+            float od = deckDensity(p + sunL * (180.0 + 120.0 * jit)) * 420.0;
             gLod = lodV;
             float Tl = exp(-od * 0.0055);                                  // Beer-Lambert toward the sun
             float h = clamp((p.y - y0) / (y1 - y0), 0.0, 1.0);
@@ -1212,19 +1254,30 @@ export function createVFX(THREE, env) {
     const vTarget = force.vapor ? 1 : opts.visible
       ? Math.min(1, gTrig) * (1 - smooth(altFt, 10000, 12000)) * (0.55 + 0.45 * rhoRatio) * smooth(s.speed, 110, 190) : 0;
     vaporLevel += (vTarget - vaporLevel) * Math.min(1, dt * (vTarget > vaporLevel ? 6 : 2.2));
-    const drift = 0.9 + 1.6 * vaporLevel;                       // stronger pull -> faster aft streaming
-    for (const v of vapor) {
-      v.u += dt * v.speed * drift * 0.55;
-      if (v.u > 1) v.u -= 1;
-      const z = THREE.MathUtils.lerp(v.zf, v.za, v.u);
+    if (vaporLevel < 0.004) {
+      vaporPoints.visible = false;
+    } else {
+      vaporPoints.visible = true;
+      const drift = 0.9 + 1.6 * vaporLevel;                       // stronger pull -> faster aft streaming
       const turb = 0.06 + 0.12 * vaporLevel;
-      v.sp.position.set(v.x + Math.sin(now * 7 + v.wob) * turb, v.y + Math.sin(now * 11 + v.phase) * turb * 0.6 + v.u * 0.25, z);
-      const life = Math.sin(Math.PI * v.u);                     // fade in at the lane front, out aft
-      const flick = 0.75 + 0.25 * Math.sin(now * 13 + v.phase) * Math.sin(now * 5.3 + v.phase * 2);
-      v.sp.material.opacity = vaporLevel * flick * life * 0.75;
-      v.sp.material.color.copy(vaporTint);
-      v.sp.scale.setScalar(v.base * (0.7 + 0.5 * v.u) * (0.85 + 0.35 * vaporLevel));
-      v.sp.visible = v.sp.material.opacity > 0.003;
+      for (let i = 0; i < vapor.length; i++) {
+        const v = vapor[i];
+        v.u += dt * v.speed * drift * 0.55;
+        if (v.u > 1) v.u -= 1;
+        const z = THREE.MathUtils.lerp(v.zf, v.za, v.u);
+        vpPos[i * 3] = v.x + Math.sin(now * 7 + v.wob) * turb;
+        vpPos[i * 3 + 1] = v.y + Math.sin(now * 11 + v.phase) * turb * 0.6 + v.u * 0.25;
+        vpPos[i * 3 + 2] = z;
+        const life = Math.sin(Math.PI * v.u);                     // fade in at the lane front, out aft
+        const flick = 0.75 + 0.25 * Math.sin(now * 13 + v.phase) * Math.sin(now * 5.3 + v.phase * 2);
+        vpAlpha[i] = vaporLevel * flick * life * 0.75;
+        vpSize[i] = v.base * (0.7 + 0.5 * v.u) * (0.85 + 0.35 * vaporLevel);
+      }
+      vpGeo.attributes.position.needsUpdate = true;
+      vpGeo.attributes.aAlpha.needsUpdate = true;
+      vpGeo.attributes.aSize.needsUpdate = true;
+      vpMat.uniforms.uCol.value.copy(vaporTint);
+      vpMat.uniforms.uScale.value = renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
     }
 
     updateSpeedLines(s, dt, opts.firstPerson);
@@ -1239,7 +1292,7 @@ export function createVFX(THREE, env) {
   return {
     attachPlume,
     setWingtips(l, r) { tipL.copy(l); tipR.copy(r); buildVapor(); },
-    clearTrails() { for (const r of ribbons) r.clear(); for (const r of contrails) r.clear(); contrailStats.active = contrailStats.live = 0; vaporTarget = lexTarget = 0; for (const q of sprayP) q.on = false; vaporLevel = 0; catSteam.reset(); },
+    clearTrails() { for (const r of ribbons) r.clear(); for (const r of contrails) r.clear(); contrailStats.active = contrailStats.live = 0; vaporTarget = lexTarget = 0; for (const q of sprayP) q.on = false; vaporLevel = 0; vaporPoints.visible = false; catSteam.reset(); },
     catSteam,
     updateContrails,
     get contrailStats() { return contrailStats; },

@@ -8,8 +8,8 @@
 // burning wrecks that splash, scoring, waves, lock-on and threat warnings.
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { DIFFICULTY_PRESETS } from './difficulty.js?v=s82a';
-import { SPW } from './loadout.js?v=s82a';
+import { DIFFICULTY_PRESETS } from './difficulty.js?v=s83a';
+import { SPW } from './loadout.js?v=s83a';
 
 const NM = 1852, FT = 0.3048, G0 = 9.81;
 // Allied CVN model: same 360 m deck as the procedural ship, re-anchored to the GLB.
@@ -416,6 +416,8 @@ export function createCombat(THREE, env) {
   const GUN_HEAT_T = 3.2, GUN_COOL = 0.28, GUN_RESUME = 0.45;
   Object.assign(C, { gunHeat: 0, gunOverheat: false });
   const _ms0 = new THREE.Vector3(), _ms1 = new THREE.Vector3();
+  const _gPort = new THREE.Vector3(), _gUp = new THREE.Vector3(), _gFwd = new THREE.Vector3(), _gRight = new THREE.Vector3();
+  const _gBore = new THREE.Vector3(), _gDir = new THREE.Vector3(), _gVel = new THREE.Vector3(), _gSpawn = new THREE.Vector3();
   function gunIdle() { muzzle.visible = muzzleStreak.visible = false; muzzleT = 0; muzzleLight.intensity = 0; C.gunFiring = false; }
   function updateGunHeat(dt, triggerHeld) {
     if (C.gunFiring) C.gunHeat = Math.min(1, C.gunHeat + dt / GUN_HEAT_T);
@@ -429,11 +431,11 @@ export function createCombat(THREE, env) {
     // Cooling steam venting from the starboard wing-root gun port.
     if (C.gunOverheat || (C.gunHeat > 0.8 && !C.gunFiring)) {
       steamAcc += dt * (C.gunOverheat ? 60 : 20);
-      const port = GUN_PORT.clone().applyQuaternion(S.quaternion).add(S.position);
-      const up = new THREE.Vector3(0, 1, 0).applyQuaternion(S.quaternion);
+      _gPort.copy(GUN_PORT).applyQuaternion(S.quaternion).add(S.position);
+      _gUp.set(0, 1, 0).applyQuaternion(S.quaternion);
       while (steamAcc >= 1) {
         steamAcc -= 1;
-        smoke.spawn({ x: port.x, y: port.y, z: port.z, vx: S.velocity.x * 0.9 + up.x * 4 + (rand() - 0.5) * 2, vy: S.velocity.y * 0.9 + up.y * 4 + rand() * 2, vz: S.velocity.z * 0.9 + up.z * 4 + (rand() - 0.5) * 2,
+        smoke.spawn({ x: _gPort.x, y: _gPort.y, z: _gPort.z, vx: S.velocity.x * 0.9 + _gUp.x * 4 + (rand() - 0.5) * 2, vy: S.velocity.y * 0.9 + _gUp.y * 4 + rand() * 2, vz: S.velocity.z * 0.9 + _gUp.z * 4 + (rand() - 0.5) * 2,
           life: 0.8 + rand() * 0.6, s0: 0.6, s1: 3.5 + rand() * 2, r: 0.97, g: 0.98, b: 1.0, a: 0.55, drag: 2.2, rise: 1.2 });
       }
     }
@@ -441,18 +443,19 @@ export function createCombat(THREE, env) {
   function fireGun(dt) {
     if (!env.isReady() || C.dead || C.ammo <= 0 || C.reload > 0 || C.gunOverheat) { gunIdle(); return; }
     gunAcc += GUN_RATE * dt;
-    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(S.quaternion);
-    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(S.quaternion), up = new THREE.Vector3(0, 1, 0).applyQuaternion(S.quaternion);
-    const port = GUN_PORT.clone().applyQuaternion(S.quaternion).add(S.position);
+    _gFwd.set(0, 0, -1).applyQuaternion(S.quaternion);
+    _gRight.set(1, 0, 0).applyQuaternion(S.quaternion); _gUp.set(0, 1, 0).applyQuaternion(S.quaternion);
+    _gPort.copy(GUN_PORT).applyQuaternion(S.quaternion).add(S.position);
     // Harmonised bore line: from the port to the boresight cross 1,500 ft ahead.
-    const bore = S.position.clone().addScaledVector(fwd, CONVERGE_M).sub(port).normalize();
+    _gBore.copy(S.position).addScaledVector(_gFwd, CONVERGE_M).sub(_gPort).normalize();
     let n = 0;
     while (gunAcc >= 1 && C.ammo > 0) {
       gunAcc -= 1; C.ammo--; n++; C.gunRounds++;
       const r = DISPERSION * 0.5 * Math.sqrt(rand()), th = rand() * Math.PI * 2;  // uniform in the 8 mrad cone
-      const dir = bore.clone().addScaledVector(right, Math.cos(th) * r).addScaledVector(up, Math.sin(th) * r).normalize();
-      const v = dir.clone().multiplyScalar(BULLET_SPEED).add(S.velocity);       // muzzle velocity + aircraft velocity
-      playerTracers.add(port.clone().addScaledVector(v, rand() * dt), v, 3.0);   // spread rounds through the frame
+      _gDir.copy(_gBore).addScaledVector(_gRight, Math.cos(th) * r).addScaledVector(_gUp, Math.sin(th) * r).normalize();
+      _gVel.copy(_gDir).multiplyScalar(BULLET_SPEED).add(S.velocity);           // muzzle velocity + aircraft velocity
+      _gSpawn.copy(_gPort).addScaledVector(_gVel, rand() * dt);
+      playerTracers.add(_gSpawn, _gVel, 3.0);                                   // spread rounds through the frame
     }
     if (C.ammo <= 0) { C.reload = 5; say('WINCHESTER GUN — RELOADING', 2); }
     C.gunFiring = n > 0;
@@ -461,7 +464,7 @@ export function createCombat(THREE, env) {
       muzzle.material.rotation = rand() * Math.PI;
       muzzle.scale.setScalar(1.3 + rand() * 1.5);
       // Streak laid along the bore as seen on screen (camera-facing sprite rotated to the projected muzzle line).
-      _ms0.copy(port).project(camera); _ms1.copy(port).addScaledVector(bore, 12).project(camera);
+      _ms0.copy(_gPort).project(camera); _ms1.copy(_gPort).addScaledVector(_gBore, 12).project(camera);
       muzzleStreak.material.rotation = Math.atan2(_ms1.y - _ms0.y, (_ms1.x - _ms0.x) * camera.aspect) - Math.PI / 2 + (rand() - 0.5) * 0.12;
       muzzleStreak.scale.set(0.8 + rand() * 0.5, 3.0 + rand() * 2.2, 1);
     }
@@ -473,8 +476,8 @@ export function createCombat(THREE, env) {
     while (smokeAcc >= 1) {
       smokeAcc -= 1;
       const g = 0.55 + rand() * 0.12;
-      smoke.spawn({ x: port.x + right.x * 0.15, y: port.y + right.y * 0.15, z: port.z + right.z * 0.15,
-        vx: S.velocity.x * 0.82 + right.x * 3 + (rand() - 0.5) * 2, vy: S.velocity.y * 0.82 + right.y * 3 + (rand() - 0.5) * 2, vz: S.velocity.z * 0.82 + right.z * 3 + (rand() - 0.5) * 2,
+      smoke.spawn({ x: _gPort.x + _gRight.x * 0.15, y: _gPort.y + _gRight.y * 0.15, z: _gPort.z + _gRight.z * 0.15,
+        vx: S.velocity.x * 0.82 + _gRight.x * 3 + (rand() - 0.5) * 2, vy: S.velocity.y * 0.82 + _gRight.y * 3 + (rand() - 0.5) * 2, vz: S.velocity.z * 0.82 + _gRight.z * 3 + (rand() - 0.5) * 2,
         life: 1.0 + rand() * 0.8, s0: 0.7, s1: 4.5 + rand() * 2, r: g, g, b: g * 1.02, a: 0.42, drag: 1.6, rise: 0.4 });
     }
   }
@@ -1657,25 +1660,30 @@ export function createCombat(THREE, env) {
     }
   }
 
+  const _wfOne = new THREE.Vector3(1, 1, 1), _wfZero = new THREE.Vector3(0, 0, 0), _wfScale = new THREE.Vector3();
+  const _wfFull = new THREE.Matrix4(), _wfNone = new THREE.Matrix4(), _wfM = new THREE.Matrix4();
+  const _wfNz = new THREE.Vector3(), _wfP = new THREE.Vector3(), _wfPo = new THREE.Vector3(), _wfPc = new THREE.Vector3();
+  const _wfS1 = new THREE.Vector3(), _wfS2 = new THREE.Vector3();
   function writeFleet() {
     if (!fleet.length) return;
-    const one = new THREE.Vector3(1, 1, 1), zero = new THREE.Vector3(0, 0, 0);
     enemies.forEach((e, i) => {
       const vis = e.alive || !!e.wreck, sk = e.scale || 1;                 // strike bombers: 1.35x airframe
-      const full = _m4.clone().compose(e.pos, e.quat, vis ? (sk !== 1 ? new THREE.Vector3(sk, sk, sk) : one) : zero), none = _m4.clone().compose(e.pos, e.quat, zero);
-      for (const f of fleet) f.inst.setMatrixAt(i, (f.part === 'L' && e.wingOffL) || (f.part === 'R' && e.wingOffR) ? none : full);
+      _wfFull.compose(e.pos, e.quat, vis ? _wfScale.set(sk, sk, sk) : _wfZero);
+      _wfNone.compose(e.pos, e.quat, _wfZero);
+      for (const f of fleet) f.inst.setMatrixAt(i, (f.part === 'L' && e.wingOffL) || (f.part === 'R' && e.wingOffR) ? _wfNone : _wfFull);
       const ab = e.alive ? e.ab : 0, on = ab > 0.05;
       nozzles.forEach((nz0, k) => {
-        const nz = sk !== 1 ? nz0.clone().multiplyScalar(sk) : nz0;
-        const p = nz.clone().add(new THREE.Vector3(0, 0, 1.9)).applyQuaternion(e.quat).add(e.pos);
-        glowMesh.setMatrixAt(i * 2 + k, new THREE.Matrix4().compose(p, e.quat, e.alive ? one : zero));
+        _wfNz.copy(nz0);
+        if (sk !== 1) _wfNz.multiplyScalar(sk);
+        _wfP.set(_wfNz.x, _wfNz.y, _wfNz.z + 1.9).applyQuaternion(e.quat).add(e.pos);
+        glowMesh.setMatrixAt(i * 2 + k, _wfM.compose(_wfP, e.quat, e.alive ? _wfOne : _wfZero));
         // Burner plume: base at the nozzle exit, length grows with afterburner.
         const flick = 0.9 + 0.2 * rand();
         const lo = (0.45 + 0.75 * ab) * flick, lc = (0.5 + 0.6 * ab) * flick;
-        const po = nz.clone().add(new THREE.Vector3(0, 0, 1.0 + 2.3 * lo)).applyQuaternion(e.quat).add(e.pos);
-        const pc = nz.clone().add(new THREE.Vector3(0, 0, 1.0 + 1.3 * lc)).applyQuaternion(e.quat).add(e.pos);
-        flameOuter.setMatrixAt(i * 2 + k, _m4.compose(po, e.quat, on ? new THREE.Vector3(0.8 + 0.3 * ab, 0.8 + 0.3 * ab, lo) : zero));
-        flameCore.setMatrixAt(i * 2 + k, _m4.compose(pc, e.quat, on ? new THREE.Vector3(1, 1, lc) : zero));
+        _wfPo.set(_wfNz.x, _wfNz.y, _wfNz.z + 1.0 + 2.3 * lo).applyQuaternion(e.quat).add(e.pos);
+        _wfPc.set(_wfNz.x, _wfNz.y, _wfNz.z + 1.0 + 1.3 * lc).applyQuaternion(e.quat).add(e.pos);
+        flameOuter.setMatrixAt(i * 2 + k, _wfM.compose(_wfPo, e.quat, on ? _wfS1.set(0.8 + 0.3 * ab, 0.8 + 0.3 * ab, lo) : _wfZero));
+        flameCore.setMatrixAt(i * 2 + k, _wfM.compose(_wfPc, e.quat, on ? _wfS2.set(1, 1, lc) : _wfZero));
       });
     });
     for (const f of fleet) f.inst.instanceMatrix.needsUpdate = true;
@@ -2108,6 +2116,9 @@ export function createCombat(THREE, env) {
       if (env.onRadio) env.onRadio('ON_WINGMAN_ENGAGE');      // voice: deduped by the radio cooldown
     }
   }
+  const _mFwd = new THREE.Vector3(), _mL2 = new THREE.Vector3(), _mLos = new THREE.Vector3();
+  const _mLosRate = new THREE.Vector3(), _mRelVel = new THREE.Vector3(), _mAcc = new THREE.Vector3();
+  const _mJit = new THREE.Vector3(), _mTail = new THREE.Vector3(), _mDir = new THREE.Vector3();
   function updateMissiles(dt, playerActive) {
     for (const m of missiles) {
       if (!m.active) continue;
@@ -2117,7 +2128,7 @@ export function createCombat(THREE, env) {
       const speed = m.vel.length();
       if (m.motor) {
         const burning = m.age < 3.2;
-        const fwd = m.vel.clone().normalize();
+        const fwd = _mFwd.copy(m.vel).normalize();
         m.vel.addScaledVector(fwd, (burning ? 320 : -40) * dt);
         if (m.vel.length() > 940) m.vel.setLength(940);
         m.plume.visible = burning;
@@ -2152,8 +2163,8 @@ export function createCombat(THREE, env) {
             if (m.cloudT >= 0.4) { m.lostTrack = true; m.cloudLost = true; }
           } else if (m.cloudLost && !tc) {
             // Target back in clear air and still inside the seeker cone: reacquire.
-            const l2 = tgt.pos.clone().sub(pos).normalize();
-            if (Math.acos(clamp(fwd.dot(l2), -1, 1)) < q.fov * 0.5) { m.lostTrack = false; m.cloudLost = false; m.cloudT = 0; m.losPrev.copy(l2); m.reacquired = true; }
+            _mL2.copy(tgt.pos).sub(pos).normalize();
+            if (Math.acos(clamp(fwd.dot(_mL2), -1, 1)) < q.fov * 0.5) { m.lostTrack = false; m.cloudLost = false; m.cloudT = 0; m.losPrev.copy(_mL2); m.reacquired = true; }
           }
         }
         // Notch: a beam-on aspect (>= 75 deg folded) below 1200 ft AGL breaks a
@@ -2171,9 +2182,9 @@ export function createCombat(THREE, env) {
         }
         const tAlive = tgt && !m.lostTrack && (tgt.isPlayer ? playerActive : tgt.alive);
         if (tAlive) {
-          const los = tgt.pos.clone().sub(pos), range = los.length(); los.divideScalar(range);
+          const range = _mLos.copy(tgt.pos).sub(pos).length(); _mLos.divideScalar(range);
           // Seeker gimbal: if the target slips outside the FOV the missile goes ballistic.
-          if (Math.acos(clamp(fwd.dot(los), -1, 1)) > q.fov * 0.5) { m.lostTrack = true; }
+          if (Math.acos(clamp(fwd.dot(_mLos), -1, 1)) > q.fov * 0.5) { m.lostTrack = true; }
           // Defensive break: a high-G turn or barrel roll inside 900 m can spoof a bandit seeker.
           if (tgt.isPlayer && !m.breakChecked && range < 900 && (S.highG || S.barrelRoll || S.gLoad > 12)) {
             m.breakChecked = true;
@@ -2184,19 +2195,20 @@ export function createCombat(THREE, env) {
             }
           }
           if (!m.lostTrack) {
-            const losRate = los.clone().sub(m.losPrev).divideScalar(Math.max(dt, 1e-4));
-            m.losPrev.copy(los);
-            const vc = -tgt.vel.clone().sub(m.vel).dot(los);
-            const acc = losRate.multiplyScalar(q.N * Math.max(vc, 200));
+            _mLosRate.copy(_mLos).sub(m.losPrev).divideScalar(Math.max(dt, 1e-4));
+            m.losPrev.copy(_mLos);
+            const vc = -_mRelVel.copy(tgt.vel).sub(m.vel).dot(_mLos);
+            _mAcc.copy(_mLosRate).multiplyScalar(q.N * Math.max(vc, 200));
             if (q.noise) {                                          // low-passed seeker wander (soft locks)
               if (!m.jit) m.jit = new THREE.Vector3();
-              m.jit.lerp(new THREE.Vector3(rand() - 0.5, rand() - 0.5, rand() - 0.5).multiplyScalar(2), 1 - Math.exp(-dt * 3));
-              acc.addScaledVector(m.jit, q.noise * 25 * G0);
+              _mJit.set(rand() - 0.5, rand() - 0.5, rand() - 0.5).multiplyScalar(2);
+              m.jit.lerp(_mJit, 1 - Math.exp(-dt * 3));
+              _mAcc.addScaledVector(m.jit, q.noise * 25 * G0);
             }
-            acc.y += G0;                                            // gravity compensation
+            _mAcc.y += G0;                                          // gravity compensation
             const lim = m.vel.length() * q.turn;
-            if (acc.length() > lim) acc.setLength(lim);
-            m.vel.addScaledVector(acc, dt);
+            if (_mAcc.length() > lim) _mAcc.setLength(lim);
+            m.vel.addScaledVector(_mAcc, dt);
             const fuse = m.enemy ? 22 : 18;
             if (range < fuse) {
               if (tgt.isPlayer) {
@@ -2229,19 +2241,18 @@ export function createCombat(THREE, env) {
         m.smokeAcc += dt * 70;
         while (m.smokeAcc >= 1 && burning) {
           m.smokeAcc -= 1;
-          const tail = pos.clone().addScaledVector(fwd, 1.8);
+          _mTail.copy(pos).addScaledVector(fwd, 1.8);
           // Bandit missiles leave distinct red-tinged smoke.
           const [r, g, b] = m.enemy ? [0.78, 0.36, 0.30] : [0.88, 0.88, 0.88];
-          smoke.spawn({ x: tail.x, y: tail.y, z: tail.z, vx: (rand() - 0.5) * 2, vy: (rand() - 0.5) * 2, vz: (rand() - 0.5) * 2,
+          smoke.spawn({ x: _mTail.x, y: _mTail.y, z: _mTail.z, vx: (rand() - 0.5) * 2, vy: (rand() - 0.5) * 2, vz: (rand() - 0.5) * 2,
             life: 2.8 + rand(), s0: 2.6, s1: 13 + rand() * 5, r, g, b, a: 0.62, drag: 0.9, rise: 0.6 });
         }
       } else {
         m.vel.y -= G0 * dt;
       }
-      m.vel.y -= (m.motor ? 0 : 0);
       pos.addScaledVector(m.vel, dt);
       if (m.enemy && playerActive) checkCloseCall(m, pos);
-      if (speed > 1) m.mesh.quaternion.setFromUnitVectors(MSL_NOSE, m.vel.clone().normalize());
+      if (speed > 1) m.mesh.quaternion.setFromUnitVectors(MSL_NOSE, _mDir.copy(m.vel).normalize());
       if (m.age > m.life || pos.y < groundLevel(pos.x, pos.z)) {
         if (pos.y < groundLevel(pos.x, pos.z) && terrainHeight(pos.x, pos.z) < 0) splash(pos, 0.5); else explosion(pos, 0.5);
         logShot(m, m.cloudLost ? 'CLOUD' : m.terrainLost ? 'TERRAIN' : m.lostTrack ? 'LOST' : m.target ? 'MISS' : 'DUMB');

@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.14', title: 'PERFORMANCE & STABILITY PASS', bullets: [
+    'Cut cockpit procedural crinkle VRAM ~16x (512 px atlas) and removed 175 per-frame HUD shadowBlur passes for smoother laptop/high-DPI frame times.',
+    'Trimmed volumetric cloud-deck raymarcher & NVG shader taps, dropped NVG MSAA target overhead, and collapsed 42 wing-vapor sprites into one GPU Points draw call.',
+    'Eliminated per-frame Vector3/Matrix4 heap churn across fleet rendering, missiles, Vulcan fire, gun sight, and ejection while fixing Alt-Tab stuck triggers and Q/E parachute steering.'
+  ] },
   { version: 'v1.1.13', title: 'CARRIER DECK FIX + MUSIC PLAYER', bullets: [
     'The bow catapult now waits for USS Enterprise to load, anchors the jet and both wingmen to its real deck ray height, and keeps the carrier mounted and visible in every carrier sortie.',
     'Scenario music now shuffles through every track and auto-advances with a crossfade at the end of each clip instead of repeating the first one.',

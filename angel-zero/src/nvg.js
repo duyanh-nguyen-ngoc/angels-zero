@@ -31,7 +31,7 @@ export function createNVG(THREE, renderer, post) {
     composer.addPass(renderPass); composer.addPass(bloom); composer.addPass(new post.OutputPass());
     bloom.setSize(Math.floor(size.x * 0.35), Math.floor(size.y * 0.35));    // composer.addPass set it full-res
   }
-  const mk = (w, h) => new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, depthBuffer: true, samples: 4 });
+  const mk = (w, h) => new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, depthBuffer: true, samples: 0 });
   const sceneRT = mk(size.x, size.y);
   const bloomRT = new THREE.WebGLRenderTarget(Math.max(1, size.x >> 2), Math.max(1, size.y >> 2), { type: THREE.HalfFloatType, depthBuffer: false });
 
@@ -51,9 +51,9 @@ export function createNVG(THREE, renderer, post) {
       ${LUM}
       void main() {
         vec3 acc = vec3(0.0); float w = 0.0;
-        for (int x = -3; x <= 3; x++) for (int y = -3; y <= 3; y++) {
-          vec2 o = vec2(float(x), float(y)) * uTexel * 3.0;
-          float k = exp(-float(x * x + y * y) / 8.0);
+        for (int x = -1; x <= 1; x++) for (int y = -1; y <= 1; y++) {
+          vec2 o = vec2(float(x), float(y)) * uTexel * 5.0;
+          float k = exp(-float(x * x + y * y) / 2.5);
           float l = lum(texture2D(tScene, vUv + o).rgb);
           acc += vec3(max(l - uKnee, 0.0)) * k; w += k;
         }
@@ -84,16 +84,16 @@ export function createNVG(THREE, renderer, post) {
         float edge = clamp(length(vec2(lx, ly)) * 2.2, 0.0, 0.6);
         // High-gain intensification with an automatic-brightness shoulder.
         float v = 1.0 - exp(-(l * uGain + edge * 0.9));
-        // Tube halos: wide multi-tap blur of the bright pass.
+        // Tube halos: multi-tap blur of the bright pass.
         vec3 halo = vec3(0.0);
-        for (int i = 0; i < 12; i++) {
-          float a = float(i) * 0.5236;
-          for (int r = 1; r <= 3; r++) {
-            vec2 o = vec2(cos(a), sin(a) * uAspect) * float(r) * 0.012;
+        for (int i = 0; i < 6; i++) {
+          float a = float(i) * 1.0472;
+          for (int r = 1; r <= 2; r++) {
+            vec2 o = vec2(cos(a), sin(a) * uAspect) * float(r) * 0.016;
             halo += texture2D(tBloom, vUv + o).rgb / float(r);
           }
         }
-        float bloom = lum(texture2D(tBloom, vUv).rgb) * 1.6 + lum(halo) * 0.09;
+        float bloom = lum(texture2D(tBloom, vUv).rgb) * 1.6 + lum(halo) * 0.25;
         v = clamp(v + bloom, 0.0, 1.6);
         // Gen-3 green phosphor ramp.
         vec3 g = mix(vec3(0.008, 0.07, 0.03), vec3(0.10, 1.0, 0.40), smoothstep(0.0, 0.62, v));

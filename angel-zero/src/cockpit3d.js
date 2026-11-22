@@ -42,12 +42,12 @@ export function createCockpit3D(THREE, env) {
      1. PROCEDURAL CRINKLE-COAT TEXTURE SET (2048 x 2048)
      ================================================================= */
   const crinkle = (() => {
-    const N = 2048, SEAM = 512;
+    const N = 512, SEAM = 128;
     const r = rng(1984);
     const grid = (cell) => { const G = Math.ceil(N / cell) + 2, a = new Float32Array(G * G); for (let i = 0; i < a.length; i++) a[i] = r(); return { a, G, cell }; };
-    const g1 = grid(3), g2 = grid(11), g3 = grid(97);
+    const g1 = grid(1), g2 = grid(3), g3 = grid(24);
     const sample = (g, x, y) => {
-      const fx = x / g.cell, fy = y / g.cell, ix = fx | 0, iy = fy | 0, tx = fx - ix, ty = fy - iy;
+      const m = g.G - 1, fx = x / g.cell, fy = y / g.cell, ix = (fx | 0) % m, iy = (fy | 0) % m, tx = fx - (fx | 0), ty = fy - (fy | 0);
       const i = iy * g.G + ix;
       const a = g.a[i], b = g.a[i + 1], c = g.a[i + g.G], d = g.a[i + g.G + 1];
       return a + (b - a) * tx + (c - a) * ty + (a - b - c + d) * tx * ty;
@@ -59,20 +59,20 @@ export function createCockpit3D(THREE, env) {
         let v = sample(g1, x, y) * 0.55 + sample(g2, x, y) * 0.35 + r() * 0.12;      // stipple / crinkle grain
         const sx = x % SEAM, sy = y % SEAM;
         const ds = Math.min(sx, SEAM - sx, sy, SEAM - sy);
-        if (ds < 3) v -= (3 - ds) * 0.9;                                          // panel seam groove
-        else if (ds < 11 && sample(g3, x, y) * sample(g2, x * 3, y * 0.3) > 0.42) WEAR[i] = 1; // edge wear
+        if (ds < 1) v -= 2.2;                                                        // panel seam groove
+        else if (ds < 4 && sample(g3, x, y) * sample(g2, x * 3, y * 0.3) > 0.42) WEAR[i] = 1; // edge wear
         H[i] = v;
       }
     }
     // Countersunk rivets beside every seam.
-    for (let s = 0; s <= N; s += SEAM) for (let t = 24; t < N; t += 48) {
-      for (const [cx, cy] of [[s + 14, t], [t, s + 14]]) {
+    for (let s = 0; s <= N; s += SEAM) for (let t = 6; t < N; t += 12) {
+      for (const [cx, cy] of [[s + 4, t], [t, s + 4]]) {
         if (cx >= N || cy >= N) continue;
-        for (let dy = -7; dy <= 7; dy++) for (let dx = -7; dx <= 7; dx++) {
+        for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
           const x = cx + dx, y = cy + dy; if (x < 0 || y < 0 || x >= N || y >= N) continue;
           const d = Math.hypot(dx, dy), i = y * N + x;
-          if (d < 4.2) { H[i] = 0.55 + (4.2 - d) * 0.05; RIV[i] = 1; }
-          else if (d < 6.2) { H[i] -= 0.6 * (1 - Math.abs(d - 5.2)); RIV[i] = 0.5; }
+          if (d < 1.2) { H[i] = 0.55 + (1.2 - d) * 0.18; RIV[i] = 1; }
+          else if (d < 2.0) { H[i] -= 0.6 * (1 - Math.abs(d - 1.6)); RIV[i] = 0.5; }
         }
       }
     }

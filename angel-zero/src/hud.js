@@ -6,7 +6,7 @@
 // clipped to the 3D combiner glass. Square tactical radar (bottom-left), stores
 // list + F-15C silhouette with per-pylon AIM-9 reload icons (bottom-right),
 // open-corner target brackets, edge pointers, minimal top-left telemetry.
-import { SPW } from './loadout.js?v=s82a';
+import { SPW } from './loadout.js?v=s83a';
 
 export function createHUD(THREE, A) {
   const canvas = A.canvas;
@@ -72,8 +72,9 @@ export function createHUD(THREE, A) {
   function glow(ctx, color = G, blur = 6) {
     ctx.strokeStyle = color;
     ctx.fillStyle = color;
-    ctx.shadowColor = blur > 0 ? glowColor(color) : 'transparent';
-    ctx.shadowBlur = blur;
+    // Skip canvas shadowBlur Gaussian passes per draw call; labelText handles contrast via 1 px backing.
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
   }
   function noGlow(ctx) { ctx.shadowBlur = 0; ctx.shadowColor = 'transparent'; }
   // Barrel heat colour: emerald #58ff9a -> amber #ffaa22 -> crimson #ff2e43.
@@ -91,7 +92,7 @@ export function createHUD(THREE, A) {
     noGlow(ctx); ctx.strokeStyle = 'rgba(88,255,154,0.18)'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.arc(x, y, r, a0, a0 + span); ctx.stroke();
     const col = heatColor(h);
-    ctx.strokeStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 4; ctx.lineWidth = 2;
+    ctx.strokeStyle = col; ctx.lineWidth = 2;
     if (C.gunOverheat && Math.floor(performance.now() / 180) % 2) ctx.strokeStyle = '#ffffff';
     ctx.beginPath(); ctx.arc(x, y, r, a0, a0 + span * Math.min(1, h)); ctx.stroke();
     ctx.restore();
@@ -763,22 +764,28 @@ export function createHUD(THREE, A) {
 
   const GUN_RANGE = 1852, SHOOT_RANGE = 0.6 * 1852, FUNNEL_RANGE = 1.2 * 1852, WINGSPAN = 13.0;
   const _gq = new THREE.Quaternion(), _inv = new THREE.Quaternion(), _w = new THREE.Vector3();
+  const _gDefPort = new THREE.Vector3(1.45, 0.35, -1.8), _gPort = new THREE.Vector3(), _gBoreL = new THREE.Vector3(), _gFwd = new THREE.Vector3();
+  const _gGeom = { port: _gPort, boreL: _gBoreL, fwd: _gFwd, vb: 1050 };
+  const _gDrop = new THREE.Vector3(), _gLocal = new THREE.Vector3(), _gunW = new THREE.Vector3();
+  const _lsZero = new THREE.Vector3(), _lsPort = new THREE.Vector3(), _lsNeed = new THREE.Vector3(), _lsPred = new THREE.Vector3();
+  const _lsBoreW = new THREE.Vector3(), _lsOff = new THREE.Quaternion(), _drVec = new THREE.Vector3();
   function gunGeom() {
-    const port = (C.gunPort || new THREE.Vector3(1.45, 0.35, -1.8)).clone();
-    const boreL = new THREE.Vector3(0, 0, -(C.convergeM || 457)).sub(port).normalize();
-    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(S.quaternion);
-    return { port, boreL, fwd, vb: C.bulletSpeed || 1050 };
+    _gPort.copy(C.gunPort || _gDefPort);
+    _gBoreL.set(0, 0, -(C.convergeM || 457)).sub(_gPort).normalize();
+    _gFwd.set(0, 0, -1).applyQuaternion(S.quaternion);
+    _gGeom.vb = C.bulletSpeed || 1050;
+    return _gGeom;
   }
   function roundRel(g, R, lateral) {
     const t = R / g.vb;
     _inv.copy(S.quaternion).invert();
-    const drop = new THREE.Vector3(0, -0.5 * 9.81 * t * t, 0).applyQuaternion(_inv);
-    const local = g.port.clone().addScaledVector(g.boreL, R).add(drop);
-    local.x += lateral;
-    const w = new THREE.Vector3(S.pitchRate, S.yawRate, S.rollRate);
-    const ang = w.length() * t;
-    if (ang > 1e-5) local.applyQuaternion(_gq.setFromAxisAngle(w.normalize(), -ang));
-    return local.applyQuaternion(S.quaternion).add(S.position);
+    _gDrop.set(0, -0.5 * 9.81 * t * t, 0).applyQuaternion(_inv);
+    _gLocal.copy(g.port).addScaledVector(g.boreL, R).add(_gDrop);
+    _gLocal.x += lateral;
+    _gunW.set(S.pitchRate, S.yawRate, S.rollRate);
+    const ang = _gunW.length() * t;
+    if (ang > 1e-5) _gLocal.applyQuaternion(_gq.setFromAxisAngle(_gunW.normalize(), -ang));
+    return _gLocal.applyQuaternion(S.quaternion).add(S.position);
   }
   function gunSightActive() {
     const t = C.designated;
@@ -811,18 +818,18 @@ export function createHUD(THREE, A) {
   }
   function leadSolution(t) {
     const g = gunGeom();
-    const port = g.port.clone().applyQuaternion(S.quaternion).add(S.position);
-    const acc = t.acc || new THREE.Vector3();
-    let tof = t.pos.distanceTo(port) / g.vb, need = new THREE.Vector3();
+    _lsPort.copy(g.port).applyQuaternion(S.quaternion).add(S.position);
+    const acc = t.acc || _lsZero;
+    let tof = t.pos.distanceTo(_lsPort) / g.vb;
     for (let i = 0; i < 4; i++) {
-      const pred = t.pos.clone().addScaledVector(t.vel, tof).addScaledVector(acc, 0.5 * tof * tof);
-      need.copy(pred).sub(port).addScaledVector(S.velocity, -tof).add(_w.set(0, 0.5 * 9.81 * tof * tof, 0));
-      tof = need.length() / g.vb;
+      _lsPred.copy(t.pos).addScaledVector(t.vel, tof).addScaledVector(acc, 0.5 * tof * tof);
+      _lsNeed.copy(_lsPred).sub(_lsPort).addScaledVector(S.velocity, -tof).add(_w.set(0, 0.5 * 9.81 * tof * tof, 0));
+      tof = _lsNeed.length() / g.vb;
     }
-    const dirAim = need.normalize();
-    const boreW = g.boreL.clone().applyQuaternion(S.quaternion);
-    const off = new THREE.Quaternion().setFromUnitVectors(boreW, g.fwd);
-    return { reticleDir: dirAim.applyQuaternion(off), tof };
+    const dirAim = _lsNeed.normalize();
+    _lsBoreW.copy(g.boreL).applyQuaternion(S.quaternion);
+    _lsOff.setFromUnitVectors(_lsBoreW, g.fwd);
+    return { reticleDir: dirAim.applyQuaternion(_lsOff), tof };
   }
   function drawLeadReticle(ctx) {
     const t = C.designated, now = performance.now();
@@ -831,11 +838,11 @@ export function createHUD(THREE, A) {
     const range = t.pos.distanceTo(S.position);
     if (range > GUN_RANGE) return;
     const sol = leadSolution(t);
-    const p = toScreen(cam.position.clone().addScaledVector(sol.reticleDir, 3000));
+    const p = toScreen(_drVec.copy(cam.position).addScaledVector(sol.reticleDir, 3000));
     const tp = toScreen(t.pos);
     if (!p.ok) return;
-    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(S.quaternion);
-    const bore = toScreen(cam.position.clone().addScaledVector(fwd, 5000));
+    _drVec.set(0, 0, -1).applyQuaternion(S.quaternion);
+    const bore = toScreen(_drVec.multiplyScalar(5000).add(cam.position));
     const r = 21, frac = clamp(range / GUN_RANGE, 0, 1);
     const col = C.lockState === 'LOCK' ? WARN : G;
     ctx.save();
@@ -1875,8 +1882,8 @@ export function createHUD(THREE, A) {
       ctx.font = f(Math.round(sz * 0.68), true);
       const wRew = ctx.measureText(rew).width;
       const x0 = -(wMain + wRew) / 2;
-      ctx.save(); noGlow(ctx); ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
-      ctx.fillStyle = 'rgba(0,12,8,0.38)'; ctx.fillRect(x0 - 14, -sz * 0.62, wMain + wRew + 28, sz * 1.24); ctx.restore();
+      ctx.save(); noGlow(ctx);
+      ctx.fillStyle = 'rgba(0,12,8,0.44)'; ctx.fillRect(x0 - 14, -sz * 0.62, wMain + wRew + 28, sz * 1.24); ctx.restore();
       ctx.textAlign = 'left';
       ctx.font = f(sz, true); labelText(ctx, main, x0, 1, s.color, 9);
       if (rew) { ctx.font = f(Math.round(sz * 0.68), true); labelText(ctx, rew, x0 + wMain, 2, s.refill ? REFILL : GB, 6); }

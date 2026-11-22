@@ -84,7 +84,7 @@ export function createEjection(THREE, env) {
 
   function stop() { st.active = false; rig.visible = false; seat.visible = false; }
 
-  const _q = new THREE.Quaternion(), _e = new THREE.Euler();
+  const _q = new THREE.Quaternion(), _e = new THREE.Euler(), _ejFwd = new THREE.Vector3(), _ejDes = new THREE.Vector3();
   function update(dt) {
     if (!st.active) return false;
     st.t += dt;
@@ -124,11 +124,12 @@ export function createEjection(THREE, env) {
       st.deploy = Math.min(1, st.deploy + dt / 0.6);
       const k = 1 - Math.pow(1 - st.deploy, 3);
       canopy.scale.set(0.2 + 0.8 * k, 0.35 + 0.65 * k, 0.2 + 0.8 * k);
-      const steer = (keys.a ? 1 : 0) - (keys.d ? 1 : 0);
+      const steer = ((keys.a || keys.q) ? 1 : 0) - ((keys.d || keys.e) ? 1 : 0);
       st.yaw += steer * 0.7 * dt;
-      const fwd = new THREE.Vector3(-Math.sin(st.yaw), 0, -Math.cos(st.yaw));
-      const desired = fwd.multiplyScalar(4.5).add(new THREE.Vector3(1.5, -5.5 - 2 * Math.abs(steer), 0.8));
-      st.vel.lerp(desired, Math.min(1, dt * (st.deploy < 1 ? 3.5 : 1.2)));
+      _ejFwd.set(-Math.sin(st.yaw), 0, -Math.cos(st.yaw));
+      _ejDes.copy(_ejFwd).multiplyScalar(4.5);
+      _ejDes.x += 1.5; _ejDes.y += -5.5 - 2 * Math.abs(steer); _ejDes.z += 0.8;
+      st.vel.lerp(_ejDes, Math.min(1, dt * (st.deploy < 1 ? 3.5 : 1.2)));
     } else {
       st.vel.y -= 9.81 * dt; st.vel.multiplyScalar(1 - 0.35 * dt);
     }
