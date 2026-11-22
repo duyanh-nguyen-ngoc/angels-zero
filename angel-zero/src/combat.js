@@ -8,11 +8,11 @@
 // burning wrecks that splash, scoring, waves, lock-on and threat warnings.
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { DIFFICULTY_PRESETS } from './difficulty.js?v=s89a';
-import { SPW } from './loadout.js?v=s89a';
-import { missionConfig } from './missions.js?v=s89a';
+import { DIFFICULTY_PRESETS } from './difficulty.js?v=s90a';
+import { SPW } from './loadout.js?v=s90a';
+import { missionConfig } from './missions.js?v=s90a';
 import { gorgeCentreX, gorgeSlope, gorgeHeading, gorgeDist, GORGE_GATE_Z, GORGE_GATE_N, GORGE_FLOOR_Y, GORGE_RIM_Y,
-  GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, CEIL_M } from './maps.js?v=s89a';
+  GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, CEIL_M } from './maps.js?v=s90a';
 
 const NM = 1852, FT = 0.3048, G0 = 9.81;
 // Allied CVN model: same 360 m deck as the procedural ship, re-anchored to the GLB.
@@ -47,6 +47,10 @@ const ENEMY_GUN = { range: 900, cone: 0.99813, burst: 0.6, cd: 1.4, rps: 50, dmg
 const ACE_DUEL_HP = 100;                       // same airframe HP as any fighter (no boss pool)
 // Duel AI: gun-defence trigger (player nose within 14 deg inside 1.5 km) and loop entry speed.
 const DUEL_THREAT_R = 1500, DUEL_THREAT_COS = Math.cos(14 * Math.PI / 180), DUEL_LOOP_V = 215;
+// CRIMSON-1 cannon: lead-point envelope, 50 rps bursts with visible every-4th tracer.
+const ACE_GUN_R = 1200, ACE_GUN_COS = Math.cos(18 * Math.PI / 180);
+const ACE_BULLET_V = 1050, ACE_GUN_RPS = 50, ACE_GUN_DMG = 4, ACE_HIT_R = 9;
+const ACE_BURST_MIN = 0.8, ACE_BURST_MAX = 1.4, ACE_GUN_CD = 1.2;
 const LOG_V = '#include <common>\n#include <logdepthbuf_pars_vertex>\n';
 const LOG_F = '#include <logdepthbuf_pars_fragment>\n';
 
@@ -372,9 +376,9 @@ export function createCombat(THREE, env) {
 
   // `visual` (optional): a store node from the F-15 GLB. Its exact mesh is cloned
   // into the missile body in place of the procedural AIM-9 parts.
-  function launch(fromPos, fromQuat, fromVel, target, enemy, quality, visual, guidance) {
-    // GUNS ONLY (ACE_DUEL): hard block for every missile / rocket, player or hostile.
-    if (gunsOnly()) { C.blockedLaunches = (C.blockedLaunches || 0) + 1; return null; }
+  function launch(fromPos, fromQuat, fromVel, target, enemy, quality, visual, guidance, who = 'MSL') {
+    // GUNS ONLY (ACE_DUEL): block missiles / rockets only, never the cannon.
+    if (gunsOnly() && who === 'MSL') { C.blockedLaunches = (C.blockedLaunches || 0) + 1; return null; }
     if (enemy && quality && /^B-/.test(quality.tag || '')) {
       if (C.mcfg.enemyMsl === false) return null;         // guns-only duel
       if (env.debug) console.log('[ANGELS_ZERO] bandit launch', quality.tag);
@@ -779,6 +783,7 @@ export function createCombat(THREE, env) {
       // ACE_DUEL: a skilled rival, not a damage sponge -- ordinary fighter airframe HP.
       e.hpMax = e.hp = gunsOnly() ? ACE_DUEL_HP : Math.round(100 * ACE_FLIGHT_HP);
       e.duel = gunsOnly(); e.duelCD = 0;
+      e.burstT = 0; e.gunCD = 1.0; e.gunAcc = 0;
       e.decoys = ACE_DECOY_N; e.chaffN = ACE_DECOY_N; e.decoyCD = 0;
       e.psmCD = 0; e.psm = null; e.psmPitch = 0;                     // CRIMSON post-stall reversal state
       orient(e);
@@ -1322,11 +1327,14 @@ export function createCombat(THREE, env) {
     // Duel: fire on the gun solution (nose on the lead point), not on the raw line of sight.
     let gunAligned = aligned;
     if (e.duel) {
-      const tof = clamp(dist / (980 + e.speed * 0.5), 0, 1.6);
-      _eLead.copy(S.position).addScaledVector(S.velocity, tof).sub(e.pos).normalize();
-      gunAligned = e.fwd.dot(_eLead);
+      let tof = dist / ACE_BULLET_V;
+      _eLead.copy(S.velocity).multiplyScalar(tof).add(S.position);
+      tof = _eLead.distanceTo(e.pos) / ACE_BULLET_V;           // one refinement pass
+      _eLead.copy(S.velocity).multiplyScalar(tof).add(S.position);
+      _eDir.subVectors(_eLead, e.pos).normalize();
+      gunAligned = e.fwd.dot(_eDir);
     }
-    if (gunsOnly && engaging && !e.masked && e.burst <= 0 && e.burstCD <= 0 && dist < ENEMY_GUN.range && gunAligned > ENEMY_GUN.cone) {
+    if (gunsOnly && !e.duel && engaging && !e.masked && e.burst <= 0 && e.burstCD <= 0 && dist < ENEMY_GUN.range && gunAligned > ENEMY_GUN.cone) {
       e.burst = ENEMY_GUN.burst; e.burstCD = ENEMY_GUN.cd;
       if (env.onSfx) env.onSfx('egun', e.pos, 0.6);
     }
@@ -1370,6 +1378,51 @@ export function createCombat(THREE, env) {
         if (gunsOnly && env.aaTracer) env.aaTracer(e.pos, dir, 0.25, true);
       }
       C.missileWarning = Math.max(C.missileWarning, 0.5);
+    }
+    // ---- CRIMSON-1 duel cannon: lead-point bursts in EVERY AI state (no early return).
+    if (e.duel && playerActive) {
+      e.gunCD -= dt;
+      if (e.burstT <= 0 && e.gunCD <= 0 && dist <= ACE_GUN_R && gunAligned >= ACE_GUN_COS) {
+        e.burstT = ACE_BURST_MIN + rand() * (ACE_BURST_MAX - ACE_BURST_MIN);
+        e.gunAcc = 0; e.duelCD = Math.max(e.duelCD, ACE_BURST_MIN);
+        if (env.debug) console.log('[ANGELS_ZERO] ace gun burst d=' + dist.toFixed(0) + ' cos=' + gunAligned.toFixed(3) + ' t=' + e.burstT.toFixed(2));
+        if (env.onSfx) env.onSfx('egun', e.pos, clamp(1 - dist / 1500, 0.15, 1));
+      }
+      if (e.burstT > 0) {
+        e.burstT -= dt;
+        e.gunAcc += ACE_GUN_RPS * dt;
+        const rounds = Math.floor(e.gunAcc);
+        e.gunAcc -= rounds;
+        C.aceRounds = (C.aceRounds || 0) + rounds;
+        for (let n = 0; n < rounds; n++) {
+          let tof = dist / ACE_BULLET_V;
+          _eLead.copy(S.velocity).multiplyScalar(tof).add(S.position);
+          tof = _eLead.distanceTo(e.pos) / ACE_BULLET_V;
+          _eLead.copy(S.velocity).multiplyScalar(tof).add(S.position);
+          _eDir.subVectors(_eLead, e.pos).normalize();
+          const sp = 0.35 * D2R;
+          _eDir.x += (rand() - 0.5) * sp; _eDir.y += (rand() - 0.5) * sp; _eDir.z += (rand() - 0.5) * sp;
+          _eDir.normalize();
+          _eMuz.copy(e.pos).addScaledVector(e.fwd, 6);
+          _eVel.copy(_eDir).multiplyScalar(ACE_BULLET_V);
+          // Closest approach of this round's ray to the player sphere (no projectile allocation).
+          _t.copy(S.position).sub(_eMuz);
+          const along = _t.dot(_eVel), v2 = ACE_BULLET_V * ACE_BULLET_V;
+          if (along > 0 && along < ACE_GUN_R * ACE_BULLET_V) {
+            _toPn.copy(_eVel).multiplyScalar(along / v2).sub(_t);
+            const perp = _toPn.length();
+            if (perp < 40 && env.onSfx) env.onSfx('gunNear', e.pos, clamp(1 - perp / 40, 0, 1));
+            if (perp < ACE_HIT_R) {
+              damagePlayer(ACE_GUN_DMG);
+              C.aceHits = (C.aceHits || 0) + 1;
+              if (env.onSfx) env.onSfx('gunhit', S.position, 1);
+              if (env.debug) console.log('[ANGELS_ZERO] ace gun hit dmg=' + ACE_GUN_DMG);
+            }
+          }
+          if (n % 4 === 0 && env.aaTracer) env.aaTracer(_eMuz, _eVel, 0.3, true);
+        }
+        if (e.burstT <= 0) e.gunCD = ACE_GUN_CD;
+      }
     }
   }
 
@@ -4532,7 +4585,7 @@ export function createCombat(THREE, env) {
       if (!C.weaponsLock.msl) rearm('msl');                 // a previous guns-only sortie must not leave empty pylons
       if (!C.weaponsLock.spw) rearm('bomb');
       if (C.mcfg.gunsOnly) { C.lockTarget = null; C.lockState = 'NONE'; C.lockProgress = 0; disarmSeeker(null); setMulti([]); }
-      C.blockedLaunches = 0;
+      C.blockedLaunches = 0; C.aceRounds = 0; C.aceHits = 0;
       const stages = C.mcfg.stages;
       if (stages && stages.length) {
         for (const e of enemies) if (!e.ace && !e.bomber) { e.alive = false; e.wreck = null; if (e.g) e.g.visible = false; }
@@ -4717,6 +4770,7 @@ export function createCombat(THREE, env) {
           hp: enemies[0].hp, wingL: enemies[0].wingL, wingR: enemies[0].wingR, off: (enemies[0].wingOffL ? 'L' : '') + (enemies[0].wingOffR ? 'R' : ''),
           hits: DBG_HITS.join(' '), crip: enemies[0].crippled, vy: Math.round(enemies[0].vel.y), eng: enemies[0].engineFire, zone: enemies[0].zoneLog, debris: debris.length } : null,
         tracers: playerTracers.list.length, enemyTracers: enemyTracers.list.length, missiles: missiles.filter(m => m.active).length, wave: C.wave,
+        aceRounds: C.aceRounds || 0, aceHits: C.aceHits || 0, blockedLaunches: C.blockedLaunches || 0,
         tgt: { armed: C.seekerArmed, wpn: C.weapon, multi: C.multi.map((e, i) => e.label.slice(-2) + ':' + C.multiState[i][0]).join(' '), locked: C.multiLocked,
           aam4: C.aam4, aamRld: +C.aam4Reload.toFixed(1), aamFired: C.aamFired || 0, ripple: ripple.length,
           aamLive: missiles.filter(m => m.active && m.aam).map(m => (m.target && m.target.label ? m.target.label.slice(-2) : 'dumb') + '@' + (m.target && m.target.pos ? Math.round(m.target.pos.distanceTo(m.mesh.position)) : '-')).join(' ') },

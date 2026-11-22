@@ -263,6 +263,15 @@ export function createAudio() {
     N.rumbleNoise = loopNoise(N.whiteBuf); N.rumbleLP = filt('lowpass', 70, 0.7); N.rumbleG = gain(0);
     N.rumbleNoise.connect(N.rumbleLP).connect(N.rumbleG).connect(cockpitLP);
 
+    // CRIMSON-1 cannon: one persistent headset burst chain + retriggerable hit click.
+    N.egunNoise = loopNoise(N.whiteBuf); N.egunBP = filt('bandpass', 1600, 2);
+    N.egunAMG = gain(0.5); N.egunG = gain(0);
+    N.egunNoise.connect(N.egunBP).connect(N.egunAMG).connect(N.egunG).connect(N.body);
+    N.egunLFO = osc('square', 50); N.egunAMD = gain(0.5);
+    N.egunLFO.connect(N.egunAMD).connect(N.egunAMG.gain);
+    N.gunHitOsc = osc('triangle', 1800); N.gunHitG = gain(0);
+    N.gunHitOsc.connect(N.gunHitG).connect(N.body); N.gunHitOsc.start();
+
     // Rain patter: band-passed pink noise (cockpit-muffled) + bright droplet ticks.
     N.rain = loopNoise(pink); N.rainBP = filt('bandpass', 2400, 0.55); N.rainGain = gain(0);
     N.rain.connect(N.rainBP).connect(N.rainGain).connect(cockpitLP);
@@ -428,6 +437,23 @@ export function createAudio() {
     sub.connect(sg).connect(lp); sub.start(t); sub.stop(t + 0.4);
     N.flybyCount = (N.flybyCount || 0) + 1;
     N.lastFlyby = { k: +kk.toFixed(2), count: N.flybyCount };
+  }
+  // Enemy cannon burst: retrigger the persistent AM chain, no nodes per round.
+  function enemyGun(dist, burstT = 1) {
+    if (!ready || !N.egunG) return;
+    const t = ctx.currentTime, vol = Math.min(1, Math.max(0.1, 1 - (dist || 0) / 1500));
+    const g = N.egunG.gain;
+    g.cancelScheduledValues(t); g.setValueAtTime(g.value, t);
+    g.linearRampToValueAtTime(0.18 * vol, t + 0.02);
+    g.setValueAtTime(0.18 * vol, t + Math.max(0.1, burstT));
+    g.linearRampToValueAtTime(0, t + Math.max(0.1, burstT) + 0.06);
+    N.egunCount = (N.egunCount || 0) + 1;
+  }
+  function gunhit() {
+    if (!ready || !N.gunHitG) return;
+    const t = ctx.currentTime, g = N.gunHitG.gain;
+    g.cancelScheduledValues(t); g.setValueAtTime(0.16, t);
+    g.exponentialRampToValueAtTime(0.001, t + 0.09);
   }
   function missileLaunch() {
     if (!ready) return;
@@ -1681,7 +1707,7 @@ export function createAudio() {
   }
 
   return {
-    init, resume, suspend, update, updateMusic, setSpray, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, setBgmPause, bumpBgmDwell() { dwell = MIN_DWELL; }, setBgmForce: v => { bgmForce = v || ''; }, selectTrack, skip, setAuto, onBgmChange, get bgmTracks() { return allTracks() || []; }, radioSquelch, preloadRadio, playRadio, stopRadio, txOpen, txTail, txClose, preload,
+    init, resume, suspend, update, updateMusic, setSpray, enemyGun, gunhit, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, setBgmPause, bumpBgmDwell() { dwell = MIN_DWELL; }, setBgmForce: v => { bgmForce = v || ''; }, selectTrack, skip, setAuto, onBgmChange, get bgmTracks() { return allTracks() || []; }, radioSquelch, preloadRadio, playRadio, stopRadio, txOpen, txTail, txClose, preload,
     get radioAnalyser() { return N.rAnalyser || null; }, get radioFreq() { return N.rFreq || null; }, get radioTime() { return N.rTime || null; },
     get radioCh() { return RADIO_CH; },
     get radioDsp() { return { pttOpen: !!N.pttOpen, pttTail: !!N.pttTail, static: !!N.rStatic, hp: N.rHP ? N.rHP.frequency.value : 0,

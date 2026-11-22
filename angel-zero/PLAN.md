@@ -1646,6 +1646,11 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   - Skim intensity comes from altitude/speed with a dense boost below 15 m, hard-suppressed over land, above 40 m, on deck, during carrier phase/autoland and outside PLAY/FLY. Wingmen and the ace get a capped lighter wake.
   - `setSpray()` stores only scalars; the existing continuous mix ramps a filtered spray rush and low rumble. Subtle rotation-only camera micro-rumble scales with skim². Every `?v=` tag bumped to s89a.
 
+- [x] **CRIMSON guns-only duel fix** *(build `s90a`, v1.1.21, `src/combat.js`, `src/audio.js`, `index.html`)*
+  - `launch()` now takes a `who` tag so guns-only blocks `MSL` only. CRIMSON-1 aims at a one-pass lead point with `ACE_BULLET_V`, fires 0.8–1.4 s bursts inside 1,200 m / 18°, and keeps firing through `DUEL_LOOP` / `EVADE_BREAK`.
+  - Rounds are hitscan closest-approach tests against a 9 m player sphere with a 0.35° spread; every fourth round draws an `aaTracer`. Hits run `damagePlayer(4)`, `gunhit` audio and a small camera bump. Counters `C.aceRounds` / `C.aceHits` feed `DUEL_OK`.
+  - `enemyGun()` / `gunhit()` reuse persistent nodes. `?duelbehind=s` places the ace on the player's six. Every `?v=` tag bumped to s90a.
+
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.

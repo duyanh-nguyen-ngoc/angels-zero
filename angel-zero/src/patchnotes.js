@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.21', title: 'CRIMSON GUNS-ONLY DUEL FIX', bullets: [
+    'CRIMSON-1 now actively hunts with lead-point cannon fire: 50 rps bursts with visible tracers that can damage the player.',
+    'A wider 18 degree firing cone inside 1,200 m and a burst state machine that keeps firing through defensive breaks.',
+    'Guns-only now blocks missiles only; the rival ace never launches a missile and the HUD duel assert reports shot and hit counts.'
+  ] },
   { version: 'v1.1.20', title: 'SEA-SKIM ROOSTER TAIL', bullets: [
     'Low passes over open water now throw a dense white-grey rooster-tail spray and a widening foam wake behind the jet, scaling with speed and proximity to the surface.',
     'Wingmen and enemy aircraft skim the water with you, with a filtered spray rush, low rumble and subtle airframe micro-rumble in the cockpit.',

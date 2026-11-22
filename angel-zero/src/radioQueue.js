@@ -1,5 +1,5 @@
 // ANGELS ZERO — priority radio queue. Pre-allocated slots, no per-line allocations.
-import { RADIO_BY_EVENT, RADIO_LINES } from './radioScript.js?v=s89a';
+import { RADIO_BY_EVENT, RADIO_LINES } from './radioScript.js?v=s90a';
 
 export const PRI = { CRITICAL: 3, STORY: 2, COMBAT: 1, AMBIENT: 0 };
 export const GAP_S = 0.35;
