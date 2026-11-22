@@ -298,6 +298,10 @@ export function createVFX(THREE, env) {
   // High-altitude engine contrails: 2 nozzles x (lead + WARDEN-2/3 + CRIMSON-1/2).
   // 22 m / 0.09 s sampling => the 96-sample ring covers ~9 s of trail.
   const CONTRAIL_N = 10;
+  // Low-altitude sea-skim rooster tail + foam wake (all buffers allocated once).
+  const SPRAY_N = 180, SPRAY_ALT = 35, SPRAY_DENSE = 15, SPRAY_KT = 120;
+  const SPRAY_LIFE_MIN = 1.2, SPRAY_LIFE_MAX = 1.8, SPRAY_RATE_MAX = 140, SPRAY_Y = 0.5;
+  const WAKE_N = 48, WAKE_Y = 0.15, WAKE_STEP_M = 12, WAKE_LIFE = 3.0;
   const NOZ = [new THREE.Vector3(-0.62, -0.05, 9.0), new THREE.Vector3(0.62, -0.05, 9.0)];
   const _noz = [NOZ[0], NOZ[1]];
   const _cw = new THREE.Vector3();
@@ -564,6 +568,131 @@ export function createVFX(THREE, env) {
     spGeo.attributes.aSize.needsUpdate = true;
     spMat.uniforms.uScale.value = renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
   }
+
+  /* ------------------------------- sea-skim rooster tail + foam wake (pooled) */
+  const rzGeo = new THREE.BufferGeometry();
+  const rzPos = new Float32Array(SPRAY_N * 3), rzSize = new Float32Array(SPRAY_N), rzAlpha = new Float32Array(SPRAY_N);
+  rzGeo.setAttribute('position', new THREE.BufferAttribute(rzPos, 3).setUsage(THREE.DynamicDrawUsage));
+  rzGeo.setAttribute('aSize', new THREE.BufferAttribute(rzSize, 1).setUsage(THREE.DynamicDrawUsage));
+  rzGeo.setAttribute('aAlpha', new THREE.BufferAttribute(rzAlpha, 1).setUsage(THREE.DynamicDrawUsage));
+  const rzMat = new THREE.ShaderMaterial({
+    uniforms: { uFar: { value: new THREE.Vector2(1500, 4200) }, uScale: { value: 400 } },
+    vertexShader: LOG_V + `
+      attribute float aAlpha; attribute float aSize; uniform vec2 uFar; uniform float uScale; varying float vA;
+      void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vA = aAlpha * (1.0 - smoothstep(uFar.x, uFar.y, -mv.z));
+        gl_PointSize = aSize * uScale / max(1.0, -mv.z);
+        gl_Position = projectionMatrix * mv;
+        #include <logdepthbuf_vertex>
+      }`,
+    fragmentShader: LOG_F + `
+      varying float vA;
+      void main() {
+        #include <logdepthbuf_fragment>
+        float d = length(gl_PointCoord - 0.5) * 2.0;
+        float a = vA * pow(clamp(1.0 - d, 0.0, 1.0), 1.5);
+        if (a < 0.004) discard;
+        gl_FragColor = vec4(0.93, 0.95, 0.97, a);
+      }`,
+    transparent: true, depthWrite: false, blending: THREE.NormalBlending
+  });
+  const rzPoints = new THREE.Points(rzGeo, rzMat);
+  rzPoints.frustumCulled = false; rzPoints.visible = false; scene.add(rzPoints);
+  const rzVel = new Float32Array(SPRAY_N * 3), rzAge = new Float32Array(SPRAY_N), rzLife = new Float32Array(SPRAY_N), rzK = new Float32Array(SPRAY_N);
+  let rzHead = 0, rzAcc = 0, rzAlive = 0;
+  const rooster = {
+    emit(x, z, fwdX, fwdZ, speed, k, dt) {
+      rzAcc += SPRAY_RATE_MAX * k * dt;
+      let n = rzAcc | 0;
+      rzAcc -= n;
+      const latX = -fwdZ, latZ = fwdX;
+      while (n-- > 0) {
+        const i = rzHead; rzHead = (rzHead + 1) % SPRAY_N;
+        const side = (rzHead & 1) ? 1 : -1, lat = (3 + 3 * k) * side;
+        const px = x - fwdX * 9 + latX * lat, pz = z - fwdZ * 9 + latZ * lat;
+        rzPos[i * 3] = px; rzPos[i * 3 + 1] = SPRAY_Y; rzPos[i * 3 + 2] = pz;
+        const out = side * (3 + 6 * k), back = speed * 0.22;
+        rzVel[i * 3] = -fwdX * back + latX * out;
+        rzVel[i * 3 + 1] = 6 + 28 * k;
+        rzVel[i * 3 + 2] = -fwdZ * back + latZ * out;
+        rzAge[i] = 0; rzLife[i] = SPRAY_LIFE_MIN + rand() * (SPRAY_LIFE_MAX - SPRAY_LIFE_MIN); rzK[i] = k;
+        rzAlpha[i] = 0; rzSize[i] = 3;
+        rzAlive++;
+      }
+    },
+    update(dt) {
+      if (!rzAlive) { rzPoints.visible = false; return; }
+      for (let i = 0; i < SPRAY_N; i++) {
+        if (rzAge[i] >= rzLife[i]) { rzAlpha[i] = 0; continue; }
+        rzAge[i] += dt;
+        const j = i * 3;
+        rzVel[j + 1] -= 9.8 * dt;
+        const drag = 1 - 1.4 * dt;
+        rzVel[j] *= drag; rzVel[j + 2] *= drag;
+        rzPos[j] += rzVel[j] * dt; rzPos[j + 1] = Math.max(SPRAY_Y, rzPos[j + 1] + rzVel[j + 1] * dt); rzPos[j + 2] += rzVel[j + 2] * dt;
+        const t = Math.min(1, rzAge[i] / rzLife[i]), k = rzK[i];
+        rzSize[i] = 3 + (8 + 12 * k - 3) * t;
+        rzAlpha[i] = k * 0.75 * smooth(0, 0.08, rzAge[i]) * Math.pow(1 - t, 1.5);
+        if (rzAge[i] >= rzLife[i]) { rzAlpha[i] = 0; rzAlive--; }
+      }
+      rzPoints.visible = rzAlive > 0;
+      if (!rzAlive) return;
+      rzGeo.attributes.position.needsUpdate = true;
+      rzGeo.attributes.aSize.needsUpdate = true;
+      rzGeo.attributes.aAlpha.needsUpdate = true;
+      rzMat.uniforms.uScale.value = renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+    },
+    reset() { for (let i = 0; i < SPRAY_N; i++) { rzAlpha[i] = 0; rzAge[i] = rzLife[i] = 0; } rzAlive = 0; rzAcc = 0; rzPoints.visible = false; },
+    get stats() { return { k: rzK[rzHead] || 0, alive: rzAlive }; }
+  };
+  // Foam wake: one additive instanced quad every 12 m travelled while skimming.
+  const wakeGeo = new THREE.PlaneGeometry(1, 1); wakeGeo.rotateX(-Math.PI / 2);
+  const wakeMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending,
+    depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+  const wakeMesh = new THREE.InstancedMesh(wakeGeo, wakeMat, WAKE_N);
+  wakeMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  wakeMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(WAKE_N * 3), 3);
+  wakeMesh.frustumCulled = false; wakeMesh.visible = false; scene.add(wakeMesh);
+  const wakePos = new Float32Array(WAKE_N * 3), wakeAge = new Float32Array(WAKE_N), wakeK = new Float32Array(WAKE_N);
+  const _rzM4 = new THREE.Matrix4(), _rzQ = new THREE.Quaternion(), _rzV = new THREE.Vector3(), _rzS = new THREE.Vector3();
+  const _rzYaw = new THREE.Vector3(0, 1, 0), _rzLast = new THREE.Vector3();
+  let wakeHead = 0, wakeAcc = 0, wakeLastValid = false, wakeAlive = 0;
+  const wake = {
+    drop(x, z, yaw, k, dt) {
+      if (k <= 0.15) { wakeLastValid = false; wakeAcc = 0; return; }
+      _rzV.set(x, WAKE_Y, z);
+      if (wakeLastValid) wakeAcc += _rzV.distanceTo(_rzLast);
+      _rzLast.copy(_rzV); wakeLastValid = true;
+      if (wakeAcc < WAKE_STEP_M) return;
+      wakeAcc -= WAKE_STEP_M;
+      const i = wakeHead; wakeHead = (wakeHead + 1) % WAKE_N;
+      wakePos[i * 3] = x; wakePos[i * 3 + 1] = WAKE_Y; wakePos[i * 3 + 2] = z;
+      wakeAge[i] = 0; wakeK[i] = k; wakeAlive++;
+    },
+    update(dt) {
+      if (!wakeAlive) { wakeMesh.visible = false; return; }
+      const col = wakeMesh.instanceColor.array;
+      for (let i = 0; i < WAKE_N; i++) {
+        if (wakeAge[i] >= WAKE_LIFE) { col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = 0; continue; }
+        wakeAge[i] += dt;
+        const t = Math.min(1, wakeAge[i] / WAKE_LIFE), k = wakeK[i];
+        const w = 6 + 18 * t;
+        _rzQ.setFromAxisAngle(_rzYaw, 0);
+        _rzS.set(w, 1, 10 + 10 * t);
+        _rzM4.compose(_rzV.set(wakePos[i * 3], WAKE_Y, wakePos[i * 3 + 2]), _rzQ, _rzS);
+        wakeMesh.setMatrixAt(i, _rzM4);
+        const b = k * 0.35 * (1 - t);
+        col[i * 3] = b; col[i * 3 + 1] = b; col[i * 3 + 2] = b;
+        if (wakeAge[i] >= WAKE_LIFE) wakeAlive--;
+      }
+      wakeMesh.visible = wakeAlive > 0;
+      if (!wakeAlive) return;
+      wakeMesh.instanceMatrix.needsUpdate = true;
+      wakeMesh.instanceColor.needsUpdate = true;
+    },
+    reset() { for (let i = 0; i < WAKE_N; i++) wakeAge[i] = WAKE_LIFE; wakeAlive = 0; wakeLastValid = false; wakeAcc = 0; wakeMesh.visible = false; },
+    get stats() { return { alive: wakeAlive }; }
+  };
 
   /* ------------------------------------------- bow catapult steam (pooled) */
   // 48 deck-roll puffs (HOLD) + 64 stroke plumes (LAUNCH) share one Points draw.
@@ -1347,6 +1476,8 @@ export function createVFX(THREE, env) {
     updateSpray(s, dt, opts.visible);
     catSteam.update(dt);
     aaTracer.update(dt);
+    rooster.update(dt);
+    wake.update(dt);
     updateWind(dt);
     updateMist(dt);
     sortClouds(dt, false);
@@ -1355,8 +1486,8 @@ export function createVFX(THREE, env) {
   return {
     attachPlume,
     setWingtips(l, r) { tipL.copy(l); tipR.copy(r); buildVapor(); },
-    clearTrails() { for (const r of ribbons) r.clear(); for (const r of contrails) r.clear(); contrailStats.active = contrailStats.live = 0; vaporTarget = lexTarget = 0; for (const q of sprayP) q.on = false; vaporLevel = 0; vaporPoints.visible = false; catSteam.reset(); },
-    catSteam, aaTracer,
+    clearTrails() { for (const r of ribbons) r.clear(); for (const r of contrails) r.clear(); contrailStats.active = contrailStats.live = 0; vaporTarget = lexTarget = 0; for (const q of sprayP) q.on = false; vaporLevel = 0; vaporPoints.visible = false; catSteam.reset(); rooster.reset(); wake.reset(); },
+    catSteam, aaTracer, spray: rooster, wake,
     updateContrails,
     get contrailStats() { return contrailStats; },
     update,

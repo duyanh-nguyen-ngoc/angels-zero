@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.20', title: 'SEA-SKIM ROOSTER TAIL', bullets: [
+    'Low passes over open water now throw a dense white-grey rooster-tail spray and a widening foam wake behind the jet, scaling with speed and proximity to the surface.',
+    'Wingmen and enemy aircraft skim the water with you, with a filtered spray rush, low rumble and subtle airframe micro-rumble in the cockpit.',
+    'The effect is suppressed over land, above 40 m and throughout carrier operations, so deck launches stay clean.'
+  ] },
   { version: 'v1.1.19', title: 'CARRIER AUTOLAND · 25 KM TRENCH · RIVAL DUEL', bullets: [
     'NAVAL BATTLE and ACE DUEL: every AFB runway, approach and island light is gone from the open ocean, and carrier AUTOLAND (press L or fly the final gate) now flies the glideslope, catches the wire, stops at 0 kt and goes to the debrief.',
     'CANYON RUN: no more auto-steering. You start at the canyon mouth before gate 1 with full WASD/mouse control, in a 25 km sweeping S-curve trench with 15 gates leading to the crater fortress.',

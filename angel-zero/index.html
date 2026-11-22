@@ -720,34 +720,34 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s88a';
-import { createBlastFX } from './src/blastfx.js?v=s88a';
-import { createHUD } from './src/hud.js?v=s88a';
-import { createCockpit3D } from './src/cockpit3d.js?v=s88a';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s88a';
-import { createEjection } from './src/eject.js?v=s88a';
-import { createAudio } from './src/audio.js?v=s88a';
-import { createRadio } from './src/radio.js?v=s88a';
-import { createProfile, LIVERIES, liveryById } from './src/profile.js?v=s88a';
-import { createLivery } from './src/livery.js?v=s88a';
-import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s88a';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s88a';
-import { createCanopyFX } from './src/canopy.js?v=s88a';
-import { createNVG } from './src/nvg.js?v=s88a';
-import { createWorld, WORLD } from './src/world.js?v=s88a';
-import { createSurfaces } from './src/surfaces.js?v=s88a';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s88a';
-import { createFreeLook } from './src/freelook.js?v=s88a';
-import { createCanopyGlass } from './src/canopyglass.js?v=s88a';
-import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s88a';
-import { SPW, SQUADRON, MODES, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode } from './src/loadout.js?v=s88a';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s88a';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s88a';
-import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s88a';
-import { createRadioQueue } from './src/radioQueue.js?v=s88a';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s88a';
+import { createVFX } from './src/vfx.js?v=s89a';
+import { createBlastFX } from './src/blastfx.js?v=s89a';
+import { createHUD } from './src/hud.js?v=s89a';
+import { createCockpit3D } from './src/cockpit3d.js?v=s89a';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s89a';
+import { createEjection } from './src/eject.js?v=s89a';
+import { createAudio } from './src/audio.js?v=s89a';
+import { createRadio } from './src/radio.js?v=s89a';
+import { createProfile, LIVERIES, liveryById } from './src/profile.js?v=s89a';
+import { createLivery } from './src/livery.js?v=s89a';
+import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s89a';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s89a';
+import { createCanopyFX } from './src/canopy.js?v=s89a';
+import { createNVG } from './src/nvg.js?v=s89a';
+import { createWorld, WORLD } from './src/world.js?v=s89a';
+import { createSurfaces } from './src/surfaces.js?v=s89a';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s89a';
+import { createFreeLook } from './src/freelook.js?v=s89a';
+import { createCanopyGlass } from './src/canopyglass.js?v=s89a';
+import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s89a';
+import { SPW, SQUADRON, MODES, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode } from './src/loadout.js?v=s89a';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s89a';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s89a';
+import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s89a';
+import { createRadioQueue } from './src/radioQueue.js?v=s89a';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s89a';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
-  GORGE_HALF_W, RUNWAY_BBOX } from './src/maps.js?v=s88a';
+  GORGE_HALF_W, RUNWAY_BBOX } from './src/maps.js?v=s89a';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -1193,6 +1193,8 @@ const _catYaw = new THREE.Quaternion(), _catAxisY = new THREE.Vector3(0, 1, 0);
 const _lp = new THREE.Vector3(), _qInv = new THREE.Quaternion(), _cq = new THREE.Quaternion();
 const _carrierPos = new THREE.Vector3(), _carrierVel = new THREE.Vector3();
 const flyShake = { t: 0.35, k: 0 };                   // preallocated near-miss rattle state
+let skimK = 0, skimTgt = 0;                          // sea-skim spray intensity (scalars only)
+const _skA = new THREE.Vector3(), _skB = new THREE.Vector3(), _skC = new THREE.Vector3();
 let wakeRoll = 0, wakeT = 0;                          // wake bump into the roll command
 let prevMach = 0, machArmed = true, machShake = null;
 function onMach1() {
@@ -1962,6 +1964,18 @@ async function startSortie() {
       ' hdg=' + (hdg / D2R).toFixed(1) + ' floor=' + GORGE_FLOOR_Y + ' ceil=' + CEIL_M.toFixed(2) + ' hL=' + hL.toFixed(1) +
       ' hR=' + hR.toFixed(1) + ' ahead=' + ahead.toFixed(1) + ' gate1Z=' + GORGE_GATE_Z[0].toFixed(0) +
       ' arc=' + (GORGE_ARC_M / 1000).toFixed(1) + 'km ' + (ok ? 'OK' : 'FAIL'));
+  }
+  if (DEBUG && Q.has('skimtest') && combat.ally) {
+    audio.init(); audio.resume();
+    const a = combat.ally;
+    state.position.copy(a.pos).addScaledVector(a.fwd, -2600);
+    state.position.y = Number(Q.get('alt')) || 10;
+    state.quaternion.copy(a.root.quaternion);
+    state.speed = Number(Q.get('spd')) || 220;
+    state.velocity.set(0, 0, -state.speed).applyQuaternion(state.quaternion);
+    state.onGround = false; state.gear = 0; state.gearDown = false;
+    cat.ph = 'AIRBORNE'; carrier.phase = null;
+    for (const w of wingmen) { w.pos.copy(state.position).addScaledVector(a.fwd, -3000); w.alive = false; }
   }
   if (combat.mode === 'FURBALL') {
     state.position.set(0, 1829, -3000);                       // cloud-sea centre, 6,000 ft, above the 5,800 ft tops
@@ -3320,6 +3334,44 @@ function updateCameraAndVisuals(dt, now) {
     w.mesh.visible = modelReady && flightMode === 'FLY' && w.alive;
   }
 
+  // --- sea-skim rooster tail: intensity gate, emitters, audio, micro-rumble ---
+  const skimAlt = state.position.y, skimKt = state.speed * 1.94384;
+  skimTgt = THREE.MathUtils.clamp(1 - skimAlt / 35, 0, 1) * THREE.MathUtils.clamp((skimKt - 120) / 230, 0, 1);
+  skimTgt = Math.min(1, skimTgt * (1 + 0.6 * THREE.MathUtils.clamp((15 - skimAlt) / 15, 0, 1)));
+  if (appMode !== 'PLAY' || flightMode !== 'FLY' || carrier.phase || autoland.on || autoland.ph) skimTgt = 0;
+  if (world.heightAt(state.position.x, state.position.z) >= -1) skimTgt = 0;
+  if (combat.carrierVisible !== false && combat.ally && combat.ally.root) {
+    alToLocal(combat.ally, state.position, _skA);
+    if (Math.abs(_skA.x) < 45 && Math.abs(_skA.z) < combat.ally.len / 2 + 20) skimTgt = 0;
+  }
+  skimK += (skimTgt - skimK) * Math.min(1, dt * (skimTgt > skimK ? 4 : 12));
+  if (skimK < 0.02) skimK = 0;
+  audio.setSpray(skimK, skimKt);
+  vfx.spray.update(dt);
+  vfx.wake.update(dt);
+  if (skimK > 0 && state.speed > 1) {
+    _skB.copy(state.velocity).setY(0).normalize();
+    vfx.spray.emit(state.position.x, state.position.z, _skB.x, _skB.z, state.speed, skimK, dt);
+    vfx.wake.drop(state.position.x, state.position.z, state.heading * D2R, skimK, dt);
+    // Wingmen / ace get a lighter wake, capped by distance to the camera.
+    const budget = 1.5 * dt;
+    for (let i = 0; i < wingmen.length; i++) {
+      const w = wingmen[i];
+      if (!w || !w.alive || !w.mesh || w.mesh.position.distanceTo(camera.position) > 2500) continue;
+      if (world.heightAt(w.pos.x, w.pos.z) >= -1 || w.pos.y > 35) continue;
+      _skB.copy(w.vel).setY(0);
+      const sp = Math.max(1, _skB.length()); _skB.multiplyScalar(1 / sp);
+      vfx.spray.emit(w.pos.x, w.pos.z, _skB.x, _skB.z, sp, skimK * 0.6, budget);
+    }
+    for (const e of combatSys.enemies) {
+      if (!e.alive || !e.aceFlight || !e.pos || e.pos.distanceTo(camera.position) > 2500) continue;
+      if (world.heightAt(e.pos.x, e.pos.z) >= -1 || e.pos.y > 35) continue;
+      _skB.copy(e.vel).setY(0);
+      const sp = Math.max(1, _skB.length()); _skB.multiplyScalar(1 / sp);
+      vfx.spray.emit(e.pos.x, e.pos.z, _skB.x, _skB.z, sp, skimK * 0.6, budget);
+    }
+  }
+
   if (appMode === 'MENU') {
     if (menuPreviewCockpit) {
       updateCockpitClip();
@@ -3423,6 +3475,12 @@ function updateCameraAndVisuals(dt, now) {
     camera.rotateX(Math.sin(tt) * a); camera.rotateY(Math.sin(tt * 1.37 + 1.1) * a * 0.8); camera.rotateZ(Math.sin(tt * 0.83 + 2.3) * a * 0.6);
     blastShake *= Math.exp(-dt * 7);
   } else blastShake = 0;
+  if (skimK > 0.02) {
+    // Sea-skim micro-rumble: tiny rotation-only jitter, no spring disturbance.
+    const a = skimK * skimK * (firstPerson ? 0.02 : 0.06) * D2R;
+    camera.rotateY(Math.sin(now * 29.7) * a * 0.5);
+    camera.rotateX(Math.sin(now * 37.1) * Math.sin(now * 23.3) * a);
+  }
   if (flyShake.t < 0.35) {
     // Missile near-miss: high-frequency airframe rattle, rotation only.
     flyShake.t = Math.min(0.35, flyShake.t + dt);
@@ -3660,7 +3718,7 @@ if (DEBUG) window.__frame = (dt = 1 / 60) => {
 if (DEBUG) window.__step = (n = 30) => { for (let i = 0; i < n; i++) { simTime += 1 / 60; stepSim(1 / 60); updateCameraAndVisuals(1 / 60, simTime); if (appMode === 'PLAY') updateAudio(); audio.updateMusic(getMusicCtx(), 1 / 60); } };
 window.__audioDebug = () => ({ state: audio.state, rms: +audio.rms.toFixed(4), muted: audio.muted, volume: audio.volume, layers: audio.layers,
   canopyRain: audio.canopyRain, wind: audio.wind, blast: audio.blast, blastFx: blast ? blast.stats : null, shake: +blastShake.toFixed(3), ribbons: vfx.ribbons, canopyGlass: canopyGlass.stats, rainCulled: weather.rainCulled,
-  music: audio.music, bgm: audio.bgm, slowMo: audio.slowMoDebug, mist: audio.mist, radio: { ...audio.radio, ...rq.state },
+  music: audio.music, bgm: audio.bgm, slowMo: audio.slowMoDebug, mist: audio.mist, spray: audio.spray, radio: { ...audio.radio, ...rq.state },
   crtRadio: combat.radio ? { call: combat.radio.call, text: combat.radio.text, age: +combat.radio.age.toFixed(2) } : null,
   gLoad: +state.gLoad.toFixed(2), gStrain: +state.gStrain.toFixed(2), throttle: +state.throttle.toFixed(2), afterburner: +state.afterburner.toFixed(2) });
 // Seeker / alert / gun state -> procedural audio mix, once per frame.
@@ -4519,13 +4577,16 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
         if (off >= t0 && off < t1) { freeLook.debugHold(false); console.log('[ANGELS_ZERO] free look released @', t1.toFixed(2), JSON.stringify(freeLook.stats)); }
       }
       simTime += h;
+      if (DEBUG && Q.has('skimtest')) state.position.y = Number(Q.get('alt')) || 10;
       if (appMode !== 'DEBRIEF') stepSim(h);           // same rule as animate(): the sim stops once the debrief is up
+      if (DEBUG && Q.has('skimtest')) updateAudio();
       updateCameraAndVisuals(h, simTime);
       canopyFx.update(h, combat.playerCloud || 0, state.speed, firstPerson, true, weather.rainHere);
       for (const t of logAt) if (t >= t0 && t < t1) console.log('[ANGELS_ZERO] SAMPLE', t, 'A', (state.alpha * 57.3).toFixed(0), 'HT', man.hammerT.toFixed(2), 'FW', _fw.y.toFixed(2), 'RI', rudderInput(0).toFixed(2), 'YR', state.yawRate.toFixed(2), 'YA', (man.yawAcc * 57.3).toFixed(0), 'GR', state.gear.toFixed(2), 'AS', state.assist, 'M', man.lastMan);
       for (const t of logAt) if (t >= t0 && t < t1) console.log('[ANGELS_ZERO] t', t1.toFixed(2), JSON.stringify(combatSys.stats()), 'alert', hud.hudAlertState, 'hp', combat.health, 'gs', state.gStrain.toFixed(2), 'G', state.gLoad.toFixed(1), 'kts', Math.round(state.speed * 1.94384), 'aoa', (state.alpha * 57.3).toFixed(1), 'beta', (state.beta * 57.3).toFixed(1), 'p', state.rollRate.toFixed(2), 'q', state.pitchRate.toFixed(2), 'alt', Math.round(state.position.y), 'pitch', Math.round(state.pitch * 57.3), 'bank', Math.round(state.bank * 57.3), 'M', state.mach.toFixed(2), 'stall', state.stalled ? 1 : 0, 'warn', hud.stallWarn ? 1 : 0,
         'mcam', JSON.stringify({ active: mcam.active, k: +mcam.k.toFixed(2) }), 'slowmo', +timeScale.toFixed(2));
     }
+    if (DEBUG) console.log('[ANGELS_ZERO] spray k=' + skimK.toFixed(2) + ' alive=' + vfx.spray.stats.alive + ' wake=' + vfx.wake.stats.alive + ' snd=' + audio.spray.k.toFixed(2) + '/' + audio.spray.gain.toFixed(3));
     if (DEBUG) console.log('[ANGELS_ZERO] PSM', state.psm ? 1 : 0, 'A', (state.alphaPk * 57.3).toFixed(0), 'S', state.spin, 'M', man.lastMan);
     if (DEBUG) console.log('[ANGELS_ZERO] FRAME', PERF_DEBUG.frameMs.toFixed(2), 'ms', PERF_DEBUG.calls, 'calls');
     console.log('[ANGELS_ZERO] combat', JSON.stringify(combatSys.stats()), 'psm', JSON.stringify({ active: state.psm, alphaPk: +(state.alphaPk * 57.2958).toFixed(1), spin: state.spin, lastMan: man.lastMan }), 'lock', combat.lockTarget ? combat.lockTarget.label : '-',
@@ -4677,7 +4738,7 @@ if (DEBUG) {
     get mode() { return flightMode; }, get enemies() { return combatSys.enemies; }, get model() { return model; }, get ready() { return modelReady; },
     get missionId() { return missionId; }, get mission() { return mission(); }, cycleMission, loadMissionScene, startSortie, launchSortie,
     get autoland() { return autoland; }, autolandPrompt, engageAutoland, getMusicCtx, get debrief() { return !debriefEl.hidden; },
-    get cat() { return cat; }, catEnter, catTick, catFire, catSnapAll, carrierDiag, enterCarrierLaunch, carrierReady,
+    get cat() { return cat; }, get skimK() { return skimK; }, catEnter, catTick, catFire, catSnapAll, carrierDiag, enterCarrierLaunch, carrierReady,
     ilsVisible, inCutscene, get missionT() { return missionT; }, applyMapProps,
     getCarrierBox() { const a = combat.ally; if (!a || !a.root) return null; const b = new THREE.Box3().setFromObject(a.root); return { min: b.min.toArray(), max: b.max.toArray() }; },
     get carrier() { return carrier; }, get jetGearDY() { return JET_GEAR_DY; },

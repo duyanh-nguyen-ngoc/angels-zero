@@ -1641,6 +1641,11 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
     - **ACE_DUEL:** `DUEL_OK ships=0 aceHp=100/100`, 0 missiles after M/1/2, and an `EVADE_BREAK` when the player's nose is on the ace.
     - **Frame cost** (browser pane `__frame`): median 2.7–3.7 ms and p95 under 6 ms.
 
+- [x] **Sea-skim rooster tail** *(build `s89a`, v1.1.20, `src/vfx.js`, `src/audio.js`, `index.html`)*
+  - A 180-point pooled `vfx.spray` emits a V-shaped white-grey rooster tail at `y = 0.5` with size/alpha ramp and gravity/drag, plus a 48-instance additive `vfx.wake` foam trail. Both are preallocated and only upload while alive.
+  - Skim intensity comes from altitude/speed with a dense boost below 15 m, hard-suppressed over land, above 40 m, on deck, during carrier phase/autoland and outside PLAY/FLY. Wingmen and the ace get a capped lighter wake.
+  - `setSpray()` stores only scalars; the existing continuous mix ramps a filtered spray rush and low rumble. Subtle rotation-only camera micro-rumble scales with skim². Every `?v=` tag bumped to s89a.
+
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.

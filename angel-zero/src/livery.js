@@ -7,7 +7,7 @@
 // `vertexColors` is enabled permanently at init so switching schemes never
 // recompiles a shader; its only new program is the one-time dice decal material.
 // Model axes: nose -Z, up +Y, right +X, metres.
-import { SQUADRON } from './loadout.js?v=s88a';
+import { SQUADRON } from './loadout.js?v=s89a';
 
 export function createLivery(THREE, model, LIVERIES, wingMeshes = []) {
   const liveryById = id => LIVERIES.find(l => l.id === id) || LIVERIES[0];

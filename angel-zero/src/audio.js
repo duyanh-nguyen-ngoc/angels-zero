@@ -20,6 +20,7 @@ export function createAudio() {
   try { const mv = parseFloat(localStorage.getItem('angelsZero_musicVol')); if (!Number.isNaN(mv) && mv >= 0 && mv <= 1) musicVol = mv; } catch (e) { /* storage unavailable */ }
 
   const N = {};                                            // live nodes
+  let sprayK = 0, sprayKt = 0;                             // sea-skim DSP targets (scalars only)
   // --- streamed scenario soundtrack -------------------------------------------------
   const BGM_DIR = 'assets/audio/bgm/', XFADE = 1.5, DUCK_DB = -5, DUCK_GAIN = 0.5623, DUCK_T = 0.25, MIN_DWELL = 4.0;
   const BGM_OK = typeof Audio !== 'undefined' && new Audio().canPlayType('audio/ogg; codecs="vorbis"') !== '';
@@ -254,6 +255,13 @@ export function createAudio() {
     N.mist.connect(N.mistHP).connect(N.mistBP).connect(N.mistG).connect(cockpitLP);
     N.mistLFO = osc('square', 17); N.mistAM = gain(0);
     N.mistLFO.connect(N.mistAM).connect(N.mistG.gain);
+
+    // Sea-skim rooster-tail rush + low hull rumble, both gated by setSpray().
+    N.sprayNoise = loopNoise(N.whiteBuf); N.sprayHP = filt('highpass', 300, 0.7);
+    N.sprayBP = filt('bandpass', 900, 0.7); N.sprayG = gain(0);
+    N.sprayNoise.connect(N.sprayHP).connect(N.sprayBP).connect(N.sprayG).connect(cockpitLP);
+    N.rumbleNoise = loopNoise(N.whiteBuf); N.rumbleLP = filt('lowpass', 70, 0.7); N.rumbleG = gain(0);
+    N.rumbleNoise.connect(N.rumbleLP).connect(N.rumbleG).connect(cockpitLP);
 
     // Rain patter: band-passed pink noise (cockpit-muffled) + bright droplet ticks.
     N.rain = loopNoise(pink); N.rainBP = filt('bandpass', 2400, 0.55); N.rainGain = gain(0);
@@ -1535,6 +1543,9 @@ export function createAudio() {
     }
   }
 
+  // Sea-skim audio: stores scalars only; the continuous mix ramps the nodes.
+  function setSpray(k, kt) { sprayK = k || 0; sprayKt = kt || 0; }
+
   /* ------------------------------------------------------ continuous mix */
   function update(p) {
     if (!ready) return;
@@ -1638,6 +1649,10 @@ export function createAudio() {
     set(N.mistG.gain, 0.055 * mk * (0.55 + 0.45 * spdK2), 0.25);
     set(N.mistAM.gain, 0.02 * mk, 0.25);
     set(N.mistBP.frequency, 7000 + 3000 * spdK2, 0.3);
+    const sGain = sprayK * 0.45 * (0.6 + 0.4 * Math.min(1, sprayKt / 500));
+    set(N.sprayG.gain, sGain, sGain > N.sprayG.gain.value ? 0.12 : 0.04);
+    set(N.sprayBP.frequency, 700 + 1400 * sprayK, 0.12);
+    set(N.rumbleG.gain, sprayK * sprayK * 0.3, sprayK > 0 ? 0.12 : 0.04);
 
     // RWR: soft search chirps when painted, quicker bright triple pips on a full
     // lock, and the rapid high-pitched launch warble only while a missile is inbound.
@@ -1666,7 +1681,7 @@ export function createAudio() {
   }
 
   return {
-    init, resume, suspend, update, updateMusic, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, setBgmPause, bumpBgmDwell() { dwell = MIN_DWELL; }, setBgmForce: v => { bgmForce = v || ''; }, selectTrack, skip, setAuto, onBgmChange, get bgmTracks() { return allTracks() || []; }, radioSquelch, preloadRadio, playRadio, stopRadio, txOpen, txTail, txClose, preload,
+    init, resume, suspend, update, updateMusic, setSpray, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, setBgmPause, bumpBgmDwell() { dwell = MIN_DWELL; }, setBgmForce: v => { bgmForce = v || ''; }, selectTrack, skip, setAuto, onBgmChange, get bgmTracks() { return allTracks() || []; }, radioSquelch, preloadRadio, playRadio, stopRadio, txOpen, txTail, txClose, preload,
     get radioAnalyser() { return N.rAnalyser || null; }, get radioFreq() { return N.rFreq || null; }, get radioTime() { return N.rTime || null; },
     get radioCh() { return RADIO_CH; },
     get radioDsp() { return { pttOpen: !!N.pttOpen, pttTail: !!N.pttTail, static: !!N.rStatic, hp: N.rHP ? N.rHP.frequency.value : 0,
@@ -1718,6 +1733,8 @@ export function createAudio() {
     get slowMoDebug() { return N.lastSlowMo || null; },
     // Cockpit mist patter level + band centre for __audioDebug.
     get mist() { return N.mistG ? { gain: +N.mistG.gain.value.toFixed(4), hz: Math.round(N.mistBP.frequency.value) } : null; },
+    get spray() { return { k: +sprayK.toFixed(3), kt: Math.round(sprayKt), gain: N.sprayG ? +N.sprayG.gain.value.toFixed(4) : 0,
+      hz: N.sprayBP ? Math.round(N.sprayBP.frequency.value) : 0, rumble: N.rumbleG ? +N.rumbleG.gain.value.toFixed(4) : 0 }; },
     // Canopy rain layer state (for __audioDebug): bus gain, hiss gain / band, tap rate and count.
     get canopyRain() {
       if (!N.canopyBus) return null;
