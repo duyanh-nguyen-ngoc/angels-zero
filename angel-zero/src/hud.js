@@ -6,7 +6,7 @@
 // clipped to the 3D combiner glass. Square tactical radar (bottom-left), stores
 // list + F-15C silhouette with per-pylon AIM-9 reload icons (bottom-right),
 // open-corner target brackets, edge pointers, minimal top-left telemetry.
-import { SPW } from './loadout.js?v=s87a';
+import { SPW } from './loadout.js?v=s88a';
 
 export function createHUD(THREE, A) {
   const canvas = A.canvas;
@@ -1715,7 +1715,7 @@ export function createHUD(THREE, A) {
     }
     if (cat && cat.ph === 'LAUNCH') { promptKey = ''; promptT = 0; return; }
     let txt = '', prio = 0;
-    if (C.rtb && C.rtb.on && C.rtb.type === 'CARRIER' && C.ally && C.ally.pos) {
+    if (C.rtb && C.rtb.on && C.rtb.type === 'CARRIER' && C.ally && C.ally.pos && !(A.isAutoland && A.isAutoland())) {
       const sternX = C.ally.pos.x - C.ally.fwd.x * C.ally.len / 2;
       const sternZ = C.ally.pos.z - C.ally.fwd.z * C.ally.len / 2;
       if (Math.hypot(sternX - S.position.x, sternZ - S.position.z) < 3500) { txt = '[L] ENGAGE AUTOLAND'; prio = 0; }
@@ -2034,6 +2034,8 @@ export function createHUD(THREE, A) {
     ctx.strokeStyle = '#ff3b5c'; diamond(ctx, p.x, p.y, 14, 0); ctx.stroke();
     ctx.font = f(11, true); ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
     labelText(ctx, `[ ACE // ${e.label} ]`, p.x, p.y - 14, '#ffd45a', 4);
+    // ACE_DUEL: a rival pilot, not a boss -- no structural HP bar.
+    if (C.mcfg && C.mcfg.gunsOnly) { ctx.restore(); return; }
     const bw = 44, bx = p.x - bw / 2, by = p.y + 18;
     noGlow(ctx); ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(bx, by, bw, 4);
     ctx.fillStyle = '#ff3b5c'; ctx.fillRect(bx, by, bw * frac, 4);

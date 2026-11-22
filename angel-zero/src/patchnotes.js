@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.19', title: 'CARRIER AUTOLAND · 25 KM TRENCH · RIVAL DUEL', bullets: [
+    'NAVAL BATTLE and ACE DUEL: every AFB runway, approach and island light is gone from the open ocean, and carrier AUTOLAND (press L or fly the final gate) now flies the glideslope, catches the wire, stops at 0 kt and goes to the debrief.',
+    'CANYON RUN: no more auto-steering. You start at the canyon mouth before gate 1 with full WASD/mouse control, in a 25 km sweeping S-curve trench with 15 gates leading to the crater fortress.',
+    'ACE DUEL: no ships, and CRIMSON-1 is now a skilled rival pilot with normal fighter HP and no boss bar. It breaks hard, loops and tracks you with its guns. Missiles are blocked at the fire handler for both sides.'
+  ] },
   { version: 'v1.1.18', title: 'OPEN-OCEAN OPS + TRENCH RUN FIX', bullets: [
     'NAVAL BATTLE and ACE DUEL now launch over open ocean with no AFB, islands, trees or ILS clutter until recovery.',
     'NAVAL BATTLE restores WARDEN-2/3 as active wingmen across three escalating fleet stages; ACE DUEL stays a strict guns-only 1v1.',

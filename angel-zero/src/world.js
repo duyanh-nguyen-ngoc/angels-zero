@@ -22,8 +22,8 @@ export const WORLD = { SIZE: 20000, CX: 0, CZ: -2500, SEG: 600 };     // 33 m gr
 const FT = 0.3048;
 export const RWY = { x: 900, z0: -1400, z1: 1600, width: 50, elev: 10 };       // runway 18/36, 3,000 m
 
-import { gorgeCentreX, GORGE_FLOOR_Y, GORGE_RIM_Y, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_CRATER_Z,
-  SEA_FLOOR_Y, RUNWAY_BBOX } from './maps.js?v=s87a';
+import { gorgeCentreX, gorgeDist, GORGE_FLOOR_Y, GORGE_RIM_Y, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_CRATER_Z,
+  GORGE_BBOX, GORGE_HALF_W, GORGE_RAMP_W, SEA_FLOOR_Y, RUNWAY_BBOX } from './maps.js?v=s88a';
 
 export function createWorld(THREE, env) {
   const { scene, createNoise2D, fbm } = env;
@@ -32,23 +32,25 @@ export function createWorld(THREE, env) {
   const ss = (x, a, b) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
   const nCoast = createNoise2D(4242), nHill = createNoise2D(991), nDet = createNoise2D(7);
   const nRidge = createNoise2D(1337), nSea = createNoise2D(2718), nVeg = createNoise2D(31);
-  // CANYON_RUN trench: 180 m floor, 60 m ramp to 366 m rim, plateau outside.
+  // CANYON_RUN trench: 220 m floor, 65 m ramp to the 366 m rim, plateau outside.
+  // Width is measured perpendicular to the S-curve so the steep sweeps stay as wide
+  // as the straights.
   function gorgeHeight(x, z) {
-    // The AFB strip and everything outside the corridor bbox keep ARCHIPELAGO terrain.
+    // The AFB strip and everything outside the trench bbox keep ARCHIPELAGO terrain.
     if ((x >= RUNWAY_BBOX.x[0] && x <= RUNWAY_BBOX.x[1] && z >= RUNWAY_BBOX.z[0] && z <= RUNWAY_BBOX.z[1]) ||
-        x < -1400 || x > 1400 || z > 600 || z < -10800) return analyticHeight(x, z);
+        x < GORGE_BBOX.x[0] || x > GORGE_BBOX.x[1] || z > GORGE_BBOX.z[0] || z < GORGE_BBOX.z[1]) return analyticHeight(x, z);
     const crDX = x - gorgeCentreX(GORGE_CRATER_Z), crDZ = z - GORGE_CRATER_Z;
     const cr = Math.hypot(crDX, crDZ);
     if (cr < GORGE_CRATER_R * 1.5) {
       const wall = GORGE_CRATER_WALL_Y * Math.exp(-Math.pow((cr - GORGE_CRATER_R * 0.72) / 190, 2));
-      const cut = Math.abs(x - gorgeCentreX(z)) < 80 && z > GORGE_CRATER_Z - 140;
+      const cut = gorgeDist(x, z) < GORGE_HALF_W && z > GORGE_CRATER_Z + GORGE_CRATER_R * 0.4;
       if (cut) return 20 + Math.min(40, wall * 0.06);
       return 20 + wall;
     }
-    const cx = gorgeCentreX(z), d = Math.abs(x - cx);
+    const d = gorgeDist(x, z);
     const floor = GORGE_FLOOR_Y + (fbm(nDet, x * 0.012, z * 0.012, 2) * 0.5 + 0.5) * 6;
     const plateau = GORGE_RIM_Y + 30 * (fbm(nHill, x * 0.0014, z * 0.0014, 3) * 0.5 + 0.5);
-    const corridor = 1 - ss(d, 90, 150);                   // 1 on the floor, 0 at the rim
+    const corridor = 1 - ss(d, GORGE_HALF_W, GORGE_RAMP_W);   // 1 on the floor, 0 at the rim
     return floor + (plateau - floor) * (1 - corridor);
   }
   let activeHeightFn = null;
@@ -1010,15 +1012,18 @@ export function createWorld(THREE, env) {
   lg.setAttribute('aMode', new THREE.Float32BufferAttribute(LP.mode, 1));
   lg.setAttribute('aPhase', new THREE.Float32BufferAttribute(LP.phase, 1));
   const lightMat = new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uNight: { value: 0 }, uScale: { value: 600 } },
+    uniforms: { uTime: { value: 0 }, uNight: { value: 0 }, uScale: { value: 600 },
+      uMask: { value: new THREE.Vector4(1, -1, 1, -1) } },      // xmin, xmax, zmin, zmax (empty when min > max)
     vertexShader: `
       #include <common>
       #include <logdepthbuf_pars_vertex>
       attribute vec3 aColor; attribute float aSize; attribute float aMode; attribute float aPhase;
-      uniform float uTime; uniform float uNight; uniform float uScale;
+      uniform float uTime; uniform float uNight; uniform float uScale; uniform vec4 uMask;
       varying vec3 vC; varying float vA;
       void main() {
         float on = 1.0;
+        // Map mask: island lights inside the CANYON_RUN trench bbox are switched off.
+        if (position.x > uMask.x && position.x < uMask.y && position.z > uMask.z && position.z < uMask.w) on = 0.0;
         if (aMode > 0.5 && aMode < 1.5) on = step(fract(uTime * 0.5 - aPhase), 0.06);          // sequenced strobe
         else if (aMode > 1.5 && aMode < 2.5) on = step(fract(uTime * 0.65 + aPhase), 0.35);    // slow blink
         else if (aMode > 2.5 && aMode < 3.5) on = pow(max(0.0, cos((uTime * 0.8 + aPhase) * 6.2831853)), 6.0);   // rotating beacon
@@ -1147,6 +1152,15 @@ export function createWorld(THREE, env) {
     geo.attributes.color.needsUpdate = true;
     boxes.length = 0; cyls.length = 0;
     if (mode === 'archipelago') { for (const b of baseBoxes) boxes.push(b); for (const q of baseCyls) cyls.push(q); }
+    else if (mode === 'gorge' && def.bbox) {                  // AFB / island obstacles outside the trench stay solid
+      const bb = def.bbox, inBB = (x, z) => x > bb.x[0] - 600 && x < bb.x[1] + 600 && z < bb.z[0] + 600 && z > bb.z[1] - 600;
+      for (const b of baseBoxes) if (!inBB(b.c.x, b.c.z)) boxes.push(b);
+      for (const q of baseCyls) if (!inBB(q.x, q.z)) cyls.push(q);
+    }
+    // Light points: hidden on open-ocean maps, masked inside the trench bbox on GORGE.
+    const mk = lightMat.uniforms.uMask.value;
+    if (mode === 'gorge' && def.bbox) mk.set(def.bbox.x[0] - 600, def.bbox.x[1] + 600, def.bbox.z[1] - 600, def.bbox.z[0] + 600);
+    else mk.set(1, -1, 1, -1);
     for (const [ix, iz, r] of (def && def.islands) || []) addCyl(ix, iz, -200, 130, r * 0.85);
     for (const child of props.children) child.visible = !!(def && def.runway);
     return def;
@@ -1154,7 +1168,9 @@ export function createWorld(THREE, env) {
 
   // Registry of switchable map props, built once at boot. InstancedMeshes are
   // only ever toggled via .visible; count / geometry are never touched.
-  const envProps = { terrain, islands: [], runway: [], baseBldg: [], radar: [], foliage: [trees.mesh] };
+  // `lights` holds the one Points object carrying every runway edge / threshold /
+  // ALSF approach strobe, taxiway, tower, bridge and rig light on the archipelago.
+  const envProps = { terrain, islands: [], runway: [], baseBldg: [], radar: [], foliage: [trees.mesh], lights: [lightPts] };
   for (const o of props.children) {
     if (radars.some(r => r.g === o)) envProps.radar.push(o);
     else if (o === trees.mesh || o.name === 'forest') envProps.foliage.push(o);

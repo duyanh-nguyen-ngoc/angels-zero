@@ -1619,6 +1619,28 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   - `NAVAL_BATTLE` restores WARDEN flight with staged bandit ranges and damaged-escort targeting; `ACE_DUEL` adds per-second `DUEL_OK` asserts with all other spawn/refill paths disabled.
   - `CANYON_RUN` uses one metres source (`FT`/`CEIL_FT`/`CEIL_M`), an airborne centred spawn with a wall-clearance assert, an 8 s ceiling arm delay, a 3 s `RADAR LOCK — DESCEND!` countdown with hysteresis and the `SAM LAUNCH — CEILING BREAK!` banner. `RUNWAY_BBOX` keeps the AFB clear of the plateau. Every `?v=` tag bumped to s87a.
 
+- [x] **Mission fix pass: carrier autoland, 25 km trench, rival duel** *(build `s88a`, v1.1.19, `src/maps.js`, `src/world.js`, `src/missions.js`, `src/combat.js`, `src/hud.js`, `index.html`)*
+  - Open-ocean maps hide `envProps.lights`, the single Points object that carries every runway edge, threshold, ALSF/approach strobe, taxiway, tower, bridge and rig light. They also hide the AFB CIWS/SAM site meshes (`setBaseDefencesVisible`). On `GORGE`, a `uMask` light-shader bbox and `applyMapProps` hide island props inside the trench.
+  - `CARRIER_AUTOLAND` is rewritten in the carrier ROOT frame:
+    - **Phases:** CAPTURE (glideslope offset decays over T = |off|/60 s), GLIDE (3.5°), FLARE (last 90 m), TRAP (wire 2, smoothstep to 0 kt over 1.6 s), ROLLOUT, then `onCarrierTrap()` and `missionComplete('CARRIER')`, which opens `12_debrief`.
+    - **Engagement:** pressing L while the prompt is up, or flying through the 400 m final gate (`autolandGateCheck`).
+    - **Root causes fixed:** the old code used the GLB child's local quaternion as the deck frame and referenced an undefined `s` in FLARE. Staged RTB also never set `missionPhase = 4`, so a trap looped back to the catapult. `combat.allyHold` now stops the carrier turning 180° mid-approach.
+  - `CANYON_RUN`:
+    - **Steering:** the leftover "spawn grace" rail-steering block in `updatePhysics` is removed, so the player has full manual control.
+    - **Spawn heading:** the old formula pointed the nose the wrong way laterally. The new `gorgeHeading(z)` fixes it.
+    - **Trench:** it moved west, clear of the AFB, with a 1.5 km straight lead-in and sweeps whose minimum radius is about 790 m. Width is measured perpendicular to the curve (`gorgeDist`). The centreline is 24.8 km (2.6× the old one).
+    - **Gates and sites:** 15 gates are spaced by arc length (`GORGE_GATE_Z`) and face down the trench, with 15 matching rim SAM sites. The spawn (`GORGE_SPAWN_Z`) is at the mouth, before gate 1.
+    - **Stage hygiene:** staged missions hide legacy jammers, skip JAM sectors, and never respawn the 40 s surface/task force.
+  - `ACE_DUEL`:
+    - **Ships:** `noShips` clears every surface ship and stops `updateFleet`. The legacy respawn that used to resurrect ships is gated by `stagedMission()`.
+    - **CRIMSON-1:** 100 HP with no boss bar. It now uses gun-line threat reactions (max-G `EVADE_BREAK` or vertical `DUEL_LOOP`), gun-solution lead pursuit, and lead-aimed bursts with scratch vectors only.
+    - **Guns only:** `gunsOnly` hard-blocks `launch()`, `fireSelected()`, `fireMissile()`, `fireAAM4()`, `fireQAAM()` and `dropBomb()`. It also zeroes ammo, keeps the pylons empty (`enforceStoreLock`, reload timers off), and stops the `10_last_stand` BGM override.
+  - **Verification:** headless Edge with zero JS/WebGL errors.
+    - **NAVAL:** `lights=0`, and both L and the final gate complete into the debrief at 0 kt.
+    - **CANYON:** the spawn is OK, `kb=a` gives bank −104 and `kb=d` gives +84 with no auto-steer, and gate 1/15 registers.
+    - **ACE_DUEL:** `DUEL_OK ships=0 aceHp=100/100`, 0 missiles after M/1/2, and an `EVADE_BREAK` when the player's nose is on the ace.
+    - **Frame cost** (browser pane `__frame`): median 2.7–3.7 ms and p95 under 6 ms.
+
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.
@@ -1698,7 +1720,7 @@ toggle, ejection, bridge fly-under. User-facing weapon labels unified to
 MSL / UGB (briefing, radio call, CCIP reload cue, stores list).
 
 ## Debug URL flags (require `?debug`)
-`hold=s,a,...` (hold keys) · `nointro` · `cockpit` · `freeze` · `warp=s` · `pose=bank,pitch` · `mouse=x,y`
+`hold=s,a,...` (hold keys) · `keyat=s:key,...` (real keydown/keyup) · `carrierfinalat=s` (carrier final, 450 m behind the stern) · `duelahead=s` (CRIMSON 800 m ahead) · `nointro` · `cockpit` · `freeze` · `warp=s` · `pose=bank,pitch` · `mouse=x,y`
 · `ab` · `highg` · `alt=m` · `spd=m/s` · `at=x,y,z,hdg|airbase|canyon|bridgeA|
 bridgeB|volcano|wind|harbor` · `overview[=h]` · `tod=NAME&az=deg` ·
 `todto=NAME:t` · `rolls=n` · `nvg` / `nvgat=s` · `camat=x,y,z` ·

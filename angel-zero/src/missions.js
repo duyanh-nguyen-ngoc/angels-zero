@@ -1,7 +1,7 @@
 // ANGELS ZERO — mission registry. One block + one MISSION_ORDER entry adds a mission.
 // Each mission supplies its spawn, waves, targets, map tag and soundtrack scenario.
 
-import { CEIL_M } from './maps.js?v=s87a';
+import { CEIL_M, GORGE_FORT, GORGE_SPAWN_Z, gorgeCentreX } from './maps.js?v=s88a';
 
 export const MISSION_KEY = 'angelsZero_mission';
 
@@ -34,26 +34,26 @@ export const MISSIONS = {
   },
   CANYON_RUN: {
     id: 'CANYON_RUN', title: 'CANYON RUN',
-    brief: 'Thread the gorge under the 1,200 ft radar ceiling and destroy the fortress at the far end.',
+    brief: 'Fly 25 km of winding trench under the 1,200 ft radar ceiling, hit the crater fortress, then climb out over the wall.',
     mapTag: 'GORGE', launch: 'AIRSTART', rtbType: 'BASE', bgmScenario: '07_canyon', wxOverride: false,
-    spawn: { pos: [0, 0, -150], hdg: 0, spd: 180, onDeck: false },
-    waves: [{ t: 0, kind: 'CAP', n: 4, alt: 900 }],
-    targets: [{ kind: 'FORT', pos: [0, 0, -9800], hp: 4 }],
+    spawn: { pos: [gorgeCentreX(GORGE_SPAWN_Z), 0, GORGE_SPAWN_Z], hdg: 0, spd: 180, onDeck: false },
+    waves: [],
+    targets: [{ kind: 'FORT', pos: GORGE_FORT, hp: 4 }],
     weapons: { gun: true, msl: true, spw: true }, enemyMsl: true, wingmen: 'FLIGHT',
     ceiling: { m: CEIL_M }, gatesPath: 'CANYON', ilsOnRtbOnly: false,
     stages: [
-      { label: 'TRENCH RUN', targets: [{ kind: 'FORT', pos: [0, 0, -9800], hp: 4 }], bandits: 0, clear: 'TARGETS' }
+      { label: 'TRENCH RUN', targets: [{ kind: 'FORT', pos: GORGE_FORT, hp: 4 }], bandits: 0, clear: 'TARGETS' }
     ]
   },
   ACE_DUEL: {
     id: 'ACE_DUEL', title: 'ACE DUEL',
-    brief: 'Launch from the carrier and defeat the two-ship CRIMSON ace flight in the cloud arena.',
+    brief: 'Guns only. Launch from the carrier and beat CRIMSON-1, a rival pilot, one on one over open ocean.',
     mapTag: 'CLOUD_ARENA', launch: 'CATAPULT', rtbType: 'CARRIER', bgmScenario: '08_crimson_duel', wxOverride: false,
     spawn: { pos: [0, 18, 9000], hdg: 0, spd: 160, onDeck: true },
-    waves: [{ t: 0, kind: 'ACE', n: 2, alt: 2400, ace: ['CRIMSON-1', 'CRIMSON-2'] }],
+    waves: [],
     targets: [],
     weapons: { gun: true, msl: false, spw: false }, enemyMsl: false, wingmen: 'NONE', ceiling: null, gatesPath: null,
-    ilsOnRtbOnly: true,
+    ilsOnRtbOnly: true, gunsOnly: true, noShips: true,
     stages: [{ label: 'CRIMSON-1', ace: ['CRIMSON-1'], bandits: 0, clear: 'ACE' }]
   },
   FURBALL: {
@@ -77,6 +77,8 @@ export function missionConfig(m) {
     ceiling: m.ceiling || null,
     gatesPath: m.gatesPath || null,
     ilsOnRtbOnly: !!m.ilsOnRtbOnly,
+    gunsOnly: !!m.gunsOnly,                                // hard block on every missile / rocket (ACE_DUEL)
+    noShips: !!m.noShips,                                  // no surface ships may exist (ACE_DUEL)
     stages: m.stages || null                               // null = legacy PHASE 1..4 flow
   };
 }

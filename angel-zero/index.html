@@ -720,33 +720,34 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s87a';
-import { createBlastFX } from './src/blastfx.js?v=s87a';
-import { createHUD } from './src/hud.js?v=s87a';
-import { createCockpit3D } from './src/cockpit3d.js?v=s87a';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s87a';
-import { createEjection } from './src/eject.js?v=s87a';
-import { createAudio } from './src/audio.js?v=s87a';
-import { createRadio } from './src/radio.js?v=s87a';
-import { createProfile, LIVERIES, liveryById } from './src/profile.js?v=s87a';
-import { createLivery } from './src/livery.js?v=s87a';
-import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s87a';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s87a';
-import { createCanopyFX } from './src/canopy.js?v=s87a';
-import { createNVG } from './src/nvg.js?v=s87a';
-import { createWorld, WORLD } from './src/world.js?v=s87a';
-import { createSurfaces } from './src/surfaces.js?v=s87a';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s87a';
-import { createFreeLook } from './src/freelook.js?v=s87a';
-import { createCanopyGlass } from './src/canopyglass.js?v=s87a';
-import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s87a';
-import { SPW, SQUADRON, MODES, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode } from './src/loadout.js?v=s87a';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s87a';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s87a';
-import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s87a';
-import { createRadioQueue } from './src/radioQueue.js?v=s87a';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s87a';
-import { MAPS, gorgeCentreX, FT, CEIL_M, GORGE_FLOOR_Y, RUNWAY_BBOX } from './src/maps.js?v=s87a';
+import { createVFX } from './src/vfx.js?v=s88a';
+import { createBlastFX } from './src/blastfx.js?v=s88a';
+import { createHUD } from './src/hud.js?v=s88a';
+import { createCockpit3D } from './src/cockpit3d.js?v=s88a';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s88a';
+import { createEjection } from './src/eject.js?v=s88a';
+import { createAudio } from './src/audio.js?v=s88a';
+import { createRadio } from './src/radio.js?v=s88a';
+import { createProfile, LIVERIES, liveryById } from './src/profile.js?v=s88a';
+import { createLivery } from './src/livery.js?v=s88a';
+import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s88a';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s88a';
+import { createCanopyFX } from './src/canopy.js?v=s88a';
+import { createNVG } from './src/nvg.js?v=s88a';
+import { createWorld, WORLD } from './src/world.js?v=s88a';
+import { createSurfaces } from './src/surfaces.js?v=s88a';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s88a';
+import { createFreeLook } from './src/freelook.js?v=s88a';
+import { createCanopyGlass } from './src/canopyglass.js?v=s88a';
+import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s88a';
+import { SPW, SQUADRON, MODES, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode } from './src/loadout.js?v=s88a';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s88a';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s88a';
+import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s88a';
+import { createRadioQueue } from './src/radioQueue.js?v=s88a';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s88a';
+import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
+  GORGE_HALF_W, RUNWAY_BBOX } from './src/maps.js?v=s88a';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -1230,12 +1231,12 @@ function applyCarrierDebugPose() {
   const a = combat.ally;
   if (Q.get('at') === 'carrier') {
     state.position.copy(a.pos).addScaledVector(a.fwd, -1200); state.position.y = a.deckY + 120;
-    state.quaternion.copy(a.g.quaternion);
+    state.quaternion.copy(a.root.quaternion);
     state.velocity.set(0, 0, -state.speed).applyQuaternion(state.quaternion);
     state.gearDown = true; state.gear = 1;
   } else if (Q.get('at') === 'carrierdeck') {
     _lp.set(8, ((a.deckYLocal && a.deckYLocal.bow1) || a.deckY) + GEAR_H, -a.len / 2 + 45).applyQuaternion(a.root.quaternion).add(a.pos);
-    state.position.copy(_lp); state.quaternion.copy(a.g.quaternion);
+    state.position.copy(_lp); state.quaternion.copy(a.root.quaternion);
     state.velocity.copy(a.vel); state.gearDown = true; state.gear = 1;
     state.onGround = true; state.throttle = 1;
     carrier.phase = 'CAT'; carrier.t = 0; carrier.pitDone = true; combat.carrierPhase = 'CAT';
@@ -1258,7 +1259,7 @@ function resetAircraft() {
   if (DEBUG && Q.has('at') && Q.get('at') !== 'carrier' && Q.get('at') !== 'carrierdeck') {
     const spots = {
       airbase: [RWY_X(), 140, 4300, 0], canyon: [world.canyonX(-5300), 120, -5300, 0],
-      canyonlow: [gorgeCentreX(-150), GORGE_FLOOR_Y + 0.5 * (CEIL_M - GORGE_FLOOR_Y), -150, 180],
+      canyonlow: [gorgeCentreX(GORGE_SPAWN_Z), GORGE_FLOOR_Y + 0.5 * (CEIL_M - GORGE_FLOOR_Y), GORGE_SPAWN_Z, 0],
       bridgeA: [-4350, 32, -3880, 92], bridgeB: [2650, 32, -3990, 70],
       volcano: [2600, 850, -5600, 50], wind: [3300, 95, 3900, 46], harbor: [-4200, 160, -900, 88],
       final18: [RWY_X(), 160, -1400 - 3600, 180], rig: [world.rigs[0].x + 2200, 45, world.rigs[0].z, 270],
@@ -1516,16 +1517,26 @@ const sortie = { active: false, t0: 0, ace0: 0, endAt: null, failReason: '' };
 function applyMapProps(mapDef) {
   const p = mapDef.props || { terrain: true, islands: true, runway: true, baseBldg: true, radar: true, foliage: true };
   const e = world.envProps;
+  // GORGE: island props inside the trench bbox (+600 m) would float over or sink
+  // into the plateau, so they are hidden; the AFB and everything else stay.
+  const bb = mapDef.heightFn === 'gorge' && mapDef.bbox ? mapDef.bbox : null;
+  const keep = o => !bb || !(o.position.x > bb.x[0] - 600 && o.position.x < bb.x[1] + 600 &&
+    o.position.z < bb.z[0] + 600 && o.position.z > bb.z[1] - 600);
   e.terrain.visible = !!p.terrain;
-  for (const o of e.islands) o.visible = !!p.islands;
+  for (const o of e.islands) o.visible = !!p.islands && keep(o);
   for (const o of e.runway) o.visible = !!p.islands && !!p.runway;
-  for (const o of e.baseBldg) o.visible = !!p.islands && !!p.baseBldg;
-  for (const o of e.radar) o.visible = !!p.islands && !!p.radar;
+  for (const o of e.baseBldg) o.visible = !!p.islands && !!p.baseBldg && keep(o);
+  for (const o of e.radar) o.visible = !!p.islands && !!p.radar && keep(o);
   for (const o of e.foliage) o.visible = !!p.islands && !!p.foliage;
+  // Every runway edge / threshold / ALSF / PAPI-style approach strobe and island light
+  // lives in one Points object: off on open-ocean maps (NAVAL_BATTLE / ACE_DUEL).
+  for (const o of e.lights || []) o.visible = !!p.islands && !!p.runway;
+  combatSys.setBaseDefencesVisible(!!p.islands && !!p.baseBldg);
   if (DEBUG) console.log('[ANGELS_ZERO] mapprops map=' + (mapDef.heightFn || 'archipelago') +
     ' terrain=' + !!p.terrain + ' islands=' + e.islands.filter(o => o.visible).length +
     ' runway=' + e.runway.filter(o => o.visible).length + ' bldg=' + e.baseBldg.filter(o => o.visible).length +
     ' radar=' + e.radar.filter(o => o.visible).length + ' foliage=' + !!p.foliage +
+    ' lights=' + (e.lights || []).filter(o => o.visible).length +
     ' collide=' + world.obstacleCount());
 }
 // Mission scene setup: pooled actors return to their pools, the terrain is rebuilt
@@ -1539,7 +1550,7 @@ function loadMissionScene(m) {
   combatSys.configureMission(m, MAPS[m.mapTag] || MAPS.ARCHIPELAGO);
   combat.missionPhase = 1; combat.rtb = null; combat.done = false;
   state.autobrake = false;
-  autoland.on = false; autoland.ph = '';
+  autoland.on = false; autoland.ph = ''; autoland.prevLz = Infinity; combat.allyHold = false;
   cat.ph = 'NONE'; cat.t = 0; cat.arm = 0; cat.grace = 0; cat.forceAB = false;
   for (const w of wingmen) { w.cat.ph = 'NONE'; w.cat.t = 0; w.cat.delay = 0; }
   const solo = combat.mcfg.wingmen === 'NONE';
@@ -1548,62 +1559,143 @@ function loadMissionScene(m) {
     if (w.mesh) w.mesh.visible = !solo && modelReady && flightMode === 'FLY';
   }
 }
-const autoland = { on: false, ph: '', t: 0, q0: new THREE.Quaternion(), p0: new THREE.Vector3(), target: null };
-const _alDest = new THREE.Vector3(), _alDir = new THREE.Vector3(), _alQ = new THREE.Quaternion(), _alE = new THREE.Euler();
+/* --------------------------------------------------------------------------
+   CARRIER_AUTOLAND. Everything is solved in the carrier ROOT frame (bow = local
+   -Z, stern = +len/2), so the moving, turning ship carries the approach with it.
+     CAPTURE  the jet's offset from the glideslope decays smoothly to zero while the
+              glideslope point slides toward the stern at AL_VAPP
+     GLIDE    on the 3.5 deg slope, wings level, gear down
+     FLARE    last AL_FLARE_D m: nose-up attitude for the arrested touchdown
+     TRAP     wire 2 at the touchdown point, relative speed smoothsteps to 0
+     ROLLOUT  0 KTS on deck, then the sortie completes into 12_debrief
+   All scratch objects are preallocated: zero per-frame allocations.
+   -------------------------------------------------------------------------- */
+const AL_FLARE_D = 90, AL_TD_DZ = 78, AL_GATE_D = 400, AL_TRAP_T = 1.6, AL_ROLL_T = 1.1;
+const autoland = { on: false, ph: '', t: 0, T: AL_CAPTURE_T, d: 0, off: new THREE.Vector3(), tdZ: 0, vRel: 0,
+  prevLz: Infinity, q0: new THREE.Quaternion(), p0: new THREE.Vector3(), target: null };
+const _alLocal = new THREE.Vector3(), _alW = new THREE.Vector3(), _alPrevW = new THREE.Vector3(), _alDir = new THREE.Vector3(),
+  _alQ = new THREE.Quaternion(), _alInv = new THREE.Quaternion(), _alM = new THREE.Matrix4(), _alZero = new THREE.Vector3(),
+  _alFlare = new THREE.Quaternion(), _alStern = new THREE.Vector3();
+const AL_TAN = Math.tan(GS_DEG * D2R);
+// World position -> carrier root frame.
+function alToLocal(a, p, out) { return out.copy(p).sub(a.root.position).applyQuaternion(_alInv.copy(a.root.quaternion).invert()); }
+// Carrier root frame -> world (uses the live root transform, never a stale matrixWorld).
+function alToWorld(a, p, out) { return out.copy(p).applyQuaternion(a.root.quaternion).add(a.root.position); }
+// Glideslope point `d` metres behind the touchdown point (local frame).
+function alSlope(a, d, out) { return out.set(0, a.deckY + GEAR_H + Math.max(0, d) * AL_TAN, a.len / 2 - AL_TD_DZ + d); }
 function autolandPrompt() {
   const a = combat.ally;
-  if (!ilsVisible() || !a || !combat.rtb || !combat.rtb.on || combat.rtb.type !== 'CARRIER' || !sortie.active) return false;
-  _carrierPos.copy(a.pos).addScaledVector(a.fwd, -a.len / 2);
-  return state.position.distanceTo(_carrierPos) < AUTOLAND_R;
+  if (!ilsVisible() || !a || !a.root || !combat.rtb || !combat.rtb.on || combat.rtb.type !== 'CARRIER' || !sortie.active) return false;
+  if (flightMode !== 'FLY' || carrier.phase || autoland.on) return false;
+  _alStern.copy(a.pos).addScaledVector(a.fwd, -a.len / 2);
+  return Math.hypot(state.position.x - _alStern.x, state.position.z - _alStern.z) < AUTOLAND_R;   // same test as the HUD pill
+}
+// Final approach gate (the 400 m frame behind the stern): flying through it engages.
+function autolandGateCheck() {
+  const a = combat.ally;
+  if (!autolandPrompt()) { autoland.prevLz = Infinity; return; }
+  alToLocal(a, state.position, _alLocal);
+  const gz = a.len / 2 + AL_GATE_D, gy = a.deckY + AL_GATE_D * AL_TAN;
+  if (autoland.prevLz > gz && _alLocal.z <= gz && Math.abs(_alLocal.x) < 34 && Math.abs(_alLocal.y - gy) < 20) {
+    if (DEBUG) console.log('[ANGELS_ZERO] autoland gate pass');
+    engageAutoland();
+  }
+  autoland.prevLz = _alLocal.z;
 }
 function engageAutoland() {
-  if (autoland.on || !combat.ally) return;
+  const a = combat.ally;
+  if (autoland.on || !a || !a.root || flightMode !== 'FLY') return;
   if (!combat.rtb) { combat.missionPhase = 4; combat.rtb = { on: true, type: 'CARRIER', t0: performance.now() }; }
-  autoland.on = true; autoland.ph = 'CAPTURE'; autoland.t = 0;
+  combat.missionPhase = 4;
+  alToLocal(a, state.position, _alLocal);
+  const tdZ = a.len / 2 - AL_TD_DZ;
+  let d0 = Math.max(_alLocal.z - tdZ, 0);
+  alSlope(a, d0, autoland.off); autoland.off.subVectors(_alLocal, autoland.off);
+  // Capture time scales with the offset; the slope point must still be behind the
+  // stern when the capture ends, so the glide segment always exists.
+  const T = THREE.MathUtils.clamp(autoland.off.length() / 60, AL_CAPTURE_T, 30);
+  if (d0 < AL_VAPP * T + 300) {
+    d0 = AL_VAPP * T + 300;
+    alSlope(a, d0, autoland.off); autoland.off.subVectors(_alLocal, autoland.off);
+  }
+  Object.assign(autoland, { on: true, ph: 'CAPTURE', t: 0, T, d: d0, tdZ, vRel: AL_VAPP, prevLz: Infinity });
   autoland.q0.copy(state.quaternion); autoland.p0.copy(state.position);
-  state.gearDown = true; gearAutoLock = true;
+  _alPrevW.copy(state.position);
+  state.gearDown = true; gearAutoLock = true; state.afterburner = 0;
+  state.pitchRate = state.rollRate = state.yawRate = 0;
+  combat.allyHold = true;                                    // no carrier turnaround while we are on approach
   combatSys.say('AUTOLAND ENGAGED — USS ENTERPRISE', 2, '#5fe8ff');
+  if (DEBUG) console.log('[ANGELS_ZERO] autoland CAPTURE d0=' + d0.toFixed(0) + ' off=' + autoland.off.length().toFixed(0) + ' T=' + T.toFixed(1));
+}
+function autolandPhase(ph) {
+  if (DEBUG) console.log('[ANGELS_ZERO] autoland ' + autoland.ph + '->' + ph + ' t=' + autoland.t.toFixed(2) +
+    ' kts=' + (state.speed * 1.94384).toFixed(0));
+  autoland.ph = ph; autoland.t = 0;
 }
 function updateAutoland(dt) {
   const a = combat.ally;
-  if (!a || combat.dead) { autoland.on = false; return; }
+  if (!a || !a.root || combat.dead) { autoland.on = false; combat.allyHold = false; return; }
   autoland.t += dt;
-  const qc = a.root.quaternion;
-  _lp.set(0, ((a.deckYLocal && a.deckYLocal.trap) || a.deckY) + GEAR_H, a.len / 2 - 78);
-  _alDest.copy(_lp).applyQuaternion(qc).add(a.pos);
-  _alDir.copy(_alDest).sub(state.position);
-  const dist = _alDir.length();
-  if (dist > 1) _alDir.multiplyScalar(1 / dist);
-  const targetYaw = Math.atan2(-a.fwd.x, -a.fwd.z);
-  _alE.set(0, targetYaw, 0); _alQ.setFromEuler(_alE);
-  if (autoland.ph === 'CAPTURE') {
-    const k = THREE.MathUtils.smoothstep(Math.min(1, autoland.t / AL_CAPTURE_T), 0, 1);
-    state.quaternion.slerpQuaternions(autoland.q0, _alQ, k);
-    if (autoland.t >= AL_CAPTURE_T) autoland.ph = 'GLIDE';
-  } else if (autoland.ph === 'GLIDE') {
-    state.quaternion.slerp(_alQ, Math.min(1, dt * 1.4));
-    if (dist < AL_FLARE_H + TRAP_DY) autoland.ph = 'FLARE';
-  } else if (autoland.ph === 'FLARE') {
-    state.quaternion.slerp(_alQ, Math.min(1, dt * 1.4));
-    state.quaternion.multiply(_dq.setFromAxisAngle(AX_X, AL_FLARE_DEG * D2R * dt));
-    if (Math.abs(_lp.y - (a.deckLocalY * s + GEAR_H)) < TRAP_DY && dist < TRAP_X) {
-      audio.cableScreech(); combatSys.onCarrierTrap(); autoland.ph = 'TRAP'; autoland.t = 0;
+  const sstep = THREE.MathUtils.smoothstep;
+  state.pitchRate = state.rollRate = state.yawRate = 0;     // pilot input is locked out
+  state.gearDown = true; state.gear = Math.min(1, state.gear + dt / GEAR_TRAVEL);
+  state.afterburner = 0;
+  if (autoland.ph === 'CAPTURE' || autoland.ph === 'GLIDE' || autoland.ph === 'FLARE') {
+    autoland.d -= AL_VAPP * dt;
+    const k = autoland.ph === 'CAPTURE' ? sstep(Math.min(1, autoland.t / autoland.T), 0, 1) : 1;
+    alSlope(a, autoland.d, _alLocal).addScaledVector(autoland.off, 1 - k);
+    alToWorld(a, _alLocal, _alW);
+    // Velocity from the path itself (includes the carrier's own motion).
+    state.velocity.copy(_alW).sub(_alPrevW).divideScalar(Math.max(dt, 1e-4));
+    state.speed = state.velocity.length();
+    state.position.copy(_alW); _alPrevW.copy(_alW);
+    // Nose along the carrier-relative glide path: local (0, -tan, -1).
+    _alDir.set(0, -AL_TAN, -1).applyQuaternion(a.root.quaternion).normalize();
+    if (autoland.ph === 'CAPTURE') {                        // blend in from the actual flight path
+      _alLocal.copy(state.velocity).sub(a.vel);
+      if (_alLocal.lengthSq() > 1) _alDir.lerp(_alLocal.normalize(), 1 - k).normalize();
     }
-  } else if (autoland.ph === 'TRAP') {
-    state.position.copy(_alDest); state.velocity.set(0, 0, 0);
-    if (autoland.t > 1.6) autoland.ph = 'ROLLOUT';
-  } else if (autoland.ph === 'ROLLOUT') {
-    state.velocity.set(0, 0, 0); state.speed = 0;
-    if (autoland.t > 1.2) { autoland.on = false; missionComplete('CARRIER'); }
+    _alQ.setFromRotationMatrix(_alM.lookAt(_alZero, _alDir, AX_Y));
+    if (autoland.ph === 'FLARE') {
+      _alFlare.setFromAxisAngle(AX_X, (AL_FLARE_DEG + 4) * D2R * sstep(1 - autoland.d / AL_FLARE_D, 0, 1));
+      _alQ.multiply(_alFlare);
+    }
+    state.quaternion.slerp(_alQ, Math.min(1, dt * (autoland.ph === 'CAPTURE' ? 2.2 : 3.5)));
+    state.throttle += (0.62 - state.throttle) * Math.min(1, dt * 2);
+    state.onGround = false;
+    if (autoland.ph === 'CAPTURE' && autoland.t >= autoland.T) autolandPhase('GLIDE');
+    if (autoland.ph === 'GLIDE' && autoland.d <= AL_FLARE_D) autolandPhase('FLARE');
+    if (autoland.ph === 'FLARE' && autoland.d <= 0) {
+      // Hook down: wire 2. Arrested from AL_VAPP relative to 0 over AL_TRAP_T.
+      autoland.vRel = AL_VAPP; autoland.d = 0;
+      audio.cableScreech(); onSfx('trap'); blastShake = Math.max(blastShake, 0.45);
+      radioEvent('ON_CARRIER_TRAP');
+      combat.trapT = performance.now(); combat.trapWire = 2; combat.traps = (combat.traps || 0) + 1;
+      tele.event(EV.CARRIER_TRAP, state.position.x, state.position.z, simTime);
+      autolandPhase('TRAP');
+    }
     return;
   }
-  const step = Math.min(dist, AL_VAPP * dt);
-  state.position.addScaledVector(_alDir, step);
-  state.velocity.copy(_alDir).multiplyScalar(AL_VAPP);
-  state.speed = AL_VAPP;
-  state.pitchRate = state.rollRate = state.yawRate = 0;
-  state.bank *= Math.exp(-2 * dt);
-  state.onGround = false;
+  if (autoland.ph === 'TRAP' || autoland.ph === 'ROLLOUT') {
+    // Ride the deck: decelerate along local -Z from the touchdown point.
+    const vRel = autoland.ph === 'TRAP' ? AL_VAPP * (1 - sstep(autoland.t, 0, AL_TRAP_T)) : 0;
+    autoland.vRel = vRel; autoland.d -= vRel * dt;           // d < 0: forward of the touchdown point
+    _alLocal.set(0, a.deckY + GEAR_H, autoland.tdZ + autoland.d);
+    alToWorld(a, _alLocal, state.position);
+    state.velocity.copy(a.fwd).multiplyScalar(vRel).add(a.vel);
+    state.speed = vRel;                                       // airspeed readout: relative to the deck
+    _alQ.copy(a.root.quaternion);
+    state.quaternion.slerp(_alQ, Math.min(1, dt * 5));
+    state.onGround = true; state.throttle += (0.15 - state.throttle) * Math.min(1, dt * 4);
+    if (autoland.ph === 'TRAP' && Math.floor(autoland.t / 0.35) !== Math.floor((autoland.t - dt) / 0.35)) blastShake = Math.max(blastShake, 0.18);
+    if (autoland.ph === 'TRAP' && autoland.t >= AL_TRAP_T) autolandPhase('ROLLOUT');
+    else if (autoland.ph === 'ROLLOUT' && autoland.t >= AL_ROLL_T) {
+      autoland.on = false; combat.allyHold = false;
+      if (DEBUG) console.log('[ANGELS_ZERO] autoland COMPLETE kts=' + (vRel * 1.94384).toFixed(1) + ' -> 12_debrief');
+      combatSys.onCarrierTrap();                              // trap bonus + MISSION COMPLETE (phase 4)
+      if (sortie.active) missionComplete('CARRIER');
+    }
+  }
 }
 /* --------------------------------------------------------------------------
    Bow catapult opening (CVN-ALLY "OVERLORD"). HOLD freezes the jet on the
@@ -1838,27 +1930,38 @@ async function startSortie() {
     state.groundSpeed = state.speed; state.groundYaw = 0; state.groundPitch = 0;
     state.throttle = 0.6;
   } else if (m.launch === 'AIRSTART') {
-    const SPAWN_Z = -150, FLOOR_HALF_W = 90;
+    // CANYON_RUN: inside the canyon mouth, before gate 1, centred between the walls,
+    // nose down the trench, half way between the floor and the radar ceiling. No
+    // autopilot or rail steering: the pilot has full control from the first frame.
+    const SPAWN_Z = GORGE_SPAWN_Z;
     const x = gorgeCentreX(SPAWN_Z), y = GORGE_FLOOR_Y + 0.5 * (CEIL_M - GORGE_FLOOR_Y);
-    const dx = gorgeCentreX(SPAWN_Z - 10) - gorgeCentreX(SPAWN_Z + 10);
-    const hdg = Math.atan2(dx, 20);
+    const hdg = gorgeHeading(SPAWN_Z);
     state.position.set(x, y, SPAWN_Z);
     state.quaternion.setFromAxisAngle(AX_Y, hdg);
     state.pitchRate = state.rollRate = state.yawRate = 0;
     state.speed = 180; state.throttle = 0.75; state.afterburner = 0;
-    state.gear = 0; state.gearDown = false; state.onGround = false;
+    state.gear = 0; state.gearDown = false; state.onGround = false; gearAutoLock = false;
     state.velocity.set(0, 0, -state.speed).applyQuaternion(state.quaternion);
+    flightMode = 'FLY';
+    vfx.clearTrails(); prevPlanePos.copy(state.position); camVelocity.set(0, 0, 0);
+    camera.position.copy(CAM_OFFSET).applyQuaternion(state.quaternion).add(state.position);
+    // Wingmen in trail on the centreline behind the lead (still inside the mouth).
+    _catFwd.set(0, 0, -1).applyQuaternion(state.quaternion);
     for (let i = 0; i < wingmen.length; i++) {
       const w = wingmen[i];
-      w.pos.copy(state.position).addScaledVector(state.velocity, -(i + 1) * 4);
-      w.pos.x += i ? 90 : -90; w.pos.y = Math.min(w.pos.y, CEIL_M - 60);
+      w.pos.copy(state.position).addScaledVector(_catFwd, -160 * (i + 1));
+      w.pos.x = gorgeCentreX(w.pos.z) + (i ? 18 : -18); w.pos.y = Math.min(y, CEIL_M - 60);
       w.quat.copy(state.quaternion); w.vel.copy(state.velocity);
       if (w.mesh) { w.mesh.position.copy(w.pos); w.mesh.quaternion.copy(w.quat); }
     }
-    const hL = terrainHeight(x - (FLOOR_HALF_W - 10), SPAWN_Z), hR = terrainHeight(x + (FLOOR_HALF_W - 10), SPAWN_Z);
-    const ok = hL < y - 60 && hR < y - 60 && y < CEIL_M - 100;
-    if (DEBUG) console.log('[ANGELS_ZERO] canyon spawn x=' + x.toFixed(1) + ' y=' + y.toFixed(1) +
-      ' floor=' + GORGE_FLOOR_Y + ' ceil=' + CEIL_M.toFixed(2) + ' hL=' + hL.toFixed(1) + ' hR=' + hR.toFixed(1) + ' ' + (ok ? 'OK' : 'FAIL'));
+    const side = GORGE_HALF_W - 10;
+    const hL = terrainHeight(x - side, SPAWN_Z), hR = terrainHeight(x + side, SPAWN_Z);
+    const ahead = terrainHeight(gorgeCentreX(SPAWN_Z - 400), SPAWN_Z - 400);
+    const ok = hL < y - 60 && hR < y - 60 && ahead < y - 60 && y < CEIL_M - 100 && SPAWN_Z > GORGE_GATE_Z[0];
+    if (DEBUG) console.log('[ANGELS_ZERO] canyon spawn x=' + x.toFixed(1) + ' y=' + y.toFixed(1) + ' z=' + SPAWN_Z +
+      ' hdg=' + (hdg / D2R).toFixed(1) + ' floor=' + GORGE_FLOOR_Y + ' ceil=' + CEIL_M.toFixed(2) + ' hL=' + hL.toFixed(1) +
+      ' hR=' + hR.toFixed(1) + ' ahead=' + ahead.toFixed(1) + ' gate1Z=' + GORGE_GATE_Z[0].toFixed(0) +
+      ' arc=' + (GORGE_ARC_M / 1000).toFixed(1) + 'km ' + (ok ? 'OK' : 'FAIL'));
   }
   if (combat.mode === 'FURBALL') {
     state.position.set(0, 1829, -3000);                       // cloud-sea centre, 6,000 ft, above the 5,800 ft tops
@@ -2521,7 +2624,9 @@ function updateCarrierOp(dt) {
   if (!ally) { carrier.phase = null; return; }
   const sstep = THREE.MathUtils.smoothstep;
   combat.carrierPhase = carrier.phase;
-  const qc = ally.g.quaternion, fwd = ally.fwd;
+  // The carrier ROOT is the world frame (bow = local -Z); the GLB child carries its own
+  // fitting rotation, so its local quaternion must never be used as the deck frame.
+  const qc = ally.root.quaternion, fwd = ally.fwd;
   carrier.t += dt;
   const place = (height) => {
     _carrierPos.copy(_lp).applyQuaternion(qc).add(ally.pos);
@@ -2564,16 +2669,6 @@ function updateCarrierOp(dt) {
 function updatePhysics(dt) {
   const clamp = THREE.MathUtils.clamp, sstep = THREE.MathUtils.smoothstep;
   const q = state.quaternion;
-  // CANYON_RUN spawn grace: keep the jet centred while the pilot takes control.
-  if (combat.missionBgm === '07_canyon' && flightMode === 'FLY' && !state.onGround) {
-    const cx = gorgeCentreX(state.position.z);
-    const dx = gorgeCentreX(state.position.z - 10) - gorgeCentreX(state.position.z + 10);
-    const want = Math.atan2(dx, 20);
-    state.position.x += (cx - state.position.x) * Math.min(1, dt * 3);
-    state.position.y = Math.max(state.position.y, terrainHeight(state.position.x, state.position.z) + 120);
-    _catYaw.setFromAxisAngle(_catAxisY, want);
-    q.slerp(_catYaw, Math.min(1, dt * 3));
-  }
   if (autoland.on) { updateAutoland(dt); return; }
   if (combat.ally) {
     updateWingCat(dt, combat.ally);                        // wingmen finish their stroke after lead releases
@@ -2620,13 +2715,14 @@ function updatePhysics(dt) {
       gearCheckT = 0;
       let d = Math.min(Math.hypot(state.position.x - R.x, state.position.z - R.z0),
         Math.hypot(state.position.x - R.x, state.position.z - R.z1));
-      if (combat.ally) d = Math.min(d, state.position.distanceTo(combat.ally.pos));
+      if (combat.ally && combat.carrierVisible !== false) d = Math.min(d, state.position.distanceTo(combat.ally.pos));
       if (d < 1600 && state.radalt < 128 && kts < 250 && state.gear < 1 && !gearAutoLock) {
         toggleGear(); gearAutoLock = true; combatSys.say('GEAR DOWN — AUTO', 1.2);
       } else if (d > 3000 || kts > 300) gearAutoLock = false;
     }
     state.assist = 0;
-    const stickOK = Math.abs(mouse.nx) < 0.25 && Math.abs(mouse.ny) < 0.35;
+    // Hands-off only: WASD input (which recentres the mouse) never counts as a neutral stick.
+    const stickOK = !kbActive && Math.abs(mouse.nx) < 0.25 && Math.abs(mouse.ny) < 0.35;
     if (ilsVisible() && stickOK && kts < 260) {
       let lat = Infinity, alg = -1, targetYaw = 0, rx = 1, rz = 0, found = false;
       // RWY 36 final: threshold at R.z1, heading north (-Z), 3 degree slope.
@@ -2636,15 +2732,15 @@ function updatePhysics(dt) {
         lat = rlat; alg = ralg; targetYaw = 0; rx = 1; rz = 0; found = true;
       }
       // Carrier centreline: stern is local +Z, bow -Z; slope from deck height.
-      if (combat.ally) {
+      if (combat.ally && combat.carrierVisible !== false) {
         const a = combat.ally;
-        _qInv.copy(a.g.quaternion).invert();
+        _qInv.copy(a.root.quaternion).invert();
         _lp.copy(state.position).sub(a.pos).applyQuaternion(_qInv);
         const clat = _lp.x, calg = _lp.z - a.len / 2;
         const cgy = a.deckY + calg * Math.tan(3 * D2R);
         if (calg >= 0 && calg <= 1300 && Math.abs(clat) < Math.abs(lat) && Math.abs(clat) < 45 && Math.abs(state.position.y - cgy) < 70) {
           lat = clat; alg = calg; targetYaw = Math.atan2(-a.fwd.x, -a.fwd.z);
-          _ilsRight.set(1, 0, 0).applyQuaternion(a.g.quaternion); rx = _ilsRight.x; rz = _ilsRight.z; found = true;
+          _ilsRight.set(1, 0, 0).applyQuaternion(a.root.quaternion); rx = _ilsRight.x; rz = _ilsRight.z; found = true;
         }
       }
       if (found) {
@@ -2658,11 +2754,11 @@ function updatePhysics(dt) {
     }
   }
   // --- allied carrier trap detection (before any ground / flight integration)
-  if (combat.ally) {
+  if (combat.ally && combat.carrierVisible !== false) {
     const ally = combat.ally;
     carrier.cool = Math.max(0, carrier.cool - dt);
     if (!carrier.phase && carrier.cool <= 0 && flightMode === 'FLY') {
-      _qInv.copy(ally.g.quaternion).invert();
+      _qInv.copy(ally.root.quaternion).invert();
       _lp.copy(state.position).sub(ally.pos).applyQuaternion(_qInv);
       const half = ally.len / 2;
       const inZone = _lp.z >= half - 115 && _lp.z <= half - 50;
@@ -3585,7 +3681,8 @@ function getMusicCtx() {
   musicCtx.launched = cat.ph === 'AIRBORNE' || (cat.ph === 'NONE' && !!sortie.active);
   musicCtx.inCombat = appMode === 'PLAY' && S.enemies.some(e => e.alive);
   musicCtx.dmg = Math.max(0, (100 - C.health) / 100);
-  musicCtx.msl = C.missiles || 0;
+  // Guns-only sorties never carry missiles, so "0 missiles" is not a last stand there.
+  musicCtx.msl = C.weaponsLock && C.weaponsLock.msl ? 1 : (C.missiles || 0);
   musicCtx.rain = weather.rainHere || 0;
   musicCtx.storm = !!(weather.active && (weather.active.storm || /RAIN|STORM/.test(weather.active.label))) || musicCtx.rain > 0.3;
   musicCtx.night = todMode === 'NIGHT';
@@ -3938,6 +4035,7 @@ const hud = createHUD(THREE, {
   getPrimary: () => combatSys.primaryTargets(),
   getCat: () => cat, getCatArmT: () => CAT_ARM_T, getCatMounted: () => !!(combat.ally && combat.ally.glbMounted),
   ilsVisible: () => ilsVisible(), getMissionT: () => missionT, inCutscene: () => inCutscene(),
+  isAutoland: () => autoland.on,
   getCombinerOutline: () => (cockpit.active ? cockpit.glassOutlineWorld() : null),
   missionClock: () => cockpit.missionClock(simTime)
 });
@@ -4233,8 +4331,17 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
     const approachAt = Q.has('approachat') ? Number(Q.get('approachat')) : -1;
     const rtbAt = Q.has('rtbat') ? Number(Q.get('rtbat')) : -1;
     const autoAt = Q.has('autolandat') ? Number(Q.get('autolandat')) : -1;
+    // ?keyat=s:key[,s:key] -> real keydown + keyup events through the game's own handler.
+    const keyAts = Q.has('keyat') ? Q.get('keyat').split(',').map(p => { const [s, k] = p.split(':'); return { s: Number(s), k }; }) : [];
     for (let i = 0, n = Number(Q.get('warp')) * 60; i < n; i++) {
       const t0 = i * h, t1 = t0 + h;
+      for (const ka of keyAts) if (ka.s >= t0 && ka.s < t1) {
+        const code = ka.k.length === 1 ? (/[0-9]/.test(ka.k) ? 'Digit' + ka.k : 'Key' + ka.k.toUpperCase()) : ka.k;
+        dispatchEvent(new KeyboardEvent('keydown', { key: ka.k, code }));
+        dispatchEvent(new KeyboardEvent('keyup', { key: ka.k, code }));
+        console.log('[ANGELS_ZERO] keyat', ka.k, '@', t1.toFixed(2), 'autoland=' + autoland.on + ' prompt=' + autolandPrompt() +
+          ' msl=' + combatSys.missiles.filter(m => m.active).length);
+      }
       advanceTimeScale(h);                               // time scale runs on real warp time too
       if (Q.has('mcamat')) {
         const [mt0, mdur] = Q.get('mcamat').split(',').map(Number);
@@ -4285,6 +4392,28 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
         state.onGround = false; gearAutoLock = false;
         console.log('[ANGELS_ZERO] approach @', t1.toFixed(2), 'z', state.position.z);
       }
+      // ?duelahead=s -> put the live CRIMSON ace 800 m dead ahead of the player's nose (duel AI check).
+      if (Q.has('duelahead') && Number(Q.get('duelahead')) >= t0 && Number(Q.get('duelahead')) < t1) {
+        const e = combatSys.enemies.find(x => x.alive && x.aceFlight);
+        if (e) {
+          _catFwd.set(0, 0, -1).applyQuaternion(state.quaternion);
+          e.pos.copy(state.position).addScaledVector(_catFwd, 800); e.fwd.copy(_catFwd);
+          e.speed = Math.max(e.speed, 240); e.vel.copy(_catFwd).multiplyScalar(e.speed); e.prev.copy(e.pos);
+          console.log('[ANGELS_ZERO] duelahead @', t1.toFixed(2), e.label);
+        }
+      }
+      // ?carrierfinalat=s -> on the carrier centreline 450 m behind the stern (just short of the
+      // 400 m final gate), on the 3.5 deg slope.
+      if (Q.has('carrierfinalat') && Number(Q.get('carrierfinalat')) >= t0 && Number(Q.get('carrierfinalat')) < t1 && combat.ally) {
+        const a = combat.ally;
+        _lp.set(0, a.deckY + 450 * AL_TAN, a.len / 2 + 450);
+        alToWorld(a, _lp, state.position);
+        state.quaternion.copy(a.root.quaternion);
+        state.speed = 85; state.velocity.set(0, 0, -state.speed).applyQuaternion(state.quaternion).add(a.vel);
+        state.throttle = 0.6; state.afterburner = 0; state.pitchRate = state.rollRate = state.yawRate = 0;
+        state.gearDown = true; state.gear = 1; state.onGround = false; mouse.nx = 0; mouse.ny = 0;
+        console.log('[ANGELS_ZERO] carrier final @', t1.toFixed(2));
+      }
       if (trapAt >= t0 && trapAt < t1 && combat.ally) {
         const a = combat.ally, half = a.len / 2;
         _lp.set(0, ((a.deckYLocal && a.deckYLocal.trap) || a.deckY) + 2, half - 78);
@@ -4313,7 +4442,7 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
       }
       if (climbAt >= t0 && climbAt < t1) {
         ceilClockBias = 8.1;
-        state.position.x = gorgeCentreX(-3000); state.position.z = -3000;
+        state.position.x = gorgeCentreX(GORGE_GATE_Z[3]); state.position.z = GORGE_GATE_Z[3];
         state.position.y = CEIL_M + 80;
         console.log('[ANGELS_ZERO] climbat', t1.toFixed(2), 'y', state.position.y.toFixed(1));
       }
@@ -4390,7 +4519,7 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
         if (off >= t0 && off < t1) { freeLook.debugHold(false); console.log('[ANGELS_ZERO] free look released @', t1.toFixed(2), JSON.stringify(freeLook.stats)); }
       }
       simTime += h;
-      stepSim(h);
+      if (appMode !== 'DEBRIEF') stepSim(h);           // same rule as animate(): the sim stops once the debrief is up
       updateCameraAndVisuals(h, simTime);
       canopyFx.update(h, combat.playerCloud || 0, state.speed, firstPerson, true, weather.rainHere);
       for (const t of logAt) if (t >= t0 && t < t1) console.log('[ANGELS_ZERO] SAMPLE', t, 'A', (state.alpha * 57.3).toFixed(0), 'HT', man.hammerT.toFixed(2), 'FW', _fw.y.toFixed(2), 'RI', rudderInput(0).toFixed(2), 'YR', state.yawRate.toFixed(2), 'YA', (man.yawAcc * 57.3).toFixed(0), 'GR', state.gear.toFixed(2), 'AS', state.assist, 'M', man.lastMan);
@@ -4475,13 +4604,23 @@ function stepSim(dt) {
       if (!combat.weaponsLock.msl) bad.push('msl');
       if (!combat.weaponsLock.spw) bad.push('spw');
       if (crimsonLaunches !== 0) bad.push('launches=' + crimsonLaunches);
-      console.log('[ANGELS_ZERO] ' + (bad.length ? 'DUEL_FAIL ' + bad.join(' ') : 'DUEL_OK'));
+      const ships = combatSys.surface.filter(t => t.alive && (t.ship || t.fleet || t.staged)).length;
+      if (ships !== 0) bad.push('ships=' + ships);
+      const ace = combatSys.enemies.find(e => e.alive && e.aceFlight);
+      if (ace && ace.hpMax > 100) bad.push('hp=' + ace.hpMax);
+      const mslLive = combatSys.missiles ? combatSys.missiles.filter(m => m.active).length : 0;
+      if (mslLive !== 0) bad.push('missiles=' + mslLive);
+      console.log('[ANGELS_ZERO] ' + (bad.length ? 'DUEL_FAIL ' + bad.join(' ') : 'DUEL_OK') +
+        ' ships=' + ships + ' aceHp=' + (ace ? ace.hp + '/' + ace.hpMax : '-') + ' blocked=' + (combat.blockedLaunches || 0) +
+        ' tac=' + (ace ? ace.tac : '-'));
     }
   }
   rq.update(performance.now() / 1000);                    // priority radio queue: no overlap, 0.35 s gaps
   combatSys.stepAlly(dt);                                 // carrier moves before the jet rides its deck
   if (DEBUG && cat.diagAt && simTime >= cat.diagAt) { cat.diagAt = 0; carrierDiag('catEnter+1s'); }
   if (cat.ph === 'WAIT') return;                          // deck prep: sim frozen until the GLB is mounted
+  combat.allyHold = autoland.on || !!carrier.phase || cat.ph === 'HOLD' || cat.ph === 'LAUNCH';
+  if (flightMode === 'FLY' && !autoland.on) autolandGateCheck();   // final approach gate -> CARRIER_AUTOLAND
   if (flightMode === 'FLY') updatePhysics(dt);
   combatSys.update(dt, simTime, { playerActive: flightMode === 'FLY', firing: keys.fire || DEBUG_FIRE });
   radioSys.update(dt, flightMode === 'FLY');
