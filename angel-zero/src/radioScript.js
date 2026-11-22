@@ -22,7 +22,8 @@ export const RADIO_SPEAKERS = {
 
 export const RADIO_EVENTS = [
   'ON_TAKEOFF', 'CAT_ARMED', 'ON_CATAPULT', 'ON_MACH_1', 'ON_NEAR_MISS', 'ON_PHASE_2_CANYON', 'ON_CANYON_LOW',
-  'ON_ACE_INBOUND', 'ON_ACE_KILL', 'ON_CARRIER_TRAP', 'ON_WINGMAN_ENGAGE', 'ON_LOW_HP', 'ON_MISSION_CLEAR'
+  'ON_ACE_INBOUND', 'ON_ACE_KILL', 'ON_CARRIER_TRAP', 'ON_WINGMAN_ENGAGE', 'ON_LOW_HP', 'ON_MISSION_CLEAR',
+  'STAGE_1', 'STAGE_2', 'STAGE_3', 'SAM_LOCK', 'CLIMB_OUT', 'GATE', 'ACE_HURT'
 ];
 
 const DIR = 'assets/voicelines/radio/';
@@ -116,7 +117,16 @@ export const RADIO_LINES = [
   L('clear_awacs_01',     'AWACS',     'ON_MISSION_CLEAR', 1, 'All objectives complete. Warden flight, the archipelago is ours. Bring them home.', true),
   L('clear_w2_01',        'WARDEN-2',  'ON_MISSION_CLEAR', 2, 'We did it! Lead, you were incredible out there!'),
   L('clear_w3_01',        'WARDEN-3',  'ON_MISSION_CLEAR', 2, 'Nobody lost today. That\'s the only score I care about.', true),
-  L('clear_awacs_02',     'AWACS',     'ON_MISSION_CLEAR', 3, 'Overlord out. Good hunting, Warden.')
+  L('clear_awacs_02',     'AWACS',     'ON_MISSION_CLEAR', 3, 'Overlord out. Good hunting, Warden.'),
+
+  // Staged mission / canyon / duel callouts.
+  L('stage_1_awacs',      'AWACS',     'STAGE_1',         2, 'Fleet contact. Take out the destroyers, Lead.'),
+  L('stage_2_awacs',      'AWACS',     'STAGE_2',         2, 'Surface action group inbound. Press the attack.'),
+  L('stage_3_awacs',      'AWACS',     'STAGE_3',         2, 'Flagship located. Finish the task force.'),
+  L('ceil_awacs_01',      'AWACS',     'SAM_LOCK',        1, 'MAYDAY — you are above the radar ceiling. DESCEND!'),
+  L('climb_awacs_01',     'AWACS',     'CLIMB_OUT',       1, 'Bunker down. PULL UP and clear the wall!'),
+  L('gate_w2_01',         'WARDEN-2',  'GATE',            3, 'Gate checkpoint. Nice flying, Lead.'),
+  L('hurt_c1_01',         'CRIMSON-1', 'ACE_HURT',        2, 'You have my attention, ghost.')
 ];
 
 // Lookup helpers (pure; safe to import anywhere).

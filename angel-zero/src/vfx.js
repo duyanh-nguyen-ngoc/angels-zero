@@ -647,6 +647,68 @@ export function createVFX(THREE, env) {
     get count() { let n = 0; for (let i = 0; i < STEAM_N; i++) if (steamP[i].on) n++; return n; }
   };
 
+  /* ----------------------------------- ship AAA / enemy gun tracers (pooled) */
+  const AA_TRACER_N = 128;
+  const aaGeo = new THREE.BufferGeometry();
+  const aaPos = new Float32Array(AA_TRACER_N * 3), aaAlpha = new Float32Array(AA_TRACER_N), aaTint = new Float32Array(AA_TRACER_N);
+  aaGeo.setAttribute('position', new THREE.BufferAttribute(aaPos, 3).setUsage(THREE.DynamicDrawUsage));
+  aaGeo.setAttribute('aAlpha', new THREE.BufferAttribute(aaAlpha, 1).setUsage(THREE.DynamicDrawUsage));
+  aaGeo.setAttribute('aTint', new THREE.BufferAttribute(aaTint, 1).setUsage(THREE.DynamicDrawUsage));
+  const aaMat = new THREE.ShaderMaterial({
+    uniforms: { uScale: { value: 400 } },
+    vertexShader: LOG_V + `
+      attribute float aAlpha; attribute float aTint; uniform float uScale; varying float vA; varying float vT;
+      void main() { vA = aAlpha; vT = aTint; vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = (2.0 + 2.0 * aAlpha) * uScale / max(1.0, -mv.z);
+        gl_Position = projectionMatrix * mv;
+        #include <logdepthbuf_vertex>
+      }`,
+    fragmentShader: LOG_F + `
+      varying float vA; varying float vT;
+      void main() {
+        #include <logdepthbuf_fragment>
+        float d = length(gl_PointCoord - 0.5) * 2.0;
+        float a = vA * pow(clamp(1.0 - d, 0.0, 1.0), 1.4);
+        if (a < 0.004) discard;
+        vec3 col = mix(vec3(1.0, 0.70, 0.28), vec3(1.0, 0.18, 0.22), vT);
+        gl_FragColor = vec4(col, a);
+      }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+  });
+  const aaPoints = new THREE.Points(aaGeo, aaMat);
+  aaPoints.frustumCulled = false; aaPoints.visible = false; scene.add(aaPoints);
+  const aaP = Array.from({ length: AA_TRACER_N }, () => ({ on: false, age: 0, life: 0.3, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0 }));
+  let aaNext = 0;
+  const aaTracer = {
+    add(pos, vel, life = 0.32, red = false) {
+      const q = aaP[aaNext]; aaNext = (aaNext + 1) % AA_TRACER_N;
+      q.on = true; q.age = 0; q.life = life;
+      q.x = pos.x; q.y = pos.y; q.z = pos.z; q.vx = vel.x; q.vy = vel.y; q.vz = vel.z;
+      q.red = red ? 1 : 0;
+    },
+    update(dt) {
+      let live = 0;
+      for (let i = 0; i < AA_TRACER_N; i++) {
+        const q = aaP[i];
+        if (!q.on) { aaAlpha[i] = 0; continue; }
+        q.age += dt;
+        if (q.age >= q.life) { q.on = false; aaAlpha[i] = 0; continue; }
+        q.x += q.vx * dt; q.y += q.vy * dt; q.z += q.vz * dt;
+        aaPos[i * 3] = q.x; aaPos[i * 3 + 1] = q.y; aaPos[i * 3 + 2] = q.z;
+        aaAlpha[i] = 1 - q.age / q.life; aaTint[i] = q.red || 0;
+        live++;
+      }
+      aaPoints.visible = live > 0;
+      if (!live) return;
+      aaGeo.attributes.position.needsUpdate = true;
+      aaGeo.attributes.aAlpha.needsUpdate = true;
+      aaGeo.attributes.aTint.needsUpdate = true;
+      aaMat.uniforms.uScale.value = renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+    },
+    reset() { for (let i = 0; i < AA_TRACER_N; i++) aaP[i].on = false; aaPoints.visible = false; },
+    get count() { let n = 0; for (let i = 0; i < AA_TRACER_N; i++) if (aaP[i].on) n++; return n; }
+  };
+
   /* ------------- hybrid clouds: raymarched sky deck + lit 3-D cumulus banks */
   // (1) SKY DECK 9,000-13,000 ft: a camera-centred back-faced dome whose
   //     fragment shader raymarches a 2.5-D volumetric cumulus layer (20 steps,
@@ -1284,6 +1346,7 @@ export function createVFX(THREE, env) {
     updateMachCone(dt, s.mach, opts.firstPerson);
     updateSpray(s, dt, opts.visible);
     catSteam.update(dt);
+    aaTracer.update(dt);
     updateWind(dt);
     updateMist(dt);
     sortClouds(dt, false);
@@ -1293,7 +1356,7 @@ export function createVFX(THREE, env) {
     attachPlume,
     setWingtips(l, r) { tipL.copy(l); tipR.copy(r); buildVapor(); },
     clearTrails() { for (const r of ribbons) r.clear(); for (const r of contrails) r.clear(); contrailStats.active = contrailStats.live = 0; vaporTarget = lexTarget = 0; for (const q of sprayP) q.on = false; vaporLevel = 0; vaporPoints.visible = false; catSteam.reset(); },
-    catSteam,
+    catSteam, aaTracer,
     updateContrails,
     get contrailStats() { return contrailStats; },
     update,

@@ -19,7 +19,15 @@ export const MISSIONS = {
     spawn: { pos: [0, 18, 9000], hdg: 0, spd: 160, onDeck: true },
     waves: [{ t: 0, kind: 'CAP', n: 4, alt: 2000 }, { t: 80, kind: 'CAP', n: 4, alt: 2400 }],
     targets: [{ kind: 'DDG', pos: [-1200, 0, 5200], hp: 170 }, { kind: 'DDG', pos: [1300, 0, 5600], hp: 170 },
-      { kind: 'CG', pos: [0, 0, 6400], hp: 260 }], ceilingFt: null
+      { kind: 'CG', pos: [0, 0, 6400], hp: 260 }], ceilingFt: null,
+    weapons: { gun: true, msl: true, spw: true }, enemyMsl: true, wingmen: 'FLIGHT', ceiling: null, gatesPath: null,
+    stages: [
+      { label: 'FLEET CONTACT', ships: [{ kind: 'DDG', pos: [-900, 0, -5000], hp: 3 }, { kind: 'DDG', pos: [900, 0, -5000], hp: 3 }], bandits: 2, clear: 'SHIPS' },
+      { label: 'SURFACE ACTION GROUP', ships: [{ kind: 'DDG', pos: [-1400, 0, -7000], hp: 3 }, { kind: 'DDG', pos: [1400, 0, -7000], hp: 3 },
+        { kind: 'CG', pos: [-500, 0, -7300], hp: 5 }, { kind: 'CG', pos: [500, 0, -7300], hp: 5 }], bandits: 3, clear: 'SHIPS' },
+      { label: 'FLAGSHIP', ships: [{ kind: 'CV_FLAG', pos: [0, 0, -9000], hp: 10 }, { kind: 'DDG', pos: [-1200, 0, -9100], hp: 3 },
+        { kind: 'DDG', pos: [1200, 0, -9100], hp: 3 }], bandits: 4, clear: 'SHIPS' }
+    ]
   },
   CANYON_RUN: {
     id: 'CANYON_RUN', title: 'CANYON RUN',
@@ -27,7 +35,12 @@ export const MISSIONS = {
     mapTag: 'GORGE', launch: 'RUNWAY', rtbType: 'BASE', bgmScenario: '07_canyon', wxOverride: false,
     spawn: { pos: [900, 140, 4300], hdg: 0, spd: 180, onDeck: false },
     waves: [{ t: 0, kind: 'CAP', n: 4, alt: 900 }],
-    targets: [{ kind: 'FORT', pos: [0, 0, -5400], hp: 420 }], ceilingFt: 1200
+    targets: [{ kind: 'FORT', pos: [0, 0, -9800], hp: 4 }], ceilingFt: 1200,
+    weapons: { gun: true, msl: true, spw: true }, enemyMsl: true, wingmen: 'FLIGHT',
+    ceiling: { m: 366, lethal: true }, gatesPath: 'CANYON',
+    stages: [
+      { label: 'TRENCH RUN', targets: [{ kind: 'FORT', pos: [0, 0, -9800], hp: 4 }], bandits: 0, clear: 'TARGETS' }
+    ]
   },
   ACE_DUEL: {
     id: 'ACE_DUEL', title: 'ACE DUEL',
@@ -35,7 +48,9 @@ export const MISSIONS = {
     mapTag: 'CLOUD_ARENA', launch: 'CATAPULT', rtbType: 'CARRIER', bgmScenario: '08_crimson_duel', wxOverride: false,
     spawn: { pos: [0, 18, 9000], hdg: 0, spd: 160, onDeck: true },
     waves: [{ t: 0, kind: 'ACE', n: 2, alt: 2400, ace: ['CRIMSON-1', 'CRIMSON-2'] }],
-    targets: [], ceilingFt: null
+    targets: [], ceilingFt: null,
+    weapons: { gun: true, msl: false, spw: false }, enemyMsl: false, wingmen: 'NONE', ceiling: null, gatesPath: null,
+    stages: [{ label: 'CRIMSON-1', ace: ['CRIMSON-1'], bandits: 0, clear: 'ACE' }]
   },
   FURBALL: {
     id: 'FURBALL', title: 'FURBALL',
@@ -47,6 +62,19 @@ export const MISSIONS = {
 };
 
 export const MISSION_ORDER = ['AIR_SUPERIORITY', 'NAVAL_BATTLE', 'CANYON_RUN', 'ACE_DUEL', 'FURBALL'];
+
+// Normalised per-sortie configuration. Missions without the new fields (AIR_SUPERIORITY
+// and FURBALL) get defaults that reproduce their existing behaviour exactly.
+export function missionConfig(m) {
+  return {
+    weapons: m.weapons || { gun: true, msl: true, spw: true },
+    enemyMsl: m.enemyMsl !== undefined ? m.enemyMsl : true,
+    wingmen: m.wingmen || 'FLIGHT',
+    ceiling: m.ceiling || null,
+    gatesPath: m.gatesPath || null,
+    stages: m.stages || null                               // null = legacy PHASE 1..4 flow
+  };
+}
 
 const read = () => {
   try { const v = localStorage.getItem(MISSION_KEY); return MISSIONS[v] ? v : MISSION_ORDER[0]; }

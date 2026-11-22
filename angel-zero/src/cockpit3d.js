@@ -967,8 +967,13 @@ export function createCockpit3D(THREE, env) {
     const spw = C.spw || '4AAM';
     const ammo = spw === '4AAM' ? C.aam4 : spw === 'UGB' ? C.bombs : C.qaam;
     const rld = spw === '4AAM' ? C.aam4Reload : spw === 'UGB' ? C.bombReload : C.qaamReload;
-    x.fillStyle = '#00ff66'; x.font = `16px ${FONT}`; x.fillText('MSL ' + (C.missiles || 0), 16, 36);
-    x.fillText(spw + ' ' + (ammo || 0), 16, 58);
+    x.fillStyle = '#00ff66'; x.font = `16px ${FONT}`;
+    if (C.weaponsLock && C.weaponsLock.msl && C.weaponsLock.spw) {
+      x.fillText('GUN ONLY', 16, 36);
+    } else {
+      x.fillText('MSL ' + (C.missiles || 0), 16, 36);
+      x.fillText(spw + ' ' + (ammo || 0), 16, 58);
+    }
     if (rld > 0) x.fillText('RLD ' + rld.toFixed(1), 150, 58);
     x.fillText('FLR ' + (C.flares ?? 0), 320, 36);
     x.fillText('CHF ' + (C.chaff === undefined ? '--' : C.chaff), 320, 58);

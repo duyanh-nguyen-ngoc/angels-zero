@@ -22,6 +22,8 @@ export const WORLD = { SIZE: 20000, CX: 0, CZ: -2500, SEG: 600 };     // 33 m gr
 const FT = 0.3048;
 export const RWY = { x: 900, z0: -1400, z1: 1600, width: 50, elev: 10 };       // runway 18/36, 3,000 m
 
+import { gorgeCentreX, GORGE_FLOOR_Y, GORGE_RIM_Y, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_CRATER_Z } from './maps.js?v=s86a';
+
 export function createWorld(THREE, env) {
   const { scene, createNoise2D, fbm } = env;
   const clamp = THREE.MathUtils.clamp;
@@ -29,6 +31,23 @@ export function createWorld(THREE, env) {
   const ss = (x, a, b) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
   const nCoast = createNoise2D(4242), nHill = createNoise2D(991), nDet = createNoise2D(7);
   const nRidge = createNoise2D(1337), nSea = createNoise2D(2718), nVeg = createNoise2D(31);
+  // CANYON_RUN trench: 180 m floor, 60 m ramp to 366 m rim, plateau outside.
+  function gorgeHeight(x, z) {
+    const crDX = x - gorgeCentreX(GORGE_CRATER_Z), crDZ = z - GORGE_CRATER_Z;
+    const cr = Math.hypot(crDX, crDZ);
+    if (cr < GORGE_CRATER_R * 1.5) {
+      const wall = GORGE_CRATER_WALL_Y * Math.exp(-Math.pow((cr - GORGE_CRATER_R * 0.72) / 190, 2));
+      const cut = Math.abs(x - gorgeCentreX(z)) < 80 && z > GORGE_CRATER_Z - 140;
+      if (cut) return 20 + Math.min(40, wall * 0.06);
+      return 20 + wall;
+    }
+    const cx = gorgeCentreX(z), d = Math.abs(x - cx);
+    const floor = GORGE_FLOOR_Y + (fbm(nDet, x * 0.012, z * 0.012, 2) * 0.5 + 0.5) * 6;
+    const plateau = GORGE_RIM_Y + 30 * (fbm(nHill, x * 0.0014, z * 0.0014, 3) * 0.5 + 0.5);
+    const corridor = 1 - ss(d, 90, 150);                   // 1 on the floor, 0 at the rim
+    return floor + (plateau - floor) * (1 - corridor);
+  }
+  let activeHeightFn = null;
 
   /* -------------------------------------------------------- island shapes */
   // Shelf just outside a coast (d = 1): turquoise sandbar falling to deep water.
@@ -184,6 +203,7 @@ export function createWorld(THREE, env) {
   // Same triangulation as THREE.PlaneGeometry rotated -90 deg about X: per quad
   // (a=(i,j) b=(i,j+1) c=(i+1,j+1) d=(i+1,j)) faces (a,b,d) and (b,c,d).
   function heightAt(x, z) {
+    if (activeHeightFn) return activeHeightFn(x, z);        // exact canyon surface for collision + SAM masking
     const fx = (x - X0) / STEP, fz = (z - Z0) / STEP;
     if (fx < 0 || fz < 0 || fx >= N || fz >= N) return -180;
     const i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j;
@@ -1108,8 +1128,9 @@ export function createWorld(THREE, env) {
         for (const [ix, iz, r] of (def.islands || [])) { const d = Math.hypot(x - ix, z - iz); if (d < r) h = Math.max(h, 120 * (1 - d / r)); }
         return h;
       }
-      : mode === 'gorge' ? (x, z) => analyticHeight(x, z) * amp
+      : mode === 'gorge' ? gorgeHeight
         : analyticHeight;
+    activeHeightFn = mode === 'gorge' ? gorgeHeight : null;
     for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) grid[j * (N + 1) + i] = fn(X0 + i * STEP, Z0 + j * STEP);
     for (let i = 0; i < pos.count; i++) {
       const gi = Math.round((pos.getX(i) + WORLD.SIZE / 2) / STEP), gj = Math.round((pos.getZ(i) + WORLD.SIZE / 2) / STEP);

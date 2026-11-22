@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.17', title: 'NAVAL ESCALATION · TRENCH RUN · GUNS-ONLY DUEL', bullets: [
+    'NAVAL BATTLE now escalates across three pooled fleet stages, from destroyer contact to a flagship battle group, with shipborne SAMs and deck AAA.',
+    'CANYON_RUN is a winding low-altitude trench with a lethal radar ceiling, sequential gates, a fortified valley bunker and a dramatic climb-out escape.',
+    'ACE_DUEL is a true 1v1 against CRIMSON-1 with guns only — no missiles, no SPW, no wingmen and no enemy missile fire.'
+  ] },
   { version: 'v1.1.16', title: 'CARRIER DECK SPAWN FIX', bullets: [
     'USS Enterprise now mounts under one persistent root before launch, with verified 360 m scale, a deck set 19 m above the water and per-track ray heights.',
     'Player and both wingmen snap to the real deck on mount and re-snap if the hull drifts, so CATAPULT_HOLD starts on the physical bow instead of over open ocean.',

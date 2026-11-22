@@ -1609,6 +1609,11 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   - One visibility writer in `stepAlly` owns `C.carrierVisible` and `a.root.visible`, walks ancestors, and pins root Y to 0; the procedural hull stays hidden after mount. `enterCarrierLaunch()` is the only caller of `catEnter()`, used by start, `?catat`, trap turnaround and every replay/menu route; `cat.ph` is `WAIT` with a `DECK PREP` hint and frozen sim until ready.
   - `catSnapAll()` re-poses player, wingmen, JBD and steam from `catTrackWorld()`, with a 0.5 m per-frame re-snap guard. `?debug` logs `CARRIER_OK` / `CARRIER_FAIL` at mount, `catEnter` and `catEnter+1 s`, including a downward ray hit check against the carrier vs ocean. Every `?v=` tag bumped to s85a.
 
+- [x] **Mission overhauls** *(build `s86a`, `src/missions.js`, `src/maps.js`, `src/world.js`, `src/combat.js`, `src/vfx.js`, `src/hud.js`, `src/cockpit3d.js`, `index.html`)*
+  - Optional mission schema fields (`stages`, `weapons`, `enemyMsl`, `wingmen`, `ceiling`, `gatesPath`) with defaults; `AIR_SUPERIORITY` keeps its legacy flow untouched. `C.stage` + `spawnStage()` drive pooled ship/bandit stages with `SHIP_HP` / `SHIP_SCALE`, ship SAMs from CG/CV_FLAG only and pooled `vfx.aaTracer` deck AAA.
+  - `GORGE` is now a winding 366 m-rim trench with a crater, exact analytic `heightAt`, `RIM_SITES`, `CEIL_*` warnings/SAM launches with terrain masking, 10 pooled canyon gates and a bunker kill that triggers `C.climb`, three weak chase SAMs and BASE RTB.
+  - `ACE_DUEL` spawns exactly one `CRIMSON-1` with doubled HP, locks player missiles/SPW (`C.weaponsLock`), hides WARDEN flight and blocks bandit missile launches in favour of a pooled gun. `?stageat`, `?fortkillat` and `at=canyonlow` hooks expose the new flows. Every `?v=` tag bumped to s86a.
+
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.

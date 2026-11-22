@@ -6,7 +6,7 @@
 // clipped to the 3D combiner glass. Square tactical radar (bottom-left), stores
 // list + F-15C silhouette with per-pylon AIM-9 reload icons (bottom-right),
 // open-corner target brackets, edge pointers, minimal top-left telemetry.
-import { SPW } from './loadout.js?v=s85a';
+import { SPW } from './loadout.js?v=s86a';
 
 export function createHUD(THREE, A) {
   const canvas = A.canvas;
@@ -1171,13 +1171,16 @@ export function createHUD(THREE, A) {
     ctx.save();
     ctx.font = f(15, true); ctx.textBaseline = 'top';
     const reloadMsl = C.missileReload > 0, reloadBomb = C.bombReload > 0;
+    const gunsOnly = !!(C.weaponsLock && C.weaponsLock.msl && C.weaponsLock.spw);
     const rows = [
-      ['  GUN', C.gunOverheat ? 'HOT' : C.reload > 0 ? 'RLD ' + C.reload.toFixed(1) : String(C.ammo), C.gunOverheat ? WARN : G],
-      [(C.weapon === 'MSL' ? '> ' : '  ') + 'MSL', reloadMsl ? 'RLD ' + C.missileReload.toFixed(1) : String(C.missiles), C.weapon === 'MSL' ? GB : G]
+      ['  GUN', C.gunOverheat ? 'HOT' : C.reload > 0 ? 'RLD ' + C.reload.toFixed(1) : String(C.ammo), C.gunOverheat ? WARN : G]
     ];
-    const spw = SPW[C.spw] || SPW['4AAM'];
-    const spwAmmo = spw.wpn === 'AAM4' ? { n: C.aam4, r: C.aam4Reload } : spw.wpn === 'BOMB' ? { n: C.bombs, r: C.bombReload } : { n: C.qaam, r: C.qaamReload };
-    rows.push([(C.weapon !== 'MSL' ? '> ' : '  ') + spw.hud, spwAmmo.r > 0 ? 'RLD ' + spwAmmo.r.toFixed(1) : String(spwAmmo.n), C.weapon === spw.wpn ? GB : G]);
+    if (!gunsOnly) {
+      rows.push([(C.weapon === 'MSL' ? '> ' : '  ') + 'MSL', reloadMsl ? 'RLD ' + C.missileReload.toFixed(1) : String(C.missiles), C.weapon === 'MSL' ? GB : G]);
+      const spw = SPW[C.spw] || SPW['4AAM'];
+      const spwAmmo = spw.wpn === 'AAM4' ? { n: C.aam4, r: C.aam4Reload } : spw.wpn === 'BOMB' ? { n: C.bombs, r: C.bombReload } : { n: C.qaam, r: C.qaamReload };
+      rows.push([(C.weapon !== 'MSL' ? '> ' : '  ') + spw.hud, spwAmmo.r > 0 ? 'RLD ' + spwAmmo.r.toFixed(1) : String(spwAmmo.n), C.weapon === spw.wpn ? GB : G]);
+    }
     rows.push(null);                                        // dashed separator
     if (C.flares !== undefined) rows.push(['  FLR', String(C.flares), C.flares > 0 ? G : AMBER]);
     if (C.chaff !== undefined) rows.push(['  CHF', String(C.chaff), C.chaff > 0 ? G : AMBER]);
@@ -1351,6 +1354,15 @@ export function createHUD(THREE, A) {
   const musicToast = { t: 0, text: '' };
   function drawCenterBanners(ctx, g) {
     const now = performance.now();
+    if (C.ceilBanner && now - C.ceilBanner < 2200) {
+      drawBanner(ctx, HW / 2, HH * 0.30, 'SAM LOCK — DESCEND', '#ff3b4d', 360, 1 - (now - C.ceilBanner) / 2200);
+    }
+    if (C.climbBanner && now - C.climbBanner < 3000) {
+      drawBanner(ctx, HW / 2, HH * 0.34, 'PULL UP — CLEAR THE WALL', '#ffbf3f', 420, 1 - (now - C.climbBanner) / 3000);
+    }
+    if (C.gateBanner && now - C.gateBanner < 900) {
+      drawBanner(ctx, HW / 2, HH * 0.38, 'GATE ' + (C.gateIdx || 0) + ' CLEARED', '#00ff66', 280, 1 - (now - C.gateBanner) / 900);
+    }
     const cx = g ? g.cx : HW / 2;
     const upperY = Math.max(g ? Math.max(30, g.minY - 24) : HH * 0.21, radioBottom ? radioBottom + 20 : 0);
     const lowerY = g ? g.cy + g.boxH * 0.27 : HH * 0.75;
