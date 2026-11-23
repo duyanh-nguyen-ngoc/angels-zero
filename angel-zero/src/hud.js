@@ -6,8 +6,8 @@
 // clipped to the 3D combiner glass. Square tactical radar (bottom-left), stores
 // list + F-15C silhouette with per-pylon AIM-9 reload icons (bottom-right),
 // open-corner target brackets, edge pointers, minimal top-left telemetry.
-import { SPW } from './loadout.js?v=s9bd';
-import { GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_FLOOR_Y } from './maps.js?v=s9bd';
+import { SPW } from './loadout.js?v=s9be';
+import { GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_FLOOR_Y } from './maps.js?v=s9be';
 
 export function createHUD(THREE, A) {
   const canvas = A.canvas;
@@ -2486,6 +2486,6 @@ export function createHUD(THREE, A) {
     addStamp, radarPulse() { radarPulseT = 0; },
     setRadarZoom(i) { radarZoom = ((i | 0) % 3 + 3) % 3; try { localStorage.setItem('angelsZero_radarZoom', String(radarZoom)); } catch (e) { /* storage unavailable */ } return RADAR_ZOOM_TAG[radarZoom]; },
     get radarZoom() { return radarZoom; },
-    get radarPulse() { return radarPulseT; }
+    get radarPulseT() { return radarPulseT; }
   };
 }

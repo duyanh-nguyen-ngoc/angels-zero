@@ -1,29 +1,29 @@
-# ANGELS ZERO — Core Systems Roadmap
+# ANGELS ZERO â€” Core Systems Roadmap
 
 Browser F-15C combat flight game (Three.js r160, ES modules, procedural Web
 Audio), deployed from `angel-zero/` to https://angels-zero.pages.dev/.
 Earlier step-by-step build notes live in the git history (`git log -- PLAN.md`).
 
-Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
+Status legend: `[x]` implemented and verified Â· `[ ]` open â€” gaps listed.
 
 ---
 
-## Pillar 1 — Core Engine & Telemetry (`src/state.js`)
+## Pillar 1 â€” Core Engine & Telemetry (`src/state.js`)
 - [ ] **Single source of truth for 6-DOF state, inventory, lock state, fixed timestep.**
   - Implemented today (inline in `index.html`): `state` (position, quaternion,
     velocity, rates, throttle / afterburner, G, AoA, Mach, radalt, highG /
     barrelRoll) and `combat` (gun / missile / UGB / flare counts, reloads,
     `weapon`, `designated` / `lockState` / `lockProgress`, `mslPylons`,
     bandit lock, cloud densities) shared by reference with every module.
-  - **Gap:** no `src/state.js` module — state and the `combat` object are
+  - **Gap:** no `src/state.js` module â€” state and the `combat` object are
     created in `index.html`.
   - **Gap:** variable timestep clamped at 50 ms per frame (`animate()`), not a
     fixed-step accumulator; physics is rate-based, so it is stable but not
     frame-rate independent at the margins.
 
-## Pillar 2 — 6-DOF Flight Physics & Camera Feel (`src/flight.js`, `src/camera.js`)
+## Pillar 2 â€” 6-DOF Flight Physics & Camera Feel (`src/flight.js`, `src/camera.js`)
 - [ ] **Responsive handling, energy, stall, chase camera, cockpit head.**
-  - [x] **Rigid-body 6-DOF F-15C** *(build `s27a`)* — attitude and velocity are
+  - [x] **Rigid-body 6-DOF F-15C** *(build `s27a`)* â€” attitude and velocity are
     decoupled: live AoA / sideslip, lift perpendicular to the airflow (CLa 3.5,
     CLmax 1.55 at the 24 deg stall), fuselage side force, drag = CD0 + 0.24 CL^2
     + transonic wave rise (M0.92-1.04) + post-stall form drag + speed brake,
@@ -41,7 +41,7 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
     break 8.3 G bleeding 40-46 kt/s, roll winds up in ~0.3 s and settles in
     ~0.3 s, 80 deg climb bleeds ~13 kt/s, AB dive M0.99 -> 1.21, level AB
     creeps through the drag rise to M1.06, stall nose drop + recovery.
-  - [x] **Stall / AoA fix (no maneuver bouncing)** *(build `s29b`)* — CAS AoA
+  - [x] **Stall / AoA fix (no maneuver bouncing)** *(build `s29b`)* â€” CAS AoA
     limiter: demand capped at 23 deg (below the 24 deg stall), nose-up authority
     tapered 20 -> 26 deg on a lead-compensated AoA (AoA + 0.22 s of AoA rate), so
     hard turns hold a planted ~22.7 deg carve with no overshoot. True stall only
@@ -80,7 +80,7 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
     red `#ff2233` / green `#22ff66` wingtips, white 1.2 Hz double-flash strobes
     (wingtips, fin tips, belly), pulsing red dorsal + belly beacons (faint by
     day, full at DAWN / DUSK / NIGHT and through NVG).
-  - [x] **Pilot G-LOC physiology** *(build `s26a`)* — `state.gStrain` builds
+  - [x] **Pilot G-LOC physiology** *(build `s26a`)* â€” `state.gStrain` builds
     above 6.2 G (faster beyond 8 G) and drains below 4.5 G, `negGStrain` under
     < -2.2 G; greyout = desaturated / dimmed 3D view plus a radial tunnel
     vignette closing to 0.92 opacity, heartbeat-synced dimming and
@@ -91,18 +91,18 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
     master hearing-tunnel low-pass 12 kHz -> 550 Hz. Verified headless: samples
     decode, strain build / release curve, greyout + warning screenshots.
   - **Gap:** flight model and chase camera live in `index.html`
-    (`updatePhysics`, `updateCameraAndVisuals`) — no `flight.js` / `camera.js`.
+    (`updatePhysics`, `updateCameraAndVisuals`) â€” no `flight.js` / `camera.js`.
   - **Gap:** no chase-camera FOV *speed* kick (only the High-G tighten).
 
-## Pillar 3 — Archipelago World & Dynamic Time-of-Day (`src/world.js`)
-- [x] **5-island eroded heightfield** — airbase island + runway peninsula,
+## Pillar 3 â€” Archipelago World & Dynamic Time-of-Day (`src/world.js`)
+- [x] **5-island eroded heightfield** â€” airbase island + runway peninsula,
   Twin Canyon Ridge gorge, volcanic caldera (3,200 ft), east / west atolls,
   two fly-under suspension bridges (184 ft clearance); triangle-exact height
   grid shared by rendering and all collision / weapon queries; obstacle
   collision for bridges, towers, hangars, turbines. *(`src/world.js`)*
-- [x] **Reef ocean** — depth-driven navy → turquoise water, sandbars,
+- [x] **Reef ocean** â€” depth-driven navy â†’ turquoise water, sandbars,
   shoreline surf foam. *(ocean shader in `index.html`)*
-- [x] **Cloud decks + lock-breaking** — 112 drifting formations in three decks
+- [x] **Cloud decks + lock-breaking** â€” 112 drifting formations in three decks
   (3.5x): 36 low sea-mist / valley banks (900-2,200 ft, seeded on ridges and
   straits), 56 towering cumulus (2,600-5,800 ft, slate-indigo bellies under
   overcast), 20 high cirrus / stratus streaks (7,500-10,500 ft, stretched thin
@@ -110,7 +110,7 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   every visible formation feeds `cloudDensity()` (two-way seeker / missile
   lock loss, white-out, canopy moisture). *(`src/vfx.js`, `src/canopy.js`,
   `src/combat.js`)*
-- [x] **Randomized weather** *(build `s25a`, `src/weather.js`)* — `CLEAR` /
+- [x] **Randomized weather** *(build `s25a`, `src/weather.js`)* â€” `CLEAR` /
   `SCATTERED` / `OVERCAST_RAIN` / `THUNDERSTORM` rolled with the time of day on
   every sortie and restart, `[ CYCLE WEATHER ]` + `WX:` chip on the briefing,
   `[ WX: ... ]` HUD badge in rain. Overcast greys sky / fog / clouds / sea toward
@@ -124,42 +124,42 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   (cockpit-muffled) and procedural thunder rolls. Verified headless: CLEAR /
   OVERCAST_RAIN / THUNDERSTORM in chase + cockpit, night storm, rain off above
   the deck, briefing chip / button, zero page console errors.
-- [x] **Time of day + NVG** — randomized DAWN / DAYLIGHT / GOLDEN_HOUR / DUSK
+- [x] **Time of day + NVG** â€” randomized DAWN / DAYLIGHT / GOLDEN_HOUR / DUSK
   / NIGHT presets (sky, sun / moon, stars, lights, fog, ocean, clouds),
   briefing `[ CYCLE TIME ]`, `N` night vision with per-preset gain.
   *(`src/atmosphere.js`, `src/nvg.js`)*
 - Note: time of day, clouds and NVG are separate modules rather than inside
   `world.js`; no functional gap.
 
-## Pillar 4 — Combat Loop, Ballistics & VFX (`src/weapons.js`, `src/vfx.js`, `src/audio.js`)
-- [x] **Two-stage targeting** *(build `s24a`)* — APG-63 auto-designates the
+## Pillar 4 â€” Combat Loop, Ballistics & VFX (`src/weapons.js`, `src/vfx.js`, `src/audio.js`)
+- [x] **Two-stage targeting** *(build `s24a`)* â€” APG-63 auto-designates the
   best bandit in the 30 deg / 8 NM forward radar cone (green brackets, type,
   range; no lock, so an un-`C`'d launch is a dumb-fire); `C` arms the seeker
-  (`combat.seekerArmed`) for the progressive IR lock NONE → ACQ (amber diamond)
-  → LOCK (crimson square + range arc + `[ SHOOT ]` + lock tone); `C` while locked
+  (`combat.seekerArmed`) for the progressive IR lock NONE â†’ ACQ (amber diamond)
+  â†’ LOCK (crimson square + range arc + `[ SHOOT ]` + lock tone); `C` while locked
   cycles to the next nearest forward bandit; a decayed lock / cloud cover drops
   back to passive radar tracking.
-- [x] **>4AAM track-while-scan** — `R` cycles `>MSL` → `>4AAM` → `>UGB` (`3`
+- [x] **>4AAM track-while-scan** â€” `R` cycles `>MSL` â†’ `>4AAM` â†’ `>UGB` (`3`
   selects it); 20-round pool, radar tracks up to 4 bandits (`TGT 1-4`), `C`
   locks them all (25 deg / 4.5 NM / 1.6 s, `LOCK 1-4`), RMB / M ripple-fires one
   missile per lock 0.09 s apart, each pylon round hidden for a 3.5 s re-rack,
   every missile guiding independently; 12 s pool reload.
-- [x] **ALR-56C RWR** — amber spike chevrons on the radar's inner ring at the
+- [x] **ALR-56C RWR** â€” amber spike chevrons on the radar's inner ring at the
   emitter's clock bearing (paint / acquiring), crimson spike on a full lock,
   pulsing crimson `M` + vector line for a missile tracking us; audio search
   chirps (painted), quick triple pips (locked), rapid 1.9 / 2.7 kHz warble only
   with a missile inbound.
-- [x] **ALQ-135 ECM (`Z`)** — 6 s jamming (`[ ECM ACTIVE ]`, cyan, drain bar)
+- [x] **ALQ-135 ECM (`Z`)** â€” 6 s jamming (`[ ECM ACTIVE ]`, cyan, drain bar)
   then 14 s recharge (`[ ECM RECHARGE ]`); bandit lock build time x2.5 and a
   35 %/s chance per established track to break. Verified headless: passive
   track without C, MSL lock + FULL launch, 4AAM 4/4 locks + 4-round ripple
   (pylons hidden, re-racked), dumb-fire before C, RWR paint / lock / msl
   bearings, ECM slow-down (0.54 vs 1.0 lock at 2.5 s) and lock breaks, zero
   page console errors.
-- [x] **Pylon stores** — real GLB AIM-9s / Mk-82 UGBs hidden and flown as
+- [x] **Pylon stores** â€” real GLB AIM-9s / Mk-82 UGBs hidden and flown as
   clones; turn-rate-limited proportional navigation by lock quality.
-- [x] **CCIP** — closed-form ballistic solve, fall line + impact pipper.
-- [x] **M61A1 Vulcan** — 6,000 rpm, tracers, LCOS lead reticle, gun funnel.
+- [x] **CCIP** â€” closed-form ballistic solve, fall line + impact pipper.
+- [x] **M61A1 Vulcan** â€” 6,000 rpm, tracers, LCOS lead reticle, gun funnel.
 - [x] **Localized enemy damage + wing severance** *(build `s29a`)*
   - Bandit airframes are split per material into body / left wing / right wing
     instanced parts (triangle centroid |x| > 1.8 m in the wing chord), so a
@@ -195,14 +195,14 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
     caution, `HYD LEAK`); >= 60 % random F100 flameout (that plume out, thrust
     x0.72, yaw / roll pull toward the dead side, oil-smoke ribbon, `L/R ENG
     OUT`); >= 85 % engine fire (flame licks, FIRE L/R tile, master caution +
-    `ENGINE FIRE — EJECT [E]`).
+    `ENGINE FIRE â€” EJECT [E]`).
   - Verified headless: overheat at ~3.3 s, lockout while held, resume after
     cooling; CCRP auto-release on a SAM (0.9 m along-track, destroyed) and the
     destroyer (1.6 m, destroyed); DMG 65 % left engine out with sideslip + roll
     toward it; DMG 90 % fire; zero page console errors.
 - [x] **Flares / chaff (`X` / `G`)**, bandit AI with symmetric locks, missile
   break / decoy / cloud loss.
-- [x] **Enemy AI & Collision Overhaul** *(current step, done — `src/combat.js`)*
+- [x] **Enemy AI & Collision Overhaul** *(current step, done â€” `src/combat.js`)*
   - Bank-to-turn bandits: roll the lift vector onto the turn demand (+/-82 deg,
     ~205 deg/s), then G-limited pull; gravity / climb / induced-drag energy
     bleed; throttle cruise 360-440 kt, afterburner 520-640 kt.
@@ -225,9 +225,9 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
     0 floor clamps), canyon chase, head-on merge (closest pass 81 m), ram
     (bandit destroyed, player HP 100 -> 55), lock + launch (break / split-S,
     flares, `FULL:FLARE` spoof), zero page console errors.
-- [x] **VFX** — afterburner diamonds, contrails, vapor, Mach cone, smoke /
+- [x] **VFX** â€” afterburner diamonds, contrails, vapor, Mach cone, smoke /
   fire particles, explosions, water geysers, shockwave rings.
-- [x] **Procedural Web Audio** — engines, BRRRT gun, seeker tones, alerts,
+- [x] **Procedural Web Audio** â€” engines, BRRRT gun, seeker tones, alerts,
   bomb / flare / NVG / cloud / designation DSP.
 - [x] **Audio audit & fix: F100 strain, airframe buffet, pilot G-LOC breathing**
   *(build `s30e`, `src/audio.js`)*
@@ -498,7 +498,7 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
     above 155 kt once lift reaches the weight; leaving the paved airfield or
     hitting a hangar = crash.
   - Pit stop: < 25 kt -> 4 s `[ REARMING & REPAIRING... ]` bar, loader
-    clacks, AWACS "Welcome home, Eagle. Fresh missiles and fuel—get back up
+    clacks, AWACS "Welcome home, Eagle. Fresh missiles and fuelâ€”get back up
     there!"; then DMG 0 %, engine fire out / both engines, MSL / 4AAM / UGB /
     GUN / FLR full, gun heat 0, fuel full (`combatSys.pitStop()`; combo and
     score untouched). Rolling above 30 kt first aborts it.
@@ -580,7 +580,7 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   - HUD: emerald `[ LOW-ALT CLUTTER // NO LOCK ]` / `[ BASE SAFE ZONE //
     CLEAR TO LAND ]` tag under the radio box. AWACS once per gear-down
     approach (25 s cooldown): "Base air defenses covering your final, Eagle.
-    Bandits are breaking off—cleared to land."
+    Bandits are breaking offâ€”cleared to land."
   - Verified in the pane: locked bandit + full-lock missile at 600 ft, descend
     -> safe at 348 ft: lock / incoming / RWR / warning 0 that frame, missile
     LOST 1.0 s later, no damage; all six bandits DISENGAGE_ORBIT at 2,953 ft,
@@ -661,7 +661,7 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
     -70..+75 deg pitch) in the camera's own frame, ground-clamped; the chase
     spring state is restored each frame so the orbit never disturbs it. The
     boresight reticle / SPEED / ALT boxes fade out by 30 deg of look offset.
-  - `[ FREE LOOK ]` tag bottom-centre while held; `ALT / MMB — Free Look` in
+  - `[ FREE LOOK ]` tag bottom-centre while held; `ALT / MMB â€” Free Look` in
     the briefing / H controls list. Debug: `?look=yaw,pitch&lookoff=s`,
     `window.__az.freeLook`, `look {...}` in the warp log.
   - Verified in the pane with dispatched Alt / MMB / mousemove / D events:
@@ -871,7 +871,7 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
     direct missile hit with both engines healthy. ON_FIRE: thrust capped at
     58 %, roll-off 0.06 + asymmetric-thrust yaw toward the dead side (stick
     holds it), fire spreads +2.2 % DMG/s, airframe explodes at 16 s
-    (`ENGINE FIRE — AIRFRAME EXPLODED` debrief reason).
+    (`ENGINE FIRE â€” AIRFRAME EXPLODED` debrief reason).
   - F is context-sensitive: Vulcan normally; during an engine emergency F press
     = Halon bottle (white vapour burst, pneumatic discharge SFX, AWACS),
     ON_FIRE -> EXTINGUISHED, spread stops. Hold F 2.5 s (fresh press, one
@@ -885,10 +885,10 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
     nozzle only; EXTINGUISHED / SEIZED thin grey wisps; RELIGHTING white vapour.
   - Cockpit: L / R ENG FIRE lamp flashes + master caution; RPM spools toward
     0 % (28 % while cranking), TEMP spikes into the red then cools.
-  - HUD (center-lower): `[ L/R ENGINE FIRE — PRESS F TO EXTINGUISH ]` + time
-    to airframe loss; `[ ENGINE COLD — HOLD F FOR WINDMILL RELIGHT (SLIM
+  - HUD (center-lower): `[ L/R ENGINE FIRE â€” PRESS F TO EXTINGUISH ]` + time
+    to airframe loss; `[ ENGINE COLD â€” HOLD F FOR WINDMILL RELIGHT (SLIM
     ODDS) ]` with live ram-air odds and a 0-100 % spool bar; then `[ ENGINE
-    RELIT! ]` / `[ RELIGHT FAILED — SINGLE ENGINE OPS ]` for 3.5 s; stores
+    RELIT! ]` / `[ RELIGHT FAILED â€” SINGLE ENGINE OPS ]` for 3.5 s; stores
     row `L ENG FIRE / COLD / CRANK / SEIZED`. Fire bell every 3.2 s on fire.
   - Debug: `engfire=s[,L|R]`, `extat=s`, `relightat=s` (holds 2.7 s),
     `relight=ok|fail`; stats `eng {...}`; `combatSys.debugEngineFire /
@@ -1109,13 +1109,13 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
     land SAM, ship SAM and debug banditShot; per-source cooldowns still apply.
     Denied SAM retries in 2-4 s. Reset on `resetPlayer()` / `pitStop()`.
   - Verified `peak <= max` (SEC-04 fleet, `at=fleet&phase=2&warp=40`, headless):
-    ROOKIE max 1 / stagger 5.5 → peak 1, launches 4, denied 145;
-    NORMAL max 2 / stagger 3.5 → peak 1, launches 1, denied 1;
-    ACE max 3 / stagger 1.8 → peak 1, launches 1, denied 0.
+    ROOKIE max 1 / stagger 5.5 â†’ peak 1, launches 4, denied 145;
+    NORMAL max 2 / stagger 3.5 â†’ peak 1, launches 1, denied 1;
+    ACE max 3 / stagger 1.8 â†’ peak 1, launches 1, denied 0.
     ACE 3.5 s / 210-frame sample of hostile missiles tracking the player: max 0
-    observed (≤ 3). Engine fire: ROOKIE 60 % DMG stays HEALTHY, 66 % ignites;
+    observed (â‰¤ 3). Engine fire: ROOKIE 60 % DMG stays HEALTHY, 66 % ignites;
     ACE 46 % ignites. `setDifficulty('ROOKIE')` returns ROOKIE.
-  - Verified persistence: `?diffcycle=2` boots NORMAL → ACE (saved) → ROOKIE
+  - Verified persistence: `?diffcycle=2` boots NORMAL â†’ ACE (saved) â†’ ROOKIE
     (saved); next boot ROOKIE (stored); `?difficulty=ace` boots ACE (forced) and
     does not save; in-sortie `diffBtn.click()` is inert. Storage-blocked boot
     falls back to NORMAL via try/catch (no page errors).
@@ -1131,31 +1131,31 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
     Opacity `smoothstep(0.98,1.0,mach) * (1 - smoothstep(1.02,1.05,mach))`,
     inner peak 0.22 / outer 0.12, hidden in cockpit. Zero per-frame allocation.
   - Transonic trigger in `updatePhysics`: `prevMach < 1 && mach >= 1 && machArmed`
-    → `onMach1()` (shake `{t:0,T:0.25,k:1}`, `combat.mach1T`, `onSfx('sonicboom')`);
+    â†’ `onMach1()` (shake `{t:0,T:0.25,k:1}`, `combat.mach1T`, `onSfx('sonicboom')`);
     re-arms below 0.97. Shake is rotation-only (0.9 deg at 38 Hz, half in cockpit).
-  - `audio.sonicBoom()`: two white-noise band-pass cracks 1,800→600 Hz at t and
-    t+0.11 (2 ms attack / 80 ms decay), sine 62→28 Hz sub peaking 1.0 at
+  - `audio.sonicBoom()`: two white-noise band-pass cracks 1,800â†’600 Hz at t and
+    t+0.11 (2 ms attack / 80 ms decay), sine 62â†’28 Hz sub peaking 1.0 at
     12 ms and decaying to 0.001 by t+1.2, through `cockpitLP`, then
     `duckWorld(0.55, 0.25)`; `audio.boom` = `{t, count}`.
   - HUD banner `[ MACH 1.0 // SUPERSONIC ]` for 1400 ms after `combat.mach1T`.
   - Verified headless: zero JS/WebGL errors, cone visible only outside Mach
-    0.98–1.05, boom counter and banner fire on the crossing, no shader-count
+    0.98â€“1.05, boom counter and banner fire on the crossing, no shader-count
     change. All `?v=` tags bumped to s52a.
 - [x] **Render performance pass** *(build `s53a`, `index.html`, `src/nvg.js`,
   `src/vfx.js`, `src/blastfx.js`, `src/world.js`)*
   - Pixel ratio capped at 1.25; composer HDR target `HalfFloatType`, `samples: 0`;
     bloom chain at 0.35 res on init and in `setSize` (strength 0.48, radius
     0.32, threshold 0.92 unchanged).
-  - Alpha discard raised 0.004 → 0.04 in `vfx` cloud/deck shaders and all
+  - Alpha discard raised 0.004 â†’ 0.04 in `vfx` cloud/deck shaders and all
     `blastfx` alpha shaders; shadows disabled on clouds, deck, forest and every
-    blast pool mesh; hanging-smoke pool 240 → 110 (stats matches).
+    blast pool mesh; hanging-smoke pool 240 â†’ 110 (stats matches).
   - `renderer.info.autoReset = false`; one preallocated `window.__perfDebug`
     object receives `calls`, `triangles`, `frameMs` each frame around
     `nvg.render` (no per-frame object allocation).
   - Verified headless during active SEC-04 combat (`?nointro&debug&phase=2&
     at=fleet`, 90 frames): `frameMs` max 4.2, avg 2.48, 0 frames over 16.6,
     232 calls / 1,034,131 triangles, 6 bandits and 27 enemy tracers live.
-    Headless Edge log: 0 JS/WebGL errors. Passes 1–5, `gpuWarm` and blast
+    Headless Edge log: 0 JS/WebGL errors. Passes 1â€“5, `gpuWarm` and blast
     shake maths untouched; all `?v=` tags bumped to s53a.
 - [x] **Missile near-miss / flyby feedback** *(build `s54a`, `src/combat.js`,
   `src/audio.js`, `src/hud.js`, `index.html`)*
@@ -1169,8 +1169,8 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
     a 0.25 s wake roll bump into `state.rollRate`, a CSS inset `#flybyPulse`
     (220 ms opacity animation), `combat.nearMissT` for `dist < 75`, and
     `onSfx('flyby')`.
-  - `audio.flybyWhoosh(k, cockpit)`: white-noise band-pass sweep 2,600→340 Hz
-    (Q 2.4), sawtooth 240→68 Hz, cockpit low-pass 2,200 Hz / chase 9,000 Hz,
+  - `audio.flybyWhoosh(k, cockpit)`: white-noise band-pass sweep 2,600â†’340 Hz
+    (Q 2.4), sawtooth 240â†’68 Hz, cockpit low-pass 2,200 Hz / chase 9,000 Hz,
     to `N.body`; `audio.flyby = { k, count }`.
   - HUD banner `[ NEAR MISS // EVADED ]` for 1400 ms after `combat.nearMissT`.
   - Verified headless: `onFlyby({dist:60,k:0.8,side:1})` sets `flyShake.k=0.8`,
@@ -1184,7 +1184,7 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
     2,500 m). Flares decoy only IR seekers; the nearby bandit lock break is
     limited to 2,500 m and the old foil bloom becomes 28 orange sparks.
   - `Z` dispenses chaff (per-preset 10/8/6, 0.5 s cooldown, +1/10 s, 4.5 s cloud
-    drifting at 0.35·jetVel, 90 pooled silver sparks). RADAR missiles inside
+    drifting at 0.35Â·jetVel, 90 pooled silver sparks). RADAR missiles inside
     900 m roll once per cloud against the preset decoy chance (0.9/0.82/0.72);
     a chaff hit detonates harmlessly. `J` now runs the ALQ-135 ECM jammer;
     briefing keybinds updated to match (Free Look still ALT/MMB).
@@ -1199,12 +1199,12 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
 - [x] **WARDEN wingmen + CRT radio portraits** *(build `s56a`, `index.html`,
   `src/combat.js`, `src/hud.js`)*
   - Two F-15C clones (`WARDEN-2/3`) share the loaded GLB geometry/materials;
-    cockpit/canopy meshes hidden. Echelon offsets ±55 m / −8 m / +45 m, smoothed
+    cockpit/canopy meshes hidden. Echelon offsets Â±55 m / âˆ’8 m / +45 m, smoothed
     with pooled scratch vectors (no per-frame `new THREE.*`).
   - `G` toggles FORM / ENGAGE (gear moved to `L`; briefing keybinds updated).
-    ENGAGE steers to 600 m behind the nearest bandit within 3 NM / 35°, clamped
+    ENGAGE steers to 600 m behind the nearest bandit within 3 NM / 35Â°, clamped
     to 1,500 m from the player, and fires at most one AIM-9 per wingman per
-    7–11 s. Friendly shots bypass the hostile director; wingman kills give no
+    7â€“11 s. Friendly shots bypass the hostile director; wingman kills give no
     player score and route through the BASE-style no-credit branch.
   - Cyan HUD diamonds with `[ WDN-2/3 ]` + range when beyond 1 NM; wing-order
     banner for 1.6 s. CRT portrait is a plain 2D canvas (no WebGL texture):
@@ -1212,7 +1212,7 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
     Callouts (fox two / splash one / clear your six) capped at one per 4 s with
     `audio.radioSquelch()` on the existing bus.
   - Verified headless (`?nointro&debug&warp=5`): 2 wingman meshes visible at
-    ±55 m, `G` -> `ENGAGE`, CRT opens, `__perfDebug.frameMs` 3.2 ms, program
+    Â±55 m, `G` -> `ENGAGE`, CRT opens, `__perfDebug.frameMs` 3.2 ms, program
     count unchanged (106), zero JS/WebGL errors (in-app browser and Edge).
     All 21 `?v=` tags bumped to s56a.
 - [x] **CRIMSON ace flight mini-encounter** *(build `s57a`, `src/combat.js`,
@@ -1243,7 +1243,7 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
     of AFB, exposes `C.ally = {g, fwd, pos, vel, deckY, len}` and adds hull +
     island AABB collision via `env.addBox` (exported from `world.js`).
   - Trap zone behind the stern (wires #1-3 at len/2-64/-78/-92): gear down,
-    <175 kt, >-6 deg pitch, within 14 m / 3.5 m of the deck → `ARREST` early
+    <175 kt, >-6 deg pitch, within 14 m / 3.5 m of the deck â†’ `ARREST` early
     return in `updatePhysics` with a 1.6 s exponential cable deceleration and
     `#wire` banner / `audio.cableScreech()` / blast impulse.
   - 3 s `DECK` turnaround calls `combatSys.pitStop()` once, restores
@@ -1279,8 +1279,8 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
     and target range. Debug `?mcamat=s,dur`, `?slowmoat=s`; logs report
     `mcam {active,k}` / `slowmo {timeScale}`.
   - Verified headless: `?nointro&debug&msl&mcamat=0.3,2&warp=2&logat=0.5,1.5`
-    → `mcam.active=true, k=1` at 0.5 s; `?nointro&debug&slowmoat=1&warp=1.1`
-    → `timeScale=0.32` and `__audioDebug().slowMo.count=1`; threat injected
+    â†’ `mcam.active=true, k=1` at 0.5 s; `?nointro&debug&slowmoat=1&warp=1.1`
+    â†’ `timeScale=0.32` and `__audioDebug().slowMo.count=1`; threat injected
     next to the jet aborts the cam and requires a fresh press; zero JS/WebGL
     errors (in-app + Edge `BAD_LINES=0`); 120-frame steady sample avg 5.65 ms /
     max 12.9 ms / 0 frames over 16.6 ms. All 21 `?v=` tags bumped to s59a.
@@ -1304,9 +1304,9 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   - Debug: `?at=canyonlow`, `?strikekillat=s`; `stats().strike` reports
     `{alive, labels, jamming, sectorLow}`. `?alt=` now correctly overrides the
     named `?at=` spot altitude.
-  - Verified headless: `?nointro&debug&at=canyon&alt=600&warp=3&logat=2` →
-    `strike.jamming=1`, 4 alive; `?at=canyonlow&warp=3` → `jamming=0`,
-    `sectorLow=true` plus the WARDEN callout; `?strikekillat=1&warp=2` →
+  - Verified headless: `?nointro&debug&at=canyon&alt=600&warp=3&logat=2` â†’
+    `strike.jamming=1`, 4 alive; `?at=canyonlow&warp=3` â†’ `jamming=0`,
+    `sectorLow=true` plus the WARDEN callout; `?strikekillat=1&warp=2` â†’
     0 alive, score +4800, 4 slow-mo pulses; zero JS/WebGL errors (in-app + Edge
     `BAD_LINES=0` on all three URLs); 90-frame jammed sample avg 4.05 ms /
     max 15 ms / 0 frames over 16.6 ms. All 21 `?v=` tags bumped to s60a.
@@ -1353,9 +1353,9 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   - Mist patter is a pre-allocated high-passed / band-passed white-noise loop
     with a 17 Hz square AM into `cockpitLP`; `update()` only ramps its params.
     `__audioDebug().mist` reports gain / band centre.
-  - Verified headless: `?nointro&debug&alt=4000&spd=230&warp=6` →
-    `contrailStats.active=3, live≈440` (lead + 2 wingmen), visible ribbon meshes
-    with alpha ≈0.52; `alt=3300` → `active=0`; cockpit cloud run →
+  - Verified headless: `?nointro&debug&alt=4000&spd=230&warp=6` â†’
+    `contrailStats.active=3, liveâ‰ˆ440` (lead + 2 wingmen), visible ribbon meshes
+    with alpha â‰ˆ0.52; `alt=3300` â†’ `active=0`; cockpit cloud run â†’
     `__audioDebug().mist.gain=0.028, hz=8861` and canopy `rain=0.75`; climbing
     out clears it to 0.05 in ~2.5 s; zero JS/WebGL errors (in-app + Edge
     `BAD_LINES=0` on four URLs); 120-frame sample avg 4.28 ms / max 5.9 ms /
@@ -1396,18 +1396,18 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
     objectives (20), capped at B for failed sorties; `rankOverride` is transient
     and leaves the stored profile schema untouched.
   - Verified headless: `?nointro&debug&warp=40&killat=10&nearat=15&debriefat=40`
-    → debrief with `tele.n=26`, 15 breakdown cells, rendered topo + trace;
+    â†’ debrief with `tele.n=26`, 15 breakdown cells, rendered topo + trace;
     different damage yields B vs C; the same 75-point total yields A when
     cleared and B when failed; zero JS/WebGL errors. Debug `?debriefat=s`,
     `?nearat=s`. Every `?v=` tag bumped to s64a.
 - [x] **FURBALL instant-action mode** *(build `s65a`, `src/loadout.js`,
   `src/combat.js`, `src/hud.js`, `index.html`)*
-  - New `MODE_KEY` / `MODES` persistence with a briefing `[ MODE: … ]` toggle;
+  - New `MODE_KEY` / `MODES` persistence with a briefing `[ MODE: â€¦ ]` toggle;
     `?mode=FURBALL` overrides without saving. FURBALL hot-starts airborne at
     6,000 ft / 420 kt over the cloud sea with gear up, cleared trails, a snapped
     chase camera and wingmen in formation.
   - `furballTick()` recycles dead bandits from the existing six-slot pool every
-    3.5 s at 6–9 km / 1,400–2,600 m, keeping two slots free for the CRIMSON pair;
+    3.5 s at 6â€“9 km / 1,400â€“2,600 m, keeping two slots free for the CRIMSON pair;
     a fresh ace pair spawns every five player kills. Mission waves, phases and
     the ace-kill end trigger are untouched when `C.mode === 'MISSION'`.
   - Double-Tab (or the pause-menu button) ends the sortie; a TAB-again HUD
@@ -1431,14 +1431,14 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
     a 10 NM / 2 s sweep. Stores shows the mirrored F-15 wireframe, engine state
     (including 2 Hz fire flash), damage bar, missiles, SPW ammo and countermeasures.
     Threat scope draws RWR missiles / locks / paints with an ACE flag and SHP tags.
-  - Verified headless: `?nointro&debug&cockpit&warp=3` + `]` → page 1 with label
+  - Verified headless: `?nointro&debug&cockpit&warp=3` + `]` â†’ page 1 with label
     `STORES & DMG`; `[` from page 0 wraps to page 2; chase view ignores the keys;
     `renderer.info.programs` (99) and `__perfDebug.calls` (29) unchanged across
     page switches; zero JS/WebGL errors across three Edge CLI URLs.
     Debug `?mfdpage=0..2`. Every `?v=` tag bumped to s66a.
 - [x] **Four-phase mission flow + tactical HUD** *(build `s67a`, `src/combat.js`,
   `src/hud.js`, `index.html`)*
-  - MISSION now runs SWEEP → STRIKE → CRIMSON INTERCEPT → CARRIER RTB; the old
+  - MISSION now runs SWEEP â†’ STRIKE â†’ CRIMSON INTERCEPT â†’ CARRIER RTB; the old
     CLEARED-on-Ace trigger is gone and completion is the #3 arrest trap.
     `primaryTargets()` reuses an 8-slot array; `stats().mission` reports the
     phase, label, objective counts and primary count. FURBALL stays endless.
@@ -1447,7 +1447,7 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
     IR / RTB / missile cam / wingmen) and an F1 keybind cheat-sheet.
   - One instanced approach-gate mesh (three frames) always in scene, opacity
     driven by damage / winchester / phase 4, so its program is compiled at warm-up.
-  - Verified headless: phase 1 card reads `OBJ: SWEEP BANDITS [0/6] — 8.1 KM`;
+  - Verified headless: phase 1 card reads `OBJ: SWEEP BANDITS [0/6] â€” 8.1 KM`;
     `?mphaseat=1,2` gives four strike primaries, `=1,4` gives the carrier with
     gates visible (opacity 0.26); `?radarshot` produces a RADAR `msl` RWR entry;
     F1 toggles the sheet; zero JS/WebGL errors across four Edge CLI URLs.
@@ -1502,7 +1502,7 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   - Velocity direction is now rate-limited toward the nose (`AOA_COUPLE` 3.4,
     `AOA_COUPLE_PSM` 0.32) instead of being force-integrated onto it; AoA is
     recomputed from body-frame velocity with no clamp. Attitude stays a pure
-    quaternion — Euler angles feed the HUD only, so loops pass vertical cleanly.
+    quaternion â€” Euler angles feed the HUD only, so loops pass vertical cleanly.
   - PSM (`B+SHIFT` under 290 kt, or high-G + full pull, or `?psm`) frees the nose:
     no AoA/G limiter, pitch authority x1.85 (cap 3.6 rad/s), yaw x1.7 with weak
     weathercock, induced drag x2.4 and post-stall flat-plate aero. Cobra, Kulbit
@@ -1526,10 +1526,10 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
     `<img>` with CSS scanlines, flicker and a sweep-in `crtIn` entrance; the
     radio dispatcher picks the portrait from the speaker callsign, tints the
     border/CRT caption green `#20FF70` or red `#FF2A3B`, and adds the
-    `▲ THREAT //` tag for Crimson. Idle state reads `STANDBY / NO SIGNAL`.
-  - Updates happen only in `onWing()` (class toggles + one timer) — zero
+    `â–² THREAT //` tag for Crimson. Idle state reads `STANDBY / NO SIGNAL`.
+  - Updates happen only in `onWing()` (class toggles + one timer) â€” zero
     per-frame JS. A failed image hides the `<img>` and keeps the text caption.
-    Verified: 6/6 webp requests 200, green↔red swap, scanlines + idle state,
+    Verified: 6/6 webp requests 200, greenâ†”red swap, scanlines + idle state,
     text-only fallback with portraits removed, zero JS/WebGL errors, frame cost
     7.4 ms. Every `?v=` tag bumped to s71a.
 - [x] **CVN carrier deck** *(build `s72a`, `src/combat.js`, `index.html`,
@@ -1571,7 +1571,7 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   - Trap/touchdown limits now 220 kt / -12 deg pitch / 20 deg bank / 9 m/s sink / 22 m lateral; firm legal touchdowns clamp the sink and seat the jet on the surface with no impact damage. `TRAP BONUS` (+1000, full health) fires on carrier traps and runway pit stops.
   - Auto-gear every 0.25 s inside 1600 m / 128 m AGL / 250 kt, re-armed past 3000 m or 300 kt; a manual `L` press locks it out. A light-stick ILS corridor (45 m lateral, 1300 m along, 70 m vertical) eases heading, cancels bank and sets `state.assist` for the `ILS ASSIST` HUD row. Runway 36 joins the carrier in six approach-gate instances.
   - Return Line at z = 8000 with 21 pulsing cyan pylons; crossing resets stores/health on a 25 s cooldown, shows the rearm banner and an edge chevron to the nearest Return Line / carrier / AFB when winchester or badly damaged.
-  - Chaff now breaks radar locks beyond 2.5 km and plays its own SFX; bandit launch callouts distinguish `RADAR MISSILE — CHAFF / NOTCH!` from `IR MISSILE — FLARES! BREAK!`, RWR task-force paints carry `g: 'RADAR'`. Keybind list refreshed. Every `?v=` tag bumped to s76a.
+  - Chaff now breaks radar locks beyond 2.5 km and plays its own SFX; bandit launch callouts distinguish `RADAR MISSILE â€” CHAFF / NOTCH!` from `IR MISSILE â€” FLARES! BREAK!`, RWR task-force paints carry `g: 'RADAR'`. Keybind list refreshed. Every `?v=` tag bumped to s76a.
 
 - [x] **WASD flight controls** *(build `s77a`, `index.html`, `src/hud.js`, `src/patchnotes.js`)*
   - `W/S` pitch (W nose-down, optional `angelsZero_invertPitch`) and `A/D` roll ramp at 4/s into the existing G-limited/PSM command path. Mouse aim is suppressed while keys are held and blends back over 0.35 s, with no snap-back. All input state is preallocated; no per-frame allocations.
@@ -1586,8 +1586,8 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
 - [x] **Mission select + dual RTB + mission BGM** *(build `s80a`, `src/missions.js`, `src/maps.js`, `src/world.js`, `src/combat.js`, `src/audio.js`, `index.html`, `src/hud.js`)*
   - `MISSIONS` registry (AIR_SUPERIORITY, NAVAL_BATTLE, CANYON_RUN, ACE_DUEL, FURBALL) with spawn, waves, targets, map tag, RTB type and soundtrack scenario. One block plus one `MISSION_ORDER` entry extends the game. The `| STANDBY |` mission row cycles the registry, persists via `angelsZero_mission`, and drives the derived MODE chip; `?debug&mission=<id>` selects one for headless runs.
   - `MAPS` supplies per-mission terrain, runway, carrier, fleet and cloud-sea layout. `world.rebuild(mapDef)` regenerates the height grid and terrain `BufferGeometry` in place (disposing the old geometry), resets collision sets and toggles runway props; pooled actors return via `combat.resetMission()` so mission switches allocate nothing and `?memtest` holds geometry/textures at delta 0.
-  - Phase flow is now PRIMARY → RTB → DONE. BASE missions touch down on RWY 36 and autobrake to a stop; CARRIER missions re-anchor six glide-slope gates in the moving carrier frame and complete with a cinematic `[L]` ILS autoland (CAPTURE → GLIDE → FLARE → TRAP → ROLLOUT) onto USS Enterprise. `[L]` engages autoland only while the `[L] ENGAGE AUTOLAND` prompt is visible, otherwise it still toggles gear. `?debug&rtbat=s` and `?debug&autolandat=s` force each ending.
-  - `resolveScenario()` now resolves from the mission registry plus dynamic state priority in one preallocated context: debrief/landed → RTB → hangar → catapult → last stand → storm/night (only for `wxOverride` missions) → `bgmScenario`. MIN_DWELL is 4 s except debrief/hangar/RTB. CANYON_RUN, NAVAL_BATTLE and ACE_DUEL keep their own score under `tod=NIGHT`. Every `?v=` tag bumped to s80a.
+  - Phase flow is now PRIMARY â†’ RTB â†’ DONE. BASE missions touch down on RWY 36 and autobrake to a stop; CARRIER missions re-anchor six glide-slope gates in the moving carrier frame and complete with a cinematic `[L]` ILS autoland (CAPTURE â†’ GLIDE â†’ FLARE â†’ TRAP â†’ ROLLOUT) onto USS Enterprise. `[L]` engages autoland only while the `[L] ENGAGE AUTOLAND` prompt is visible, otherwise it still toggles gear. `?debug&rtbat=s` and `?debug&autolandat=s` force each ending.
+  - `resolveScenario()` now resolves from the mission registry plus dynamic state priority in one preallocated context: debrief/landed â†’ RTB â†’ hangar â†’ catapult â†’ last stand â†’ storm/night (only for `wxOverride` missions) â†’ `bgmScenario`. MIN_DWELL is 4 s except debrief/hangar/RTB. CANYON_RUN, NAVAL_BATTLE and ACE_DUEL keep their own score under `tod=NIGHT`. Every `?v=` tag bumped to s80a.
 
 - [x] **Catapult launch opening** *(build `s81a`, `src/combat.js`, `src/vfx.js`, `src/audio.js`, `src/hud.js`, `src/radioScript.js`, `index.html`)*
   - Carrier sorties open in `CATAPULT_HOLD` on the bow track at 0 kt with the JBD raised and deck steam rolling; the existing `cat_awacs_01` clip fires as `CAT_ARMED` (CRT-text fallback). The HUD shows `[HOLD FULL AFTERBURNER / SHIFT] LAUNCH` with an arm bar while the objective card stays hidden.
@@ -1597,10 +1597,10 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
 - [x] **Carrier deck fix + music player** *(build `s82a`, `src/combat.js`, `src/audio.js`, `src/hud.js`, `scripts/build_bgm.py`, `assets/audio/bgm/manifest.json`, `index.html`)*
   - `startSortie()` now awaits the CVN GLB and calls `placeCarrier(def)` before `catEnter()`, showing the loading hint while it waits. A persistent unscaled `allyRoot` is mounted once, never disposed by `resetMission()` / `world.rebuild()`, and is force-visible in carrier missions; `updateAlly(dt)` runs before `catTick` so the jet never lags the moving ship.
   - The deck surface is raycast once per catapult / JBD / trap point (island hits rejected), and `JET_GEAR_DY` is measured from the extended GLB gear. Cat poses use `allyRoot.localToWorld()` with the measured deck height; `?debug&mission=NAVAL_BATTLE&warp=1` logs a deck gap under 0.3 m.
-  - `build_bgm.py --manifest-only` rewrites the v2 manifest with per-track titles without re-encoding. `audio.js` shuffles each scenario with a Fisher–Yates bag and crossfades to the next track on `timeupdate` / `ended`; `selectTrack`, `skip`, `setAuto` and `onBgmChange` drive the clickable `#bgmWidget` (`,` / `.` / `/` hotkeys) with a 1.2 s HUD toast. Every `?v=` tag bumped to s82a.
+  - `build_bgm.py --manifest-only` rewrites the v2 manifest with per-track titles without re-encoding. `audio.js` shuffles each scenario with a Fisherâ€“Yates bag and crossfades to the next track on `timeupdate` / `ended`; `selectTrack`, `skip`, `setAuto` and `onBgmChange` drive the clickable `#bgmWidget` (`,` / `.` / `/` hotkeys) with a 1.2 s HUD toast. Every `?v=` tag bumped to s82a.
 
 - [x] **Comms overhaul** *(build `s84a`, `src/radioQueue.js`, `src/radioScript.js`, `src/audio.js`, `index.html`)*
-  - Voiced lines run through one pre-allocated headset chain: highpass → lowpass → soft-clip WaveShaper → compressor → ring split → pan → analyser → `radioBus`, plus a forever-running gated static bed. `RADIO_CH` presets give AWACS cyan, WARDEN-2/3 green with ±0.25 pan, and CRIMSON heavy drive with ring; PTT open/tail one-shots and the static gate are rendered once at init.
+  - Voiced lines run through one pre-allocated headset chain: highpass â†’ lowpass â†’ soft-clip WaveShaper â†’ compressor â†’ ring split â†’ pan â†’ analyser â†’ `radioBus`, plus a forever-running gated static bed. `RADIO_CH` presets give AWACS cyan, WARDEN-2/3 green with Â±0.25 pan, and CRIMSON heavy drive with ring; PTT open/tail one-shots and the static gate are rendered once at init.
   - `radioQueue.js` owns all voice timing: eight reused slots, priority/category cooldowns, per-line TTL, a 0.35 s inter-line gap, and CRITICAL pre-emption of combat/ambient lines while STORY is never cut off. The single `-5 dB` music duck ramps over 0.2 s at open and 0.4 s at tail; the old 0.25 s duck is gone.
   - `#crtBox` is now a reactive Voice Box driven by `onTx`/`onIdle`: faction-coloured callsign, portrait, `#crtSub` subtitles, CSS static-flash transitions, and 24 analyser bars plus a time-domain polyline at 30 Hz. `?radiospam=1`, `?radiocrit=s` and `__audioDebug().radio` expose queue state. Every `?v=` tag bumped to s84a.
 
@@ -1617,18 +1617,18 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
 - [x] **Open-ocean ops + trench run fix** *(build `s87a`, `src/maps.js`, `src/world.js`, `src/missions.js`, `src/combat.js`, `src/hud.js`, `index.html`)*
   - `props` flags and `applyMapProps()` / `envProps` hide every AFB mesh, runway, building, radar and instanced tree on `STRAIT` / `CLOUD_ARENA` with visibility-only toggles; `ILS` displays, gates, assist and recovery chevron are gated by `ilsVisible()` (`ilsOnRtbOnly`).
   - `NAVAL_BATTLE` restores WARDEN flight with staged bandit ranges and damaged-escort targeting; `ACE_DUEL` adds per-second `DUEL_OK` asserts with all other spawn/refill paths disabled.
-  - `CANYON_RUN` uses one metres source (`FT`/`CEIL_FT`/`CEIL_M`), an airborne centred spawn with a wall-clearance assert, an 8 s ceiling arm delay, a 3 s `RADAR LOCK — DESCEND!` countdown with hysteresis and the `SAM LAUNCH — CEILING BREAK!` banner. `RUNWAY_BBOX` keeps the AFB clear of the plateau. Every `?v=` tag bumped to s87a.
+  - `CANYON_RUN` uses one metres source (`FT`/`CEIL_FT`/`CEIL_M`), an airborne centred spawn with a wall-clearance assert, an 8 s ceiling arm delay, a 3 s `RADAR LOCK â€” DESCEND!` countdown with hysteresis and the `SAM LAUNCH â€” CEILING BREAK!` banner. `RUNWAY_BBOX` keeps the AFB clear of the plateau. Every `?v=` tag bumped to s87a.
 
 - [x] **Mission fix pass: carrier autoland, 25 km trench, rival duel** *(build `s88a`, v1.1.19, `src/maps.js`, `src/world.js`, `src/missions.js`, `src/combat.js`, `src/hud.js`, `index.html`)*
   - Open-ocean maps hide `envProps.lights`, the single Points object that carries every runway edge, threshold, ALSF/approach strobe, taxiway, tower, bridge and rig light. They also hide the AFB CIWS/SAM site meshes (`setBaseDefencesVisible`). On `GORGE`, a `uMask` light-shader bbox and `applyMapProps` hide island props inside the trench.
   - `CARRIER_AUTOLAND` is rewritten in the carrier ROOT frame:
-    - **Phases:** CAPTURE (glideslope offset decays over T = |off|/60 s), GLIDE (3.5°), FLARE (last 90 m), TRAP (wire 2, smoothstep to 0 kt over 1.6 s), ROLLOUT, then `onCarrierTrap()` and `missionComplete('CARRIER')`, which opens `12_debrief`.
+    - **Phases:** CAPTURE (glideslope offset decays over T = |off|/60 s), GLIDE (3.5Â°), FLARE (last 90 m), TRAP (wire 2, smoothstep to 0 kt over 1.6 s), ROLLOUT, then `onCarrierTrap()` and `missionComplete('CARRIER')`, which opens `12_debrief`.
     - **Engagement:** pressing L while the prompt is up, or flying through the 400 m final gate (`autolandGateCheck`).
-    - **Root causes fixed:** the old code used the GLB child's local quaternion as the deck frame and referenced an undefined `s` in FLARE. Staged RTB also never set `missionPhase = 4`, so a trap looped back to the catapult. `combat.allyHold` now stops the carrier turning 180° mid-approach.
+    - **Root causes fixed:** the old code used the GLB child's local quaternion as the deck frame and referenced an undefined `s` in FLARE. Staged RTB also never set `missionPhase = 4`, so a trap looped back to the catapult. `combat.allyHold` now stops the carrier turning 180Â° mid-approach.
   - `CANYON_RUN`:
     - **Steering:** the leftover "spawn grace" rail-steering block in `updatePhysics` is removed, so the player has full manual control.
     - **Spawn heading:** the old formula pointed the nose the wrong way laterally. The new `gorgeHeading(z)` fixes it.
-    - **Trench:** it moved west, clear of the AFB, with a 1.5 km straight lead-in and sweeps whose minimum radius is about 790 m. Width is measured perpendicular to the curve (`gorgeDist`). The centreline is 24.8 km (2.6× the old one).
+    - **Trench:** it moved west, clear of the AFB, with a 1.5 km straight lead-in and sweeps whose minimum radius is about 790 m. Width is measured perpendicular to the curve (`gorgeDist`). The centreline is 24.8 km (2.6Ã— the old one).
     - **Gates and sites:** 15 gates are spaced by arc length (`GORGE_GATE_Z`) and face down the trench, with 15 matching rim SAM sites. The spawn (`GORGE_SPAWN_Z`) is at the mouth, before gate 1.
     - **Stage hygiene:** staged missions hide legacy jammers, skip JAM sectors, and never respawn the 40 s surface/task force.
   - `ACE_DUEL`:
@@ -1637,98 +1637,98 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
     - **Guns only:** `gunsOnly` hard-blocks `launch()`, `fireSelected()`, `fireMissile()`, `fireAAM4()`, `fireQAAM()` and `dropBomb()`. It also zeroes ammo, keeps the pylons empty (`enforceStoreLock`, reload timers off), and stops the `10_last_stand` BGM override.
   - **Verification:** headless Edge with zero JS/WebGL errors.
     - **NAVAL:** `lights=0`, and both L and the final gate complete into the debrief at 0 kt.
-    - **CANYON:** the spawn is OK, `kb=a` gives bank −104 and `kb=d` gives +84 with no auto-steer, and gate 1/15 registers.
+    - **CANYON:** the spawn is OK, `kb=a` gives bank âˆ’104 and `kb=d` gives +84 with no auto-steer, and gate 1/15 registers.
     - **ACE_DUEL:** `DUEL_OK ships=0 aceHp=100/100`, 0 missiles after M/1/2, and an `EVADE_BREAK` when the player's nose is on the ace.
-    - **Frame cost** (browser pane `__frame`): median 2.7–3.7 ms and p95 under 6 ms.
+    - **Frame cost** (browser pane `__frame`): median 2.7â€“3.7 ms and p95 under 6 ms.
 
 - [x] **Sea-skim rooster tail** *(build `s89a`, v1.1.20, `src/vfx.js`, `src/audio.js`, `index.html`)*
   - A 180-point pooled `vfx.spray` emits a V-shaped white-grey rooster tail at `y = 0.5` with size/alpha ramp and gravity/drag, plus a 48-instance additive `vfx.wake` foam trail. Both are preallocated and only upload while alive.
   - Skim intensity comes from altitude/speed with a dense boost below 15 m, hard-suppressed over land, above 40 m, on deck, during carrier phase/autoland and outside PLAY/FLY. Wingmen and the ace get a capped lighter wake.
-  - `setSpray()` stores only scalars; the existing continuous mix ramps a filtered spray rush and low rumble. Subtle rotation-only camera micro-rumble scales with skim². Every `?v=` tag bumped to s89a.
+  - `setSpray()` stores only scalars; the existing continuous mix ramps a filtered spray rush and low rumble. Subtle rotation-only camera micro-rumble scales with skimÂ². Every `?v=` tag bumped to s89a.
 
 - [x] **CRIMSON guns-only duel fix** *(build `s90a`, v1.1.21, `src/combat.js`, `src/audio.js`, `index.html`)*
-  - `launch()` now takes a `who` tag so guns-only blocks `MSL` only. CRIMSON-1 aims at a one-pass lead point with `ACE_BULLET_V`, fires 0.8–1.4 s bursts inside 1,200 m / 18°, and keeps firing through `DUEL_LOOP` / `EVADE_BREAK`.
-  - Rounds are hitscan closest-approach tests against a 9 m player sphere with a 0.35° spread; every fourth round draws an `aaTracer`. Hits run `damagePlayer(4)`, `gunhit` audio and a small camera bump. Counters `C.aceRounds` / `C.aceHits` feed `DUEL_OK`.
+  - `launch()` now takes a `who` tag so guns-only blocks `MSL` only. CRIMSON-1 aims at a one-pass lead point with `ACE_BULLET_V`, fires 0.8â€“1.4 s bursts inside 1,200 m / 18Â°, and keeps firing through `DUEL_LOOP` / `EVADE_BREAK`.
+  - Rounds are hitscan closest-approach tests against a 9 m player sphere with a 0.35Â° spread; every fourth round draws an `aaTracer`. Hits run `damagePlayer(4)`, `gunhit` audio and a small camera bump. Counters `C.aceRounds` / `C.aceHits` feed `DUEL_OK`.
   - `enemyGun()` / `gunhit()` reuse persistent nodes. `?duelbehind=s` places the ace on the player's six. Every `?v=` tag bumped to s90a.
 
 - [x] **Heavy SAM barrage** *(build `s91a`, v1.1.22, `src/combat.js`, `src/vfx.js`, `src/hud.js`, `index.html`)*
-  - Diagnosed the silent ceiling: `lastSam` (seconds) was compared to `CEIL_SAM_CD * 1000`, `CEIL_SAM_MIN_D = 1800` rejected every rim battery, and `surfaceSAM` capped all SAMs at 2. The new state machine uses a 38-site preallocated battery pool, a nearest-3 partial sort, 1.5 s WARN and rolling 4–6 salvos every 1.8 s with 0.12 s rail stagger.
+  - Diagnosed the silent ceiling: `lastSam` (seconds) was compared to `CEIL_SAM_CD * 1000`, `CEIL_SAM_MIN_D = 1800` rejected every rim battery, and `surfaceSAM` capped all SAMs at 2. The new state machine uses a 38-site preallocated battery pool, a nearest-3 partial sort, 1.5 s WARN and rolling 4â€“6 salvos every 1.8 s with 0.12 s rail stagger.
   - 24 pooled SAMs fly with `SAM_V/SAM_G/SAM_LIFE`, PN guidance, flare/chaff decoys, terrain collision and a 0.6 s mask break. `vfx.samFx` draws 24 smoke ribbons and 24 additive motor glows; launch puffs reuse the steam pool.
-  - Fort destruction starts a 12 s climb-out wall of 6–8 SAMs every 2 s from the crater ring plus the last four rim sites, then hands off to RTB. `?ceilat` / `?flareauto` and once-per-second `ceil` logs make the barrage observable. Every `?v=` tag bumped to s91a.
+  - Fort destruction starts a 12 s climb-out wall of 6â€“8 SAMs every 2 s from the crater ring plus the last four rim sites, then hands off to RTB. `?ceilat` / `?flareauto` and once-per-second `ceil` logs make the barrage observable. Every `?v=` tag bumped to s91a.
 
 - [x] **Living battlefields** *(build `s92a`, v1.1.23, `src/ambient.js`, `src/atmosphere.js`, `src/vfx.js`, `src/combat.js`, `index.html`)*
   - New `createAmbient(THREE, env)` factory with `configure/update/reset/stats`: one prebuilt pool per effect, module scratch only and no `new` in `update`. Every mission switch calls `reset()` then `configure(id)` and only toggles flags / visibility, so AFB, canyon and ocean props never leak across maps.
-  - Clouds drift on a wrapped wind offset (`vfx.setWind`), CLOUD_ARENA deck punch-through feeds `vfx.mist`, canopy rain and audio mist. `atmosphere.blendTo(name, secs)` adds STORM / SUNBREAK and phase/RTB-driven sky changes (golden hour on `11_rtb`, explicit `?tod=` suppresses blends). The ocean lerps `uSwell` calm→storm and scrolls two normal octaves.
-  - 96 instanced ship-wake quads from the ally carrier and all live fleet vessels, a 40-point flak pool with orange-core→grey-puff shader, and 6 persistent oil-fire columns (32 points each) claimed from `env.onSmoke` on ship damage/sinking and fort kills. CANYON gets 12 sweeping searchlight cones plus 10 gorge mist sprites; AIR SUPERIORITY gets spinning radar dishes, 16 blinking beacons and 4 racetrack jets with pooled ribbon contrails and distant tracers.
+  - Clouds drift on a wrapped wind offset (`vfx.setWind`), CLOUD_ARENA deck punch-through feeds `vfx.mist`, canopy rain and audio mist. `atmosphere.blendTo(name, secs)` adds STORM / SUNBREAK and phase/RTB-driven sky changes (golden hour on `11_rtb`, explicit `?tod=` suppresses blends). The ocean lerps `uSwell` calmâ†’storm and scrolls two normal octaves.
+  - 96 instanced ship-wake quads from the ally carrier and all live fleet vessels, a 40-point flak pool with orange-coreâ†’grey-puff shader, and 6 persistent oil-fire columns (32 points each) claimed from `env.onSmoke` on ship damage/sinking and fort kills. CANYON gets 12 sweeping searchlight cones plus 10 gorge mist sprites; AIR SUPERIORITY gets spinning radar dishes, 16 blinking beacons and 4 racetrack jets with pooled ribbon contrails and distant tracers.
   - `?ambient=0` kill switch, once-per-second `ambient` log and ambient data in the warp dump. Headless checks confirm sky/flak/wakes/search/beacons/traffic counts, full reset on mission switch, zero errors and ~8 ms p95. Every `?v=` tag bumped to s92a.
 
 - [x] **Reliable scenario score** *(build `s93d`, v1.1.24, `src/audio.js`, `index.html`)*
   - Fixed the AudioContext unlock / manifest race: `switchTo()` now defers into `pendingScn` before `init()` has built the decks, the manifest fetch flushes that pending scenario, and `armUnlock()` retries on every gesture until a real `playing` event confirms playback. `playDeck()` handles `NotAllowedError` with a gesture re-arm and other errors with a capped 1.5 s retry; the same-scenario guard no longer skips a paused deck.
   - One-time key audit checks the 12 `BGM_KEYS` against the manifest, the resolver and `MISSIONS`; unknown keys log and fall back to `03_air_superiority`. `setAuto(true)` is re-applied at mission start and on returning to STANDBY (`?bgmtrack=` keeps MANUAL), and `lastMusicKey` force-switches on every app/flight/cat/autoland/RTB/phase/mission transition.
-  - Deck state is committed only on the `playing` event, so the `#bgmWidget` title always equals `audio.bgm.title`. Headless checks confirm a fresh load + first gesture starts `01_hangar` un-paused, each mission's exact scenario (including catapult→`06_strike`/`08_crimson_duel`, `11_rtb` and `12_debrief`), `bgm keys ok=12`, zero JS errors and ~5–8 ms p95.
+  - Deck state is committed only on the `playing` event, so the `#bgmWidget` title always equals `audio.bgm.title`. Headless checks confirm a fresh load + first gesture starts `01_hangar` un-paused, each mission's exact scenario (including catapultâ†’`06_strike`/`08_crimson_duel`, `11_rtb` and `12_debrief`), `bgm keys ok=12`, zero JS errors and ~5â€“8 ms p95.
 
 - [x] **WARDEN three-state orders + wounded wingman save** *(build `s95c`, v1.1.25, `src/combat.js`, `src/hud.js`, `src/telemetry.js`, `index.html`)*
-  - `G` now cycles `C.wingOrder` through FORM / COVER / FOCUS with a 2 s order badge and `onWing` + `ON_WINGMAN_ENGAGE` feedback; `1`/`2`/`3` remain weapon keys. COVER scores rear-hemisphere lockers at 0.35× range, FOCUS shares `C.designated` with a 400 m bracket for WARDEN-3 and drops to COVER on `NO DESIGNATION`. Targets are re-picked every 0.5 s into `w.tgt`.
+  - `G` now cycles `C.wingOrder` through FORM / COVER / FOCUS with a 2 s order badge and `onWing` + `ON_WINGMAN_ENGAGE` feedback; `1`/`2`/`3` remain weapon keys. COVER scores rear-hemisphere lockers at 0.35Ã— range, FOCUS shares `C.designated` with a 400 m bracket for WARDEN-3 and drops to COVER on `NO DESIGNATION`. Targets are re-picked every 0.5 s into `w.tgt`.
   - WARDEN-2 can enter LIMPING in AIR_SUPERIORITY / NAVAL_BATTLE (low HP or mid-stage): 220 kt low-G RTB to the carrier stern or RWY 36, grey pooled smoke ribbon, two assigned pursuers (revived from the bandit pool if needed) that steer toward her. Clearing them fires `WINGMAN SAVED +1500` as a STYLE entry, event banner, `WING_SAVED` telemetry and a thank-you call; losing her is a plain loss.
   - `?wingorderat=s:n` / `?limpat=s` and `__az.setWingOrder` / `__az.triggerWoundedWingman` make both deterministic. Headless checks confirm G cycling, COVER/FOCUS target sharing, smoke + 2 pursuers, SAVE reward and no limp in ACE_DUEL / CANYON_RUN, with zero JS errors and unchanged frame cost.
 
 - [x] **Solar IR blind + Vulcan missile intercepts** *(build `s96e`, v1.1.26, `src/combat.js`, `src/hud.js`, `index.html`)*
-  - `env.getSunDir` follows the live atmosphere sun; with the nose within 12° of it, clear skies and no cloud deck, `C.sunT` charges over 0.5 s. An IR seeker whose LOS to the player is within 18° of the sun then drops lock (`m.lostTrack`, `m.target=null`) for +350 with a radio call, event, `lockdrop` SFX and 3 s cooldown. RADAR/SAM and already-lost missiles are skipped; NIGHT disables it.
-  - Player gun rounds now test a swept segment–segment closest approach against each active enemy missile's `prevPos → pos` path (7 m). A hit detonates the missile safely, clears the warning/RWR, awards +800, fires slow-motion (with its own cooldown), a banner and a callout. All scratch vectors are preallocated.
+  - `env.getSunDir` follows the live atmosphere sun; with the nose within 12Â° of it, clear skies and no cloud deck, `C.sunT` charges over 0.5 s. An IR seeker whose LOS to the player is within 18Â° of the sun then drops lock (`m.lostTrack`, `m.target=null`) for +350 with a radio call, event, `lockdrop` SFX and 3 s cooldown. RADAR/SAM and already-lost missiles are skipped; NIGHT disables it.
+  - Player gun rounds now test a swept segmentâ€“segment closest approach against each active enemy missile's `prevPos â†’ pos` path (7 m). A hit detonates the missile safely, clears the warning/RWR, awards +800, fires slow-motion (with its own cooldown), a banner and a callout. All scratch vectors are preallocated.
   - `?sunat=s` / `?irmslat=s` / `?mslshootat=s` plus `__az.launchIR` / `__az.spawnHeadOn` / `__az.aimAtSun` make both deterministic; warp logs and `stats().sun` / `stats().intercepts` expose the state.
 
 - [x] **Linked weak points + flagship VLS telegraph** *(build `s97d`, v1.1.27, `src/combat.js`, `src/vfx.js`, `src/audio.js`, `src/hud.js`, `src/ambient.js`, `index.html`)*
-  - CG and CV_FLAG ships carry a destructible RADAR / AA mast (pooled virtual ground target, `◇ AA` HUD box). Gun, missile and bomb hits route to `hitSub()`; at zero HP the ship's flak, CIWS and SAM timers stop, an explosion/smoke column and `AA DISABLED +600` fire, and ambient flak density drops via `combat.activeAAShips`.
+  - CG and CV_FLAG ships carry a destructible RADAR / AA mast (pooled virtual ground target, `â—‡ AA` HUD box). Gun, missile and bomb hits route to `hitSub()`; at zero HP the ship's flak, CIWS and SAM timers stop, an explosion/smoke column and `AA DISABLED +600` fire, and ambient flak density drops via `combat.activeAAShips`.
   - Canyon rim sites have their own HP pool and virtual targets; destroyed sites flip `SITE_ON`, stop searchlights and are skipped by the barrage picker. Once both sites in a sector die, that sector fires nothing and neighbours fire half-size volleys. State is fully restored on mission switch.
   - The flagship telegraphs a salvo with a 3 s red charge beam and rising tone, then fires six spread VLS missiles that fly straight for 1.2 s before homing. Destroying the mast cancels it. `?subkillat=s` / `?sitekillat=s:i` / `?flagsalvoat=s` and matching `__az` helpers make all three deterministic.
 
 - [x] **Carrier wave-off ambush + supersonic tower buzz** *(build `s98b`, v1.1.28, `index.html`, `src/combat.js`, `src/hud.js`, `src/audio.js`, `src/vfx.js`)*
-  - A once-per-sortie 25 % roll during autoland GLIDE aborts cleanly (pose and velocity preserved, `allyHold` released, gear up, burner + pitch assist), switches BGM to `10_last_stand` via the `ambush` music-key component, and spawns 2–3 pooled ambush bandits ahead of the bow with a CRITICAL radio call and red banner. Clearing them restores `11_rtb`, scores +800 and re-enables the autoland prompt.
-  - Mach ≥ 1 sweeps the jet's frame against the carrier island, AFB tower and live bandits with pooled `Float32Array` anchors + per-enemy cooldowns. Hits fire a `TOWER BUZZ +500` / `SONIC PASS +250` banner, camera impulse, mach-cone pulse, persistent sonic-boom nodes and a callout. A 10 s cooldown prevents farming. `?waveoffat=s` / `?buzzat=s:kind` make both deterministic.
+  - A once-per-sortie 25 % roll during autoland GLIDE aborts cleanly (pose and velocity preserved, `allyHold` released, gear up, burner + pitch assist), switches BGM to `10_last_stand` via the `ambush` music-key component, and spawns 2â€“3 pooled ambush bandits ahead of the bow with a CRITICAL radio call and red banner. Clearing them restores `11_rtb`, scores +800 and re-enables the autoland prompt.
+  - Mach â‰¥ 1 sweeps the jet's frame against the carrier island, AFB tower and live bandits with pooled `Float32Array` anchors + per-enemy cooldowns. Hits fire a `TOWER BUZZ +500` / `SONIC PASS +250` banner, camera impulse, mach-cone pulse, persistent sonic-boom nodes and a callout. A 10 s cooldown prevents farming. `?waveoffat=s` / `?buzzat=s:kind` make both deterministic.
 
 - [x] **Instanced agile drone swarm** *(build `s99a`, v1.1.29, `index.html`, `src/combat.js`, `src/hud.js`, `src/audio.js`)*
-  - Separate pooled archetype: one `InstancedMesh` delta-wing body + additive engine-glow `Points`, typed-array flight state, in-place bounding-sphere culling, zero per-frame allocations. 6–8 drones spawn on mid/late AIR SUPERIORITY waves, NAVAL stages 2/3 (half carrier-anchored) and every 75 s in FURBALL; never ACE_DUEL or CANYON_RUN. They stay out of `enemies`, the debrief map and RWR.
-  - Boids/orbit steering with periodic peel-off pursuit and short cannon bursts. Virtual `DRONE_TGT` lock objects feed the normal seeker and 4AAM (0.6× lock time); a single Vulcan round or missile kills one, with 12 m splash, `SWARM KILL +200`, `QUAD SPLASH` and a `SWARM CLEARED +1000` finish. HUD draws compact `◇` markers, an amber `SWARM n/8` bracket, radar diamonds and inbound/cleared banners; a persistent sawtooth hum tracks the nearest drone.
+  - Separate pooled archetype: one `InstancedMesh` delta-wing body + additive engine-glow `Points`, typed-array flight state, in-place bounding-sphere culling, zero per-frame allocations. 6â€“8 drones spawn on mid/late AIR SUPERIORITY waves, NAVAL stages 2/3 (half carrier-anchored) and every 75 s in FURBALL; never ACE_DUEL or CANYON_RUN. They stay out of `enemies`, the debrief map and RWR.
+  - Boids/orbit steering with periodic peel-off pursuit and short cannon bursts. Virtual `DRONE_TGT` lock objects feed the normal seeker and 4AAM (0.6Ã— lock time); a single Vulcan round or missile kills one, with 12 m splash, `SWARM KILL +200`, `QUAD SPLASH` and a `SWARM CLEARED +1000` finish. HUD draws compact `â—‡` markers, an amber `SWARM n/8` bracket, radar diamonds and inbound/cleared banners; a persistent sawtooth hum tracks the nearest drone.
   - `?drones=1` / `?droneat=s`, `__az.spawnDroneSwarm()` / `__az.killDrone(i)`, once-per-second warp logs and `stats().drones` make headless verification deterministic.
 
 - [x] **Wingman roles + canyon trench shortcut** *(build `s99b`, v1.1.30, `src/loadout.js`, `src/combat.js`, `src/maps.js`, `src/world.js`, `src/hud.js`, `index.html`)*
-  - Persistent `angelsZero_wingRoles` ({w2:'CAP', w3:'STRIKE'}), STANDBY role row with sub-cursor pills and roster tags, `?roles=CAP,STRIKE`. STRIKE wings prioritise subsystem masts, ships and (in CANYON) rim SAM sites, with a 6 s rear-hemisphere self-defence override and CAP fallback; FORM/FOCUS orders still override the role. SEAD shots use the trench centreline, a 15°/2.5 km firing gate and a 12 s cadence.
-  - `GORGE_SC_*` constants define a 2.2 km straight ravine across the first S-bend: analytic carve in `gorgeHeight()` (one height grid, no extra draw calls), one three-instance jittered rock arch with three AABB blockers, rim sites inside the ravine suppressed. Swept z-plane state machine (`IDLE→IN→ARCH_OK→DONE`) awards `TRENCH SHORTCUT +1200`, skips gates 5..5 and calls WARDEN-2; flying high or wide fails cleanly.
+  - Persistent `angelsZero_wingRoles` ({w2:'CAP', w3:'STRIKE'}), STANDBY role row with sub-cursor pills and roster tags, `?roles=CAP,STRIKE`. STRIKE wings prioritise subsystem masts, ships and (in CANYON) rim SAM sites, with a 6 s rear-hemisphere self-defence override and CAP fallback; FORM/FOCUS orders still override the role. SEAD shots use the trench centreline, a 15Â°/2.5 km firing gate and a 12 s cadence.
+  - `GORGE_SC_*` constants define a 2.2 km straight ravine across the first S-bend: analytic carve in `gorgeHeight()` (one height grid, no extra draw calls), one three-instance jittered rock arch with three AABB blockers, rim sites inside the ravine suppressed. Swept z-plane state machine (`IDLEâ†’INâ†’ARCH_OKâ†’DONE`) awards `TRENCH SHORTCUT +1200`, skips gates 5..5 and calls WARDEN-2; flying high or wide fails cleanly.
   - `?at=scmouth` / `?alt=200` headless poses, `sc` logs and `stats().shortcut` / `stats().style.wingRoles`. Cached GORGE rebuild stays under 15 ms because the carve costs only a few scalar ops per grid cell.
 
 - [x] **Hot scramble, broken-wing recovery, CRIMSON-1 intrusion** *(build `s9ba`, v1.1.31, `index.html`, `src/combat.js`, `src/audio.js`, `src/profile.js`, `src/hud.js`)*
   - NAVAL catapult launches roll a 30 % hot scramble (`?scramble=1/0`): two inert pooled raiders sweep the bow on carrier-local paths, CIWS tracers and water splashes fill the hold, and `catRelease()` hands them over to normal ENGAGE AI with weapons live. No player damage or collision while `cat.ph` is HOLD/LAUNCH.
-  - Sticky `C.bw.eligible` from `syncEngineFlags()`; `?engoutat=s:L` forces it. A manual carrier trap or smooth runway touchdown awards BROKEN WING +2000, sets a permanent profile badge, and puts a ★ cell on the debrief.
-  - `C.intr` CUT/DUEL/DONE state holds stage advance + RTB, plays `audio.bgmCut(1.5)` with radio static, spawns a single diving CRIMSON-1 with combo ≥ 4 (or `?intrusion=1`), forces `08_crimson_duel` through `musicCtx.intrusion`, holds the wingmen in FORM, and unlocks RTB on kill or long-range disengage. `?intrusionat=s` forces it deterministically.
+  - Sticky `C.bw.eligible` from `syncEngineFlags()`; `?engoutat=s:L` forces it. A manual carrier trap or smooth runway touchdown awards BROKEN WING +2000, sets a permanent profile badge, and puts a â˜… cell on the debrief.
+  - `C.intr` CUT/DUEL/DONE state holds stage advance + RTB, plays `audio.bgmCut(1.5)` with radio static, spawns a single diving CRIMSON-1 with combo â‰¥ 4 (or `?intrusion=1`), forces `08_crimson_duel` through `musicCtx.intrusion`, holds the wingmen in FORM, and unlocks RTB on kill or long-range disengage. `?intrusionat=s` forces it deterministically.
 
 - [x] **Friendly ESM zones + cloud icing** *(build `s9bc`, v1.1.33, `src/combat.js`, `src/hud.js`, `src/canopyglass.js`, `src/cockpit3d.js`, `index.html`)*
-  - Carrier (NAVAL) and orbiting AWACS (AIR_SUPERIORITY) broadcast a 4.5 km friendly ESM umbrella with hysteresis. Inside: 1.6× lock build, 1.3× missile reload and 1.25× turn on missiles latched at launch. Cyan radar ring, ESM ACTIVE badge and VSD circle show coverage; ACE_DUEL / CANYON never get it.
+  - Carrier (NAVAL) and orbiting AWACS (AIR_SUPERIORITY) broadcast a 4.5 km friendly ESM umbrella with hysteresis. Inside: 1.6Ã— lock build, 1.3Ã— missile reload and 1.25Ã— turn on missiles latched at launch. Cyan radar ring, ESM ACTIVE badge and VSD circle show coverage; ACE_DUEL / CANYON never get it.
   - `state.cloudIce` builds in thick cloud (0.45 threshold), melts in clear air and twice as fast on burner. At high ice, pitch/roll authority fades 20 % and drag rises 12 %; `[ ICING ]` banner, master caution, radio call, canopy frost shader and a cached HUD frost vignette make the risk legible. `?esm=0`, `?awacsat=s`, `?icecloud=s`, `?ice=v` provide deterministic tests.
 
-- [x] **Ace Combat feel pass** *(build `s9bd`, v1.1.34, `index.html`, `src/combat.js`, `src/hud.js`, `src/audio.js`, `src/vfx.js`, `src/cockpit3d.js`, `src/canopyglass.js`)*
+- [x] **Ace Combat feel pass** *(build `s9be`, v1.1.34, `index.html`, `src/combat.js`, `src/hud.js`, `src/audio.js`, `src/vfx.js`, `src/cockpit3d.js`, `src/canopyglass.js`)*
   - Hold-T padlock springs the chase / cockpit camera onto `C.designated` with neck limits, releasing cleanly without disturbing freelook or the missile cam. Y cycles radar zoom 4/10/25 km with persistence; both views and the F1 sheet show the new keys.
   - Pooled in-world `HIT` / `DESTROYED` stamps (0.8 s, 8 slots) fire from `env.onHitStamp`; `C.shootCue` lights `[ SHOOT ]` on rear/head-on aspects with a 0.25 s hold.
   - `env.onMissionUpdate` + `audio.bgmDip(1.2)` + `hud.radarPulse()` + `[ MISSION UPDATE ]` banner fire on stage escalation, flagship spawn, ambush and intrusion CUT with a 4 s cooldown. Cloud-deck punch flashes the canopy and boosts mist; contrails ease in above 12,000 ft on the existing pooled ribbons (no new draw calls).
 
-## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
-- [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
+## Pillar 5 â€” Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
+- [x] **3rd person** â€” `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.
-- [x] **1st person** — conformal ladder + tapes clipped to the combiner glass.
-- [x] **Sleek chamfered HUD polish** *(build `s23a`)* — tapered F-15 combiner
+- [x] **1st person** â€” conformal ladder + tapes clipped to the combiner glass.
+- [x] **Sleek chamfered HUD polish** *(build `s23a`)* â€” tapered F-15 combiner
   (narrowing top, chamfered upper corners) on thin dark anodized posts, green-
   cyan tint at 0.14 opacity with no glowing border; open 1 px pointed readouts
-  `[ 455 >` / `< 4256 ]` in both views, `▼ 347` heading without a box, 1 px
+  `[ 455 >` / `< 4256 ]` in both views, `â–¼ 347` heading without a box, 1 px
   ladders with shorter micro-ticks, open-corner `A/B` / `ARM` tags, rounded
   1 px radar frame, translucent glass-pill `PATCH NOTES` / `CONTROLS` buttons.
 - [x] **F-15C cockpit interior replication** *(build `s30a`, `src/cockpit3d.js`)*
-  — reference-matched analog panel: light military-grey structure (#8f99a1
+  â€” reference-matched analog panel: light military-grey structure (#8f99a1
   crinkle coat), dark charcoal glare shield and sub-plates, white silkscreen,
   hazard-striped EMERG LG / EMERG JETT / EMERG BK, one static 2048 px painted
   faceplate + real 3D bezels, knobs, toggles, lamps. Live: VSD B-scope radar
   (sweep, blips, designation / lock), round TEWS (RWR bearings), 3D ADI ball
   (rolls + pitches with attitude), HSI (rotating rose, target bearing bug,
   miles), ASI / Mach, AoA, G (with peak), ALT, VVI, clock, twin RPM / TEMP /
-  FUEL FLOW / NOZ POS, FUEL QTY, HYD — 16 dials in one atlas at 15 Hz, CRTs at
+  FUEL FLOW / NOZ POS, FUEL QTY, HYD â€” 16 dials in one atlas at 15 Hz, CRTs at
   30 Hz. UFC / HUD SET with MASTER CAUTION + AI/SAM lamps, A/G-ADI-VI, gear
   NOSE/LEFT/RIGHT + FLAP lamps, L/R ENG FIRE, red gear handle + SELECT JETT.
   Amber 3x13 caution matrix lit by low fuel, over-G / G-strain, gun overheat,
@@ -1741,7 +1741,7 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   700 + 4,300 x throttle + 17,000 x AB pph per engine; refills on respawn).
   Verified headless: straight ahead, pull + roll + AB, NVG, dusk, DMG 90 %
   cautions, chase / menu regressions, zero page console errors.
-- [x] **Animated 3D HOTAS** *(`src/cockpit3d.js`)* — center stick (ribbed boot,
+- [x] **Animated 3D HOTAS** *(`src/cockpit3d.js`)* â€” center stick (ribbed boot,
   charcoal shaft, contoured grip, thumb rest, 4-way trim hat, red pickle,
   two-stage trigger) tilting +/-16 deg pitch / +/-18 deg roll from `state.ctl`,
   trigger squeezes while the Vulcan fires, pickle depresses on every missile /
@@ -1749,11 +1749,11 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   sweeping -22 deg idle -> +16 deg MIL -> +28 deg afterburner. Eye line lowered
   to -12 deg so the grips frame below the MFD screens. Verified headless
   (neutral, pull + roll, push + roll, idle, fire, pickle, NVG, chase).
-- [x] **Radar** — bottom-left 4 NM square radar with coastline / contour
+- [x] **Radar** â€” bottom-left 4 NM square radar with coastline / contour
   overlay, runway + bridge marks, bandit / missile blips.
-- [x] **Stores** — bottom-right GUN / MSL / UGB / FLR / DMG list, F-15C
+- [x] **Stores** â€” bottom-right GUN / MSL / UGB / FLR / DMG list, F-15C
   wireframe with per-pylon AIM-9 reload icons.
-- [x] **Menus** — AC7/AC8 glass briefing + tactical pause menu (volume,
+- [x] **Menus** â€” AC7/AC8 glass briefing + tactical pause menu (volume,
   restart, camera preview, time-of-day selector, patch notes).
 
 ---
@@ -1769,7 +1769,7 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
 | Shift | Afterburner; High-G turn while pulling (also W+S) |
 | LMB / F | M61 Vulcan cannon |
 | RMB / M | Fire selected: AIM-9, 4AAM ripple, or drop UGB |
-| R · 1 / 2 / 3 | Cycle MSL / 4AAM / UGB · select MSL / UGB / 4AAM |
+| R Â· 1 / 2 / 3 | Cycle MSL / 4AAM / UGB Â· select MSL / UGB / 4AAM |
 | (auto) | APG-63 auto-radar designation of the forward bandit(s) |
 | C | Lock missile seeker / cycle target when locked |
 | Z | ALQ-135 ECM jammer (6 s on, 14 s recharge) |
@@ -1789,27 +1789,27 @@ toggle, ejection, bridge fly-under. User-facing weapon labels unified to
 MSL / UGB (briefing, radio call, CCIP reload cue, stores list).
 
 ## Debug URL flags (require `?debug`)
-`subkillat=s` (cripple nearest AA mast) · `sitekillat=s:i` (destroy rim site i) · `flagsalvoat=s` (force flagship telegraph) · `sunat=s` (hold nose on sun 1 s) · `irmslat=s` (IR missile from 3 km behind) · `mslshootat=s` (head-on missile in gun line) · `wingorderat=s:n` (force wing order 0/1/2) · `limpat=s` (force wounded WARDEN-2) · `ambient=0` (kill all living-world effects) · `hold=s,a,...` (hold keys) · `keyat=s:key,...` (real keydown/keyup) · `carrierfinalat=s` (carrier final, 450 m behind the stern) · `duelahead=s` (CRIMSON 800 m ahead) · `nointro` · `cockpit` · `freeze` · `warp=s` · `pose=bank,pitch` · `mouse=x,y`
-· `ab` · `highg` · `alt=m` · `spd=m/s` · `at=x,y,z,hdg|airbase|canyon|bridgeA|
-bridgeB|volcano|wind|harbor` · `overview[=h]` · `tod=NAME&az=deg` ·
-`todto=NAME:t` · `rolls=n` · `nvg` / `nvgat=s` · `camat=x,y,z` ·
-`bogey=m` · `six=m` · `place=i:az:el:dist,...` · `cat=s` · `catat=s` · `catlaunchat=s` · `killat=s` ·
-`mslat=s` · `bshot=soft|full` · `wpn=bomb` · `bomb=n` · `bombat=s` ·
-`flare` / `flareat=s` · `breakat=m` · `cloudpos=az:el:dist` · `cloudon=t:i` ·
-`look=yaw,pitch` (hold free look, degrees) · `lookoff=s` (release at s) ·
-`at=final18|rig|stack` (3.6 km RWY 18 final / oil rig run / sea-stack run) ·
-`at=fleet` · `phase=1|2|3` · `sinkat=s[,i]` (sink task-force ship i) · `maskshot=s` (aimed bandit shot)
-· `wingtest=L|R|C,dist` (passive bandit on the gun line) · `wingtrack=L|R` (keep the nose on its wing while firing) · `dmg=pct` · `ccrp=i,dist,alt[,spd]` (level run-in at surface target i) · `fireon=t` / `fireoff=t` (trigger)
-· `wx=CLEAR|SCATTERED|OVERCAST_RAIN|THUNDERSTORM` · `difficulty=ROOKIE|NORMAL|ACE` (forced, not saved) · `diffcycle=n` (n briefing clicks; no `nointro`) · `logat=t,...` · `fireat=t` (RMB) · `ecmat=t` (Z) · `wpn=aam4` · `fire` · `msl` · `eject` · `alert` · `force=cone,vapor,mist`
-· `merge=m` (head-on bandit) · `ram=m` (head-on, no break) · `lowpatrol=m` · `ace` (start in PHASE 3: SCARLET 1 + 2 escorts) · `debrief=CLEARED|FAILED[,score]` (end the sortie 3 s after load) · `onrwy[=z]` (stopped on RWY 36, gear down) · `gear` (start gear down)
-(wave patrols low over the islands, no engaging) · `bandcam=i,dist` (chase
+`subkillat=s` (cripple nearest AA mast) Â· `sitekillat=s:i` (destroy rim site i) Â· `flagsalvoat=s` (force flagship telegraph) Â· `sunat=s` (hold nose on sun 1 s) Â· `irmslat=s` (IR missile from 3 km behind) Â· `mslshootat=s` (head-on missile in gun line) Â· `wingorderat=s:n` (force wing order 0/1/2) Â· `limpat=s` (force wounded WARDEN-2) Â· `ambient=0` (kill all living-world effects) Â· `hold=s,a,...` (hold keys) Â· `keyat=s:key,...` (real keydown/keyup) Â· `carrierfinalat=s` (carrier final, 450 m behind the stern) Â· `duelahead=s` (CRIMSON 800 m ahead) Â· `nointro` Â· `cockpit` Â· `freeze` Â· `warp=s` Â· `pose=bank,pitch` Â· `mouse=x,y`
+Â· `ab` Â· `highg` Â· `alt=m` Â· `spd=m/s` Â· `at=x,y,z,hdg|airbase|canyon|bridgeA|
+bridgeB|volcano|wind|harbor` Â· `overview[=h]` Â· `tod=NAME&az=deg` Â·
+`todto=NAME:t` Â· `rolls=n` Â· `nvg` / `nvgat=s` Â· `camat=x,y,z` Â·
+`bogey=m` Â· `six=m` Â· `place=i:az:el:dist,...` Â· `cat=s` Â· `catat=s` Â· `catlaunchat=s` Â· `killat=s` Â·
+`mslat=s` Â· `bshot=soft|full` Â· `wpn=bomb` Â· `bomb=n` Â· `bombat=s` Â·
+`flare` / `flareat=s` Â· `breakat=m` Â· `cloudpos=az:el:dist` Â· `cloudon=t:i` Â·
+`look=yaw,pitch` (hold free look, degrees) Â· `lookoff=s` (release at s) Â·
+`at=final18|rig|stack` (3.6 km RWY 18 final / oil rig run / sea-stack run) Â·
+`at=fleet` Â· `phase=1|2|3` Â· `sinkat=s[,i]` (sink task-force ship i) Â· `maskshot=s` (aimed bandit shot)
+Â· `wingtest=L|R|C,dist` (passive bandit on the gun line) Â· `wingtrack=L|R` (keep the nose on its wing while firing) Â· `dmg=pct` Â· `ccrp=i,dist,alt[,spd]` (level run-in at surface target i) Â· `fireon=t` / `fireoff=t` (trigger)
+Â· `wx=CLEAR|SCATTERED|OVERCAST_RAIN|THUNDERSTORM` Â· `difficulty=ROOKIE|NORMAL|ACE` (forced, not saved) Â· `diffcycle=n` (n briefing clicks; no `nointro`) Â· `logat=t,...` Â· `fireat=t` (RMB) Â· `ecmat=t` (Z) Â· `wpn=aam4` Â· `fire` Â· `msl` Â· `eject` Â· `alert` Â· `force=cone,vapor,mist`
+Â· `merge=m` (head-on bandit) Â· `ram=m` (head-on, no break) Â· `lowpatrol=m` Â· `ace` (start in PHASE 3: SCARLET 1 + 2 escorts) Â· `debrief=CLEARED|FAILED[,score]` (end the sortie 3 s after load) Â· `onrwy[=z]` (stopped on RWY 36, gear down) Â· `gear` (start gear down)
+(wave patrols low over the islands, no engaging) Â· `bandcam=i,dist` (chase
 camera on bandit i).
 
 ## Next
-0. **Step 4 (final): landing gear + runway ops** — gear / flaps / hook,
+0. **Step 4 (final): landing gear + runway ops** â€” gear / flaps / hook,
    touchdown physics, taxi, takeoff roll, rearm on the runway.
 1. Pillar 1: extract `state` / `combat` into `src/state.js`; fixed-step
    simulation accumulator.
-2. Pillar 2: extract `updatePhysics` → `src/flight.js` and the chase camera →
+2. Pillar 2: extract `updatePhysics` â†’ `src/flight.js` and the chase camera â†’
    `src/camera.js`; add FOV speed kick and an explicit stall / departure
    recovery model.

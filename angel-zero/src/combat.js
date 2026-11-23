@@ -8,13 +8,13 @@
 // burning wrecks that splash, scoring, waves, lock-on and threat warnings.
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { DIFFICULTY_PRESETS } from './difficulty.js?v=s9bd';
-import { SPW } from './loadout.js?v=s9bd';
-import { missionConfig } from './missions.js?v=s9bd';
+import { DIFFICULTY_PRESETS } from './difficulty.js?v=s9be';
+import { SPW } from './loadout.js?v=s9be';
+import { missionConfig } from './missions.js?v=s9be';
 import { gorgeCentreX, gorgeSlope, gorgeHeading, gorgeDist, GORGE_GATE_Z, GORGE_GATE_N, GORGE_FLOOR_Y, GORGE_RIM_Y,
   GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_FORT, GORGE_ARC_M, GORGE_SPAWN_Z, CEIL_M,
   GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_ZB, GORGE_SC_HALF_W, GORGE_SC_ARCH_Z, GORGE_SC_ARCH_Y0,
-  GORGE_SC_ARCH_W, GORGE_SC_SKIP, GORGE_SC_SAVE_M } from './maps.js?v=s9bd';
+  GORGE_SC_ARCH_W, GORGE_SC_SKIP, GORGE_SC_SAVE_M } from './maps.js?v=s9be';
 
 const NM = 1852, FT = 0.3048, G0 = 9.81;
 // Allied CVN model: same 360 m deck as the procedural ship, re-anchored to the GLB.
@@ -4574,6 +4574,7 @@ export function createCombat(THREE, env) {
     if (!t.alive) return;
     if (t.ship && t.hpMax === undefined) t.hpMax = t.hp;
     t.hp -= n;
+    if (t.hp > 0) emitStamp(t, 0);
     if (t.ship && !t.smokeClaimed && t.hpMax && t.hp > 0 && t.hp < t.hpMax * 0.5) {
       t.smokeClaimed = true;
       if (env.onSmoke) env.onSmoke(t.pos, 1);
