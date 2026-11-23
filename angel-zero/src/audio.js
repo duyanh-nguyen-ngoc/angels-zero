@@ -9,7 +9,7 @@
 // to the procedural layers below. A master "hearing tunnel" low-pass sweeps
 // 12 kHz -> 550 Hz as the pilot approaches G-LOC.
 
-import { MISSIONS } from './missions.js?v=s9be';
+import { MISSIONS } from './missions.js?v=s9bf';
 
 export function createAudio() {
   let ctx = null, master = null, cockpitLP = null, ready = false;
@@ -149,7 +149,7 @@ export function createAudio() {
     comp.threshold.value = -16; comp.knee.value = 12; comp.ratio.value = 5; comp.attack.value = 0.004; comp.release.value = 0.25;
     cockpitLP = filt('lowpass', 18000, 0.5);                // canopy muffles the outside world in first person
     // G-LOC hearing tunnel: master low-pass, 12 kHz open -> 550 Hz near blackout.
-    N.tunnel = filt('lowpass', 12000, 0.6);
+    N.tunnel = filt('lowpass', 12000, 0.5);
     // Slow-mo bass drop: whole-world low-pass + 90 Hz shelf, swept open again on recovery.
     N.slowLP = filt('lowpass', 20000, 0.7);
     N.slowShelf = ctx.createBiquadFilter(); N.slowShelf.type = 'lowshelf'; N.slowShelf.frequency.value = 90; N.slowShelf.gain.value = 0;
@@ -160,6 +160,19 @@ export function createAudio() {
     cockpitLP.connect(master); master.connect(N.slowLP).connect(N.slowShelf).connect(N.duck); N.duck.connect(N.tunnel); N.tunnel.connect(comp); comp.connect(N.analyser); N.analyser.connect(ctx.destination);
     // Body bus: the pilot's own breathing / heartbeat and the headset chime skip the tunnel.
     N.body = gain(muted ? 0 : volume); N.body.connect(comp);
+    // Pilot physiology: all nodes built once. Body sounds bypass the hearing tunnel.
+    const pNoise = loopNoise(N.white);
+    N.breathBP1 = filt('bandpass', 550, 1.1); N.breathBP2 = filt('bandpass', 1500, 1.4);
+    N.breathG = gain(0); pNoise.connect(N.breathBP1).connect(N.breathG).connect(N.body);
+    pNoise.connect(N.breathBP2).connect(N.breathG);
+    N.hissHP = filt('highpass', 2500, 0.7); N.hissG = gain(0); pNoise.connect(N.hissHP).connect(N.hissG).connect(N.body);
+    N.gaspBP = filt('bandpass', 800, 1.2); N.gaspG = gain(0); pNoise.connect(N.gaspBP).connect(N.gaspG).connect(N.body);
+    N.heartA = osc('sine', 55); N.heartB = osc('sine', 42); N.heartG = gain(0);
+    N.heartAGain = gain(0); N.heartBGain = gain(0);
+    N.heartA.connect(N.heartAGain).connect(N.heartG); N.heartB.connect(N.heartBGain).connect(N.heartG); N.heartG.connect(N.body);
+    N.tinA = osc('sine', 7800); N.tinB = osc('sine', 8100); N.tinG = gain(0);
+    N.tinA.connect(N.tinG); N.tinB.connect(N.tinG); N.tinG.connect(N.body);
+    N.nextGBeat = 0; N.nextGBreath = 0; N.gSuitArm = true; N.gPeakMix = 0;
     // Voiced radio: headset bus (skips cockpit LP + G-LOC tunnel).
     N.radioBus = gain(0.95); N.radioBus.connect(N.body);
     // Comms DSP: HP -> LP -> soft clip -> compressor -> ring-mod split -> pan -> analyser.
@@ -682,6 +695,23 @@ export function createAudio() {
     if (samples.buffet && !N.buff) { N.buff = loopVoice(samples.buffet); N.buffGain = gain(0); N.buff.connect(N.buffGain).connect(cockpitLP); }
     if (samples.breath && !N.breath) { N.breath = loopVoice(samples.breath); N.breathGain = gain(0); N.breath.connect(N.breathGain).connect(N.body); }
   }
+  // Recovery gasp: two ragged inhales through a sweeping band-pass on the body bus.
+  function gasp(strong = false) {
+    if (!ready || !N.gaspBP) return;
+    const t = ctx.currentTime, amp = strong ? 0.5 : 0.32;
+    N.gaspBP.frequency.cancelScheduledValues(t);
+    N.gaspBP.frequency.setValueAtTime(800, t);
+    N.gaspBP.frequency.linearRampToValueAtTime(2200, t + 0.35);
+    N.gaspBP.frequency.setValueAtTime(900, t + 0.5);
+    N.gaspBP.frequency.linearRampToValueAtTime(2000, t + 0.85);
+    const gp = N.gaspG.gain;
+    gp.cancelScheduledValues(t); gp.setValueAtTime(0, t);
+    for (const [a, dur] of [[0, 0.45], [0.52, 0.45]]) {
+      gp.linearRampToValueAtTime(amp, t + a + 0.08);
+      gp.setValueAtTime(amp * 0.85, t + a + dur * 0.6);
+      gp.linearRampToValueAtTime(0, t + a + dur);
+    }
+  }
   // Over-G / G-LOC warning chime (sample, or a two-tone avionics fallback).
   function glocChime() {
     if (!ready) return;
@@ -1098,7 +1128,8 @@ export function createAudio() {
     if (BGM_OK) {
       // src -> g -> musicBus -> duckG -> musicVolG -> master (all created once).
       N.musicBus = gain(0.62); N.duckG = gain(1); N.musicVolG = gain(musicOn ? musicVol : 0);
-      N.musicBus.connect(N.duckG).connect(N.musicVolG).connect(master);
+      N.musicBus.connect(N.duckG).connect(N.musicVolG);
+    N.gBgmG = gain(1); N.musicVolG.connect(N.gBgmG).connect(master);
       for (let i = 0; i < 2; i++) {
         const el = new Audio();
         el.loop = true; el.preload = 'none'; el.crossOrigin = 'anonymous';
@@ -1813,16 +1844,68 @@ export function createAudio() {
     if (N.buff) { set(N.buffGain.gain, 0.25 * buffK, 0.12); set(N.buff.playbackRate, 0.9 + 0.3 * buffK, 0.2); }
     set(N.buffFGain.gain, 0.25 * buffK * (0.7 + 0.3 * Math.random()), 0.05);
     updateWind(p, kts, live);
-    // G-LOC: hearing tunnel (14 kHz -> 480 Hz above 0.45) on the outside world only.
-    set(N.tunnel.frequency, 14000 * Math.pow(480 / 14000, sm(gs, 0.45, 1.0)), 0.12);
-    // Pilot anti-G breathing from 5 G / strain 0.15; heartbeat from strain 0.35 (95 -> 155 BPM).
-    const breathK = Math.max(sm(gs, 0.15, 0.7), 0.7 * sm(gl, 5.0, 7.5)) * live;
+    // ---- pilot G physiology mix -------------------------------------------------
+    const gStrain = p.gStrain || 0, gloc = !!p.gloc, gNeg = p.gNeg || 0;
+    const S = sm(gStrain, 0.30, 0.95);
+    const tunnelHz = gloc ? 200 : 14000 * Math.pow(320 / 14000, S);
+    set(N.tunnel.frequency, tunnelHz, 0.15);
+    if (N.gBgmG) set(N.gBgmG.gain, gloc ? 0.1 : 1 - 0.7 * S, 0.15);
     const tNow = ctx.currentTime;
-    if (breathK > 0.03 && tNow >= N.nextBreath) { const period = 2.6 - 1.1 * breathK; breathCycle(breathK, period); N.nextBreath = tNow + period; }
-    if (N.breath) { set(N.breathGain.gain, 0.22 * breathK, 0.2); set(N.breath.playbackRate, 1 + 0.25 * gs, 0.3); }
-    const heartK = sm(gs, 0.35, 0.8) * live;
-    if (heartK > 0.02 && tNow >= N.nextBeat) { heartbeat(0.5 + 0.5 * heartK); N.nextBeat = tNow + 60 / (95 + 60 * sm(gs, 0.35, 1.0)); }
-    N.dbg = { groanK: +groanK.toFixed(2), lugK: +lugK.toFixed(2), buffK: +buffK.toFixed(2), breathK: +breathK.toFixed(2), heartK: +heartK.toFixed(2), tunnel: Math.round(N.tunnel.frequency.value) };
+    // AGSM: 3 s cycle from 4.5 G. Strain phase = 2.5 s of 4 Hz grunts, then a
+    // 0.5 s exhale / inhale burst. Gain envelope only; the noise source is persistent.
+    const breathK = (gloc ? 0.85 : 0.65 * sm(gl, 4.5, 8.5)) * live;
+    set(N.breathG.gain, breathK, 0.1);
+    if (breathK > 0.02 && tNow + 0.1 >= N.nextGBreath) {
+      const at = Math.max(tNow, N.nextGBreath);
+      const bg = N.breathG.gain;
+      bg.setValueAtTime(0.15 * breathK, at);
+      for (let i = 0; i < 10; i++) {
+        const p0 = at + i * 0.25;
+        bg.setValueAtTime(0.15 * breathK, p0);
+        bg.linearRampToValueAtTime(0.55 * breathK, p0 + 0.07);
+        bg.linearRampToValueAtTime(0.15 * breathK, p0 + 0.2);
+      }
+      bg.setValueAtTime(0.9 * breathK, at + 2.6); bg.linearRampToValueAtTime(0.1 * breathK, at + 3);
+      N.nextGBreath = at + 3;
+    }
+    // G-suit inflation hiss at 4.5 G, re-armed below 4.2; soft deflation on unloading.
+    if (gl >= 4.5 && N.gSuitArm && live) {
+      N.gSuitArm = false;
+      N.hissG.gain.cancelScheduledValues(tNow); N.hissG.gain.setValueAtTime(0, tNow);
+      N.hissG.gain.linearRampToValueAtTime(0.28, tNow + 0.03);
+      N.hissG.gain.setTargetAtTime(0, tNow + 0.03, 0.2);
+    } else if (gl < 4.2) {
+      if (!N.gSuitArm) {
+        N.hissG.gain.cancelScheduledValues(tNow);
+        N.hissG.gain.setValueAtTime(N.hissG.gain.value, tNow);
+        N.hissG.gain.linearRampToValueAtTime(0.06, tNow + 0.05);
+        N.hissG.gain.setTargetAtTime(0, tNow + 0.05, 0.25);
+      }
+      N.gSuitArm = true;
+    }
+    // Heartbeat: lub-dub pair 0.12 s apart, BPM 110 -> 165 with strain.
+    const bpm = 110 + 55 * sm(gStrain, 0.30, 1.0);
+    const heartK = (gloc ? 1 : 0.62 * sm(gStrain, 0.30, 0.6)) * live;
+    set(N.heartG.gain, heartK, 0.08);
+    if (heartK > 0.02 && tNow + 0.1 >= N.nextGBeat) {
+      const at = Math.max(tNow, N.nextGBeat), period = 60 / bpm;
+      for (const [off, amp, f] of [[0, 1, 55], [0.12, 0.72, 42]]) {
+        const o = off ? N.heartB : N.heartA, g = off ? N.heartBGain : N.heartAGain;
+        o.frequency.setValueAtTime(f, at + off);
+        if (g) { g.gain.cancelScheduledValues(at + off); g.gain.setValueAtTime(0, at + off);
+          g.gain.linearRampToValueAtTime(amp * heartK, at + off + 0.012);
+          g.gain.exponentialRampToValueAtTime(0.001, at + off + 0.16); }
+      }
+      N.nextGBeat = at + period;
+      N.beatPhase = at;
+    }
+    // Tinnitus: 7.8 / 8.1 kHz ring at high strain, 0.08 in G-LOC, 2 s fade on waking.
+    let tin = 0.04 * sm(gStrain, 0.65, 0.99);
+    if (gloc) { tin = 0.08; N.tinFade = tNow + 2; }
+    if (N.tinFade && tNow < N.tinFade) tin = Math.max(tin, 0.08 * (N.tinFade - tNow) / 2);
+    set(N.tinG.gain, live ? tin : 0, 0.12);
+    N.gmix = { lp: N.tunnel.frequency.value, bpm: bpm, breath: breathK, tin: tin, beatPhase: N.beatPhase || 0, neg: gNeg };
+    N.dbg = { groanK: +groanK.toFixed(2), lugK: +lugK.toFixed(2), buffK: +buffK.toFixed(2), breathK: +breathK.toFixed(2), heartK: +heartK.toFixed(2), tunnel: Math.round(N.tunnel.frequency.value), bpm: Math.round(bpm), neg: +gNeg.toFixed(2) };
     if (p.glocWarn && (!N.chimeT || ctx.currentTime - N.chimeT > 2.4)) { glocChime(); N.chimeT = ctx.currentTime; }
     if (!p.glocWarn) N.chimeT = 0;
 
@@ -1938,6 +2021,7 @@ export function createAudio() {
       return Math.sqrt(s / N.anaBuf.length);
     },
     get layers() { return N.dbg || null; },
+    get gmix() { return N.gmix || null; }, get dbg() { return N.dbg || null; }, gasp,
     // Slipstream / buffet bus targets + live AudioParam values (for __audioDebug).
     get wind() { return N.windDbg || null; },
     // Last two-stage detonation (crack band, sub sweep, crack / boom times, travel delay).

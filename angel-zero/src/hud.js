@@ -6,8 +6,8 @@
 // clipped to the 3D combiner glass. Square tactical radar (bottom-left), stores
 // list + F-15C silhouette with per-pylon AIM-9 reload icons (bottom-right),
 // open-corner target brackets, edge pointers, minimal top-left telemetry.
-import { SPW } from './loadout.js?v=s9be';
-import { GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_FLOOR_Y } from './maps.js?v=s9be';
+import { SPW } from './loadout.js?v=s9bf';
+import { GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_FLOOR_Y } from './maps.js?v=s9bf';
 
 export function createHUD(THREE, A) {
   const canvas = A.canvas;
@@ -59,6 +59,8 @@ export function createHUD(THREE, A) {
   // Pooled in-world hit stamps.
   const STAMP_POS = new Float32Array(STAMP_N * 3), STAMP_T = new Float32Array(STAMP_N), STAMP_K = new Uint8Array(STAMP_N);
   STAMP_T.fill(99);
+  const G_JITTER = new Float32Array(32);
+  for (let i = 0; i < 32; i++) G_JITTER[i] = Math.sin(i * 1.7) * 1.5;
   let stampNext = 0;
 
   function resize() {
@@ -2022,6 +2024,13 @@ export function createHUD(THREE, A) {
     lastT = now;
     hctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     hctx.clearRect(0, 0, HW, HH);
+    const gs = S.gStrain || 0;
+    const gDim = S.glocT > 0 ? 0.05 : (gs > 0.85 ? 1 - 0.5 * smooth(gs, 0.85, 0.99) : 1);
+    hctx.save(); hctx.globalAlpha = gDim;
+    if (gs > 0.85 && S.glocT <= 0) {
+      const ji = Math.floor(now / 40) & 31;
+      hctx.translate(G_JITTER[ji], G_JITTER[(ji + 11) & 31]);
+    }
     if (!A.isReady() || (A.isHidden && A.isHidden())) return;
     if (C.gunFiring) hctx.translate((Math.random() - 0.5) * 2.5, (Math.random() - 0.5) * 2.5);
 
@@ -2119,6 +2128,7 @@ export function createHUD(THREE, A) {
       labelText(hctx, 'TGT ' + Math.round(mc.dist) + ' M', HW / 2, 82, '#5fe8ff', 4);
       hctx.restore();
     }
+    hctx.restore();
   }
 
   // Style feed in center-peripheral vision, just below the reticle / combiner
@@ -2422,7 +2432,11 @@ export function createHUD(THREE, A) {
     ctx.restore();
     if (st > 0.72 && !C.dead) {
       const a = 0.55 + 0.45 * Math.abs(Math.sin(t * Math.PI * 2.3));
-      drawBanner(ctx, HW / 2, HH * 0.32, '[ G-LOC WARNING ]', WARN, 240, a);
+      drawBanner(ctx, HW / 2, HH * 0.32, S.glocT > 0 ? '[ G-LOC ]' : '[ G-LOC WARNING ]', WARN, 240, a);
+    }
+    if ((S.gLoad || 0) > 8 && !C.dead) {
+      ctx.save(); ctx.font = f(13, true); ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      labelText(ctx, (S.gLoad).toFixed(1) + ' G', HW / 2, HH * 0.36, WARN, 4); ctx.restore();
     }
   }
 

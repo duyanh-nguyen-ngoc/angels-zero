@@ -22,13 +22,17 @@ export function createNVG(THREE, renderer, post) {
   //   0.48, radius 0.32: only HDR emissives > 1 -- tracers, muzzle flash,
   //   afterburner cores, the sun -- cross it), OutputPass applies ACES Filmic +
   //   sRGB exactly once. The 2D HUD canvas sits above WebGL, so it never blurs.
-  let composer = null, renderPass = null, bloom = null;
+  let composer = null, renderPass = null, bloom = null, gPass = null;
   if (post) {
     const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 0 });
     composer = new post.EffectComposer(renderer, rt);
     renderPass = new post.RenderPass(new THREE.Scene(), new THREE.PerspectiveCamera());
     bloom = new post.UnrealBloomPass(new THREE.Vector2(Math.max(1, Math.floor(size.x * 0.25)), Math.max(1, Math.floor(size.y * 0.25))), 0.48, 0.32, 0.92);
     composer.addPass(renderPass); composer.addPass(bloom); composer.addPass(new post.OutputPass());
+    if (post.ShaderPass) {
+      gPass = new post.ShaderPass({ uniforms: gUniforms(), vertexShader: gVert(), fragmentShader: gFrag() });
+      gPass.enabled = false; composer.addPass(gPass);
+    }
     bloom.setSize(Math.max(1, Math.floor(size.x * 0.25)), Math.max(1, Math.floor(size.y * 0.25)));    // composer.addPass set it full-res
   }
   const mk = (w, h) => new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, depthBuffer: true, samples: 0 });
@@ -43,6 +47,38 @@ export function createNVG(THREE, renderer, post) {
   const VERT = `varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
   const LUM = `float lum(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }`;
 
+  function gUniforms() { return {
+    tDiffuse: { value: null }, uDesat: { value: 0 }, uContrast: { value: 1 },
+    uTunnel: { value: 1.25 }, uPulse: { value: 0 }, uBlack: { value: 0 }, uRed: { value: 0 }
+  }; }
+  function gVert() { return `varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`; }
+  function gFrag() { return `
+    uniform sampler2D tDiffuse; uniform float uDesat, uContrast, uTunnel, uPulse, uBlack, uRed;
+    varying vec2 vUv;
+    void main() {
+      vec4 s = texture2D(tDiffuse, vUv);
+      vec3 c = s.rgb;
+      float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+      c = mix(c, vec3(l), clamp(uDesat, 0.0, 1.0));
+      c = (c - 0.5) * uContrast + 0.5;
+      float d = length((vUv - 0.5) * vec2(1.0, 1.0)) * 2.0;
+      float vig = 1.0 - smoothstep(uTunnel - 0.25, uTunnel + 0.05, d);
+      c *= mix(1.0, vig, clamp(uPulse + uBlack, 0.0, 1.0));
+      c = mix(c, c * vec3(1.25, 0.42, 0.45), clamp(uRed, 0.0, 1.0));
+      c *= (1.0 - uBlack);
+      gl_FragColor = vec4(max(c, 0.0), s.a);
+    }`; }
+  const gMat = new THREE.ShaderMaterial({ uniforms: gUniforms(), vertexShader: gVert(), fragmentShader: gFrag(), depthTest: false, depthWrite: false });
+  const gRT = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
+  const gState = { active: false };
+  function setG(o) {
+    const u = gMat.uniforms;
+    u.uDesat.value = o.desat || 0; u.uContrast.value = o.contrast === undefined ? 1 : o.contrast;
+    u.uTunnel.value = o.tunnel === undefined ? 1.25 : o.tunnel; u.uPulse.value = o.pulse || 0;
+    u.uBlack.value = o.black || 0; u.uRed.value = o.red || 0;
+    gState.active = u.uDesat.value > 0.001 || u.uContrast.value < 0.999 || u.uTunnel.value < 1.249 || u.uPulse.value > 0.001 || u.uBlack.value > 0.001 || u.uRed.value > 0.001;
+    if (gPass) { gPass.enabled = gState.active; Object.keys(u).forEach(k => { if (gPass.uniforms[k]) gPass.uniforms[k].value = u[k].value; }); }
+  }
   const brightMat = new THREE.ShaderMaterial({
     uniforms: { tScene: { value: sceneRT.texture }, uTexel: { value: new THREE.Vector2(1 / size.x, 1 / size.y) }, uKnee: { value: 1.25 } },
     vertexShader: VERT,
@@ -129,6 +165,7 @@ export function createNVG(THREE, renderer, post) {
       composer.setSize(size.x, size.y);                                       // target pixel ratio is 1: drawing-buffer px
       bloom.setSize(Math.max(1, Math.floor(size.x * 0.25)), Math.max(1, Math.floor(size.y * 0.25)));    // 0.25-res bloom chain
     }
+    gRT.setSize(size.x, size.y);
   }
   // Renders the frame: through the HDR bloom composer in normal vision, through the tubes with NVG.
   function render(scene, camera, t, cockpit) {
@@ -147,13 +184,23 @@ export function createNVG(THREE, renderer, post) {
     compMat.uniforms.uTime.value = t;
     compMat.uniforms.uCockpit.value = cockpit ? 1 : 0;
     quad.material = compMat;
-    renderer.setRenderTarget(prev);
-    renderer.render(quadScene, quadCam);
+    if (gState.active) {
+      renderer.setRenderTarget(gRT);
+      renderer.render(quadScene, quadCam);
+      gMat.uniforms.tDiffuse.value = gRT.texture;
+      quad.material = gMat;
+      renderer.setRenderTarget(prev);
+      renderer.render(quadScene, quadCam);
+    } else {
+      renderer.setRenderTarget(prev);
+      renderer.render(quadScene, quadCam);
+    }
   }
   return {
     render, setSize,
     target: sceneRT,                                   // pre-allocated HDR target (shader warm-up compiles against it)
     get bloom() { return bloom; }, get composer() { return composer; },
+    setG, get gPass() { return gPass; }, get gActive() { return gState.active; },
     setGain(k) { compMat.uniforms.uGain.value = k; },
     get gain() { return compMat.uniforms.uGain.value; },
     get active() { return active; },

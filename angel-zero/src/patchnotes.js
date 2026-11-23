@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.36', title: 'G-LOC PHYSIOLOGY', bullets: [
+    'G-strain now builds faster from 4.8 G with a hold-then-drain recovery, gradually heavy controls, and a true 1.8 s blackout that unloads the jet and wakes you with blurred vision before control returns.',
+    'AGSM breathing, a 4.5 G suit-inflation hiss, a pounding heartbeat, high-G tinnitus and a recovery gasp share a dedicated body-sound bus; the world and music muffles as you grey out.',
+    'A final fullscreen pass drives desaturation, a heartbeat-pulsing tunnel, blackout and a grey bloom-back recovery in both normal and night-vision views.'
+  ] },
   { version: 'v1.1.35', title: 'ZERO-FREEZE COMBAT LIGHTS', bullets: [
     'Eliminated the multi-second freeze when taking missile hits, igniting an engine, or ejecting: nozzle plume lights and gun muzzle light now stay anchored in the scene so hiding a dead engine or aircraft never changes Three.js point-light shader counts.',
     'Verified 0 mid-flight shader recompiles across engine fire, crash ejection, cockpit cannon fire, and sortie respawn.'
