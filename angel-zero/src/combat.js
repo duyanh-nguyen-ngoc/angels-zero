@@ -8,13 +8,13 @@
 // burning wrecks that splash, scoring, waves, lock-on and threat warnings.
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { DIFFICULTY_PRESETS } from './difficulty.js?v=s99b';
-import { SPW } from './loadout.js?v=s99b';
-import { missionConfig } from './missions.js?v=s99b';
+import { DIFFICULTY_PRESETS } from './difficulty.js?v=s9ba';
+import { SPW } from './loadout.js?v=s9ba';
+import { missionConfig } from './missions.js?v=s9ba';
 import { gorgeCentreX, gorgeSlope, gorgeHeading, gorgeDist, GORGE_GATE_Z, GORGE_GATE_N, GORGE_FLOOR_Y, GORGE_RIM_Y,
   GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_FORT, GORGE_ARC_M, GORGE_SPAWN_Z, CEIL_M,
   GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_ZB, GORGE_SC_HALF_W, GORGE_SC_ARCH_Z, GORGE_SC_ARCH_Y0,
-  GORGE_SC_ARCH_W, GORGE_SC_SKIP, GORGE_SC_SAVE_M } from './maps.js?v=s99b';
+  GORGE_SC_ARCH_W, GORGE_SC_SKIP, GORGE_SC_SAVE_M } from './maps.js?v=s9ba';
 
 const NM = 1852, FT = 0.3048, G0 = 9.81;
 // Allied CVN model: same 360 m deck as the procedural ship, re-anchored to the GLB.
@@ -55,6 +55,9 @@ const CANYON_GATE_N = GORGE_GATE_N;
 const CLIMB_WALL_T = 12, CLIMB_SALVO_MIN = 6, CLIMB_SALVO_MAX = 8, CLIMB_SALVO_CD = 2.0;
 const SAM_V = 620, SAM_G = 22, SAM_LIFE = 14;
 const SAM_SITE_PER_GATE = 2, CRATER_SITE_N = 8;
+// One-engine recovery + mid-mission ace intrusion.
+const BW_PTS = 2000, BW_KEY = 'BROKEN_WING';
+const INTR_COMBO = 4, INTR_CUT_S = 1.5, INTR_HP = 160, INTR_DROP_DY = 1800, INTR_BONUS = 1500;
 const ENEMY_GUN = { range: 900, cone: 0.99813, burst: 0.6, cd: 1.4, rps: 50, dmg: 0.006, spread: 0.6 * 0.01745 };
 const ACE_DUEL_HP = 100;                       // same airframe HP as any fighter (no boss pool)
 // Duel AI: gun-defence trigger (player nose within 14 deg inside 1.5 km) and loop entry speed.
@@ -134,8 +137,11 @@ export function createCombat(THREE, env) {
     sunT: 0, sunCD: 0, sunBlinds: 0, sunBannerT: 0, mslIntercepts: 0, interceptBannerT: 0, interceptSlowCD: 0,
     subKills: 0, siteKills: 0, flagBannerT: 0, salvoKills: 0,
     ambushActive: false, buzzTower: 0, buzzJet: 0,
-    droneInboundT: 0, droneClearedT: 0,
+    droneInboundT: 0, droneClearedT: 0, scrambleT: 0, bwBannerT: 0, intrBannerT: 0,
     wingRoles: { w2: 'CAP', w3: 'STRIKE' },
+    bw: { eligible: false, landed: false, logged: false },
+    intr: { st: 'IDLE', t: 0, ace: -1, used: false, farT: 0 },
+    wingHold: false,
     sc: { st: 'IDLE', used: false, pz: 0, px: 0, py: 0, logT: 0, bannerT: 0 },
     swarm: { on: false, n: 0, alive: 0, anchor: 'PLAYER', bonusPaid: true, t: 0 } });
   Object.assign(C, { mcfg: missionConfig({}), stage: 0, stageT: 0,
@@ -1088,7 +1094,7 @@ export function createCombat(THREE, env) {
   // the Phase-3 SOL-1 boss (which keeps the e.ace flag / ACE_KILL scoring).
   function waveAlive() {
     let n = 0;
-    for (const e of enemies) if (e.alive && !e.bomber && !e.ace && !e.aceFlight) n++;
+    for (const e of enemies) if (e.alive && !e.scripted && !e.bomber && !e.ace && !e.aceFlight) n++;
     for (let i = 0; i < DRONE_N; i++) if (DR_ALIVE[i]) n++;       // a wave isn't clear until its swarm is gone
     return n;
   }
@@ -1123,6 +1129,149 @@ export function createCombat(THREE, env) {
       return;
     }
   }
+  // ---- BROKEN WING: sticky one-engine eligibility, awarded on a safe recovery.
+  function awardBrokenWing(kind) {
+    if (!C.bw.eligible || C.bw.landed) return false;
+    C.bw.landed = true;
+    C.score += BW_PTS;
+    pushEvent(BW_KEY, 'BROKEN WING', BW_PTS, '#ffd45a');
+    say('BROKEN WING +' + BW_PTS, 3, '#ffd45a');
+    C.bwBannerT = performance.now();
+    if (env.onWing) env.onWing("WARDEN-3: ONE ENGINE AND YOU STILL STUCK IT. HELL OF A LANDING.", 'WARDEN-3', '#00ff66');
+    if (env.debug) console.log('[ANGELS_ZERO] bw award kind=' + kind + ' +' + BW_PTS);
+    return true;
+  }
+
+  // ---- Hot scramble: two inert raiders fly a carrier-local path during the
+  // catapult hold. No AI, no weapons, no collision until handoff at release.
+  const SCR_N = 2, SCR_PATH = new Float32Array(SCR_N * 4 * 3);
+  const _scrP = new THREE.Vector3(), _scrQ = new THREE.Quaternion(), _scrD = new THREE.Vector3();
+  function spawnRaiders(n, out) {
+    const want = Math.min(n | 0, SCR_N);
+    let placed = 0;
+    for (const e of enemies) {
+      if (placed >= want) break;
+      if (e.alive || e.ace || e.bomber || e.aceFlight) continue;
+      resetAI(e); clearAce(e);
+      e.scripted = true; e.noMsl = true; e.noBreak = true; e.burstCD = 999; e.burstT = 0; e.bLock = 0;
+      e.hp = e.hpMax = 100; e.alive = true; e.wreck = null;
+      e.scriptT = -placed * 0.8; e.scriptSlot = placed;
+      e.tac = e.mode = 'PATROL';
+      if (out) out[placed] = e.id;
+      placed++;
+    }
+    if (env.debug) console.log('[ANGELS_ZERO] scramble raiders n=' + placed);
+    return placed;
+  }
+  function updateScriptedRaider(e, dt) {
+    e.scriptT += dt;
+    const a = C.ally;
+    if (!a || !a.root) return;
+    const base = e.scriptSlot * 12;
+    const root = a.root;
+    root.updateWorldMatrix(true, false);
+    // Four carrier-local corners: off the bow quarter, island pass, astern, loop.
+    const pts = SCR_PATH;
+    const deckY = (a.deckYLocal && a.deckYLocal.bow0) || a.deckY || 19;
+    const local = (i, x, y, z) => { const k = (base + i) * 3; pts[k] = x; pts[k + 1] = y; pts[k + 2] = z; };
+    local(0, (e.scriptSlot ? 1 : -1) * 260, 180, -5000);
+    local(1, (e.scriptSlot ? 1 : -1) * 220, 180, -220);
+    local(2, (e.scriptSlot ? 1 : -1) * 240, 180, 2400);
+    local(3, (e.scriptSlot ? 1 : -1) * 900, 260, 5200);
+    const t = e.scriptT;
+    let seg = Math.max(0, Math.min(2, Math.floor(t / 2))), u = Math.max(0, Math.min(1, (t - seg * 2) / 2));
+    if (t > 6) { seg = 3; u = (t * 0.16) % 1; }              // racetrack until release
+    const k0 = (base + seg) * 3, k1 = (base + seg + 1) * 3;
+    _scrP.set(pts[k0] + (pts[k1] - pts[k0]) * u, pts[k0 + 1] + (pts[k1 + 1] - pts[k0 + 1]) * u, pts[k0 + 2] + (pts[k1 + 2] - pts[k0 + 2]) * u);
+    root.localToWorld(_scrP);
+    _scrD.copy(_scrP).sub(e.pos);
+    if (_scrD.lengthSq() > 1) {
+      e.fwd.copy(_scrD).normalize();
+      e.speed = 260; e.vel.copy(e.fwd).multiplyScalar(e.speed); e.prev.copy(e.pos);
+      e.pos.copy(_scrP); orient(e);
+    }
+  }
+  function handoffRaiders(out) {
+    let n = 0;
+    for (const e of enemies) if (e.scripted) {
+      e.scripted = false; e.noMsl = false; e.noBreak = false; e.burstCD = 1.5;
+      e.tac = e.mode = 'ENGAGE'; e.mslCD = 6 + n; e.bLock = 0;
+      if (out && n < out.length) out[n] = e.id;
+      n++;
+    }
+    if (env.debug && n) console.log('[ANGELS_ZERO] scramble handoff n=' + n);
+    return n;
+  }
+
+  // ---- Mid-mission CRIMSON-1 intrusion -------------------------------------
+  let intrForce = false;
+  function intrBgm(scn) { if (env.onIntrusion) env.onIntrusion(scn); }
+  function spawnIntruder() {
+    const slots = enemies.filter(e => !e.alive && !e.ace && !e.bomber && !e.scripted);
+    if (!slots.length) return false;
+    const e = slots[0];
+    resetAI(e); clearAce(e);
+    _afF.set(0, 0, -1).applyQuaternion(S.quaternion);
+    e.pos.copy(S.position).addScaledVector(_afF, 1200);
+    let floorY = S.position.y + INTR_DROP_DY;
+    const deck = env.getCloudDeck && env.getCloudDeck();
+    if (deck && deck.top !== undefined) floorY = Math.max(floorY, deck.top + 200);
+    e.pos.y = floorY;
+    e.alive = true; e.wreck = null;
+    _scrD.copy(S.position).sub(e.pos).normalize();
+    _scrD.y -= 0.7; _scrD.normalize();                 // 35 deg dive toward the player
+    e.fwd.copy(_scrD); e.speed = e.cruise; e.vel.copy(e.fwd).multiplyScalar(e.speed); e.prev.copy(e.pos);
+    e.tac = e.mode = 'ENGAGE'; e.mslCD = 5; e.bLock = 0;
+    e.aceFlight = true; e.intrAce = true; e.label = 'CRIMSON-1'; e.type = 'ACE';
+    e.hpMax = e.hp = INTR_HP; e.duel = false; e.duelCD = 0;
+    e.decoys = 2; e.chaffN = 2; e.decoyCD = 0;
+    C.intr.ace = enemies.indexOf(e);
+    orient(e); tintFleet(); writeFleet();
+    C.wingHold = true;
+    if (env.onSfx) env.onSfx('aceWarn');
+    if (env.debug) console.log('[ANGELS_ZERO] intr spawn alt=' + Math.round(e.pos.y) + ' idx=' + C.intr.ace);
+    intrBgm('SPAWN');
+    return true;
+  }
+  function startIntrusion() {
+    if (C.intr.used || C.intr.st !== 'IDLE') return false;
+    C.intr.st = 'CUT'; C.intr.t = INTR_CUT_S; C.intr.farT = 0;
+    C.intrBannerT = performance.now();
+    say('SIGNAL INTRUSION — CRIMSON-1 INBOUND', 2, '#ff3b5c');
+    if (env.debug) console.log('[ANGELS_ZERO] intr trigger combo=' + C.comboMult.toFixed(2));
+    intrBgm('CUT');
+    return true;
+  }
+  function finishIntrusion(killed) {
+    if (C.intr.st === 'DONE' || C.intr.st === 'IDLE') return;
+    C.intr.st = 'DONE'; C.intr.used = true; C.wingHold = false;
+    if (killed) {
+      C.score += INTR_BONUS;
+      pushEvent('INTRUSION', 'CRIMSON DOWN', INTR_BONUS, '#ff3b5c');
+      say('CRIMSON-1 IS DOWN. NET IS CLEAR.', 2.6, '#00ff66');
+      if (env.debug) console.log('[ANGELS_ZERO] intr done kill=1 +' + INTR_BONUS);
+    } else if (env.debug) console.log('[ANGELS_ZERO] intr done kill=0');
+    intrBgm('DONE');
+  }
+  function updateIntrusion(dt) {
+    const I = C.intr;
+    if (I.st === 'IDLE' || I.st === 'DONE') return;
+    if (I.st === 'CUT') {
+      I.t -= dt;
+      if (I.t <= 0) {
+        I.st = 'DUEL';
+        if (env.onWing) env.onWing("CRIMSON-1: THIS IS MY SKY NOW, ANGEL. JUST YOU AND ME.", 'CRIMON-1'.replace('CRIMON', 'CRIMSON'), '#ff3b5c', true);
+        spawnIntruder();
+      }
+      return;
+    }
+    const ace = I.ace >= 0 ? enemies[I.ace] : null;
+    if (!ace || !ace.alive) { finishIntrusion(true); return; }
+    if (ace.pos.distanceTo(S.position) > 12000) {
+      I.farT += dt; if (I.farT > 20) finishIntrusion(false);
+    } else I.farT = 0;
+  }
+
   function spawnAceFlight(names) {
     if (aceFlightDone) return false;
     const calls = names && names.length ? names : ['CRIMSON-1', 'CRIMSON-2'];
@@ -1166,6 +1315,7 @@ export function createCombat(THREE, env) {
   }
   // Missiles / bombs: one-shot kills on ordinary bandits; the Ace soaks 150 HP per hit.
   function heavyHit(e, how) {
+    if (e && e.scripted) return false;                            // scramble raiders are inert on deck
     if (e.bomber) {                                               // heavy airframe: two missile hits
       e.hp -= BOMBER.msl; e.rollVel += (rand() - 0.5) * 0.6;
       if (e.hp <= 0) { destroyEnemy(e, true, how); return; }
@@ -1807,7 +1957,7 @@ export function createCombat(THREE, env) {
   function checkRams(playerActive) {
     if (!playerActive || !lastPlayerValid) return;
     for (const e of enemies) {
-      if (!e.alive) continue;
+      if (!e.alive || e.scripted) continue;
       const a = _s.copy(e.prev).sub(lastPlayerPos), b = _w.copy(e.pos).sub(S.position);
       const seg = _mv.copy(b).sub(a), l2 = seg.lengthSq();
       const t = l2 > 0 ? clamp(-a.dot(seg) / l2, 0, 1) : 0;
@@ -1866,6 +2016,7 @@ export function createCombat(THREE, env) {
         aceFlightDone = false; spawnAceFlight();
       }
     }
+    if (e.intrAce) finishIntrusion(true);
     if (e.aceFlight) {
       C.score += ACE_FLIGHT_BONUS;
       pushEvent('DESTROYED', 'ACE DOWN // ' + e.label, 2500, '#ffd45a');
@@ -1912,7 +2063,9 @@ export function createCombat(THREE, env) {
     BRIDGE_THREAD: { text: 'BRIDGE THREAD', pts: 600, mult: 1.0,  color: '#ffd45a' },
     DANGER_CLOSE:  { text: 'DANGER CLOSE',  pts: 0,   mult: 0,    color: '#ffb838' },
     PSM:           { text: 'POST-STALL',    pts: 400, mult: 0.5,  color: '#00ff66' },
-    QUAD_SPLASH:   { text: 'QUAD SPLASH',   pts: 0,   mult: 0,    color: '#ffd45a' }   // drone salvo: display only
+    QUAD_SPLASH:   { text: 'QUAD SPLASH',   pts: 0,   mult: 0,    color: '#ffd45a' },  // drone salvo: display only
+    BROKEN_WING:   { text: 'BROKEN WING',    pts: BW_PTS, mult: 1.0, color: '#ffd45a' },
+    INTRUSION:     { text: 'CRIMSON DOWN',   pts: INTR_BONUS, mult: 0.5, color: '#ff3b5c' }
   };
   Object.assign(C, { comboMult: 1, comboTimer: 0, comboMax: COMBO_MAX, comboWindow: COMBO_T, comboBonus: 0,
     styleFeed: [], styleCounts: {}, dangerClose: false, dangerMult: 1 });
@@ -3077,6 +3230,12 @@ export function createCombat(THREE, env) {
   }
   function updateMissionPhase() {
     if (C.mode === 'FURBALL' || C.ambushActive) return;
+    if (C.intr.st === 'CUT' || C.intr.st === 'DUEL') return;
+    if (C.intr.st === 'IDLE' && !C.intr.used && (C.missionId === 'AIR_SUPERIORITY' || C.missionId === 'NAVAL_BATTLE')) {
+      const staged = C.mcfg.stages && C.mcfg.stages.length;
+      const readyStage = staged ? C.stage >= 1 : C.missionPhase >= 2;
+      if (readyStage && (intrForce || C.comboMult >= INTR_COMBO)) startIntrusion();
+    }
     const stages = C.mcfg.stages;
     if (stages && stages.length) {
       if (C.rtb) { C.obj = { done: 0, total: 1 }; return; }
@@ -3262,6 +3421,7 @@ export function createCombat(THREE, env) {
     w.pickT -= dt;
     if (w.pickT > 0) return w.tgt;
     w.pickT = 0.5;
+    if (C.wingHold) { w.tgt = null; if (w.homeOff) w.off.copy(w.homeOff); return null; }
     if (C.wingOrder === 0) { w.tgt = null; if (w.homeOff) w.off.copy(w.homeOff); return null; }
     if (C.wingOrder === 2) {
       const d = C.designated;
@@ -5328,6 +5488,12 @@ export function createCombat(THREE, env) {
     C.engState = st;
     C.engineOut = st === 'HEALTHY' ? null : C.engSide;
     C.engineFire = st === 'ON_FIRE';
+    // Eligibility is sticky for the sortie: losing an engine airborne earns the
+    // badge even after a Halon discharge or a later relight.
+    if (C.engineOut && !S.onGround && C.bw) {
+      C.bw.eligible = true;
+      if (env.debug && !C.bw.logged) { C.bw.logged = true; console.log('[ANGELS_ZERO] bw eligible side=' + C.engineOut); }
+    }
   }
   function setEng(side, st) { if (side === 'L') C.engL = st; else C.engR = st; syncEngineFlags(); }
   function resetEngines() {
@@ -5512,6 +5678,8 @@ export function createCombat(THREE, env) {
       lockProgress: 0, lockState: 'NONE', rwrTrack: false, banditLock: 0, events: [],
       gunRounds: 0, gunHitsP: 0, mslFiredP: 0, mslHitsP: 0, maxDmg: 0, traps: 0, furballKills: 0, lowHpSaid: false });
     furT = 0; furSwarmT = 75;
+    Object.assign(C.bw, { eligible: false, landed: false, logged: false });
+    Object.assign(C.intr, { st: 'IDLE', t: 0, ace: -1, used: false, farT: 0 }); C.wingHold = false;
     Object.assign(C.sc, { st: 'IDLE', used: false, pz: S.position.z, px: S.position.x, py: S.position.y, logT: 0, bannerT: 0 });
     clearDronePool(); droneSalvoT = 0; droneSalvoKills = 0; droneSalvoPaid = false;
     for (const e of enemies) e.bLock = 0;
@@ -5624,9 +5792,11 @@ export function createCombat(THREE, env) {
     if (ready) {
       if (C.mode !== 'FURBALL' && !stagedMission() && C.missionPhase === 3 && !aceFlightDone && C.phase !== 3 && waveAlive() <= WAVE_SIZE * 0.5) spawnAceFlight();
       for (const e of enemies) {
+        if (e.scripted && e.alive) { updateScriptedRaider(e, dt); continue; }
         if (e.alive) { if (e.crippled) updateCrippled(e, dt); else updateEnemy(e, dt, playerActive); }
         else if (e.wreck) updateWreck(e, dt);
       }
+      updateIntrusion(dt);
       updateDrones(dt, playerActive);
       checkRams(playerActive);
       updateDebris(dt);
@@ -5720,6 +5890,7 @@ export function createCombat(THREE, env) {
         }
       }
       for (const e of enemies) {
+        if (e.scripted) continue;
         if (e.alive && segHit(b, e.pos, DIFF.gunHitRadius) && segT < 0.999) {        // not yet abeam: it passes through next frame
           // Closest approach of this frame's round path, in the bandit's local frame.
           const zone = hitZone(e, _hl.copy(cp).sub(e.pos).applyQuaternion(_qi.copy(e.quat).invert()));
@@ -5759,6 +5930,10 @@ export function createCombat(THREE, env) {
     configureMission(m, mapDef) {
       C.missionTitle = m.title; C.missionId = m.id; C.rtbType = m.rtbType; C.missionBgm = m.bgmScenario;
       C.wingOrder = 0; C.orderBadgeT = 0; resetLimp();
+      intrForce = false;
+      Object.assign(C.bw, { eligible: false, landed: false, logged: false });
+      Object.assign(C.intr, { st: 'IDLE', t: 0, ace: -1, used: false, farT: 0 }); C.wingHold = false;
+      if (env.onIntrusion) env.onIntrusion('RESET');
       Object.assign(C.sc, { st: 'IDLE', used: false, pz: S.position.z, px: S.position.x, py: S.position.y, logT: 0, bannerT: 0 });
       C.subKills = 0; C.siteKills = 0; C.flagBannerT = 0;
       clearDronePool(); furSwarmT = 75; droneSalvoT = 0; droneSalvoKills = 0; droneSalvoPaid = false;
@@ -5815,6 +5990,9 @@ export function createCombat(THREE, env) {
     },
     // Mission switch: return every pooled actor to its pool without allocating.
     resetMission() {
+      intrForce = false;
+      Object.assign(C.bw, { eligible: false, landed: false, logged: false });
+      Object.assign(C.intr, { st: 'IDLE', t: 0, ace: -1, used: false, farT: 0 }); C.wingHold = false;
       for (const e of enemies) { e.alive = false; e.wreck = null; if (e.g) e.g.visible = false; }
       for (const m of missiles) { m.active = false; if (m.mesh) m.mesh.visible = false; }
       for (const t of surface) { t.alive = false; if (t.g) t.g.visible = false; }
@@ -5824,6 +6002,7 @@ export function createCombat(THREE, env) {
     },
     primaryTargets,
     onCarrierTrap() {
+      awardBrokenWing('TRAP');
       C.health = 100; C.score += 1000;
       pushEvent('BONUS', 'TRAP BONUS', 1000, '#ffd45a');
       if (C.mode === 'FURBALL' || C.missionPhase !== 4) return;
@@ -5833,6 +6012,9 @@ export function createCombat(THREE, env) {
     get difficulty() { return C.difficulty; },
     fireSelected, pickleUp, dropBomb, setWeapon, toggleWeapon, dispenseFlares, dispenseChaff, fireAAM4, activateECM, setWingOrder, triggerWoundedWingman, spawnAceFlight, spawnAmbush,
     setWingRoles,
+    awardBrokenWing, spawnRaiders, handoffRaiders,
+    setIntrusionForce(on) { intrForce = !!on; return intrForce; }, forceIntrusion() { return startIntrusion(); },
+    get intrusion() { return C.intr; },
     get sc() { return C.sc; },
     spawnDroneSwarm(n = SWARM_MAX, anchor = 'PLAYER') { return spawnSwarm(n, anchor); },
     killDrone(i, how = 'GUN') { return killDrone(i, how); },
@@ -6013,6 +6195,8 @@ export function createCombat(THREE, env) {
         aceRounds: C.aceRounds || 0, aceHits: C.aceHits || 0, blockedLaunches: C.blockedLaunches || 0,
         samLaunched: C.samLaunched || 0, samFlared: C.samFlared || 0, samMasked: C.samMasked || 0, samHit: C.samHit || 0, samLive: C.samLive || 0,
         subKills: C.subKills || 0, siteKills: C.siteKills || 0,
+        bw: { eligible: !!C.bw.eligible, landed: !!C.bw.landed, out: C.engineOut || null },
+        intr: { st: C.intr.st, used: C.intr.used, ace: C.intr.ace, hold: !!C.wingHold },
         ambush: { active: !!C.ambushActive, n: enemies.filter(e => e.alive && e.ambush).length },
         shortcut: { st: C.sc.st, used: C.sc.used, gateIdx: C.gateIdx, save: GORGE_SC_SAVE_M, bannerT: C.sc.bannerT },
         buzz: { tower: C.buzzTower || 0, jet: C.buzzJet || 0 },

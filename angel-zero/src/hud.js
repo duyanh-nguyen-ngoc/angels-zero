@@ -6,8 +6,8 @@
 // clipped to the 3D combiner glass. Square tactical radar (bottom-left), stores
 // list + F-15C silhouette with per-pylon AIM-9 reload icons (bottom-right),
 // open-corner target brackets, edge pointers, minimal top-left telemetry.
-import { SPW } from './loadout.js?v=s99b';
-import { GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_FLOOR_Y } from './maps.js?v=s99b';
+import { SPW } from './loadout.js?v=s9ba';
+import { GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_FLOOR_Y } from './maps.js?v=s9ba';
 
 export function createHUD(THREE, A) {
   const canvas = A.canvas;
@@ -1473,6 +1473,18 @@ export function createHUD(THREE, A) {
     if (C.buzzBannerT && now - C.buzzBannerT < 1800) {
       const age = now - C.buzzBannerT;
       drawBanner(ctx, cx, upperY + 288, C.buzzLabel || 'SONIC PASS', '#5fe8ff', 330, 1 - age / 1800);
+    }
+    if (C.scrambleT && now - C.scrambleT < 3000) {
+      const age = now - C.scrambleT;
+      drawBanner(ctx, cx, upperY + 252, 'SCRAMBLE! BANDITS OVERHEAD', WARN, 440, pulseAlpha(160) * (1 - age / 3000));
+    }
+    if (C.bwBannerT && now - C.bwBannerT < 3200) {
+      const age = now - C.bwBannerT;
+      drawBanner(ctx, cx, upperY + 36, 'BROKEN WING +2000', '#ffd45a', 360, 1 - age / 3200);
+    }
+    if (C.intr && C.intr.st === 'CUT') {
+      const glitch = (Math.floor(now / 85) % 3) ? 'SIGNAL INTRUSION' : '▒▒▒ SIGNAL LOST ▒▒▒';
+      drawBanner(ctx, cx, upperY, glitch, WARN, 460, 0.55 + 0.45 * (Math.floor(now / 70) % 2));
     }
     if (C.interceptBannerT && now - C.interceptBannerT < 2500) {
       const age = now - C.interceptBannerT;

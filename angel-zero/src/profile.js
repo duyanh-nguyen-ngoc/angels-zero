@@ -5,6 +5,7 @@
 // record and the game keeps working.
 
 export const PROFILE_KEY = 'angels_zero_profile';
+export const BW_KEY = 'BROKEN_WING';
 export const RANKS = ['C', 'B', 'A', 'S'];                   // ascending
 // Sortie score thresholds (score includes the combo multiplier). A failed
 // sortie (ejected / shot down) is capped at B.
@@ -24,7 +25,7 @@ export const liveryById = id => LIVERIES.find(l => l.id === id) || LIVERIES[0];
 
 const DEFAULTS = () => ({
   version: 1, bestScore: 0, bestRank: null, sortiesCleared: 0, sortiesFlown: 0, totalKills: 0,
-  wingsSevered: 0, bridgesThreaded: 0, unlockedLiveries: ['EAGLE_GREY'], selectedLivery: 'EAGLE_GREY'
+  wingsSevered: 0, bridgesThreaded: 0, badges: [], unlockedLiveries: ['EAGLE_GREY'], selectedLivery: 'EAGLE_GREY'
 });
 
 export function createProfile(storage = (() => { try { return window.localStorage; } catch (e) { return null; } })()) {
@@ -41,6 +42,7 @@ export function createProfile(storage = (() => { try { return window.localStorag
       bestScore: num(raw.bestScore), sortiesCleared: num(raw.sortiesCleared), sortiesFlown: num(raw.sortiesFlown),
       totalKills: num(raw.totalKills), wingsSevered: num(raw.wingsSevered), bridgesThreaded: num(raw.bridgesThreaded),
       bestRank: RANKS.includes(raw.bestRank) ? raw.bestRank : null,
+      badges: Array.isArray(raw.badges) ? [...new Set(raw.badges.filter(b => b === BW_KEY))] : [],
       unlockedLiveries: [...new Set(unlocked)],
       selectedLivery: ids.includes(raw.selectedLivery) && unlocked.includes(raw.selectedLivery) ? raw.selectedLivery : 'EAGLE_GREY'
     };
@@ -69,6 +71,11 @@ export function createProfile(storage = (() => { try { return window.localStorag
     data.unlockedLiveries.push(id);
     return true;
   }
+  function addBadge(id) {
+    if (data.badges.includes(id)) return false;
+    data.badges.push(id);
+    return true;
+  }
 
   // Bank a sortie: s = { outcome: 'CLEARED' | 'FAILED' | 'ABANDONED', score, kills,
   // gunsKills, wingsSevered, bridges, aceDown }. Lifetime counters always bank;
@@ -76,7 +83,8 @@ export function createProfile(storage = (() => { try { return window.localStorag
   function recordSortie(s) {
     const cleared = s.outcome === 'CLEARED', debriefed = s.outcome !== 'ABANDONED';
     data.totalKills += num(s.kills); data.wingsSevered += num(s.wingsSevered); data.bridgesThreaded += num(s.bridges);
-    const res = { outcome: s.outcome, rank: null, newBest: false, newBestRank: false, unlocked: [] };
+    const res = { outcome: s.outcome, rank: null, newBest: false, newBestRank: false, unlocked: [], badges: [] };
+    if (s.brokenWing && addBadge(BW_KEY)) res.badges.push(BW_KEY);
     if (debriefed) {
       data.sortiesFlown++;
       if (cleared) data.sortiesCleared++;
@@ -100,7 +108,8 @@ export function createProfile(storage = (() => { try { return window.localStorag
   save();                                                   // normalise whatever was stored
   return {
     get data() { return data; }, get persistent() { return persistent; },
-    rankFor, recordSortie, select, unlock: id => { const n = unlock(id); save(); return n; }, reset,
+    rankFor, recordSortie, select, unlock: id => { const n = unlock(id); save(); return n; },
+    addBadge: id => { const n = addBadge(id); save(); return n; }, get badges() { return new Set(data.badges); }, reset,
     isUnlocked: id => data.unlockedLiveries.includes(id)
   };
 }

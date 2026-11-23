@@ -1696,6 +1696,11 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   - `GORGE_SC_*` constants define a 2.2 km straight ravine across the first S-bend: analytic carve in `gorgeHeight()` (one height grid, no extra draw calls), one three-instance jittered rock arch with three AABB blockers, rim sites inside the ravine suppressed. Swept z-plane state machine (`IDLE→IN→ARCH_OK→DONE`) awards `TRENCH SHORTCUT +1200`, skips gates 5..5 and calls WARDEN-2; flying high or wide fails cleanly.
   - `?at=scmouth` / `?alt=200` headless poses, `sc` logs and `stats().shortcut` / `stats().style.wingRoles`. Cached GORGE rebuild stays under 15 ms because the carve costs only a few scalar ops per grid cell.
 
+- [x] **Hot scramble, broken-wing recovery, CRIMSON-1 intrusion** *(build `s9ba`, v1.1.31, `index.html`, `src/combat.js`, `src/audio.js`, `src/profile.js`, `src/hud.js`)*
+  - NAVAL catapult launches roll a 30 % hot scramble (`?scramble=1/0`): two inert pooled raiders sweep the bow on carrier-local paths, CIWS tracers and water splashes fill the hold, and `catRelease()` hands them over to normal ENGAGE AI with weapons live. No player damage or collision while `cat.ph` is HOLD/LAUNCH.
+  - Sticky `C.bw.eligible` from `syncEngineFlags()`; `?engoutat=s:L` forces it. A manual carrier trap or smooth runway touchdown awards BROKEN WING +2000, sets a permanent profile badge, and puts a ★ cell on the debrief.
+  - `C.intr` CUT/DUEL/DONE state holds stage advance + RTB, plays `audio.bgmCut(1.5)` with radio static, spawns a single diving CRIMSON-1 with combo ≥ 4 (or `?intrusion=1`), forces `08_crimson_duel` through `musicCtx.intrusion`, holds the wingmen in FORM, and unlocks RTB on kill or long-range disengage. `?intrusionat=s` forces it deterministically.
+
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.

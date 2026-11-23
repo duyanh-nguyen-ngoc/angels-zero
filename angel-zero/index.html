@@ -725,35 +725,35 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s99b';
-import { createAmbient } from './src/ambient.js?v=s99b';
-import { createBlastFX } from './src/blastfx.js?v=s99b';
-import { createHUD } from './src/hud.js?v=s99b';
-import { createCockpit3D } from './src/cockpit3d.js?v=s99b';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s99b';
-import { createEjection } from './src/eject.js?v=s99b';
-import { createAudio } from './src/audio.js?v=s99b';
-import { createRadio } from './src/radio.js?v=s99b';
-import { createProfile, LIVERIES, liveryById } from './src/profile.js?v=s99b';
-import { createLivery } from './src/livery.js?v=s99b';
-import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s99b';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s99b';
-import { createCanopyFX } from './src/canopy.js?v=s99b';
-import { createNVG } from './src/nvg.js?v=s99b';
-import { createWorld, WORLD } from './src/world.js?v=s99b';
-import { createSurfaces } from './src/surfaces.js?v=s99b';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s99b';
-import { createFreeLook } from './src/freelook.js?v=s99b';
-import { createCanopyGlass } from './src/canopyglass.js?v=s99b';
-import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s99b';
-import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s99b';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s99b';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s99b';
-import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s99b';
-import { createRadioQueue } from './src/radioQueue.js?v=s99b';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s99b';
+import { createVFX } from './src/vfx.js?v=s9ba';
+import { createAmbient } from './src/ambient.js?v=s9ba';
+import { createBlastFX } from './src/blastfx.js?v=s9ba';
+import { createHUD } from './src/hud.js?v=s9ba';
+import { createCockpit3D } from './src/cockpit3d.js?v=s9ba';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9ba';
+import { createEjection } from './src/eject.js?v=s9ba';
+import { createAudio } from './src/audio.js?v=s9ba';
+import { createRadio } from './src/radio.js?v=s9ba';
+import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9ba';
+import { createLivery } from './src/livery.js?v=s9ba';
+import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s9ba';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9ba';
+import { createCanopyFX } from './src/canopy.js?v=s9ba';
+import { createNVG } from './src/nvg.js?v=s9ba';
+import { createWorld, WORLD } from './src/world.js?v=s9ba';
+import { createSurfaces } from './src/surfaces.js?v=s9ba';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9ba';
+import { createFreeLook } from './src/freelook.js?v=s9ba';
+import { createCanopyGlass } from './src/canopyglass.js?v=s9ba';
+import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9ba';
+import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9ba';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9bb';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9ba';
+import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9ba';
+import { createRadioQueue } from './src/radioQueue.js?v=s9ba';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9ba';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
-  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s99b';
+  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9ba';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -765,6 +765,8 @@ let selectedSPW = DEBUG && Q.has('spw') && SPW[Q.get('spw')] ? Q.get('spw') : lo
 let selectedLivery = DEBUG && Q.has('livery') && SQUADRON[Q.get('livery')] ? Q.get('livery') : loadLivery();
 let selectedMode = DEBUG && Q.has('mode') && MODES.includes(Q.get('mode')) ? Q.get('mode') : loadMode();
 let missionId = DEBUG && Q.has('mission') && MISSIONS[Q.get('mission')] ? Q.get('mission') : loadMission();
+const FORCE_SCRAMBLE = DEBUG && Q.get('scramble') === '1', NO_SCRAMBLE = DEBUG && Q.get('scramble') === '0';
+const FORCE_INTRUSION = DEBUG && Q.get('intrusion') === '1', NO_INTRUSION = DEBUG && Q.get('intrusion') === '0';
 // Wingman roles: persisted in localStorage, optionally overridden by ?roles=CAP,STRIKE.
 let selectedRoles = loadRoles();
 if (DEBUG && Q.has('roles')) {
@@ -1212,6 +1214,11 @@ const carrier = { phase: null, t: 0, v0: 0, wire: 0, cool: 0, pitDone: false };
 // Bow catapult launch opening: HOLD -> LAUNCH -> AIRBORNE. Preallocated scratch: no per-frame allocations.
 const cat = { ph: 'NONE', t: 0, arm: 0, trackIdx: 0, grace: 0, forceAB: false, diagAt: 0, resnapLogged: false };
 const CAT_SNAP_TOL = 0.5;
+// Hot scramble: inert raiders sweep the bow while the catapult is armed.
+const SCR_CHANCE = 0.30, SCR_RAIDERS = 2, SCR_PASS_T = 7, SCR_ALT = 180, SCR_V = 260, SCR_OFF_X = 220;
+const CIWS_RPS = 25, SCR_SPLASH_RATE = 10;
+const scramble = { st: 'IDLE', t: 0, ids: new Int16Array(SCR_RAIDERS).fill(-1), rolled: false, ciwsAcc: 0, splashT: 0, whooshT: 0 };
+const _scrMuzzle = new THREE.Vector3(), _scrAim = new THREE.Vector3(), _scrVel = new THREE.Vector3();
 const _catFwd = new THREE.Vector3(), _catPos = new THREE.Vector3(), _catQ = new THREE.Quaternion();
 const _catBox = new THREE.Box3(), _catRay = new THREE.Raycaster(), _catDown = new THREE.Vector3(0, -1, 0);
 const _catDiagOrigin = new THREE.Vector3(), _catHitTargets = [];
@@ -1525,6 +1532,7 @@ function launchSortie() {
   if (!(DEBUG && Q.has('bgmtrack'))) audio.setAuto(true);                                        // AudioContext is created/resumed inside this user gesture
   warmupGPUSync();                                     // no-op once the briefing-time warm-up has finished
   appMode = 'PLAY';
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   for (const k in keys) keys[k] = false;
   mouse.nx = 0; mouse.ny = 0;                          // centre the stick until the mouse moves
   resetAircraft();
@@ -1595,11 +1603,14 @@ function loadMissionScene(m) {
   ambient.configure(m.id);
   combat.missionPhase = 1; combat.rtb = null; combat.done = false;
   state.autobrake = false;
-  autoland.on = false; autoland.ph = ''; autoland.prevLz = Infinity; combat.allyHold = false;
+  autoland.on = false; autoland.ph = ''; autoland.prevLz = Infinity; autoland.used = false; combat.allyHold = false;
   waveoff.used = false; waveoff.rolled = false; waveoff.st = 'IDLE'; waveoff.t = 0; waveoff.n = 0;
   waveoff.ids.fill(-1); waveoff.pitchBias = 0; combat.ambushActive = false;
   BUZZ_CDV.fill(0);
   cat.ph = 'NONE'; cat.t = 0; cat.arm = 0; cat.grace = 0; cat.forceAB = false;
+  scramble.st = 'IDLE'; scramble.t = 0; scramble.ids.fill(-1); scramble.rolled = false;
+  if (FORCE_INTRUSION) combatSys.setIntrusionForce(true);
+  if (NO_INTRUSION) combatSys.setIntrusionForce(false);
   for (const w of wingmen) { w.cat.ph = 'NONE'; w.cat.t = 0; w.cat.delay = 0; }
 }
 function missionConfigWingSolo(m) {
@@ -1624,7 +1635,7 @@ const WO_BANDITS_MIN = 2, WO_BANDITS_MAX = 3, WO_SPAWN_D = 6000, WO_SPAWN_ALT = 
 const BUZZ_MACH = 1.0, BUZZ_R = 90, BUZZ_CD = 10, BUZZ_TOWER_PTS = 500, BUZZ_JET_PTS = 250;
 const BUZZ_SHAKE = 0.35, BUZZ_SHAKE_CP = 0.12;
 const autoland = { on: false, ph: '', t: 0, T: AL_CAPTURE_T, d: 0, off: new THREE.Vector3(), tdZ: 0, vRel: 0,
-  prevLz: Infinity, q0: new THREE.Quaternion(), p0: new THREE.Vector3(), target: null };
+  prevLz: Infinity, q0: new THREE.Quaternion(), p0: new THREE.Vector3(), target: null, used: false };
 const waveoff = { used: false, rolled: false, st: 'IDLE', t: 0, n: 0, bannerT: 0, pitchBias: 0, ids: new Int16Array(3).fill(-1) };
 const BUZZ_ANCH = new Float32Array(8 * 3), BUZZ_KIND = new Uint8Array(8), BUZZ_CDV = new Float32Array(8);
 const _bz0 = new THREE.Vector3(), _bz1 = new THREE.Vector3(), _bzSeg = new THREE.Vector3(), _bzLocal = new THREE.Vector3();
@@ -1674,7 +1685,7 @@ function engageAutoland() {
     d0 = AL_VAPP * T + 300;
     alSlope(a, d0, autoland.off); autoland.off.subVectors(_alLocal, autoland.off);
   }
-  Object.assign(autoland, { on: true, ph: 'CAPTURE', t: 0, T, d: d0, tdZ, vRel: AL_VAPP, prevLz: Infinity });
+  Object.assign(autoland, { on: true, ph: 'CAPTURE', t: 0, T, d: d0, tdZ, vRel: AL_VAPP, prevLz: Infinity, used: true });
   autoland.q0.copy(state.quaternion); autoland.p0.copy(state.position);
   _alPrevW.copy(state.position);
   state.gearDown = true; gearAutoLock = true; state.afterburner = 0;
@@ -1966,6 +1977,12 @@ function catEnter() {
   combatSys.updateJbd(a, true, 1);
   vfx.catSteam.reset();
   if (!radioEvent('CAT_ARMED')) onWing('Deck is clear. Catapult armed. Go when ready, Lead.', 'AWACS', '#00ff66', true);
+  if (missionId === 'NAVAL_BATTLE' && !scramble.rolled && !(combat.traps > 0)) {
+    scramble.rolled = true;
+    const roll = NO_SCRAMBLE ? false : FORCE_SCRAMBLE || Math.random() < SCR_CHANCE;
+    if (roll) scramble.st = 'INBOUND';
+    if (DEBUG) console.log('[ANGELS_ZERO] scramble roll p=' + SCR_CHANCE + ' hit=' + roll);
+  }
   const solo = combat.mcfg.wingmen === 'NONE';
   for (let i = 0; i < wingmen.length; i++) {
     const w = wingmen[i], wc = w.cat;
@@ -1986,7 +2003,63 @@ function catRelease() {
   state.velocity.copy(_catFwd).multiplyScalar(CAT_VEND).add(a.vel);
   state.speed = CAT_VEND; state.onGround = false; gearAutoLock = false;
   audio.bumpBgmDwell();                                  // switch to the mission track on this frame
+  if (scramble.st === 'PASS') {
+    const n = combatSys.handoffRaiders(scramble.ids);
+    scramble.st = 'HANDOFF';
+    if (DEBUG) console.log('[ANGELS_ZERO] scramble handoff n=' + n);
+  }
 }
+function stepHotScramble(dt) {
+  if (scramble.st === 'INBOUND') {
+    const n = combatSys.spawnRaiders(SCR_RAIDERS, scramble.ids);
+    if (!n) return;
+    scramble.st = 'PASS'; scramble.t = 0; scramble.splashT = 0;
+    combat.scrambleT = performance.now();
+    musicCtx.scramble = 1;
+    if (typeof rq !== 'undefined') rq.say('SCRAMBLE! BANDITS OVERHEAD — LAUNCH NOW!', { pri: 3, bypass: true, cat: 'MISSILE', ch: 'AWACS' });
+    if (DEBUG) console.log('[ANGELS_ZERO] scramble pass start n=' + n);
+  }
+  if (scramble.st !== 'PASS') return;
+  scramble.t += dt;
+  // CIWS: short white-orange bursts from two carrier-local mounts, deliberately
+  // lagging the raider so nothing on deck can be hit.
+  const a = combat.ally;
+  if (a && a.root) {
+    scramble.ciwsAcc += CIWS_RPS * dt;
+    for (const id of scramble.ids) {
+      const e = combatSys.enemies.find(x => x && x.id === id && x.alive);
+      if (!e) continue;
+      const d = Math.hypot(e.pos.x - state.position.x, e.pos.z - state.position.z);
+      if (d < 240 && scramble.whooshT <= 0) {
+        blastShake = Math.max(blastShake, 0.22); audio.flybyWhoosh(0.7, firstPerson); scramble.whooshT = 1.5;
+        if (DEBUG) console.log('[ANGELS_ZERO] scramble pass i=' + e.id + ' d=' + Math.round(d));
+      }
+      if (scramble.ciwsAcc < 1) continue;
+      if (id !== scramble.ids[0]) continue;
+      scramble.ciwsAcc -= 1;
+      for (let k = 0; k < 2; k++) {
+        a.root.localToWorld(_scrMuzzle.set(k ? 34 : -34, (a.deckY || 19) + 14, -40));
+        _scrAim.copy(e.pos).addScaledVector(e.vel, -0.06).sub(_scrMuzzle).normalize();
+        _scrVel.copy(_scrAim).multiplyScalar(980);
+        vfx.aaTracer.add(_scrMuzzle, _scrVel, 0.24, false);
+      }
+    }
+    scramble.splashT -= dt;
+    if (scramble.splashT <= 0) {
+      scramble.splashT = 1 / SCR_SPLASH_RATE;
+      const ang = Math.random() * Math.PI * 2, r = 40 + Math.random() * 160;
+      a.root.localToWorld(_scrMuzzle.set(Math.cos(ang) * r, -1, Math.sin(ang) * r));
+      vfx.spray.emit(_scrMuzzle.x, _scrMuzzle.z, 0, 0, 0, 1, dt);
+    }
+  }
+  scramble.whooshT = Math.max(0, scramble.whooshT - dt);
+  if (scramble.t > SCR_PASS_T + 16) {
+    const n = combatSys.handoffRaiders(scramble.ids);
+    scramble.st = 'HANDOFF';
+    if (DEBUG) console.log('[ANGELS_ZERO] scramble handoff n=' + n + ' auto');
+  }
+}
+
 function updateWingCat(dt, a) {
   for (let i = 0; i < wingmen.length; i++) {
     const w = wingmen[i], wc = w.cat, trk = wc.track;
@@ -2043,6 +2116,7 @@ function catTick(dt) {
     state.gearDown = true; state.gear = 1; gearAutoLock = true;
     _catFwd.set(0, 0, -1).applyQuaternion(state.quaternion);
     vfx.catSteam.hold(state.position, _catFwd, dt);
+    stepHotScramble(dt);
   } else if (cat.ph === 'LAUNCH') {
     cat.t += dt;
     const t = Math.min(cat.t, CAT_T), rel = 0.5 * CAT_ACC * t * t, v = Math.min(CAT_VEND, CAT_ACC * t);
@@ -2184,7 +2258,7 @@ function sortieStats() {
   const sc = combat.styleCounts || {};
   return { score: Math.round(combat.score || 0), kills: combat.kills || 0, gunsKills: sc.GUNS_KILL || 0, wingsSevered: sc.WING_RIP || 0,
     bridges: sc.BRIDGE_THREAD || 0, aceDown: (combat.aceDowns || 0) > sortie.ace0, peak: combat.comboPeak || 1, time: simTime - sortie.t0,
-    phase: combat.phase || 1 };
+    phase: combat.phase || 1, brokenWing: !!(combat.bw && combat.bw.landed) };
 }
 function watchSortie() {
   // MISSION now ends via the phase-4 carrier trap (combat.onCarrierTrap → onMissionComplete).
@@ -2357,6 +2431,7 @@ function showDebrief(outcome, st, res) {
   const flags = [];
   if (res.newBest) flags.push('NEW HIGH SCORE');
   if (res.newBestRank) flags.push('NEW BEST RANK');
+  if (st.brokenWing) flags.push('★ BROKEN WING');
   if (!cleared && res.rank === 'B' && profile.rankFor(st.score, true) !== 'B') flags.push('RANK CAPPED AT B — SORTIE NOT CLEARED');
   document.getElementById('dbFlags').innerHTML = flags.map(f => `<span>${f}</span>`).join('');
   const ri = st.rankInfo || computeRank(st, outcome);
@@ -2375,6 +2450,7 @@ function showDebrief(outcome, st, res) {
     ['WINGS SEVERED', st.wingsSevered],
     ['BRIDGE THREADS', st.bridges],
     ['PEAK COMBO', 'x' + st.peak.toFixed(2).replace(/0$/, '')],
+    ...(st.brokenWing ? [['BROKEN WING', '★ +2000']] : []),
     ['ACE', st.aceDown ? 'DOWN' : '—'],
     ['PTS TIME / DMG', `${ri.ptsTime.toFixed(1)} / ${ri.ptsDmg.toFixed(1)}`],
     ['PTS ACC / OBJ', `${ri.ptsAcc.toFixed(1)} / ${ri.ptsObj.toFixed(1)}`],
@@ -2527,6 +2603,7 @@ function pauseSim() {
 function resumeSim() {
   if (appMode !== 'PAUSED') return;
   appMode = 'PLAY';
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   lastTime = performance.now();
   audio.setBgmPause(false);
   audio.resume();
@@ -2582,8 +2659,12 @@ addEventListener('mousemove', e => {
 let fKeyEngine = false;                                // F currently held as the engine fire-bottle / relight switch
 // With Alt held (free look) read letter / digit keys by physical code: Alt can remap e.key
 // (macOS Option), and Alt+D / Alt+F etc. must not reach browser shortcuts mid-dogfight.
-const keyOf = e => (e.altKey && /^Key[A-Z]$/.test(e.code) ? e.code.slice(3).toLowerCase()
-  : e.altKey && /^Digit\d$/.test(e.code) ? e.code.slice(5) : e.key.toLowerCase());
+const keyOf = e => ((e.altKey || e.ctrlKey || e.shiftKey)
+  ? (/^Key[A-Z]$/.test(e.code) ? e.code.slice(3).toLowerCase()
+    : /^Digit\d$/.test(e.code) ? e.code.slice(5)
+    : e.code === 'BracketLeft' ? '[' : e.code === 'BracketRight' ? ']'
+    : (e.key || '').toLowerCase())
+  : (e.key || '').toLowerCase());
 addEventListener('keydown', e => {
   if (freeLook.onKey(e, true)) return;
   const k = keyOf(e);
@@ -2594,7 +2675,13 @@ addEventListener('keydown', e => {
     if (!e.repeat) combat.cheat = !combat.cheat;
     return;
   }
-  if (e.altKey && appMode === 'PLAY') e.preventDefault();
+  if (e.code === 'Slash' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) e.preventDefault();
+  if (appMode === 'PLAY' && !uiModal) {
+    // Capture browser/modifier chords during active flight (keep F12 free for DevTools).
+    if ((e.ctrlKey || e.altKey || e.metaKey) && e.code !== 'F12') e.preventDefault();
+    if (['Tab', 'Space', 'Backspace', 'Slash', 'Quote', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+      'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'AltLeft', 'AltRight', 'ControlLeft', 'ControlRight'].includes(e.code)) e.preventDefault();
+  }
   // Music player: , . / are free; [ ] remain the cockpit MFD pages. Work in MENU/PAUSED too.
   if (!e.repeat && e.code === 'Comma') { audio.skip(-1); hud.setMusicToast('♪ ' + (audio.bgm.title || '—')); return; }
   if (!e.repeat && e.code === 'Period') { audio.skip(1); hud.setMusicToast('♪ ' + (audio.bgm.title || '—')); return; }
@@ -2683,6 +2770,7 @@ addEventListener('keydown', e => {
   if (k === 'backspace' && flightMode === 'FLY') { e.preventDefault(); resetAircraft(); }
 });
 addEventListener('keyup', e => {
+  if (appMode === 'PLAY' && (e.code === 'AltLeft' || e.code === 'AltRight' || e.key === 'Alt')) e.preventDefault();
   if (freeLook.onKey(e, false)) return;
   const k = keyOf(e);
   kbHeld.delete(e.code);
@@ -2732,6 +2820,16 @@ addEventListener('visibilitychange', () => { if (document.hidden) clearFlightInp
 addEventListener('beforeunload', e => {
   if (appMode !== 'PLAY') return;
   e.preventDefault(); e.returnValue = ''; return '';
+});
+document.addEventListener('fullscreenchange', () => {
+  if (!navigator.keyboard) return;
+  if (document.fullscreenElement && navigator.keyboard.lock) {
+    navigator.keyboard.lock(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'KeyR', 'KeyF', 'KeyG', 'KeyH',
+      'KeyJ', 'KeyK', 'KeyL', 'KeyN', 'KeyP', 'KeyB', 'KeyC', 'KeyV', 'KeyX', 'KeyZ', 'Digit1', 'Digit2',
+      'Digit3', 'Tab']).catch(() => {});
+  } else if (navigator.keyboard.unlock) {
+    navigator.keyboard.unlock();
+  }
 });
 
 const patchButton = document.getElementById('patchButton');
@@ -3360,6 +3458,7 @@ function enterGround(td) {
   state.groundPitch = Math.max(0, state.pitch);
   state.pitchRate = state.rollRate = state.yawRate = 0;
   state.touchdown = { kts: +td.kts.toFixed(0), vy: +td.vy.toFixed(2), bank: +td.bank.toFixed(1), pitch: +td.pitch.toFixed(1), t: simTime };
+  if (combat.engineOut && !autoland.used && td.vy > -4 && onAirfield(state.position.x, state.position.z)) combatSys.awardBrokenWing('RWY');
   state.pit.done = false; state.pit.active = false; state.pit.t = 0;
   const firm = Math.min(1, -td.vy / 9.5);
   audio.tireScreech(0.6 + 0.6 * firm);
@@ -3920,6 +4019,9 @@ renderer.domElement.addEventListener('wheel', e => {
   e.preventDefault();
   state.throttle = THREE.MathUtils.clamp(state.throttle - Math.sign(e.deltaY) * 0.05, 0, 1);
 }, { passive: false });
+window.addEventListener('wheel', e => {
+  if (e.ctrlKey && appMode === 'PLAY' && !uiModal) e.preventDefault();
+}, { passive: false });
 if (DEBUG) window.__dbgInput = (nx, ny, k = {}) => { mouse.nx = nx; mouse.ny = ny; Object.assign(keys, k); };   // debug: hold stick / keys
 if (DEBUG) window.__kbDebug = () => ({ held: [...kbHeld], pitch: kbAxis.pitch, roll: kbAxis.roll, hold: kbHold, active: kbActive, throttle: state.throttle });
 // debug: advance the sim + audio mix n frames (for checks in a throttled / hidden tab)
@@ -3945,7 +4047,7 @@ const _audioFwd = new THREE.Vector3();
 // Preallocated music context: one object, updated in place every frame (no allocations).
 const musicCtx = { debrief: false, landed: false, rtb: false, app: 'MENU', onGround: false, launched: false,
   inCombat: false, dmg: 0, msl: 0, storm: false, rain: 0, night: false, nvg: false,
-  wxOverride: false, bgmScenario: '03_air_superiority',
+  wxOverride: false, bgmScenario: '03_air_superiority', intrusion: 0, scramble: 0,
   // Legacy synth fallback fields (no per-frame allocation; kept for browsers w/o Ogg).
   airborne: false, banditDist: Infinity, combo: 1, ace: false, ambush: 0 };
 function getMusicCtx() {
@@ -3971,23 +4073,25 @@ function getMusicCtx() {
   musicCtx.combo = C.comboMult || 1;
   musicCtx.ace = !!(C.ace && C.ace.alive);
   musicCtx.ambush = waveoff.st === 'AMBUSH' ? 1 : 0;
+  musicCtx.intrusion = combat.intr && (combat.intr.st === 'DUEL' || combat.intr.st === 'DONE' && !combat.rtb) ? 1 : 0;
+  musicCtx.scramble = scramble.st === 'PASS' ? 1 : 0;
   return musicCtx;
 }
 // Scenario transitions are state-driven, not time-driven. Scalars are compared
 // first so the composite key string is only built on a real transition (zero
 // per-frame allocations in the steady state).
 let lastMusicKey = '';
-const musicKeyParts = ['', '', '', '', false, 0, '', 0];
+const musicKeyParts = ['', '', '', '', false, 0, '', 0, 0];
 function syncMusicScenario(force = false) {
   const C = combat;
   const a = appMode, f = flightMode, cp = cat.ph, ap = autoland.ph;
   const rt = !!(C.rtb && C.rtb.on), ph = C.missionPhase | 0, mid = missionId, amb = waveoff.st === 'AMBUSH' ? 1 : 0;
   if (!force && musicKeyParts[0] === a && musicKeyParts[1] === f && musicKeyParts[2] === cp &&
       musicKeyParts[3] === ap && musicKeyParts[4] === rt && musicKeyParts[5] === ph && musicKeyParts[6] === mid &&
-      musicKeyParts[7] === amb) return;
+      musicKeyParts[7] === amb && musicKeyParts[8] === musicCtx.intrusion) return;
   musicKeyParts[0] = a; musicKeyParts[1] = f; musicKeyParts[2] = cp; musicKeyParts[3] = ap;
-  musicKeyParts[4] = rt; musicKeyParts[5] = ph; musicKeyParts[6] = mid; musicKeyParts[7] = amb;
-  lastMusicKey = a + '|' + f + '|' + cp + '|' + ap + '|' + rt + '|' + ph + '|' + mid + '|' + amb;
+  musicKeyParts[4] = rt; musicKeyParts[5] = ph; musicKeyParts[6] = mid; musicKeyParts[7] = amb; musicKeyParts[8] = musicCtx.intrusion;
+  lastMusicKey = a + '|' + f + '|' + cp + '|' + ap + '|' + rt + '|' + ph + '|' + mid + '|' + amb + '|' + musicCtx.intrusion;
   // force=true bypasses MIN_DWELL exactly like the existing 11_rtb path.
   audio.switchTo(audio.resolveScenario(getMusicCtx()), true);
 }
@@ -4124,6 +4228,17 @@ const combatSys = createCombat(THREE, { scene, camera, renderer, state, combat, 
   sectorAt: world.sectorAt, isTerrainOccluded: world.isTerrainOccluded, fleetLane: world.fleetLane, canyonCenter: world.canyonCenter,
   isReady: () => modelReady && flightMode === 'FLY', onPlayerDown: reason => triggerEject(reason), onSfx, onFlyby, onWing,
   onSlowMo: triggerSlowMo, getWingmen: () => wingmen, addBox: world.addBox, limpTrail,
+    onIntrusion(phase) {
+      if (phase === 'CUT') { audio.bgmCut(1.5); hud.setAlertState('NORMAL'); }
+      else if (phase === 'SPAWN') {
+        rq.say({ id: 'CRIMSON_INTRUSION', text: 'CRIMSON-1: THIS IS MY SKY NOW, ANGEL. JUST YOU AND ME.', pri: 3, cat: 'MISSILE', ch: 'ENEMY', duration: 4 }, { bypass: true });
+        setBox({ ch: 'CRIMSON', text: 'THIS IS MY SKY NOW, ANGEL.', id: '' }, 4);
+        syncMusicScenario(true);
+      } else if (phase === 'DONE' || phase === 'RESET') {
+        if (phase === 'DONE') rq.say('CRIMSON-1 IS DOWN. NET IS CLEAR.', { pri: 2, bypass: true, ch: 'AWACS' });
+        audio.bgmStaticEnd(); syncMusicScenario(true);
+      }
+    },
   // Live sun direction follows the time-of-day preset; NIGHT has no blinding sun.
   getSunDir: out => todMode === 'NIGHT' ? out.set(0, -1, 0) : out.copy(SUN_DIR),
   getCloudWet: () => cloudWet, getCloudDeck: () => (world.map && world.map.cloudSea) || null,
@@ -4677,6 +4792,9 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
     const aceWingAt = Q.has('acewingat') ? Number(Q.get('acewingat')) : -1;
     const trapAt = Q.has('trapat') ? Number(Q.get('trapat')) : -1, catAt = Q.has('catat') ? Number(Q.get('catat')) : -1;
     const catLaunchAt = Q.has('catlaunchat') ? Number(Q.get('catlaunchat')) : -1;
+    const engOutAt = Q.has('engoutat') ? Q.get('engoutat').split(':') : null;
+    const intrusionAt = Q.has('intrusionat') ? Number(Q.get('intrusionat')) : -1;
+    let intrusionAtDone = false;
     const restartAt = Q.has('restartat') ? Number(Q.get('restartat')) : -1;
     const stageAt = Q.has('stageat') ? Number(Q.get('stageat')) : -1;
     // Drone test hook: ?drones=1 spawns at t=1 s, ?droneat=s overrides the time.
@@ -4884,6 +5002,16 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
       if (catAt >= t0 && catAt < t1 && combat.ally) {
         await enterCarrierLaunch(mission());
         console.log('[ANGELS_ZERO] catapult hold @', t1.toFixed(2), cat.ph);
+      }
+      if (engOutAt && Number(engOutAt[0]) >= t0 && Number(engOutAt[0]) < t1) {
+        combatSys.debugEngineFire(engOutAt[1] || 'L');
+        combatSys.fireKey(true); combatSys.fireKey(false);
+        console.log('[ANGELS_ZERO] engoutat @', t1.toFixed(2), engOutAt[1] || 'L', JSON.stringify(combatSys.stats().eng));
+      }
+      if (intrusionAt >= t0 && intrusionAt < t1 && !intrusionAtDone) {
+        intrusionAtDone = true;
+        combatSys.setIntrusionForce(true);
+        console.log('[ANGELS_ZERO] intrusionat @', t1.toFixed(2), combatSys.forceIntrusion());
       }
       if (catLaunchAt >= t0 && catLaunchAt < t1 && cat.ph === 'HOLD') {
         cat.forceAB = true; state.throttle = 1; state.afterburner = 1;
@@ -5173,6 +5301,8 @@ if (DEBUG) {
     get missionId() { return missionId; }, get mission() { return mission(); }, cycleMission, loadMissionScene, startSortie, launchSortie,
     get autoland() { return autoland; }, autolandPrompt, engageAutoland, getMusicCtx, get debrief() { return !debriefEl.hidden; },
     get cat() { return cat; }, get skimK() { return skimK; }, catEnter, catTick, catFire, catSnapAll, carrierDiag, enterCarrierLaunch, carrierReady,
+    get scramble() { return scramble; }, get bw() { return combat.bw; }, get intrusion() { return combat.intr; },
+    awardBrokenWing: k => combatSys.awardBrokenWing(k), forceIntrusion: () => combatSys.forceIntrusion(),
     ilsVisible, inCutscene, get missionT() { return missionT; }, applyMapProps,
     getCarrierBox() { const a = combat.ally; if (!a || !a.root) return null; const b = new THREE.Box3().setFromObject(a.root); return { min: b.min.toArray(), max: b.max.toArray() }; },
     get carrier() { return carrier; }, get jetGearDY() { return JET_GEAR_DY; },

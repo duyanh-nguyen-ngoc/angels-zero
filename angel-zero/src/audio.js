@@ -9,7 +9,7 @@
 // to the procedural layers below. A master "hearing tunnel" low-pass sweeps
 // 12 kHz -> 550 Hz as the pilot approaches G-LOC.
 
-import { MISSIONS } from './missions.js?v=s99b';
+import { MISSIONS } from './missions.js?v=s9ba';
 
 export function createAudio() {
   let ctx = null, master = null, cockpitLP = null, ready = false;
@@ -1316,6 +1316,7 @@ export function createAudio() {
     if (!c) return '01_hangar';
     if (c.debrief || c.landed) return '12_debrief';
     if (c.ambush) return '10_last_stand';
+    if (c.intrusion) return '08_crimson_duel';
     if (c.rtb) return '11_rtb';
     if (c.app === 'MENU') return '01_hangar';
     if (c.onGround && !c.launched) return '02_catapult';
@@ -1538,6 +1539,26 @@ export function createAudio() {
     setTimeout(() => { if (rxState === 'FADE') { rxState = 'IDLE'; rxCur = null; } }, FADE_S * 1000);
   }
   function txClose() { txTail(); }
+  // Mid-mission signal intrusion: mute the music bed and blast radio static for a
+  // fixed window, then restore. Decks keep running, so autoplay is never disturbed.
+  function bgmCut(secs = 1.5) {
+    if (!ready || !N.duckG || !N.rStaticG) return;
+    const t = ctx.currentTime, dur = Math.max(0.2, secs);
+    rampDuck(0, 0.08);
+    const sg = N.rStaticG.gain;
+    sg.cancelScheduledValues(t); sg.setValueAtTime(sg.value, t);
+    sg.linearRampToValueAtTime(0.6, t + 0.05);
+    sg.setValueAtTime(0.6, t + Math.max(0.06, dur - 0.08));
+    sg.linearRampToValueAtTime(0, t + dur);
+    if (N.rStaticBP) N.rStaticBP.frequency.setValueAtTime(1400, t);
+    setTimeout(() => { rampDuck(bgmPausedByUser ? DUCK_GAIN : 1, 0.25); }, dur * 1000);
+  }
+  function bgmStaticEnd() {
+    if (!ready || !N.rStaticG) return;
+    const t = ctx.currentTime, sg = N.rStaticG.gain;
+    sg.cancelScheduledValues(t); sg.setValueAtTime(sg.value, t); sg.linearRampToValueAtTime(0, t + 0.12);
+    rampDuck(bgmPausedByUser ? DUCK_GAIN : 1, 0.2);
+  }
   // Lazy clip cache: single throttled background worker prevents fetch/decode hitches at launch.
   function preloadRadio(lines) {
     if (!ready || !ctx || !Array.isArray(lines)) return Promise.resolve(0);
@@ -1865,7 +1886,7 @@ export function createAudio() {
   }
 
   return {
-    init, resume, suspend, update, updateMusic, setSpray, setFlagCharge, setDroneHum, enemyGun, gunhit, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, samLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, setBgmPause, bumpBgmDwell() { dwell = MIN_DWELL; }, setBgmForce: v => { bgmForce = v || ''; }, switchTo, selectTrack, skip, setAuto, onBgmChange, get bgmTracks() { return allTracks() || []; }, radioSquelch, preloadRadio, playRadio, stopRadio, txOpen, txTail, txClose, preload,
+    init, resume, suspend, update, updateMusic, bgmCut, bgmStaticEnd, setSpray, setFlagCharge, setDroneHum, enemyGun, gunhit, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, samLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, setBgmPause, bumpBgmDwell() { dwell = MIN_DWELL; }, setBgmForce: v => { bgmForce = v || ''; }, switchTo, selectTrack, skip, setAuto, onBgmChange, get bgmTracks() { return allTracks() || []; }, radioSquelch, preloadRadio, playRadio, stopRadio, txOpen, txTail, txClose, preload,
     get radioAnalyser() { return N.rAnalyser || null; }, get radioFreq() { return N.rFreq || null; }, get radioTime() { return N.rTime || null; },
     get radioCh() { return RADIO_CH; },
     get radioDsp() { return { pttOpen: !!N.pttOpen, pttTail: !!N.pttTail, static: !!N.rStatic, hp: N.rHP ? N.rHP.frequency.value : 0,

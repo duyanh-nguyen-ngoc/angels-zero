@@ -3,6 +3,16 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.32', title: 'CLEAN FLIGHT INPUTS', bullets: [
+    'Multi-key flight combos no longer trigger browser shortcuts in flight: Ctrl, Alt, and Shift chords (including Ctrl+F/S/R/G/J/L/P, Slash, F3/F5, Alt release, and Ctrl+Wheel page zoom) are now intercepted cleanly while keeping F12 free.',
+    'Weapon and combat keys now resolve by physical key code when Shift, Ctrl, or Alt are held, so switching weapons with Shift+1/2/3 under afterburner works reliably.',
+    'Launching or resuming a sortie now clears stray button focus, and entering fullscreen (F11) engages browser Keyboard Lock on supported browsers.'
+  ] },
+  { version: 'v1.1.31', title: 'HOT SCRAMBLE & CRIMSON INTRUSION', bullets: [
+    'Carrier launches can now go hot: bandits sweep overhead while you sit on the catapult, the ship\'s CIWS chatters and splashes dot the wake. Clear the bow and they turn on you for real.',
+    'Bring the jet home on one engine and a manual trap or runway landing earns BROKEN WING +2000, a WARDEN-3 callout and a permanent badge in your service record.',
+    'Push a high combo (or force it in testing) and CRIMSON-1 cuts in mid-mission: the music tears out for a moment, the 08_crimson_duel track takes over, and RTB stays locked until he is down.'
+  ] },
   { version: 'v1.1.30', title: 'FLIGHT ROLES & TRENCH SHORTCUT', bullets: [
     'WARDEN-2 and WARDEN-3 now carry persistent CAP / STRIKE roles from the STANDBY menu. STRIKE wings hunt ships and radar masts first, switch to canyon SAM sites when nothing afloat remains, and still break off for a six-second self-defence intercept.',
     'A narrow rock arch cuts across the first S-bend of CANYON_RUN. Fly the centreline under the span to skip the gates and bank TRENCH SHORTCUT +1200; clip the piers and you will find the normal crash path. WARDEN-2 has opinions either way.',
