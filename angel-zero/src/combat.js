@@ -805,6 +805,7 @@ export function createCombat(THREE, env) {
     if (!enemy) C.lastPlayerMsl = m;                    // missile cam tracks the most recent player shot
     if (hostileAtPlayer && !isSam) director.noteLaunch();
     if (env.onSfx) env.onSfx('launch', fromPos, 1);
+    if (!enemy && env.onPlayerLaunch) env.onPlayerLaunch(fromPos, fromQuat, fromVel);
     return m;
   }
   function fireMissile() {
@@ -873,6 +874,7 @@ export function createCombat(THREE, env) {
     let n = 0;
     while (gunAcc >= 1 && C.ammo > 0) {
       gunAcc -= 1; C.ammo--; n++; C.gunRounds++;
+      if (C.gunRounds % 3 === 0 && env.onGunRound) env.onGunRound();     // cockpit stutter-flash every 3rd round
       const r = DISPERSION * 0.5 * Math.sqrt(rand()), th = rand() * Math.PI * 2;  // uniform in the 8 mrad cone
       _gDir.copy(_gBore).addScaledVector(_gRight, Math.cos(th) * r).addScaledVector(_gUp, Math.sin(th) * r).normalize();
       _gVel.copy(_gDir).multiplyScalar(BULLET_SPEED).add(S.velocity);           // muzzle velocity + aircraft velocity

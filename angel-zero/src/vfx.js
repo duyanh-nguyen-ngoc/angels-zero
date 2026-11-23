@@ -322,6 +322,8 @@ export function createVFX(THREE, env) {
   const contrailStats = { active: 0, live: 0 };
   function updateContrails(emitters, now) {
     if (plumes.length >= 2) { _noz[0] = plumes[0].g.position; _noz[1] = plumes[1].g.position; }
+    const burnerScale = 1 + 0.35 * burnerFlashK;
+    for (let bi = 0; bi < plumes.length; bi++) if (plumes[bi] && plumes[bi].g) plumes[bi].g.scale.setScalar(burnerScale);
     _ctCol.copy(CONTRAIL_COL).multiply(vaporTint);
     let active = 0, live = 0;
     const n = Math.min(5, emitters.length);
@@ -497,10 +499,12 @@ export function createVFX(THREE, env) {
   machConeInner.renderOrder = 5; machConeOuter.renderOrder = 4;
   machConeInner.visible = false; machConeOuter.visible = false;
   jet.add(machConeInner, machConeOuter);
-  let coneClock = 0, machPulseK = 0;
+  let coneClock = 0, machPulseK = 0, burnerFlashK = 0;
   function updateMachCone(dt, mach, isCockpit) {
     coneClock += dt;
     machPulseK = Math.max(0, machPulseK - dt / 0.4);
+    burnerFlashK = Math.max(0, burnerFlashK - dt / 0.2);
+    launchPuff.update(dt);
     const win = force.cone ? 1 : smooth(mach, 0.98, 1.0) * (1 - smooth(mach, 1.02, 1.05));
     const show = !isCockpit && win > 0.005;
     machConeInner.visible = machConeOuter.visible = show;
@@ -997,6 +1001,83 @@ export function createVFX(THREE, env) {
     },
     reset() { for (let i = 0; i < AA_TRACER_N; i++) aaP[i].on = false; aaPoints.visible = false; },
     get count() { let n = 0; for (let i = 0; i < AA_TRACER_N; i++) if (aaP[i].on) n++; return n; }
+  };
+
+  /* ------------------------- launch motor smoke puffs (one pooled Points) ----- */
+  const LPUFF_N = 24;
+  const lpGeo = new THREE.BufferGeometry();
+  const lpPos = new Float32Array(LPUFF_N * 3), lpAge = new Float32Array(LPUFF_N),
+    lpSeed = new Float32Array(LPUFF_N), lpLife = new Float32Array(LPUFF_N),
+    lpAlpha = new Float32Array(LPUFF_N), lpSize = new Float32Array(LPUFF_N),
+    lpBaseX = new Float32Array(LPUFF_N), lpBaseY = new Float32Array(LPUFF_N), lpBaseZ = new Float32Array(LPUFF_N),
+    lpDirX = new Float32Array(LPUFF_N), lpDirY = new Float32Array(LPUFF_N), lpDirZ = new Float32Array(LPUFF_N),
+    lpDriftX = new Float32Array(LPUFF_N), lpDriftY = new Float32Array(LPUFF_N), lpDriftZ = new Float32Array(LPUFF_N);
+  lpAge.fill(99);
+  lpGeo.setAttribute('position', new THREE.BufferAttribute(lpPos, 3).setUsage(THREE.DynamicDrawUsage));
+  lpGeo.setAttribute('aAlpha', new THREE.BufferAttribute(lpAlpha, 1).setUsage(THREE.DynamicDrawUsage));
+  lpGeo.setAttribute('aSize', new THREE.BufferAttribute(lpSize, 1).setUsage(THREE.DynamicDrawUsage));
+  const lpMat = new THREE.ShaderMaterial({
+    uniforms: { uScale: { value: 400 } },
+    vertexShader: LOG_V + `
+      attribute float aAlpha; attribute float aSize; uniform float uScale; varying float vA;
+      void main() { vA = aAlpha; vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = aSize * uScale / max(1.0, -mv.z);
+        gl_Position = projectionMatrix * mv;
+        #include <logdepthbuf_vertex>
+      }`,
+    fragmentShader: LOG_F + `
+      varying float vA;
+      void main() {
+        #include <logdepthbuf_fragment>
+        float d = length(gl_PointCoord - 0.5) * 2.0;
+        float a = vA * pow(clamp(1.0 - d, 0.0, 1.0), 1.6);
+        if (a < 0.004) discard;
+        gl_FragColor = vec4(vec3(0.82, 0.85, 0.89) * a, a);
+      }`,
+    transparent: true, depthWrite: false, blending: THREE.NormalBlending
+  });
+  const lpPoints = new THREE.Points(lpGeo, lpMat);
+  lpPoints.frustumCulled = false; lpPoints.visible = false; scene.add(lpPoints);
+  let lpNext = 0;
+  const lpTmpR = new THREE.Vector3(), lpTmpU = new THREE.Vector3();
+  const launchPuff = {
+    spawn(pos, fwd, jetVel, rightSign = 1) {
+      lpTmpR.set(fwd.z, 0, -fwd.x).normalize().multiplyScalar(rightSign >= 0 ? 1 : -1);
+      lpTmpU.crossVectors(fwd, lpTmpR).normalize();
+      for (let k = 0; k < 8; k++) {
+        const i = lpNext; lpNext = (lpNext + 1) % LPUFF_N;
+        const seed = Math.random() * 6.283;
+        lpBaseX[i] = pos.x; lpBaseY[i] = pos.y; lpBaseZ[i] = pos.z;
+        lpDirX[i] = fwd.x; lpDirY[i] = fwd.y; lpDirZ[i] = fwd.z;
+        lpDriftX[i] = -(jetVel ? jetVel.x : 0) * 0.4 + lpTmpR.x * 0.6;
+        lpDriftY[i] = -(jetVel ? jetVel.y : 0) * 0.4 + lpTmpU.x * 0.2;
+        lpDriftZ[i] = -(jetVel ? jetVel.z : 0) * 0.4 + lpTmpR.z * 0.6;
+        lpSeed[i] = seed; lpAge[i] = 0; lpLife[i] = 0.9; lpAlpha[i] = 0.5;
+      }
+      if (env.debug) console.log('[ANGELS_ZERO] lpuff n=8');
+    },
+    update(dt) {
+      let live = 0;
+      for (let i = 0; i < LPUFF_N; i++) {
+        if (lpAge[i] >= lpLife[i]) { lpAlpha[i] = 0; continue; }
+        lpAge[i] += dt;
+        const t = lpAge[i], k = Math.min(1, t / lpLife[i]);
+        const R = 0.3 + 1.9 * k, w = t * 14, s = lpSeed[i];
+        lpPos[i * 3] = lpBaseX[i] + lpDirX[i] * (10 * t) + lpDriftX[i] * t + Math.cos(w + s) * R;
+        lpPos[i * 3 + 1] = lpBaseY[i] + lpDirY[i] * (10 * t) + lpDriftY[i] * t + Math.sin(w + s) * R;
+        lpPos[i * 3 + 2] = lpBaseZ[i] + lpDirZ[i] * (10 * t) + lpDriftZ[i] * t + Math.cos(w + s + 1.6) * R;
+        lpAlpha[i] = 0.5 * (1 - k) * (1 - k);
+        lpSize[i] = 1.2 + 3.8 * k;
+        live++;
+      }
+      lpPoints.visible = live > 0;
+      if (!live) return;
+      lpGeo.attributes.position.needsUpdate = true;
+      lpGeo.attributes.aAlpha.needsUpdate = true;
+      lpGeo.attributes.aSize.needsUpdate = true;
+      lpMat.uniforms.uScale.value = renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+    },
+    reset() { lpAge.fill(99); lpAlpha.fill(0); lpPoints.visible = false; }
   };
 
   /* ------------- hybrid clouds: raymarched sky deck + lit 3-D cumulus banks */
@@ -1652,7 +1733,8 @@ export function createVFX(THREE, env) {
     attachPlume,
     setWingtips(l, r) { tipL.copy(l); tipR.copy(r); buildVapor(); },
     clearTrails() { for (const r of ribbons) r.clear(); for (const r of contrails) r.clear(); contrailStats.active = contrailStats.live = 0; vaporTarget = lexTarget = 0; for (const q of sprayP) q.on = false; vaporLevel = 0; vaporPoints.visible = false; catSteam.reset(); rooster.reset(); wake.reset(); samFx.clear(); flagBeam.hide(); },
-    catSteam, aaTracer, spray: rooster, wake, samFx, flagBeam,
+    catSteam, aaTracer, spray: rooster, wake, samFx, flagBeam, launchPuff,
+    burnerFlash(k) { burnerFlashK = Math.max(burnerFlashK, k || 1); },
     updateContrails,
     get contrailStats() { return contrailStats; },
     update,

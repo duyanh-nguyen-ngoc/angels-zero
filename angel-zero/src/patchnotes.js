@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.39', title: 'BURNER THUMP & SUPERSONIC QUIET', bullets: [
+    'Pushing the throttle into afterburner now lands a sub-bass ignition thump with a manifold whoosh and a short forward camera kick, once per engagement. The nozzles flare as the burner lights, and the catapult keeps its own launch audio.',
+    'Gun bursts stutter a warm glare across the canopy bow and glare shield in the cockpit, and missile shots add a white rail flash plus a spiralling launch-motor smoke puff. All of it is emissive or pooled; light count and draw calls stay constant.',
+    'Mach 0.96-1.03 brings a transonic airframe buffet and 9 Hz rumble; past Mach 1.05 the cockpit wind quietens by 35 % while engine and music stay put. Hold 20-24 deg AoA and the jet develops a subtle bounded wing rock that an opposing roll input damps out.'
+  ] },
   { version: 'v1.1.38', title: 'BATTLE DAMAGE & BITCHING BETTY', bullets: [
     'Heavy hits now crack the canopy, glitch the HUD combiner and make damaged hydraulics whine when you haul the stick. Cracks clear at the pit stop or a new sortie.',
     'A prioritized voice warning system calls PULL UP, ENGINE FIRE, CHAFF/FLARE, OVER G, ALTITUDE and BINGO FUEL with per-alert cooldowns, on its own audio bus so it never waits behind AWACS radio.',

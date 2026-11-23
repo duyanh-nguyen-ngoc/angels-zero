@@ -726,35 +726,35 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s9c2';
-import { createAmbient } from './src/ambient.js?v=s9c2';
-import { createBlastFX } from './src/blastfx.js?v=s9c2';
-import { createHUD } from './src/hud.js?v=s9c2';
-import { createCockpit3D } from './src/cockpit3d.js?v=s9c2';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9c2';
-import { createEjection } from './src/eject.js?v=s9c2';
-import { createAudio } from './src/audio.js?v=s9c2';
-import { createRadio } from './src/radio.js?v=s9c2';
-import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9c2';
-import { createLivery } from './src/livery.js?v=s9c2';
-import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s9c2';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9c2';
-import { createCanopyFX } from './src/canopy.js?v=s9c2';
-import { createNVG } from './src/nvg.js?v=s9c2';
-import { createWorld, WORLD } from './src/world.js?v=s9c2';
-import { createSurfaces } from './src/surfaces.js?v=s9c2';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9c2';
-import { createFreeLook } from './src/freelook.js?v=s9c2';
-import { createCanopyGlass } from './src/canopyglass.js?v=s9c2';
-import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9c2';
-import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9c2';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9c2';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9c2';
-import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9c2';
-import { createRadioQueue } from './src/radioQueue.js?v=s9c2';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9c2';
+import { createVFX } from './src/vfx.js?v=s9c4';
+import { createAmbient } from './src/ambient.js?v=s9c4';
+import { createBlastFX } from './src/blastfx.js?v=s9c4';
+import { createHUD } from './src/hud.js?v=s9c4';
+import { createCockpit3D } from './src/cockpit3d.js?v=s9c4';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9c4';
+import { createEjection } from './src/eject.js?v=s9c4';
+import { createAudio } from './src/audio.js?v=s9c4';
+import { createRadio } from './src/radio.js?v=s9c4';
+import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9c4';
+import { createLivery } from './src/livery.js?v=s9c4';
+import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s9c4';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9c4';
+import { createCanopyFX } from './src/canopy.js?v=s9c4';
+import { createNVG } from './src/nvg.js?v=s9c4';
+import { createWorld, WORLD } from './src/world.js?v=s9c4';
+import { createSurfaces } from './src/surfaces.js?v=s9c4';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9c4';
+import { createFreeLook } from './src/freelook.js?v=s9c4';
+import { createCanopyGlass } from './src/canopyglass.js?v=s9c4';
+import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9c4';
+import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9c4';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9c4';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9c4';
+import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9c4';
+import { createRadioQueue } from './src/radioQueue.js?v=s9c4';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9c4';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
-  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9c2';
+  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9c4';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -1274,6 +1274,29 @@ function onMach1() {
   combat.mach1T = performance.now();
   radioEvent('ON_MACH_1');
   onSfx('sonicboom');
+}
+
+/* --- feel pass: AB ignition thump, transonic buffet, supersonic quiet, wing rock --- */
+const AB_EDGE = 0.15, AB_THUMP_CD = 1.2, AB_KICK_T = 0.15, AB_KICK = 0.06;
+const TRANS_M0 = 0.96, TRANS_M1 = 1.03, SUPER_M = 1.05, TRANS_SHAKE = 0.035, SUPER_QUIET = 0.35;
+const WR_A0 = 20, WR_A1 = 24, WR_AMP_MIN = 2, WR_AMP_MAX = 4, WR_FREQ = 0.55, WR_DAMP_STICK = 0.7;
+const _abFwd = new THREE.Vector3(), _lpFwd = new THREE.Vector3();
+let abPrev = 0, abCD = 0, abKickT = 0;
+let transK = 0, superK = 0, superArmed = true, superCD = 0;
+let wrPhase = 0, wrK = 0, wrRoll = 0, wrAoa = 0, feelLogT = 0;
+// Headless hooks parsed once (scalars only, no per-frame allocation).
+const abatAt = DEBUG && Q.has('abat') ? Number(Q.get('abat')) : -1;
+let debugABOn = false;
+const aoaHoldParts = DEBUG && Q.has('aoahold') ? Q.get('aoahold').split(':') : null;
+const aoaHoldDeg = aoaHoldParts ? Number(aoaHoldParts[0]) : 0;
+const aoaHoldDur = aoaHoldParts && aoaHoldParts[1] ? Number(aoaHoldParts[1]) : 5;
+let aoaHoldT = 0;
+const spdHold = DEBUG && Q.has('spdhold') ? Number(Q.get('spdhold')) || 0 : 0;
+function onBurnerLight() {
+  blastShake = Math.max(blastShake, firstPerson ? AB_KICK * 0.33 : AB_KICK);
+  abKickT = AB_KICK_T;
+  vfx.burnerFlash(1);
+  audio.burnerThump(firstPerson);
 }
 const flybyPulse = document.getElementById('flybyPulse');
 function onFlyby({ dist, k, side }) {
@@ -3184,9 +3207,11 @@ function updatePhysics(dt) {
   if (state.assist) state.bank *= Math.exp(-0.4 * dt);          // ILS wings-level easing
 
   // --- air data
-  const speed = Math.max(1, state.velocity.length());
+  let speed = Math.max(1, state.velocity.length());
   state.speed = speed;
   _vdir.copy(state.velocity).divideScalar(speed);
+  // ?spdhold=m -- DEBUG-only airspeed clamp so headless Mach sweeps stay deterministic.
+  if (DEBUG && spdHold > 0) { state.velocity.copy(_vdir).multiplyScalar(spdHold); speed = spdHold; state.speed = speed; }
   const rho = airDensity(state.position.y);
   const qBar = 0.5 * rho * speed * speed;
   const sos = 340.3 - 0.0041 * Math.min(state.position.y, 11000);
@@ -3194,9 +3219,21 @@ function updatePhysics(dt) {
   state.mach = mach;
   if (prevMach < 1.0 && state.mach >= 1.0 && machArmed) { machArmed = false; onMach1(); }
   if (state.mach < 0.97) machArmed = true;
-  const alpha = Math.atan2(-_vdir.dot(_up), _vdir.dot(_fwd));
+  // Supersonic vapour pulse: rising edge through Mach 1.05, once per 5 s crossing.
+  if (superCD > 0) superCD = Math.max(0, superCD - dt);
+  if (mach >= SUPER_M && superArmed && superCD <= 0) {
+    superArmed = false; superCD = 5; vfx.machPulse(1);
+    if (DEBUG) console.log('[ANGELS_ZERO] trans k=' + transK.toFixed(2) + ' super k=' + superK.toFixed(2) + ' pulse');
+  }
+  if (mach < SUPER_M - 0.02) superArmed = true;
+  let alpha = Math.atan2(-_vdir.dot(_up), _vdir.dot(_fwd));
   const beta = Math.atan2(_vdir.dot(_right), _vdir.dot(_fwd));
   state.alpha = alpha; state.beta = beta;
+  // ?aoahold=deg:s -- DEBUG-only AoA clamp (flight-second window) for headless wing-rock tests.
+  if (aoaHoldDeg > 0 && aoaHoldT < aoaHoldDur && flightMode === 'FLY' && !state.onGround) {
+    aoaHoldT += dt;
+    alpha = aoaHoldDeg * D2R; state.alpha = alpha;
+  }
   const mass = aircraftMass();
   state.mass = mass;
   const W = mass * GRAVITY;
@@ -3301,6 +3338,29 @@ function updatePhysics(dt) {
   const rollIdle = roll.left <= 0 && Math.abs(rollIn) < 0.04 && rudderIn === 0;
   state.rollRate += (pCmd - state.rollRate) * Math.min(1, (roll.left > 0 ? 12 : 1.5 + 6.5 * auth) * kxx * (rollIdle ? 1.8 : 1) * dt);
   if (wakeT > 0) { state.rollRate += wakeRoll * (wakeT / 0.25) * dt * 8; wakeT -= dt; }
+
+  // --- High-AoA wing rock: bounded 20..24 deg roll oscillation, rate-only (no attitude snap).
+  // Above 24 deg the existing PSM / stall / spin model owns roll. Active roll stick damps it out.
+  const aoaDeg = alpha * 57.2958;
+  wrAoa = aoaDeg;
+  const wrAllowed = flightMode === 'FLY' && !autoland.on && !state.glocT &&
+    cat.ph !== 'HOLD' && cat.ph !== 'LAUNCH' && cat.ph !== 'WAIT';
+  if (wrAllowed) {
+    wrK = sstep(aoaDeg, WR_A0, WR_A0 + 1) * (1 - sstep(aoaDeg, 23.5, WR_A1));
+    const amp = WR_AMP_MIN + (WR_AMP_MAX - WR_AMP_MIN) * sstep(aoaDeg, WR_A0, WR_A1);
+    const damp = clamp(1 - WR_DAMP_STICK * (Math.abs(rollIn) / 0.3), 0.3, 1);
+    wrPhase += 2 * Math.PI * WR_FREQ * dt;
+    const ampR = wrK * damp * amp * D2R;
+    wrRoll = ampR * Math.sin(wrPhase);
+    state.rollRate += ampR * (2 * Math.PI * WR_FREQ) * Math.cos(wrPhase) * 0.9 * dt;
+    if (DEBUG && wrK > 0.3) {
+      feelLogT += dt;
+      if (feelLogT >= 1) {
+        feelLogT = 0;
+        console.log('[ANGELS_ZERO] wingrock aoa=' + aoaDeg.toFixed(1) + ' amp=' + amp.toFixed(1) + ' damp=' + damp.toFixed(2));
+      }
+    }
+  } else { wrK = 0; wrRoll = 0; }
 
   // Yaw: rudder + weathercock stability (nose into the airflow) + adverse yaw from roll.
   // Post-stall: the vertical fin is blanketed by the broken airflow — no weathercock
@@ -3527,9 +3587,29 @@ function updateAirbrake(dt, mach) {
 }
 function updateThrottle(dt) {
   state.throttle = THREE.MathUtils.clamp(state.throttle + throttleDelta(dt), 0, 1);
+  // ?abat=s: on at s, off at s+0.5, on again at s+1.0 -> one thump + one cooldown skip.
+  if (abatAt >= 0) {
+    if (simTime >= abatAt && simTime < abatAt + 0.5) debugABOn = true;
+    else if (simTime >= abatAt + 0.5 && simTime < abatAt + 1.0) debugABOn = false;
+    else if (simTime >= abatAt + 1.0) debugABOn = true;
+  }
   // AB engages only when Shift is held and the throttle is already at the stop.
-  const abWanted = ((keys.shift && state.throttle >= 0.999) || Q.has('ab')) ? 1 : 0;
+  const abWanted = ((keys.shift && state.throttle >= 0.999) || Q.has('ab') || debugABOn) ? 1 : 0;
   state.afterburner += (abWanted - state.afterburner) * Math.min(1, 4 * dt);
+  // MIL -> AB rising edge: thump / kick / plume flash once per engagement with cooldown.
+  // Catapult HOLD / LAUNCH own their own audio, so the thump waits until release.
+  const abK = state.afterburner;
+  if (abCD > 0) abCD = Math.max(0, abCD - dt);
+  const abEdge = abPrev <= AB_EDGE && abK > AB_EDGE;
+  const catBusy = cat.ph === 'HOLD' || cat.ph === 'LAUNCH' || cat.forceAB;
+  if (abEdge && !catBusy && abCD <= 0) {
+    onBurnerLight();
+    abCD = AB_THUMP_CD;
+    if (DEBUG) console.log('[ANGELS_ZERO] ab thump k=' + abK.toFixed(2));
+  } else if (abEdge && !catBusy && abCD > 0 && DEBUG) {
+    console.log('[ANGELS_ZERO] ab cd skip');
+  }
+  abPrev = abK;
   // Internal fuel: 13,455 lb; per-engine burn 700 pph idle + 4,300 x throttle + 17,000 x AB (cockpit gauges, FUEL LOW cautions).
   state.fuelFlow = (combat.engineOut ? 1 : 2) * (700 + 4300 * state.throttle + 17000 * state.afterburner);
   state.fuel = Math.max(0, state.fuel - state.fuelFlow * dt / 3600);
@@ -4018,6 +4098,30 @@ function updateCameraAndVisuals(dt, now) {
       camera.rotateX(ang); camera.rotateZ(ang);
     } else machShake = null;
   }
+  // --- transonic buffet -> supersonic quiet: factors shared by shake, audio and VFX.
+  const machNow = state.mach;
+  transK = THREE.MathUtils.smoothstep(machNow, TRANS_M0, 0.995) *
+    (1 - THREE.MathUtils.smoothstep(machNow, 1.01, TRANS_M1));
+  superK = THREE.MathUtils.smoothstep(machNow, TRANS_M1, SUPER_M);
+  if (flightMode === 'FLY' && transK > 0.001) {
+    const ts = transK * (firstPerson ? TRANS_SHAKE * 0.34 : TRANS_SHAKE);
+    const sh = Math.sin(now * 113) * 0.6 + Math.sin(now * 57) * 0.4;
+    camera.rotateX(ts * sh); camera.rotateY(ts * sh * 0.65);
+    if (firstPerson) camera.rotateZ(0.3 * D2R * transK * Math.sin(now * 73));
+  }
+  // AB ignition: short forward jolt, positional, decays to zero over AB_KICK_T.
+  if (abKickT > 0) {
+    abKickT = Math.max(0, abKickT - dt);
+    const j = (firstPerson ? AB_KICK * 0.33 : AB_KICK) * (abKickT / AB_KICK_T);
+    camera.position.addScaledVector(_abFwd.set(0, 0, -1).applyQuaternion(state.quaternion), j);
+  }
+  if (DEBUG && (transK > 0.01 || superK > 0.01)) {
+    feelLogT += dt;
+    if (feelLogT >= 1) {
+      feelLogT = 0;
+      console.log('[ANGELS_ZERO] trans k=' + transK.toFixed(2) + ' super k=' + superK.toFixed(2) + ' wind×=' + (audio.windQuiet || 1).toFixed(2));
+    }
+  }
   camera.updateMatrixWorld();
   combatSys.cullFleet();
   if (blast && !fxHold) blast.update(dt);
@@ -4352,7 +4456,9 @@ function updateAudio() {
     dt: 1 / 60,
     kts: state.speed * 1.94384,
     airbrake: flightMode === 'FLY' ? state.ctl.airbrake : 0, gear: flightMode === 'FLY' ? state.gear : 0,
-    rolling: flightMode === 'FLY' && state.onGround ? state.groundSpeed : 0
+    rolling: flightMode === 'FLY' && state.onGround ? state.groundSpeed : 0,
+    // Feel pass: transonic shear / supersonic quiet / high-AoA wing-rock creak.
+    transK, superK, wrK, wrPhase
   });
   // GEAR OVERSPEED: gear out above 280 kt -> master caution tone once per exceedance.
   const over = flightMode === 'FLY' && state.gear > 0.05 && state.speed * 1.94384 > GEAR_OVERSPEED_KT;
@@ -4426,7 +4532,7 @@ function onSfx(type, pos, scale = 1) {
   else if (type === 'flyby') audio.flybyWhoosh(scale, firstPerson);
 }
 const vfx = createVFX(THREE, { scene, camera, jet, renderer, terrainHeight, sunDir: SUN_DIR, canyonX: world.canyonX, runway: world.runway,
-  force: DEBUG && Q.has('force') ? Q.get('force').split(',') : [] });
+  debug: DEBUG, force: DEBUG && Q.has('force') ? Q.get('force').split(',') : [] });
 // One pooled smoke ribbon for the wounded-wingman limp trail (driven by combat).
 const limpTrail = vfx.makeRibbon({ w0: 1.5, w1: 7, life: 4, alpha: 0.6, step: 6, far: [900, 9000] });
 limpTrail.mat.uniforms.uCol.value.set(0x9aa0a6); limpTrail.mesh.visible = false;
@@ -4486,6 +4592,13 @@ const combatSys = createCombat(THREE, { scene, camera, renderer, state, combat, 
   getSunDir: out => todMode === 'NIGHT' ? out.set(0, -1, 0) : out.copy(SUN_DIR),
   getCloudWet: () => cloudWet, getCloudDeck: () => (world.map && world.map.cloudSea) || null,
   aaTracer: (pos, dir, life, red) => vfx.aaTracer.add(pos, dir, life, red),
+  // Feel pass: player-only weapon feedback (cockpit glare + launch-motor puff).
+  onGunRound: () => { if (firstPerson) cockpit.flash('GUN'); },
+  onPlayerLaunch: (p, q, v) => {
+    if (firstPerson) cockpit.flash('MSL');
+    _lpFwd.set(0, 0, -1).applyQuaternion(q);
+    vfx.launchPuff.spawn(p, _lpFwd, v);
+  },
   samPuff: p => vfx.catSteam.stroke(p, _samPuffFwd, 0.6, 0.06),
   samFx: (list, camPos, now) => vfx.samFx.update(list, camPos, now),
   flagBeam: vfx.flagBeam,
@@ -4692,7 +4805,7 @@ modeBtn.addEventListener('click', e => {
 syncModeUI();
 
 const cockpit = createCockpit3D(THREE, { scene, camera, renderer, sunLight, sunDir: SUN_DIR, envTex, state, combat,
-  missiles, STALL_AOA, getEnemies: () => combatSys.enemies,
+  missiles, STALL_AOA, debug: DEBUG, getEnemies: () => combatSys.enemies,
   getWingmen: () => wingmen, getStrikeTargets: () => combatSys.strikeTargets });
 cockpit.setFreeLook(freeLook.view);
 if (DEBUG && Q.has('mfdpage')) {
@@ -5040,6 +5153,9 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
     const h = 1 / 60;
     const logAt = (Q.get('logat') || '').split(',').filter(Boolean).map(Number);
     const mslAt = Q.has('mslat') ? Number(Q.get('mslat')) : -1, rollAt = Q.has('rollat') ? Number(Q.get('rollat')) : -1;
+    const gunParts = Q.has('gunat') ? Q.get('gunat').split(':') : null;
+    const gunAt = gunParts ? Number(gunParts[0]) : -1, gunDur = gunParts && gunParts[1] ? Number(gunParts[1]) : 1;
+    let gunOffAt = -1;
     const aceWingAt = Q.has('acewingat') ? Number(Q.get('acewingat')) : -1;
     const trapAt = Q.has('trapat') ? Number(Q.get('trapat')) : -1, catAt = Q.has('catat') ? Number(Q.get('catat')) : -1;
     const catLaunchAt = Q.has('catlaunchat') ? Number(Q.get('catlaunchat')) : -1;
@@ -5153,6 +5269,8 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
       if (mphaseAt && t1 >= mphaseAt[0] && t0 < mphaseAt[0]) { console.log('[ANGELS_ZERO] mphase @', t1.toFixed(2), combatSys.setMissionPhase(mphaseAt[1])); }
       if (t1 >= debriefAt && t0 < debriefAt) { console.log('[ANGELS_ZERO] debrief @', t1.toFixed(2), JSON.stringify(combatSys.stats().tele)); endSortie('CLEARED'); }
       if (mslAt >= t0 && mslAt < t1) { console.log('[ANGELS_ZERO] fire @', t1.toFixed(2), combat.lockState, combat.lockProgress.toFixed(2)); combatSys.fireMissile(); }
+      if (gunAt >= 0 && gunAt >= t0 && gunAt < t1) { DEBUG_FIRE = true; gunOffAt = gunAt + gunDur; console.log('[ANGELS_ZERO] gunat @', t1.toFixed(2)); }
+      if (gunOffAt >= 0 && gunOffAt >= t0 && gunOffAt < t1) { DEBUG_FIRE = false; gunOffAt = -1; console.log('[ANGELS_ZERO] gunoff @', t1.toFixed(2)); }
       if (rollAt >= t0 && rollAt < t1) startRoll(1);
       if (aceWingAt >= t0 && aceWingAt < t1) { console.log('[ANGELS_ZERO] ace flight @', t1.toFixed(2), combatSys.spawnAceFlight()); }
       if (droneAt >= t0 && droneAt < t1 && !droneAtDone) {
@@ -5622,6 +5740,16 @@ addEventListener('resize', () => {
 if (DEBUG) {
   window.__az = { scene, camera, renderer, state, combat, combatSys, ambient, eject, audio, mouse, keys, vfx, blast, get blastShake() { return blastShake; }, flyShake, onFlyby, onWing, wingmen, hud, cockpit, perf, jet, cockpitHidden, terrainHeight, setView, freeLook, world, nvg, setNVG, gpuWarm, mcam, slowMo, get timeScale() { return timeScale; }, triggerSlowMo, get selectedSPW() { return selectedSPW; }, get selectedLivery() { return selectedLivery; }, loadSPW, loadLivery, saveSPW, saveLivery, SQUADRON, SPW, get firstPerson() { return firstPerson; },
     get appMode() { return appMode; },
+    // Feel-pass scalars / test hooks (all reads are snapshot objects allocated on demand, never per frame).
+    get dbgFeel() { return { spdHold, aoaHoldDeg, aoaHoldT, abatAt, abCD, transK, superK, wrK, wrPhase }; },
+    get ab() { return { prev: abPrev, k: state.afterburner, cd: abCD, count: audio.burnerCount }; },
+    get trans() { return { k: transK, super: superK, quiet: audio.windQuiet, pulseCD: superCD }; },
+    get wr() { return { k: wrK, phase: wrPhase, roll: wrRoll, aoa: wrAoa, bank: state.bank * 57.2958 }; },
+    updateVisuals: (dt, t) => updateCameraAndVisuals(dt, t),
+    tickAudio: () => updateAudio(),
+    flashCockpit: kind => cockpit.flash(kind),
+    spawnPuff: () => vfx.launchPuff.spawn(state.position, _lpFwd.set(0, 0, -1).applyQuaternion(state.quaternion), state.velocity),
+    triggerBurner: () => onBurnerLight(),
     triggerEject, startRoll, stepSim, profile, toggleGear, placeOnRunway, get landingGear() { return landingGear; }, get livery() { return livery; }, endSortie, sortie, renderHangar, replaySortie, debriefToBriefing,
     get mode() { return flightMode; }, get enemies() { return combatSys.enemies; },
     spawnDroneSwarm: (n, anchor) => combatSys.spawnDroneSwarm(n, anchor), get drones() { return combatSys.drones; },

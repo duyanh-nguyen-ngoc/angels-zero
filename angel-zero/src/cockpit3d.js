@@ -128,6 +128,12 @@ export function createCockpit3D(THREE, env) {
   }
   const bowMat = paint(10, 1.2, { color: 0xc4cbd0, metalness: 0.25 });
   const shieldMat = paint(1.6, 1.6, { color: 0x3a4046, metalness: 0.15, env: 0.25, bump: 1.2 });   // dark charcoal glare shield
+  // Emissive-only weapon glare: no new PointLight, so the shader light count never changes.
+  // Both the canopy bow and the glare shield catch the muzzle / motor flash.
+  bowMat.emissive = new THREE.Color(0xffd9a0); bowMat.emissiveIntensity = 0;
+  shieldMat.emissive = new THREE.Color(0xffd9a0); shieldMat.emissiveIntensity = 0;
+  const glareColor = new THREE.Color();
+  let glareT = 0, glareK = 0;
   const panelMat = paint(1.4, 0.8, { color: 0xeeeeee, metalness: 0.3 });
   const consoleMat = paint(0.6, 0.6, { metalness: 0.3 });
   const tubMat = paint(2, 2, { color: 0x9aa0a8, metalness: 0.2, env: 0.15, side: THREE.DoubleSide });
@@ -1187,8 +1193,15 @@ export function createCockpit3D(THREE, env) {
   function setFreeLook(v) { freeLook = v; }               // { yaw, pitch, lean } shared by reference
   function setActive(on) {
     active = on; rig.visible = on; sunLight.castShadow = false;
+    if (!on) { glareT = 0; glareK = 0; shieldMat.emissiveIntensity = 0; bowMat.emissiveIntensity = 0; }
   }
   function update(dt, now, eyeWorld, jetQuat) {
+    if (glareT > 0) {
+      glareT = Math.max(0, glareT - dt);
+      const gi = glareK * 2.2 * (glareT / 0.08);
+      shieldMat.emissiveIntensity = gi; bowMat.emissiveIntensity = gi;
+      if (glareT <= 0) { shieldMat.emissiveIntensity = 0; bowMat.emissiveIntensity = 0; }
+    }
     if (!active) return;
     frame++;
     rig.position.copy(eyeWorld); rig.quaternion.copy(jetQuat); rig.updateMatrixWorld(true);
@@ -1297,8 +1310,15 @@ export function createCockpit3D(THREE, env) {
   const _w = new THREE.Vector3();
   return {
     rig, setActive, update, missionClock, setNVG, setFreeLook,
+    flash(kind) {
+      glareColor.setHex(kind === 'GUN' ? 0xffd9a0 : 0xfff4e0);
+      shieldMat.emissive.copy(glareColor); bowMat.emissive.copy(glareColor);
+      glareT = 0.08; glareK = kind === 'GUN' ? 0.55 : 0.85;
+      if (typeof console !== 'undefined' && env.debug) console.log('[ANGELS_ZERO] glare flash kind=' + kind);
+    },
     setMfdPage(p) { mfdPage = ((p % 3) + 3) % 3; mfdDirty = true; gaugeStats.mfd.page = mfdPage; },
     get active() { return active; },
+    get glare() { return { k: glareK, t: glareT, intensity: shieldMat.emissiveIntensity }; },
     get gaugeStats() { return gaugeStats; },          // dials repainted / cell uploads since start
     get hotas() {
       return { pitch: +(hotas.pitch / D2R).toFixed(1), roll: +(hotas.roll / D2R).toFixed(1), trig: +hotas.trig.toFixed(2), pickle: +hotas.pickle.toFixed(2),

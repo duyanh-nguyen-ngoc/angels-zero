@@ -23,6 +23,7 @@ export function createAudio() {
 
   const N = {};                                            // live nodes
   let sprayK = 0, sprayKt = 0;                             // sea-skim DSP targets (scalars only)
+  let burnerCount = 0;                                     // MIL -> AB ignition thump counter (getter lives at module scope)
   // --- streamed scenario soundtrack -------------------------------------------------
   const BGM_DIR = 'assets/audio/bgm/', XFADE = 1.5, DUCK_DB = -5, DUCK_GAIN = 0.5623, DUCK_T = 0.25, MIN_DWELL = 4.0;
   const BGM_OK = typeof Audio !== 'undefined' && new Audio().canPlayType('audio/ogg; codecs="vorbis"') !== '';
@@ -385,6 +386,21 @@ export function createAudio() {
     N.windBuffN = loopNoise(pink); N.windBuffBP = filt('bandpass', 140, 1.4); N.windBuffGain = gain(0);
     N.windBuffN.connect(N.windBuffBP).connect(N.windBuffGain).connect(N.windBus);
     N.windDbg = { kts: 0, slipGain: 0, slipHz: 220, buffGain: 0, buffHz: 140, lp: 16000, bus: 0 };
+    // AB ignition thump: sub punch + manifold whoosh, envelopes only (no per-shot nodes).
+    N.thumpOsc = osc('sine', 55); N.thumpG = gain(0);
+    N.whooshN = loopNoise(N.whiteBuf); N.whooshBP = filt('bandpass', 350, 1.2); N.whooshG = gain(0);
+    N.thumpCP = gain(1); N.thumpCH = gain(0);
+    N.thumpG.connect(N.thumpCP).connect(cockpitLP);
+    N.thumpG.connect(N.thumpCH).connect(master);
+    N.whooshG.connect(N.thumpCP); N.whooshG.connect(N.thumpCH);
+    // Transonic shear / buffet and high-AoA airframe creak.
+    N.shearN = loopNoise(N.whiteBuf); N.shearBP = filt('bandpass', 2200, 0.8); N.shearG = gain(0);
+    N.shearN.connect(N.shearBP).connect(N.shearG).connect(cockpitLP);
+    N.transBufN = loopNoise(N.whiteBuf); N.transBufLP = filt('lowpass', 90, 0.8); N.transBufG = gain(0);
+    N.transBufN.connect(N.transBufLP).connect(N.transBufG).connect(cockpitLP);
+    N.transAM = osc('sine', 9); N.transAMG = gain(0.35); N.transAM.connect(N.transAMG).connect(N.transBufG.gain);
+    N.creakN = loopNoise(pink); N.creakBP = filt('bandpass', 140, 4); N.creakG = gain(0);
+    N.creakN.connect(N.creakBP).connect(N.creakG).connect(cockpitLP);
 
     // Procedural fallbacks for the sampled layers.
     N.buffNoise = loopNoise(brown); N.buffBP = filt('bandpass', 75, 1.1); N.buffFGain = gain(0);
@@ -411,17 +427,50 @@ export function createAudio() {
     const q = Math.pow(cl((kts - 110) / 520), 1.6);              // dynamic pressure feel
     const slipHz = 220 + 930 * cl((kts - 150) / 500);
     const view = p.cockpit ? 0.8 : 1.15;                         // brighter exterior rush in chase view
-    const slipGain = run * 0.2 * q * view;
+    // Supersonic cockpit quiet: wind / airflow gains drop smoothly above Mach 1.05.
+    // Folded into the computed targets below (never re-multiply a live AudioParam).
+    const quiet = 1 - 0.35 * Math.max(0, Math.min(1, p.superK || 0)) * (p.cockpit ? 1 : 0);
+    const slipGain = run * 0.2 * q * view * quiet;
     const buffK = run * Math.max(sm(gl, 3.2, 7.5), sm(ak, 11, 24)) * sm(kts, 100, 220);
-    const buffHz = 140 + 220 * buffK, buffGain = 0.26 * buffK * (0.85 + 0.25 * q) * (p.cockpit ? 1.1 : 0.9);
+    const buffHz = 140 + 220 * buffK, buffGain = 0.26 * buffK * (0.85 + 0.25 * q) * (p.cockpit ? 1.1 : 0.9) * quiet;
     const lp = p.cockpit ? 1800 : 16000;
     for (const s of N.slip) set(s.bp.frequency, slipHz, WT);
     set(N.slipGain.gain, slipGain, WT);
     set(N.windBuffBP.frequency, buffHz, WT); set(N.windBuffGain.gain, buffGain, WT);
     set(N.windLP.frequency, lp, WT);
     set(N.windBus.gain, run, WT);
+    const trans = Math.max(0, Math.min(1, p.transK || 0));
+    const wrK = Math.max(0, Math.min(1, p.wrK || 0)), wrS = Math.abs(Math.sin(p.wrPhase || 0));
+    set(N.shearG.gain, 0.25 * trans * (p.cockpit ? 1 : 0.5), 0.08);
+    set(N.transBufG.gain, 0.3 * trans * (p.cockpit ? 1 : 0.4), 0.08);
+    set(N.creakG.gain, 0.15 * wrK * wrS * (p.cockpit ? 1 : 0.5), 0.05);
+    N.windQuiet = quiet;
     N.windDbg = { kts: Math.round(kts), slipGain: +slipGain.toFixed(4), slipHz: Math.round(slipHz), buffGain: +buffGain.toFixed(4),
       buffHz: Math.round(buffHz), lp, bus: run, live: { slip: +N.slipGain.gain.value.toFixed(4), bp: Math.round(N.slip[0].bp.frequency.value), buff: +N.windBuffGain.gain.value.toFixed(4) } };
+  }
+
+  // MIL -> AB ignition: pitch-dropping sub punch + rising manifold whoosh.
+  // Envelope retriggers on persistent nodes only -- no nodes created per thump.
+  function burnerThump(cockpit) {
+    if (!ready) return;
+    const t = ctx.currentTime;
+    burnerCount++;
+    N.thumpCP.gain.setValueAtTime(cockpit ? 1 : 0, t);
+    N.thumpCH.gain.setValueAtTime(cockpit ? 0 : 1, t);
+    N.thumpOsc.frequency.cancelScheduledValues(t);
+    N.thumpOsc.frequency.setValueAtTime(55, t);
+    N.thumpOsc.frequency.exponentialRampToValueAtTime(28, t + 0.18);
+    const tg = N.thumpG.gain;
+    tg.cancelScheduledValues(t); tg.setValueAtTime(0, t);
+    tg.linearRampToValueAtTime(0.8, t + 0.004);
+    tg.exponentialRampToValueAtTime(0.001, t + 0.35);
+    N.whooshBP.frequency.cancelScheduledValues(t);
+    N.whooshBP.frequency.setValueAtTime(350, t);
+    N.whooshBP.frequency.linearRampToValueAtTime(1200, t + 0.25);
+    const wg = N.whooshG.gain;
+    wg.cancelScheduledValues(t); wg.setValueAtTime(0, t);
+    wg.linearRampToValueAtTime(0.35, t + 0.02);
+    wg.exponentialRampToValueAtTime(0.001, t + 0.4);
   }
 
   /* ------------------------------------------------------- one-shot events */
@@ -2100,6 +2149,7 @@ export function createAudio() {
     },
     get layers() { return N.dbg || null; },
     get gmix() { return N.gmix || null; }, get dbg() { return N.dbg || null; }, gasp,
+    burnerThump, get burnerCount() { return burnerCount; }, get windQuiet() { return N.windQuiet || 1; },
     vws: { say: vwsSay }, get vwsLast() { return { ...vwsLast }; },
     get vwsState() { return { q: Array.from(vwsQ), cd: Array.from(vwsCd), playing: vwsPlaying, until: vwsUntil }; }, get hydWhine() { return N.hydG ? +N.hydG.gain.value.toFixed(4) : 0; },
     preloadVWS(files) {
