@@ -83,6 +83,18 @@ export function createAudio() {
   const osc = (type, f) => { const o = ctx.createOscillator(); o.type = type; o.frequency.value = f; o.start(); return o; };
   const set = (p, v, t = tc) => p.setTargetAtTime(v, ctx.currentTime, t);
   const sm = (x, a, b) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  // F100 waveshaper curves: one Float32Array(2048) each, built once at factory time.
+  function mkEngineCurve(fn) {
+    const c = new Float32Array(2048);
+    for (let i = 0; i < 2048; i++) c[i] = fn((i / 2047) * 2 - 1);
+    return c;
+  }
+  const CURVE_EXH = mkEngineCurve(x => x > 0 ? Math.tanh(2.4 * x) : Math.tanh(3.2 * x) / 1.15);
+  const CURVE_CRACK = mkEngineCurve(x => Math.max(0, Math.abs(x) - 0.55) * 4.5);
+  const CURVE_BURST = mkEngineCurve(x => Math.tanh(6 * x));
+  const RPM_IDLE = 0.28, RPM_MIL = 1.0, TAU_UP = 1.8, TAU_DN = 2.4, RPM_WINDMILL = 0.08;
+  const AB_TAU_UP = 0.35, AB_TAU_DN = 0.6, DETUNE = Math.pow(2, 7 / 1200);
+  const ENG_H = [1, 2, 3.1];
 
   /* ------------------------------------------------- recorded samples */
   // Fetched + decoded at page load (OfflineAudioContext), so they are ready the
@@ -218,18 +230,100 @@ export function createAudio() {
     N.rStatic.connect(N.rStaticBP).connect(N.rStaticG).connect(N.rPan);
     initMusic();
 
-    // F100 turbines: filtered pink/brown body + sawtooth whine + afterburner rumble.
-    N.engBody = loopNoise(pink); N.engLP = filt('lowpass', 500, 0.9); N.engGain = gain(0);
-    N.engBody.connect(N.engLP).connect(N.engGain).connect(cockpitLP);
-    N.engLow = loopNoise(brown); N.engLowLP = filt('lowpass', 140, 0.7); N.engLowGain = gain(0);
-    N.engLow.connect(N.engLowLP).connect(N.engLowGain).connect(cockpitLP);
-    N.whineA = osc('sawtooth', 220); N.whineB = osc('sawtooth', 223);
-    N.whineBP = filt('bandpass', 1400, 9); N.whineGain = gain(0);
-    N.whineA.connect(N.whineBP); N.whineB.connect(N.whineBP); N.whineBP.connect(N.whineGain).connect(cockpitLP);
-    N.abNoise = loopNoise(brown); N.abBP = filt('lowpass', 380, 1.2); N.abGain = gain(0);
-    N.abNoise.connect(N.abBP).connect(N.abGain).connect(cockpitLP);
-    N.abCrackle = loopNoise(white); N.abCrackleBP = filt('bandpass', 900, 0.8); N.abCrackleGain = gain(0);
-    N.abCrackle.connect(N.abCrackleBP).connect(N.abCrackleGain).connect(cockpitLP);
+    // === F100 twin-engine DSP: entire graph built once here, never after init. ===
+    const E = N.E = { rpmL: RPM_IDLE, rpmR: RPM_IDLE * 1.015, abK: 0, lastT: 0, freqAcc: 0, f0Sent: 0, rms: -100, f0: 650 };
+    const mkShaper = curve => { const ws = ctx.createWaveShaper(); ws.curve = curve; ws.oversample = '2x'; return ws; };
+    const mkShelf = (type, f, db, q) => { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.gain.value = db; if (q) b.Q.value = q; return b; };
+    E.ckBus = gain(1); E.chBus = gain(1);
+    E.ckMixG = gain(0); E.chMixG = gain(1);
+    E.comp = ctx.createDynamicsCompressor();
+    E.comp.threshold.value = -18; E.comp.knee.value = 12; E.comp.ratio.value = 3;
+    E.comp.attack.value = 0.01; E.comp.release.value = 0.2;
+    E.ckTrim = gain(0.025); E.chTrim = gain(0.18);  // ~-18 dBFS chase / -22 dBFS cockpit at full AB
+    E.ckBus.connect(E.ckTrim).connect(E.ckMixG).connect(E.comp);
+    E.chBus.connect(E.chTrim).connect(E.chMixG).connect(E.comp);
+    E.out = gain(1); E.comp.connect(E.out).connect(master);
+    E.ana = ctx.createAnalyser(); E.ana.fftSize = 512; E.anaBuf = new Float32Array(512); E.out.connect(E.ana);
+    // Per-engine, per-view panners (cockpit narrow, chase wide).
+    E.pan = [];
+    for (let e = 0; e < 2; e++) {
+      E.pan[e] = {};
+      for (const v of ['ck', 'ch']) {
+        const pan = ctx.createStereoPanner();
+        pan.pan.value = (e ? 1 : -1) * (v === 'ck' ? 0.08 : 0.3);
+        pan.connect(v === 'ck' ? E.ckBus : E.chBus);
+        E.pan[e][v] = pan;
+      }
+    }
+    // Compressor fan choir: 3 triangle oscillators + 3 resonant noise bands per engine/view.
+    E.choir = [];
+    for (let e = 0; e < 2; e++) for (const v of ['ck', 'ch']) {
+      const bus = gain(1); bus.connect(E.pan[e][v]);
+      const hs = [];
+      for (let h = 0; h < 3; h++) {
+        const base = h === 0 ? 0.11 : h === 1 ? 0.07 : 0.05;
+        const trim = base * (v === 'ck' ? (h ? 1.4 : 1) : 0.8);
+        const amp = gain(trim); amp.connect(bus);
+        const oscN = osc('triangle', 700); oscN.connect(amp);
+        const bp = filt('bandpass', 700, 18), ng = gain(0.11);
+        loopNoise(pink).connect(bp).connect(ng).connect(amp);
+        hs.push({ o: oscN, bp, amp, sent: 0 });
+      }
+      E.choir.push({ e, v, bus, hs });
+    }
+    // Tearing exhaust: pink noise -> HP -> 9 dB formant -> AM -> drive -> waveshaper -> view filters.
+    E.exh = [];
+    for (let e = 0; e < 2; e++) {
+      const hp = filt('highpass', 180);
+      const form = ctx.createBiquadFilter(); form.type = 'peaking'; form.frequency.value = 400; form.Q.value = 1.4; form.gain.value = 9;
+      const am = gain(0.7), drive = gain(0.6), shaper = mkShaper(CURVE_EXH), g = gain(0);
+      loopNoise(pink).connect(hp).connect(form).connect(am).connect(drive).connect(shaper).connect(g);
+      const ckLP = filt('lowpass', 650, 0.5); g.connect(ckLP).connect(E.pan[e].ck);
+      const chShelf = mkShelf('highshelf', 6000, 3), chLP = filt('lowpass', 9000);
+      g.connect(chShelf).connect(chLP).connect(E.pan[e].ch);
+      // Audio-rate combustion flutter: f and 1.71xf, wobled +/-3 Hz at 0.7 Hz.
+      const fl1 = osc('sine', 30), fl2 = osc('sine', 51), wob = osc('sine', 0.7), wobAmt = gain(3), flSum = gain(0.28);
+      wob.connect(wobAmt); wobAmt.connect(fl1.frequency); wobAmt.connect(fl2.frequency);
+      fl1.connect(flSum); fl2.connect(flSum); flSum.connect(am.gain);
+      E.exh.push({ hp, form, drive, g, fl1, fl2, flSum, ckLP });
+    }
+    // AB crackle: brown noise through a threshold shaper drives the gain of HP'd white noise.
+    {
+      const src = loopNoise(brown), lp = filt('lowpass', 30), shaper = mkShaper(CURVE_CRACK), vca = gain(0);
+      src.connect(lp).connect(shaper).connect(vca.gain);
+      const noise = loopNoise(white), hp = filt('highpass', 900), g = gain(0);
+      noise.connect(hp).connect(vca).connect(g);
+      g.connect(gain(0.3)).connect(E.ckBus); g.connect(gain(1)).connect(E.chBus);
+      E.crackG = g;
+    }
+    // Sub-bass thrust: 41 / 43.5 Hz twin beat + brown noise through a resonant 36-85 Hz LP.
+    {
+      const a = osc('sine', 41), b = osc('sine', 43.5), ag = gain(0.5), bg = gain(0.5);
+      const lp = filt('lowpass', 60, 6), bus = gain(0);
+      a.connect(ag).connect(lp); b.connect(bg).connect(lp); loopNoise(brown).connect(lp);
+      lp.connect(bus);
+      const peak = ctx.createBiquadFilter(); peak.type = 'peaking'; peak.frequency.value = 70; peak.Q.value = 0.9; peak.gain.value = 7;
+      const shelf = mkShelf('lowshelf', 120, 5);
+      bus.connect(peak).connect(shelf).connect(E.ckBus);
+      bus.connect(E.chBus);
+      E.sub = { a, b, ag, bg, lp, bus };
+    }
+    // Cockpit ECS hiss + chase air shear (both persistent, gain-only per frame).
+    {
+      const ecsG = gain(0.025); loopNoise(white).connect(filt('bandpass', 4500, 0.7)).connect(ecsG).connect(E.ckBus);
+      const shearG = gain(0); loopNoise(white).connect(filt('highpass', 3000)).connect(shearG).connect(E.chBus);
+      E.ecsG = ecsG; E.shearG = shearG;
+    }
+    // Light-off thump (new transient path; persistent nodes, voice retriggered by envelopes).
+    {
+      const sine = osc('sine', 58), sg = gain(0);
+      sine.connect(sg); sg.connect(gain(0.35)).connect(E.ckBus); sg.connect(gain(1)).connect(E.chBus);
+      const noise = loopNoise(white), lp = filt('lowpass', 900), shaper = mkShaper(CURVE_BURST), bg = gain(0);
+      noise.connect(lp).connect(shaper).connect(bg);
+      bg.connect(gain(0.4)).connect(E.ckBus); bg.connect(gain(0.6)).connect(E.chBus);
+      E.th = { sine, sg, bg };
+    }
+    console.log('[ANGELS_ZERO] eng nodes=' + (Object.keys(N).length + E.choir.length * 7 + E.exh.length * 10));
 
     // M61A1 "BRRRT" — no pitched oscillator in the audio path, only chopped noise.
     // A 2 s white/pink noise loop is amplitude-chopped at 100 Hz (6,000 rounds/min)
@@ -466,25 +560,22 @@ export function createAudio() {
   // MIL -> AB ignition: pitch-dropping sub punch + rising manifold whoosh.
   // Envelope retriggers on persistent nodes only -- no nodes created per thump.
   function burnerThump(cockpit) {
-    if (!ready) return;
-    const t = ctx.currentTime;
+    if (!ready || !N.E) return;
+    const t = ctx.currentTime, th = N.E.th;
     burnerCount++;
-    N.thumpCP.gain.setValueAtTime(cockpit ? 1 : 0, t);
-    N.thumpCH.gain.setValueAtTime(cockpit ? 0 : 1, t);
-    N.thumpOsc.frequency.cancelScheduledValues(t);
-    N.thumpOsc.frequency.setValueAtTime(55, t);
-    N.thumpOsc.frequency.exponentialRampToValueAtTime(28, t + 0.18);
-    const tg = N.thumpG.gain;
-    tg.cancelScheduledValues(t); tg.setValueAtTime(0, t);
-    tg.linearRampToValueAtTime(0.8, t + 0.004);
-    tg.exponentialRampToValueAtTime(0.001, t + 0.35);
-    N.whooshBP.frequency.cancelScheduledValues(t);
-    N.whooshBP.frequency.setValueAtTime(350, t);
-    N.whooshBP.frequency.linearRampToValueAtTime(1200, t + 0.25);
-    const wg = N.whooshG.gain;
-    wg.cancelScheduledValues(t); wg.setValueAtTime(0, t);
-    wg.linearRampToValueAtTime(0.35, t + 0.02);
-    wg.exponentialRampToValueAtTime(0.001, t + 0.4);
+    th.sine.frequency.cancelScheduledValues(t);
+    th.sine.frequency.setValueAtTime(58, t);
+    th.sine.frequency.exponentialRampToValueAtTime(24, t + 0.22);
+    const sg = th.sg.gain;
+    sg.cancelScheduledValues(t); sg.setValueAtTime(0, t);
+    sg.linearRampToValueAtTime(0.9, t + 0.004);
+    sg.setTargetAtTime(0, t + 0.01, 0.12);
+    const bg = th.bg.gain;
+    bg.cancelScheduledValues(t); bg.setValueAtTime(0, t);
+    bg.linearRampToValueAtTime(0.6, t + 0.003);
+    bg.setValueAtTime(0.6, t + 0.06);
+    bg.setTargetAtTime(0, t + 0.06, 0.11);
+    N.lastThumpCockpit = !!cockpit;
   }
 
   // Touchdown: two main-gear tyre chirps (0.07 s apart) + a metallic deck ring on carriers.
@@ -1976,45 +2067,88 @@ export function createAudio() {
     set(N.droneBP.frequency, 620 + 300 * v, 0.12);
   }
 
+  /* ------------------------------------------------------ F100 spool model */
+  // Scalar-only spool integration. AudioParams are the only thing touched per frame;
+  // all nodes were built at init. Frequencies are re-sent at <= 30 Hz.
+  function updateEngine(p, abTarget, live) {
+    const E = N.E;
+    const now = ctx.currentTime;
+    let dt = now - E.lastT;
+    if (!(dt > 0)) dt = 0.016; else if (dt > 0.1) dt = 0.1;
+    E.lastT = now;
+    const th = Math.min(1, Math.max(0, Number.isFinite(p.throttle) ? p.throttle : 0));
+    abTarget = Math.min(1, Math.max(0, Number.isFinite(abTarget) ? abTarget : 0));
+    const aliveL = p.engL !== false && p.engL !== 'OUT' && p.engL !== 0;
+    const aliveR = p.engR !== false && p.engR !== 'OUT' && p.engR !== 0;
+    const tgtL = (live && aliveL) ? RPM_IDLE + (RPM_MIL - RPM_IDLE) * th : RPM_WINDMILL;
+    const tgtR = (live && aliveR) ? (RPM_IDLE + (RPM_MIL - RPM_IDLE) * th) * 1.015 : RPM_WINDMILL;
+    E.rpmL += (tgtL - E.rpmL) * (1 - Math.exp(-dt / (tgtL > E.rpmL ? TAU_UP : TAU_DN)));
+    E.rpmR += (tgtR - E.rpmR) * (1 - Math.exp(-dt / ((tgtR > E.rpmR ? TAU_UP : TAU_DN) * 1.015)));
+    E.abK += (abTarget - E.abK) * (1 - Math.exp(-dt / (abTarget > E.abK ? AB_TAU_UP : AB_TAU_DN)));
+    const rpmL = E.rpmL, rpmR = E.rpmR, abK = E.abK;
+    const f0 = 650 * Math.pow(3400 / 650, Math.min(1, Math.max(0, (rpmL - RPM_IDLE) / (RPM_MIL - RPM_IDLE))));
+    E.f0 = Math.min(12000, f0);
+    // Per-frame gain Automation only (no node creations, no ramps stacking).
+    const choirK = 0.6 * Math.pow(rpmL, 1.5) * (1 - 0.35 * abK);
+    const exhGain = 0.08 + 0.42 * rpmL * rpmL + 0.55 * abK;
+    const driveAmt = 0.6 + 1.1 * abK;
+    const flutterHz = 16 + 14 * rpmL + 4 * abK;
+    set(E.shearG.gain, 0.12 * Math.pow(Math.min(1, (p.speed || 0) / 400), 2) * (p.cockpit ? 0 : 1));
+    set(E.ecsG.gain, 0.025 + 0.015 * Math.min(1, (p.speed || 0) / 300) * live);
+    set(E.crackG.gain, 0.35 * Math.pow(abK, 1.4) * live);
+    E.sub.lp.frequency && set(E.sub.lp.frequency, 36 + 49 * (0.6 * rpmL + 0.4 * abK), 0.25);
+    set(E.sub.bus.gain, (0.12 * rpmL + 0.75 * Math.pow(abK, 1.3)) * live, 0.25);
+    const bothAlive = (live && aliveL && aliveR) ? 1 : 0;
+    set(E.sub.ag.gain, 0.5 * bothAlive); set(E.sub.bg.gain, 0.5 * bothAlive);
+    for (let i = 0; i < 2; i++) {
+      const ex = E.exh[i], rpm = i ? rpmR : rpmL;
+      set(ex.form.frequency, 240 + 280 * rpm, 0.12);
+      set(ex.drive.gain, driveAmt, 0.08);
+      set(ex.g.gain, exhGain * (i ? 0.97 : 1) * live, 0.12);
+      set(ex.flSum.gain, 0.25 + 0.2 * abK, 0.12);
+      ex.fl1.frequency && set(ex.fl1.frequency, Math.min(12000, flutterHz * (i ? DETUNE : 1)), 0.08);
+      ex.fl2.frequency && set(ex.fl2.frequency, Math.min(12000, flutterHz * 1.71 * (i ? DETUNE : 1)), 0.08);
+    }
+    for (const c of E.choir) c.bus && set(c.bus.gain, choirK * (c.e ? 0.97 : 1), 0.12);
+    // View crossfade + run-state gate.
+    set(E.ckMixG.gain, p.cockpit ? 1 : 0, 0.25);
+    set(E.chMixG.gain, p.cockpit ? 0 : 1, 0.25);
+    set(E.out.gain, live ? 1 : 0, 0.3);
+    E.freqAcc += dt;
+    if (E.freqAcc >= 1 / 30) {
+      E.freqAcc = 0;
+      for (const c of E.choir) {
+        const det = c.e ? DETUNE : 1;
+        for (let h = 0; h < 3; h++) {
+          const hs = c.hs[h], f = Math.min(12000, E.f0 * ENG_H[h] * det);
+          if (hs.sent < 1 || Math.abs(f - hs.sent) / f > 0.004) {
+            hs.o.frequency.setTargetAtTime(f, now, 0.05);
+            hs.bp.frequency.setTargetAtTime(f, now, 0.05);
+            hs.sent = f;
+          }
+        }
+      }
+      E.ana.getFloatTimeDomainData(E.anaBuf);
+      let sum = 0;
+      for (let i = 0; i < E.anaBuf.length; i++) sum += E.anaBuf[i] * E.anaBuf[i];
+      E.rms = 20 * Math.log10(Math.max(1e-7, Math.sqrt(sum / E.anaBuf.length)));
+    }
+    N.engineDbg = { rpmL: +rpmL.toFixed(3), rpmR: +rpmR.toFixed(3), f0: Math.round(E.f0), abK: +abK.toFixed(3),
+      mix: p.cockpit ? 'CK' : 'CH', rms: +E.rms.toFixed(1), thumps: burnerCount };
+  }
+
   /* ------------------------------------------------------ continuous mix */
   function update(p) {
     if (!ready) return;
-    const th = p.throttle, ab = p.afterburner, live = p.engineOn ? 1 : 0;
-    const t = 0.30 + 0.70 * th;                           // 30 % idle hum -> 100 % military
-    set(N.engLP.frequency, 260 + 1500 * t + 1400 * ab);
-    // (engine body gain is set below, scaled when the recorded turbine is playing)
-    set(N.engLowGain.gain, live * (0.18 + 0.20 * t + 0.45 * ab));
-    const whine = 160 + 640 * t + 80 * ab;
-    set(N.whineA.frequency, whine); set(N.whineB.frequency, whine * 1.013);
-    set(N.whineBP.frequency, whine * 3.1);
-    set(N.whineGain.gain, live * (0.012 + 0.03 * t) * (1 - 0.4 * ab));
-    set(N.abBP.frequency, 180 + 260 * ab);
-    set(N.abGain.gain, live * 0.75 * ab, 0.12);
-    set(N.abCrackleGain.gain, live * 0.09 * ab * (0.7 + 0.3 * Math.random()), 0.03);
-    set(cockpitLP.frequency, p.cockpit ? 2600 : 18000, 0.15);
-
-    // Recorded turbine: pitch rides throttle / burner; under sustained G (> 4.8 G)
-    // or high AoA (> 14 deg) it dips and the low compressor rumble swells.
-    ensureSampleVoices();
+    const ab = (p.ab === undefined ? p.afterburner : p.ab) || 0;
+    const th = Math.min(1, Math.max(0, Number.isFinite(p.throttle) ? p.throttle : 0));
+    const live = p.engineOn ? 1 : 0;
     const gl = p.gLoad || 1, aoa = p.aoa || 0, gs = p.gStrain || 0;
-    const strainK = Math.max(sm(gl, 4.8, 8.5), sm(aoa, 14, 24));
-    if (N.turb) {
-      set(N.turb.playbackRate, (0.78 + 0.32 * th + 0.12 * ab) * (1 - 0.07 * strainK), 0.15);
-      set(N.turbPeak.gain, 8 * strainK, 0.2);
-      set(N.turbLP.frequency, 1500 + 5000 * th + 3500 * ab, 0.12);
-      set(N.turbGain.gain, live * (0.22 + 0.32 * th + 0.22 * ab), 0.1);
-    }
-    const sampleK = N.turb ? 0.5 : 1;                     // procedural body thins out under the real recording
-    set(N.engGain.gain, live * (0.10 + 0.22 * t + 0.20 * ab) * sampleK);
-    // F100 core: 82 / 84.5 Hz at idle -> ~165 Hz MIL; pitch sags ~8 % while lugging.
     const kts = p.kts || 0;
     const lugK = live * Math.max(sm(aoa, 10, 22), 0.6 * sm(gl, 3.2, 9));
-    const coreF = (82 + 83 * th + 12 * ab) * (1 - 0.08 * lugK);
-    set(N.coreA.frequency, coreF, 0.12); set(N.coreB.frequency, coreF * 1.03, 0.12);
-    set(N.coreLP.frequency, 420 + 900 * th + 600 * ab, 0.12); set(N.coreGain.gain, live * (0.05 + 0.07 * th + 0.04 * ab), 0.1);
-    set(N.comp.frequency, 1400 + 1200 * th, 0.15); set(N.compGain.gain, live * (0.004 + 0.012 * th) * (1 - 0.5 * ab), 0.12);
-    set(N.subGain.gain, live * 0.22 * ab, 0.15);
-    set(N.engLP.frequency, 320 + 900 * t + 1500 * ab);                    // exhaust roar LP 320 Hz -> 1.8 kHz in AB
+    set(cockpitLP.frequency, p.cockpit ? 2600 : 18000, 0.15);
+    ensureSampleVoices();
+    updateEngine(p, ab, live);
     // Airframe metal groan + creak: 3.2 G -> 9 G.
     const groanK = live * sm(gl, 3.2, 9.0);
     set(N.groanGain.gain, 0.32 * groanK, 0.12); set(N.groanBP.frequency, 160 + 120 * groanK, 0.2);
@@ -2215,7 +2349,7 @@ export function createAudio() {
     get gmix() { return N.gmix || null; }, get dbg() { return N.dbg || null; }, gasp,
     burnerThump, get burnerCount() { return burnerCount; }, get windQuiet() { return N.windQuiet || 1; },
     tyreChirp, noseThump, shuttleClank,
-    get feelCounts() { return { tyre: tyreCount, nose: noseCount, clank: clankCount }; },
+    get feelCounts() { return { tyre: tyreCount, nose: noseCount, clank: clankCount }; },    get engine() { return N.engineDbg || null; },
     vws: { say: vwsSay }, get vwsLast() { return { ...vwsLast }; },
     get vwsState() { return { q: Array.from(vwsQ), cd: Array.from(vwsCd), playing: vwsPlaying, until: vwsUntil }; }, get hydWhine() { return N.hydG ? +N.hydG.gain.value.toFixed(4) : 0; },
     preloadVWS(files) {

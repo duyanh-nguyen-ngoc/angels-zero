@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.41', title: 'F100 ENGINE OVERHAUL', bullets: [
+    'Both F100s now spool with real inertia: roughly 1.8 s up and 2.4 s down, with the right engine detuned and lagging slightly so the pair beats naturally. The compressor whine is a six-oscillator, six-band harmonic choir instead of a single flat tone.',
+    'Exhaust is waveshaped and torn by an audio-rate combustion flutter, with a resonant duct formant and deep 36-85 Hz sub-bass thrust. Afterburner adds sparse crackle and a harder sub punch on light-off.',
+    'Cockpit and chase now have distinct engine mixes - muffled aft roar, body-conducted bass and close intake whine up front; open roaring tailpipes and wide stereo outside. A dedicated compressor and fixed trims keep the bus peak-safe so BGM, radio, RWR and guns stay crisp.'
+  ] },
   { version: 'v1.1.40', title: 'CRIPPLED BANDITS & SOLID DECKS', bullets: [
     'Bandits below half health now trail dark oil smoke and throw intermittent hot-orange sparks from the tail. The ribbons and sparks come from fixed pools, so kills and mission resets clean up without leaking geometry or textures.',
     'Touchdowns have weight again: sink rate drives a two-beat tyre chirp, a metal ring on carrier decks, an oleo camera dip and a nose-wheel slap as the nose comes down. The gear struts visibly compress.',
