@@ -84,6 +84,7 @@ export function createCanopyGlass(THREE, env) {
     uSky: { value: new THREE.Color(0.35, 0.5, 0.75) }, uHor: { value: fogColor },
     uGain: { value: 1 }, uGlare: { value: 1 }, uHud: { value: 1 },
     uTime: { value: 0 }, uRain: { value: 0 }, uMoist: { value: 0 }, uFrost: { value: 0 }, uPunch: { value: 0 },
+    uCrack: { value: null }, uCrackK: { value: 0 },
     uFlow: { value: new THREE.Vector2() }, uStretch: { value: 1 }
   };
   const mat = new THREE.ShaderMaterial({
@@ -104,7 +105,7 @@ export function createCanopyGlass(THREE, env) {
       #include <logdepthbuf_pars_fragment>
       uniform vec3 uSun; uniform vec3 uSunCol; uniform vec3 uSky; uniform vec3 uHor;
       uniform float uGain; uniform float uGlare; uniform float uHud;
-      uniform float uTime; uniform float uRain; uniform float uMoist; uniform float uFrost; uniform float uPunch; uniform vec2 uFlow; uniform float uStretch;
+      uniform float uTime; uniform float uRain; uniform float uMoist; uniform float uFrost; uniform float uPunch; uniform float uCrackK; uniform sampler2D uCrack; uniform vec2 uFlow; uniform float uStretch;
       varying vec3 vWPos; varying vec3 vWN; varying vec2 vUv; varying vec2 vMet;
       float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
       float ggx(float ndh, float a) { float a2 = a * a, d = ndh * ndh * (a2 - 1.0) + 1.0; return a2 / (3.14159265 * d * d); }
@@ -221,6 +222,15 @@ export function createCanopyGlass(THREE, env) {
           col = mix(col, vec3(0.88, 0.94, 1.0), wash * 0.8);
           alpha = clamp(alpha + wash * 0.6, 0.0, 0.98);
         }
+        if (uCrackK > 0.01) {
+          vec4 ck = texture2D(uCrack, vUv);
+          float line = ck.g * uCrackK;
+          vec3 edge = vec3(0.78, 0.88, 1.0) * line * 1.5;
+          col = col * (1.0 - line * 0.35) + edge;
+          float oil = max(0.0, ck.r - ck.g);
+          col = mix(col, vec3(0.26, 0.17, 0.10), oil * 0.15 * uCrackK);
+          alpha = clamp(alpha + line * 0.55, 0.0, 0.98);
+        }
         gl_FragColor = vec4(col + add, clamp(alpha, 0.0, 0.98));
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -242,6 +252,56 @@ export function createCanopyGlass(THREE, env) {
   ];
   for (const c of seals) parent.add(new THREE.Mesh(new THREE.TubeGeometry(c, 96, 0.013, 6, false), sealMat));
 
+  // ---- damage crack mask: repainted only when level / seed changes ----
+  const crackCv = document.createElement('canvas'); crackCv.width = crackCv.height = 512;
+  const crackCtx = crackCv.getContext('2d', { willReadFrequently: true });
+  const crackTex = new THREE.CanvasTexture(crackCv);
+  U.uCrack.value = crackTex;
+  let crackLevel = -1, crackSeed = -1;
+  function repaintCrack(level, seed) {
+    const c = crackCtx, N = 512;
+    c.clearRect(0, 0, N, N);
+    c.lineCap = 'round'; c.lineJoin = 'round'; c.shadowBlur = 0;
+    let s = (seed | 0) || 1;
+    const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 8) & 0xffffff) / 0xffffff; };
+    const webs = level >= 2 ? 2 : 1;
+    for (let w = 0; w < webs; w++) {
+      const ox = w === 0 ? 26 + rnd() * 60 : N - 26 - rnd() * 60;
+      const oy = w === 0 ? 26 + rnd() * 60 : N - 26 - rnd() * 60;
+      const spokes = 7 + ((rnd() * 3) | 0);
+      for (let k = 0; k < spokes; k++) {
+        const a = (k / spokes) * Math.PI * 2 + rnd() * 0.4;
+        c.strokeStyle = 'rgba(255,255,255,0.92)'; c.lineWidth = 1.4;
+        c.beginPath(); c.moveTo(ox, oy);
+        let x = ox, y = oy;
+        for (let seg = 1; seg <= 7; seg++) {
+          const r = seg * (16 + rnd() * 12), ja = a + (rnd() - 0.5) * 0.22;
+          x = ox + Math.cos(ja) * r; y = oy + Math.sin(ja) * r;
+          c.lineTo(x, y);
+        }
+        c.stroke();
+      }
+      for (let ring = 1; ring <= 3; ring++) {
+        const r = ring * 42 + rnd() * 8;
+        c.strokeStyle = 'rgba(255,255,255,0.55)'; c.lineWidth = 1;
+        c.beginPath();
+        for (let k = 0; k <= spokes; k++) {
+          const a = (k / spokes) * Math.PI * 2 + rnd() * 0.08;
+          const px = ox + Math.cos(a) * r, py = oy + Math.sin(a) * r;
+          k ? c.lineTo(px, py) : c.moveTo(px, py);
+        }
+        c.stroke();
+      }
+      // Oil streak drifting down from the impact in brown (blue-channel marker).
+      const len = level >= 2 ? 250 : 140;
+      const g = c.createLinearGradient(0, oy, 0, oy + len);
+      g.addColorStop(0, 'rgba(70,45,20,0.55)'); g.addColorStop(1, 'rgba(70,45,20,0)');
+      c.fillStyle = g; c.beginPath();
+      c.moveTo(ox - 9, oy); c.lineTo(ox + 9, oy); c.lineTo(ox + 3, oy + len); c.lineTo(ox - 4, oy + len); c.closePath(); c.fill();
+    }
+    crackTex.needsUpdate = true;
+  }
+
   // ---- per-frame drive ----
   const flow = U.uFlow.value;
   let moist = 0;
@@ -254,6 +314,13 @@ export function createCanopyGlass(THREE, env) {
     U.uMoist.value = o.visible ? moist : 0;
     U.uRain.value = o.visible ? o.rain : 0;
     U.uFrost.value = o.visible ? (o.frost || 0) : 0;
+    const ck = o.crack || { level: 0, seed: 0 };
+    if (ck.level !== crackLevel || ck.seed !== crackSeed) {
+      crackLevel = ck.level; crackSeed = ck.seed;
+      repaintCrack(crackLevel, crackSeed);
+      if (typeof console !== 'undefined') console.log('[ANGELS_ZERO] crack repaint level=' + crackLevel + ' seed=' + crackSeed);
+    }
+    U.uCrackK.value = crackLevel > 0 ? 1 : 0;
     U.uPunch.value = o.visible ? (o.punch || 0) : 0;
     // Slipstream slide speed over the glass (m/s): slow beads trickle back below
     // ~120 kt, a fast wash above ~200 kt (whips back at dogfight speeds).
@@ -273,6 +340,6 @@ export function createCanopyGlass(THREE, env) {
   return {
     glass, update,
     get moisture() { return moist; },
-    get stats() { return { rain: +U.uRain.value.toFixed(2), moist: +moist.toFixed(2), frost: +U.uFrost.value.toFixed(2), flow: +flow.y.toFixed(1), stretch: +U.uStretch.value.toFixed(2) }; }
+    get stats() { return { rain: +U.uRain.value.toFixed(2), moist: +moist.toFixed(2), frost: +U.uFrost.value.toFixed(2), crack: crackLevel, seed: crackSeed, flow: +flow.y.toFixed(1), stretch: +U.uStretch.value.toFixed(2) }; }
   };
 }

@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.38', title: 'BATTLE DAMAGE & BITCHING BETTY', bullets: [
+    'Heavy hits now crack the canopy, glitch the HUD combiner and make damaged hydraulics whine when you haul the stick. Cracks clear at the pit stop or a new sortie.',
+    'A prioritized voice warning system calls PULL UP, ENGINE FIRE, CHAFF/FLARE, OVER G, ALTITUDE and BINGO FUEL with per-alert cooldowns, on its own audio bus so it never waits behind AWACS radio.',
+    'Voice lines use supplied recordings when present, then Web Speech (optional), then a dual-tone chime with no speech assets required.'
+  ] },
   { version: 'v1.1.37', title: 'DLZ, TTI & JHMCS', bullets: [
     'A live dynamic launch zone bar now sits beside the altitude tape, with Rmax / Rne / Rmin marks, a range caret and closing velocity; fired missiles report a counting TTI that flips to PITBULL inside 1.5 s.',
     'In the cockpit, holding Free Look brings up a JHMCS helmet sight with airspeed, altitude, heading, boresight reference and target diamonds. QAAM seekers can acquire targets up to 65 degrees off the nose inside the helmet circle.',

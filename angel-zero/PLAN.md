@@ -1721,6 +1721,10 @@ Status legend: `[x]` implemented and verified Â· `[ ]` open — gaps listed.
   - Free look lives in the `freeLook` global in `index.html` (there is no `src/freelook.js`); its yaw/pitch are converted to a scratch world look vector and passed to combat via `env.getLook`. QAAM can acquire inside a 12° helmet cone out to 65° off-boresight with a 1.2× lock penalty; other weapons stay boresight-only. `drawJHMCS()` renders the 90 px helmet ring, KCAS/ALT flanks, look heading, nose reference, OB readout and target diamonds.
   - `?freelookat=s:yaw,pitch` and `?dlz=1` provide deterministic verification; cockpit MFD signature includes DLZ/TTI buckets.
 
+- [x] **Cockpit battle damage + VWS** *(build `s9c2`, v1.1.38, `src/canopyglass.js`, `src/hud.js`, `src/audio.js`, `src/combat.js`, `index.html`)*
+  - Damage raises `C.crackLevel` monotonically; `canopyglass.js` repaints a 512² seeded spiderweb crack CanvasTexture only when level/seed change, with `uCrack/uCrackK` and oil streak. `env.onPlayerHit` calls `hud.glitch(0.55)` for jitter, alpha flicker and tear bands; low HP adds timed flickers from a fixed interval table. Hydraulic damage drives a 380 Hz whine gated by stick load.
+  - `audio.js` adds a dedicated VWS bus and priority/cooldown router with buffer → speech → dual-tone chime fallbacks. Triggers in `stepSim` cover PULL UP, OVER G, BINGO FUEL, CHAFF_FLARE, ALTITUDE and ENGINE_FIRE (from combat), each syncing `hud.setAlertState`. `?dmgat`, `?hydat`, `?vwsat`, `?vws`, `?fuel` provide deterministic tests. Pit stop / mission reset clear cracks, glitch and alert overrides.
+
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.

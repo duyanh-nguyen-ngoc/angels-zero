@@ -6,8 +6,8 @@
 // clipped to the 3D combiner glass. Square tactical radar (bottom-left), stores
 // list + F-15C silhouette with per-pylon AIM-9 reload icons (bottom-right),
 // open-corner target brackets, edge pointers, minimal top-left telemetry.
-import { SPW } from './loadout.js?v=s9c0';
-import { GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_FLOOR_Y } from './maps.js?v=s9c0';
+import { SPW } from './loadout.js?v=s9c2';
+import { GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_FLOOR_Y } from './maps.js?v=s9c2';
 
 export function createHUD(THREE, A) {
   const canvas = A.canvas;
@@ -61,6 +61,9 @@ export function createHUD(THREE, A) {
   STAMP_T.fill(99);
   const G_JITTER = new Float32Array(32);
   for (let i = 0; i < 32; i++) G_JITTER[i] = Math.sin(i * 1.7) * 1.5;
+  const FlickT = new Float32Array(32);
+  for (let i = 0; i < 32; i++) FlickT[i] = 2 + ((i * 7) % 41) / 10;   // 2.0 .. 6.0 s
+  let glitchT = 0, flickT = FlickT[0], flickIdx = 0;
   let stampNext = 0;
 
   function resize() {
@@ -2107,6 +2110,20 @@ export function createHUD(THREE, A) {
     lastT = now;
     hctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     hctx.clearRect(0, 0, HW, HH);
+    if (glitchT > 0 && !C.dead) {
+      const k = Math.min(1, glitchT / 0.55), ji = Math.floor(now / 33) & 31;
+      hctx.translate(G_JITTER[ji] * 2 * k, G_JITTER[(ji + 9) & 31] * k);
+      hctx.globalAlpha *= 0.55 + 0.45 * (Math.floor(now / 45) % 2);
+    }
+    const hpFrac = C.health === undefined ? 1 : C.health;
+    if (hpFrac < 25 && !C.dead) {
+      flickT -= dt;
+      if (flickT <= 0) {
+        flickIdx = (flickIdx + 1) & 31; flickT = FlickT[flickIdx];
+        glitchT = Math.max(glitchT, 0.08);
+      }
+    } else flickT = FlickT[0];
+    glitchT = Math.max(0, glitchT - dt);
     const gs = S.gStrain || 0;
     const gDim = S.glocT > 0 ? 0.05 : (gs > 0.85 ? 1 - 0.5 * smooth(gs, 0.85, 0.99) : 1);
     hctx.save(); hctx.globalAlpha = gDim;
@@ -2202,6 +2219,12 @@ export function createHUD(THREE, A) {
     drawFreeLookTag(hctx);
     drawGLoc(hctx);
     drawJam(hctx);
+    if (glitchT > 0 && !C.dead) {
+      const k = Math.min(1, glitchT / 0.55), y = HH * (0.36 + 0.22 * Math.sin(now / 90));
+      hctx.save(); hctx.globalAlpha = 0.35 * k;
+      hctx.drawImage(canvas, 0, y * DPR, canvas.width, 6 * DPR, 8 * k, y - 3, HW, 6);
+      hctx.restore();
+    }
     const mc = !C.dead && A.getMissileCam ? A.getMissileCam() : null;
     if (mc) {
       hctx.save();
@@ -2581,7 +2604,8 @@ export function createHUD(THREE, A) {
     get hudAlertState() { return alertState; },
     setAlertState(s) { alertOverride = s; },
     setMusicToast(text) { musicToast.text = text || ''; musicToast.t = musicToast.text ? performance.now() : 0; },
-    addStamp, radarPulse() { radarPulseT = 0; },
+    addStamp, glitch(t = 0.55) { glitchT = Math.max(glitchT, Math.min(0.55, t)); },
+    clearGlitch() { glitchT = 0; flickT = FlickT[0]; flickIdx = 0; }, radarPulse() { radarPulseT = 0; },
     setRadarZoom(i) { radarZoom = ((i | 0) % 3 + 3) % 3; try { localStorage.setItem('angelsZero_radarZoom', String(radarZoom)); } catch (e) { /* storage unavailable */ } return RADAR_ZOOM_TAG[radarZoom]; },
     get radarZoom() { return radarZoom; },
     get radarPulseT() { return radarPulseT; }

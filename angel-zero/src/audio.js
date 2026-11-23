@@ -173,8 +173,19 @@ export function createAudio() {
     N.tinA = osc('sine', 7800); N.tinB = osc('sine', 8100); N.tinG = gain(0);
     N.tinA.connect(N.tinG); N.tinB.connect(N.tinG); N.tinG.connect(N.body);
     N.nextGBeat = 0; N.nextGBreath = 0; N.gSuitArm = true; N.gPeakMix = 0;
+    // Hydraulic damage whine: sawtooth through band-pass, LFO wobble on pitch.
+    N.hydOsc = osc('sawtooth', 380); N.hydBP = filt('bandpass', 900, 6); N.hydG = gain(0);
+    N.hydOsc.connect(N.hydBP).connect(N.hydG).connect(cockpitLP);
+    N.hydLFO = osc('sine', 7); N.hydLFOAmt = gain(25);
+    N.hydLFO.connect(N.hydLFOAmt).connect(N.hydOsc.frequency);
     // Voiced radio: headset bus (skips cockpit LP + G-LOC tunnel).
-    N.radioBus = gain(0.95); N.radioBus.connect(N.body);
+    N.radioBus = gain(0.95); N.vwsDuckG = gain(1);
+    N.radioBus.connect(N.vwsDuckG).connect(N.body);
+    // Voice warning system: dedicated bus, never queued behind comms radio.
+    N.vwsHP = filt('highpass', 300, 0.7);
+    N.vwsComp = ctx.createDynamicsCompressor();
+    N.vwsComp.threshold.value = -18; N.vwsComp.ratio.value = 3; N.vwsComp.attack.value = 0.004; N.vwsComp.release.value = 0.18;
+    N.vwsBus = gain(0.9); N.vwsHP.connect(N.vwsComp).connect(N.vwsBus).connect(master);
     // Comms DSP: HP -> LP -> soft clip -> compressor -> ring-mod split -> pan -> analyser.
     N.rHP = filt('highpass', 340, 0.7); N.rLP = filt('lowpass', 2900, 0.7);
     N.rShaper = ctx.createWaveShaper(); N.rShaper.curve = CURVE_SOFT; N.rShaper.oversample = '2x';
@@ -694,6 +705,68 @@ export function createAudio() {
     }
     if (samples.buffet && !N.buff) { N.buff = loopVoice(samples.buffet); N.buffGain = gain(0); N.buff.connect(N.buffGain).connect(cockpitLP); }
     if (samples.breath && !N.breath) { N.breath = loopVoice(samples.breath); N.breathGain = gain(0); N.breath.connect(N.breathGain).connect(N.body); }
+  }
+  // ---- cockpit voice warning system -------------------------------------------
+  const VWS_IDS = ['PULL_UP', 'ENGINE_FIRE', 'CHAFF_FLARE', 'OVER_G', 'ALTITUDE', 'BINGO_FUEL'];
+  const VWS_PRI = { PULL_UP: 5, ENGINE_FIRE: 4, CHAFF_FLARE: 3, OVER_G: 2, ALTITUDE: 2, BINGO_FUEL: 1 };
+  const VWS_CD = { PULL_UP: 1.6, ENGINE_FIRE: 6, CHAFF_FLARE: 4, OVER_G: 3, ALTITUDE: 5, BINGO_FUEL: 30 };
+  const VWS_PHRASE = { PULL_UP: 'PULL UP', ENGINE_FIRE: 'ENGINE FIRE', CHAFF_FLARE: 'CHAFF, FLARE',
+    OVER_G: 'OVER G', ALTITUDE: 'ALTITUDE', BINGO_FUEL: 'BINGO FUEL' };
+  const VWS_BUF = Object.create(null);
+  const vwsQ = new Int8Array(VWS_IDS.length), vwsCd = new Float32Array(VWS_IDS.length);
+  let vwsPlaying = -1, vwsUntil = 0, vwsSpeech = false, vwsMuted = true, vwsDebug = false;
+  const vwsLast = { id: '', src: '', t: 0 };
+  try { vwsMuted = localStorage.getItem('angelsZero_vws') !== '0'; } catch (e) { /* storage unavailable */ }
+  const vwsUtt = typeof SpeechSynthesisUtterance !== 'undefined' ? VWS_IDS.reduce((o, id) => {
+    const u = new SpeechSynthesisUtterance(VWS_PHRASE[id]); u.rate = 1.15; u.pitch = 1.1; u.volume = 0.9;
+    o[id] = u; return o;
+  }, Object.create(null)) : null;
+  function vwsSay(id) {
+    const i = VWS_IDS.indexOf(id);
+    if (i < 0) return false;
+    if (vwsCd[i] > 0) { if (vwsDebug) console.log('[ANGELS_ZERO] vws cd skip id=' + id); return false; }
+    vwsQ[i] = 1; vwsCd[i] = VWS_CD[id];
+    return true;
+  }
+  function vwsPlay(id) {
+    vwsLast.id = id; vwsLast.t = ctx ? ctx.currentTime : 0;
+    let src = 'chime';
+    if (VWS_BUF[id]) {
+      const s = ctx.createBufferSource(); s.buffer = VWS_BUF[id];
+      const g = gain(1); s.connect(g).connect(N.vwsHP); s.start(); s.onended = () => { try { g.disconnect(); } catch (e) {} };
+      src = 'buf'; vwsUntil = performance.now() / 1000 + Math.min(2, VWS_BUF[id].duration);
+    } else if (vwsSpeech && vwsUtt && typeof speechSynthesis !== 'undefined') {
+      try { speechSynthesis.speak(vwsUtt[id]); src = 'speech'; } catch (e) { src = 'chime'; }
+      vwsUntil = performance.now() / 1000 + 1.1;
+    } else {
+      const t = ctx.currentTime;
+      for (let rep = 0; rep < 2; rep++) for (const [f, off] of [[1000, 0], [800, 0.12]]) {
+        const o = ctx.createOscillator(), g = gain(0); o.type = 'sine'; o.frequency.value = f;
+        const a = t + rep * 0.3 + off;
+        g.gain.setValueAtTime(0, a); g.gain.linearRampToValueAtTime(0.08, a + 0.01);
+        g.gain.linearRampToValueAtTime(0, a + 0.11);
+        o.connect(g).connect(N.vwsHP); o.start(a); o.stop(a + 0.13);
+      }
+      vwsUntil = performance.now() / 1000 + 0.75;
+    }
+    vwsLast.src = src;
+    if (N.vwsDuckG) N.vwsDuckG.gain.setTargetAtTime(0.63, ctx.currentTime, 0.03);
+    if (vwsDebug) console.log('[ANGELS_ZERO] vws play id=' + id + ' src=' + src + ' pre=' + VWS_PRI[id]);
+  }
+  function vwsUpdate(dt) {
+    if (!ready) return;
+    for (let i = 0; i < vwsCd.length; i++) vwsCd[i] = Math.max(0, vwsCd[i] - dt);
+    if (vwsPlaying >= 0) {
+      if (performance.now() / 1000 >= vwsUntil) {
+        vwsPlaying = -1;
+        if (N.vwsDuckG) N.vwsDuckG.gain.setTargetAtTime(1, ctx.currentTime, 0.08);
+      }
+      return;
+    }
+    let best = -1, bp = -1;
+    for (let i = 0; i < vwsQ.length; i++) if (vwsQ[i] && VWS_PRI[VWS_IDS[i]] > bp) { bp = VWS_PRI[VWS_IDS[i]]; best = i; }
+    if (best < 0) return;
+    vwsQ[best] = 0; vwsPlaying = best; vwsPlay(VWS_IDS[best]);
   }
   // Recovery gasp: two ragged inhales through a sweeping band-pass on the body bus.
   function gasp(strong = false) {
@@ -1904,7 +1977,12 @@ export function createAudio() {
     if (gloc) { tin = 0.08; N.tinFade = tNow + 2; }
     if (N.tinFade && tNow < N.tinFade) tin = Math.max(tin, 0.08 * (N.tinFade - tNow) / 2);
     set(N.tinG.gain, live ? tin : 0, 0.12);
-    N.gmix = { lp: N.tunnel.frequency.value, bpm: bpm, breath: breathK, tin: tin, beatPhase: N.beatPhase || 0, neg: gNeg };
+    // Hydraulic whine: rises with stick load while the system is damaged.
+    const hd = Math.max(0, Math.min(1, p.hydDamage || 0)), stick = Math.max(0, Math.min(1, p.stick || 0));
+    set(N.hydG.gain, 0.12 * hd * sm(stick, 0.08, 0.6), hd > 0 && stick > 0.08 ? 0.05 : 0.25);
+    set(N.hydOsc.frequency, 380 + 220 * stick, 0.1);
+    vwsUpdate(p.dt || 0.016);
+    N.gmix = { lp: N.tunnel.frequency.value, bpm: bpm, breath: breathK, tin: tin, beatPhase: N.beatPhase || 0, neg: gNeg, hyd: N.hydG.gain.value };
     N.dbg = { groanK: +groanK.toFixed(2), lugK: +lugK.toFixed(2), buffK: +buffK.toFixed(2), breathK: +breathK.toFixed(2), heartK: +heartK.toFixed(2), tunnel: Math.round(N.tunnel.frequency.value), bpm: Math.round(bpm), neg: +gNeg.toFixed(2) };
     if (p.glocWarn && (!N.chimeT || ctx.currentTime - N.chimeT > 2.4)) { glocChime(); N.chimeT = ctx.currentTime; }
     if (!p.glocWarn) N.chimeT = 0;
@@ -2022,6 +2100,14 @@ export function createAudio() {
     },
     get layers() { return N.dbg || null; },
     get gmix() { return N.gmix || null; }, get dbg() { return N.dbg || null; }, gasp,
+    vws: { say: vwsSay }, get vwsLast() { return { ...vwsLast }; },
+    get vwsState() { return { q: Array.from(vwsQ), cd: Array.from(vwsCd), playing: vwsPlaying, until: vwsUntil }; }, get hydWhine() { return N.hydG ? +N.hydG.gain.value.toFixed(4) : 0; },
+    preloadVWS(files) {
+      return Promise.all(Object.entries(files || {}).map(([id, url]) => fetch(url).then(r => r.arrayBuffer())
+        .then(ab => new Promise(res => { const pr = ctx.decodeAudioData(ab, res); if (pr && pr.catch) pr.catch(() => {}); }))
+        .then(buf => { VWS_BUF[id] = buf; }).catch(() => {})));
+    },
+    setVWS(on) { vwsSpeech = !!on; }, setVWSMuted(on) { vwsMuted = !!on; }, setVWSLog(on) { vwsDebug = !!on; },
     // Slipstream / buffet bus targets + live AudioParam values (for __audioDebug).
     get wind() { return N.windDbg || null; },
     // Last two-stage detonation (crack band, sub sweep, crack / boom times, travel delay).

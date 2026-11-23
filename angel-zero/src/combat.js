@@ -8,13 +8,13 @@
 // burning wrecks that splash, scoring, waves, lock-on and threat warnings.
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { DIFFICULTY_PRESETS } from './difficulty.js?v=s9c0';
-import { SPW } from './loadout.js?v=s9c0';
-import { missionConfig } from './missions.js?v=s9c0';
+import { DIFFICULTY_PRESETS } from './difficulty.js?v=s9c2';
+import { SPW } from './loadout.js?v=s9c2';
+import { missionConfig } from './missions.js?v=s9c2';
 import { gorgeCentreX, gorgeSlope, gorgeHeading, gorgeDist, GORGE_GATE_Z, GORGE_GATE_N, GORGE_FLOOR_Y, GORGE_RIM_Y,
   GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_FORT, GORGE_ARC_M, GORGE_SPAWN_Z, CEIL_M,
   GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_ZB, GORGE_SC_HALF_W, GORGE_SC_ARCH_Z, GORGE_SC_ARCH_Y0,
-  GORGE_SC_ARCH_W, GORGE_SC_SKIP, GORGE_SC_SAVE_M } from './maps.js?v=s9c0';
+  GORGE_SC_ARCH_W, GORGE_SC_SKIP, GORGE_SC_SAVE_M } from './maps.js?v=s9c2';
 
 const NM = 1852, FT = 0.3048, G0 = 9.81;
 // Allied CVN model: same 360 m deck as the procedural ship, re-anchored to the GLB.
@@ -138,7 +138,7 @@ export function createCombat(THREE, env) {
     subKills: 0, siteKills: 0, flagBannerT: 0, salvoKills: 0,
     ambushActive: false, buzzTower: 0, buzzJet: 0,
     droneInboundT: 0, droneClearedT: 0, scrambleT: 0, bwBannerT: 0, intrBannerT: 0,
-    shootCue: false, shootT: 0, shootAspect: 0,
+    shootCue: false, shootT: 0, shootAspect: 0, crackLevel: 0, crackSeed: 0,
     dlz: { on: false, rmin: 0, rmax: 0, rne: 0, r: 0, vc: 0, inNez: false, inRange: false },
     tti: undefined, pitbull: false,
     wingRoles: { w2: 'CAP', w3: 'STRIKE' },
@@ -4019,6 +4019,12 @@ export function createCombat(THREE, env) {
     if (C.dead) return;
     C.health = Math.max(0, C.health - n);
     C.maxDmg = Math.max(C.maxDmg || 0, 100 - C.health);
+    const wantCrack = C.health < 20 ? 2 : C.health < 45 || n >= 20 ? 1 : 0;
+    if (wantCrack > C.crackLevel) {
+      C.crackLevel = wantCrack; C.crackSeed = (C.crackSeed || 0) + 1;
+      if (env.debug) console.log('[ANGELS_ZERO] crack level=' + C.crackLevel + ' seed=' + C.crackSeed + ' repaint');
+    }
+    if (env.onPlayerHit) env.onPlayerHit(n);
     if (C.health <= 45 && !C.lowHpSaid) { C.lowHpSaid = true; if (env.onRadio) env.onRadio('ON_LOW_HP'); }
     else if (C.health > 70) C.lowHpSaid = false;
     C.hitFlash = 0.3;
@@ -5673,6 +5679,7 @@ export function createCombat(THREE, env) {
     pushEvent('DAMAGED', `[ ${side} ENG FIRE ] ${reason}`, 0, '#ff4d3d');
     if (env.onSfx) { env.onSfx('flameout', null, 1); env.onSfx('firebell', null, 1); }
     if (env.onRadio) env.onRadio('ENG_FIRE', { side });
+    if (env.onVws) env.onVws('ENGINE_FIRE');
     return true;
   }
   // Emergency procedure input pending? (F is the fire-bottle / relight switch then.)
@@ -5815,6 +5822,7 @@ export function createCombat(THREE, env) {
     if (C.weaponsLock.spw) C.bombs = 0;
     resetEngines();                                         // both F100s back to HEALTHY
     director.reset();
+    C.crackLevel = 0; C.crackSeed = 0;
     C.score += 1000;
     pushEvent('BONUS', 'TRAP BONUS', 1000, '#ffd45a');
   }
@@ -5825,7 +5833,7 @@ export function createCombat(THREE, env) {
     Object.assign(C, { bombs: stores.bomb.length, bombReload: 0, flares: FLR_MAX, ccip: null, aam4: AAM4_MAX, aam4Reload: 0, qaam: QAAM_MAX, qaamReload: 0, ecmState: 'READY', ecmT: 0 });
     for (const st of stores.msl) st.aamHidden = false;
     ripple.length = 0; aamRack = 0; disarmSeeker(null); setMulti([]);
-    Object.assign(C, { gunHeat: 0, gunOverheat: false, engineOut: null, engineFire: false, hydraulic: false, ccrpArmed: false });
+    Object.assign(C, { gunHeat: 0, gunOverheat: false, engineOut: null, engineFire: false, hydraulic: false, ccrpArmed: false, crackLevel: 0, crackSeed: 0 });
     resetEngines();
     director.reset();
     flareRecharge = 0;
@@ -6095,7 +6103,7 @@ export function createCombat(THREE, env) {
       Object.assign(C.intr, { st: 'IDLE', t: 0, ace: -1, used: false, farT: 0 }); C.wingHold = false;
       if (env.onIntrusion) env.onIntrusion('RESET');
       Object.assign(C.sc, { st: 'IDLE', used: false, pz: S.position.z, px: S.position.x, py: S.position.y, logT: 0, bannerT: 0 });
-      C.subKills = 0; C.siteKills = 0; C.flagBannerT = 0;
+      C.subKills = 0; C.siteKills = 0; C.flagBannerT = 0; C.crackLevel = 0; C.crackSeed = 0;
       clearDronePool(); furSwarmT = 75; droneSalvoT = 0; droneSalvoKills = 0; droneSalvoPaid = false;
       SITE_HPV.fill(SITE_HP); SITE_ON.fill(1); sectorDead.fill(0);
       // Rim batteries carved away by the shortcut stay disabled on every reset.
@@ -6178,6 +6186,8 @@ export function createCombat(THREE, env) {
     get intrusion() { return C.intr; },
     get esm() { return { on: !!C.esmOn, in: !!C.inESM, x: C.esmPos.x, z: C.esmPos.z, r: ESM_R }; },
     get inESM() { return !!C.inESM; }, get shootCue() { return !!C.shootCue; }, get dlz() { return C.dlz; }, get tti() { return C.tti; }, get look() { return JLOOK; },
+    get crack() { return { level: C.crackLevel, seed: C.crackSeed }; },
+    damagePlayer(n) { damagePlayer(n); return C.health; },
     setESMDisabled(on) { C.esmDisabled = !!on; return C.esmDisabled; },
     get sc() { return C.sc; },
     spawnDroneSwarm(n = SWARM_MAX, anchor = 'PLAYER') { return spawnSwarm(n, anchor); },
@@ -6387,7 +6397,7 @@ export function createCombat(THREE, env) {
         ground: { tgts: surface.map(t => t.id + (t.alive ? '' : 'x')).join(' '), tgt: C.groundTgt ? C.groundTgt.label : null,
           ccrp: C.ccrp ? { along: Math.round(C.ccrp.along), cross: Math.round(C.ccrp.cross), ttr: +C.ccrp.ttr.toFixed(1), rng: Math.round(C.ccrp.range) } : null,
           armed: !!C.ccrpArmed, rel: C.ccrpRelease || null },
-        dmg: { pct: Math.round(100 - C.health), hyd: !!C.hydraulic, out: C.engineOut || null, fire: !!C.engineFire },
+        dmg: { pct: Math.round(100 - C.health), hyd: !!C.hydraulic, out: C.engineOut || null, fire: !!C.engineFire, crack: C.crackLevel, seed: C.crackSeed },
         eng: { L: C.engL, R: C.engR, side: C.engSide, fireT: +C.fireT.toFixed(1), relightT: +C.relightT.toFixed(2), used: C.relightUsed, result: C.relightResult, p: +(C.relightP || 0).toFixed(2), armed: C.fireArmed },
         zone: { sector: C.sector ? C.sector.code : null, terrainBreaks: C.terrainBreaks || 0, baseHits: C.baseHits || 0, baseKills: C.baseKills || 0,
           shots: C.mslLog.slice(-4).map(x => x.tag + ':' + x.result).join(' '), sams: missiles.filter(m => m.active && m.sam).length, provoked: fleetProvoked,
