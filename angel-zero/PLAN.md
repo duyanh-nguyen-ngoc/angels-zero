@@ -1686,6 +1686,11 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   - A once-per-sortie 25 % roll during autoland GLIDE aborts cleanly (pose and velocity preserved, `allyHold` released, gear up, burner + pitch assist), switches BGM to `10_last_stand` via the `ambush` music-key component, and spawns 2–3 pooled ambush bandits ahead of the bow with a CRITICAL radio call and red banner. Clearing them restores `11_rtb`, scores +800 and re-enables the autoland prompt.
   - Mach ≥ 1 sweeps the jet's frame against the carrier island, AFB tower and live bandits with pooled `Float32Array` anchors + per-enemy cooldowns. Hits fire a `TOWER BUZZ +500` / `SONIC PASS +250` banner, camera impulse, mach-cone pulse, persistent sonic-boom nodes and a callout. A 10 s cooldown prevents farming. `?waveoffat=s` / `?buzzat=s:kind` make both deterministic.
 
+- [x] **Instanced agile drone swarm** *(build `s99a`, v1.1.29, `index.html`, `src/combat.js`, `src/hud.js`, `src/audio.js`)*
+  - Separate pooled archetype: one `InstancedMesh` delta-wing body + additive engine-glow `Points`, typed-array flight state, in-place bounding-sphere culling, zero per-frame allocations. 6–8 drones spawn on mid/late AIR SUPERIORITY waves, NAVAL stages 2/3 (half carrier-anchored) and every 75 s in FURBALL; never ACE_DUEL or CANYON_RUN. They stay out of `enemies`, the debrief map and RWR.
+  - Boids/orbit steering with periodic peel-off pursuit and short cannon bursts. Virtual `DRONE_TGT` lock objects feed the normal seeker and 4AAM (0.6× lock time); a single Vulcan round or missile kills one, with 12 m splash, `SWARM KILL +200`, `QUAD SPLASH` and a `SWARM CLEARED +1000` finish. HUD draws compact `◇` markers, an amber `SWARM n/8` bracket, radar diamonds and inbound/cleared banners; a persistent sawtooth hum tracks the nearest drone.
+  - `?drones=1` / `?droneat=s`, `__az.spawnDroneSwarm()` / `__az.killDrone(i)`, once-per-second warp logs and `stats().drones` make headless verification deterministic.
+
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.

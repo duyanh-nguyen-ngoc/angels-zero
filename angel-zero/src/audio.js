@@ -9,7 +9,7 @@
 // to the procedural layers below. A master "hearing tunnel" low-pass sweeps
 // 12 kHz -> 550 Hz as the pilot approaches G-LOC.
 
-import { MISSIONS } from './missions.js?v=s98b';
+import { MISSIONS } from './missions.js?v=s99a';
 
 export function createAudio() {
   let ctx = null, master = null, cockpitLP = null, ready = false;
@@ -279,6 +279,10 @@ export function createAudio() {
     N.flagG = gain(0); N.flagLFO = osc('square', 2); N.flagAM = gain(0);
     N.flagOsc.connect(N.flagBP).connect(N.flagG).connect(master);
     N.flagLFO.connect(N.flagAM).connect(N.flagG.gain);
+    // Drone swarm: one persistent buzzing sawtooth through a band-pass; gain is
+    // driven by the nearest live drone's distance (setDroneHum), silent otherwise.
+    N.droneOsc = osc('sawtooth', 140); N.droneBP = filt('bandpass', 620, 3.5); N.droneG = gain(0);
+    N.droneOsc.connect(N.droneBP).connect(N.droneG).connect(cockpitLP);
     // Sonic boom: one persistent noise crack + one 45 Hz thump, retriggered by envelopes.
     N.boomN = loopNoise(N.whiteBuf); N.boomLP = filt('lowpass', 180, 0.8); N.boomNG = gain(0);
     N.boomN.connect(N.boomLP).connect(N.boomNG).connect(cockpitLP);
@@ -1717,6 +1721,14 @@ export function createAudio() {
     set(N.flagAM.gain, 0.02 + 0.05 * k, 0.08);
     set(N.flagG.gain, k > 0 ? 0.035 + 0.04 * k : 0, 0.06);
   }
+  // Drone swarm proximity 0..1 (1 = closest). Pitch rises slightly as they close in.
+  function setDroneHum(k) {
+    const v = Math.max(0, Math.min(1, k || 0));
+    if (!ready || !N.droneOsc) return;
+    set(N.droneG.gain, 0.075 * v * v, 0.12);
+    set(N.droneOsc.frequency, 140 + 26 * v, 0.12);
+    set(N.droneBP.frequency, 620 + 300 * v, 0.12);
+  }
 
   /* ------------------------------------------------------ continuous mix */
   function update(p) {
@@ -1853,7 +1865,7 @@ export function createAudio() {
   }
 
   return {
-    init, resume, suspend, update, updateMusic, setSpray, setFlagCharge, enemyGun, gunhit, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, samLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, setBgmPause, bumpBgmDwell() { dwell = MIN_DWELL; }, setBgmForce: v => { bgmForce = v || ''; }, switchTo, selectTrack, skip, setAuto, onBgmChange, get bgmTracks() { return allTracks() || []; }, radioSquelch, preloadRadio, playRadio, stopRadio, txOpen, txTail, txClose, preload,
+    init, resume, suspend, update, updateMusic, setSpray, setFlagCharge, setDroneHum, enemyGun, gunhit, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, samLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, setBgmPause, bumpBgmDwell() { dwell = MIN_DWELL; }, setBgmForce: v => { bgmForce = v || ''; }, switchTo, selectTrack, skip, setAuto, onBgmChange, get bgmTracks() { return allTracks() || []; }, radioSquelch, preloadRadio, playRadio, stopRadio, txOpen, txTail, txClose, preload,
     get radioAnalyser() { return N.rAnalyser || null; }, get radioFreq() { return N.rFreq || null; }, get radioTime() { return N.rTime || null; },
     get radioCh() { return RADIO_CH; },
     get radioDsp() { return { pttOpen: !!N.pttOpen, pttTail: !!N.pttTail, static: !!N.rStatic, hp: N.rHP ? N.rHP.frequency.value : 0,
@@ -1907,6 +1919,7 @@ export function createAudio() {
     get slowMoDebug() { return N.lastSlowMo || null; },
     // Cockpit mist patter level + band centre for __audioDebug.
     get mist() { return N.mistG ? { gain: +N.mistG.gain.value.toFixed(4), hz: Math.round(N.mistBP.frequency.value) } : null; },
+    get droneHum() { return N.droneG ? { gain: +N.droneG.gain.value.toFixed(4), hz: Math.round(N.droneOsc.frequency.value) } : null; },
     get spray() { return { k: +sprayK.toFixed(3), kt: Math.round(sprayKt), gain: N.sprayG ? +N.sprayG.gain.value.toFixed(4) : 0,
       hz: N.sprayBP ? Math.round(N.sprayBP.frequency.value) : 0, rumble: N.rumbleG ? +N.rumbleG.gain.value.toFixed(4) : 0 }; },
     // Canopy rain layer state (for __audioDebug): bus gain, hiss gain / band, tap rate and count.

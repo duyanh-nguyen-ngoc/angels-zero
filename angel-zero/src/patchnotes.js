@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.29', title: 'AGILE DRONE SWARM', bullets: [
+    'Instanced UAV swarms now ride in on mid/late AIR SUPERIORITY waves, NAVAL stage 2/3 and periodic FURBALLs. Compact radar diamonds and a SWARM n/8 bracket keep them distinct from full fighters.',
+    'Agile drones orbit and peel off in pursuit, return fire in short cannon bursts, and fall to a single Vulcan round or 4AAM missile. Clear the whole swarm for a SWARM CLEARED +1000 bonus.',
+    'A dedicated drone hum rises as the nearest UAV closes in; RWR and the mission map stay clean because swarms are a separate pooled archetype.'
+  ] },
   { version: 'v1.1.28', title: 'WAVE-OFF & TOWER BUZZ', bullets: [
     'Carrier recoveries can now spring a wave-off ambush: a clean go-around with full burner, a priority bandit call, and a Last Stand score until the bow is clear and you are cleared to land again.',
     'Buzz the carrier island or the AFB tower supersonically — or thunder past a bandit — for a shockwave jolt, a sonic crack, bonus points and a radio call.',

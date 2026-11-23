@@ -6,7 +6,7 @@
 // clipped to the 3D combiner glass. Square tactical radar (bottom-left), stores
 // list + F-15C silhouette with per-pylon AIM-9 reload icons (bottom-right),
 // open-corner target brackets, edge pointers, minimal top-left telemetry.
-import { SPW } from './loadout.js?v=s98b';
+import { SPW } from './loadout.js?v=s99a';
 
 export function createHUD(THREE, A) {
   const canvas = A.canvas;
@@ -117,6 +117,14 @@ export function createHUD(THREE, A) {
   function toScreen(v) {
     _sp.copy(v).project(cam);
     return { x: (_sp.x * 0.5 + 0.5) * HW, y: (-_sp.y * 0.5 + 0.5) * HH, ok: _sp.z > -1 && _sp.z < 1 };
+  }
+  // Drone marker scratch: reused projection object, zero per-frame allocations.
+  const _drScr = new THREE.Vector3(), _drPr = { x: 0, y: 0, ok: false }, _drCentroid = new THREE.Vector3();
+  function droneScreen(v) {
+    _drScr.copy(v).project(cam);
+    _drPr.x = (_drScr.x * 0.5 + 0.5) * HW; _drPr.y = (-_drScr.y * 0.5 + 0.5) * HH;
+    _drPr.ok = _drScr.z > -1 && _drScr.z < 1;
+    return _drPr;
   }
   function focal() { return (HH / 2) / Math.tan(cam.fov / 2 * D2R); }
   const wrap180 = a => ((a % 360) + 540) % 360 - 180;
@@ -511,8 +519,17 @@ export function createHUD(THREE, A) {
     const nextTgt = C.nextTarget && C.nextTarget.alive ? C.nextTarget : null;
     const offRing = [];
 
-    for (const e of (A.getTargets ? A.getTargets() : A.getEnemies())) {     // bandits + task-force ships
+    for (const e of (A.getTargets ? A.getTargets() : A.getEnemies())) {     // bandits + task-force ships + drones
       if (!e.alive) continue;
+      if (e.kind === 'DRONE' && !trackInfo(e)) {                            // compact UAV diamond, no range text
+        const p = droneScreen(e.pos);
+        if (p.ok && p.x > 36 && p.x < HW - 36 && p.y > 42 && p.y < HH - 42) {
+          ctx.save(); glow(ctx, '#ffb838', 3); ctx.lineWidth = 1.1;
+          diamond(ctx, p.x, p.y, 7);
+          ctx.restore();
+        }
+        continue;                                                           // locked drones fall through to the normal lock box
+      }
       const range = e.pos.distanceTo(S.position);
       const { p, on } = onScreenOf(e.pos, e === prim);
       if (!on) {
@@ -598,6 +615,23 @@ export function createHUD(THREE, A) {
         labelText(ctx, 'CLOUD OBSCURED', p.x, p.y + baseS + 10, AMBER, 4);
       }
       ctx.restore();
+    }
+
+    // Swarm group bracket: one amber `SWARM n/8` badge at the live centroid.
+    const drones = A.getDrones ? A.getDrones() : null;
+    if (drones) {
+      let n = 0, cx = 0, cy = 0, cz = 0;
+      for (const d of drones) if (d.alive) { cx += d.pos.x; cy += d.pos.y; cz += d.pos.z; n++; }
+      if (n) {
+        const p = droneScreen(_drCentroid.set(cx / n, cy / n, cz / n));
+        if (p.ok && p.x > 90 && p.x < HW - 90 && p.y > 70 && p.y < HH - 70) {
+          ctx.save(); glow(ctx, '#ffb838', 4); ctx.lineWidth = 1.2;
+          drawCornerBracket(ctx, p.x, p.y, 22, 8);
+          ctx.font = f(11, true); ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+          labelText(ctx, 'SWARM ' + n + '/8', p.x, p.y - 26, '#ffb838', 4);
+          ctx.restore();
+        }
+      }
     }
 
     // Inbound enemy missiles: flashing crimson diamond on screen, chevron on 26% ring off-screen.
@@ -1047,6 +1081,20 @@ export function createHUD(THREE, A) {
       ctx.restore();
       if (kind !== 'bogey') { ctx.lineWidth = 1.1; drawCornerBracket(ctx, bx, by, 8, 3); }
     }
+    // Drone swarm: small amber diamonds on the radar, distinct from fighter triangles.
+    const drList = A.getDrones ? A.getDrones() : null;
+    if (drList) for (const d of drList) {
+      if (!d.alive) continue;
+      const rx = d.pos.x - S.position.x, rz = d.pos.z - S.position.z;
+      const sx = rx * Math.cos(hRad) + rz * Math.sin(hRad), sy = -rx * Math.sin(hRad) + rz * Math.cos(hRad);
+      const rr = Math.hypot(sx, sy), beyond = rr > MAX_M * 0.97, f2 = beyond ? (MAX_M * 0.97) / rr : 1;
+      const bx = cx + sx * k * f2, by = cy + sy * k * f2;
+      const isLock = trackInfo(d) && trackInfo(d).st === 'LOCK';
+      ctx.save();
+      glow(ctx, isLock ? WARN : AMBER, beyond ? 2 : 4); ctx.lineWidth = 1.2;
+      diamond(ctx, bx, by, beyond ? 3.5 : 5);
+      ctx.restore();
+    }
 
     // Pulsing red missile lines for incoming missiles.
     for (const m of A.missiles) {
@@ -1436,6 +1484,14 @@ export function createHUD(THREE, A) {
     if (C.aceFlightT && now - C.aceFlightT < 3000) {
       const age = now - C.aceFlightT;
       drawBanner(ctx, cx, upperY + 36, '[ WARNING // ACE SQUADRON INBOUND ]', WARN, 380, pulseAlpha(200) * (1 - age / 3000));
+    }
+    if (C.droneInboundT && now - C.droneInboundT < 3200) {
+      const age = now - C.droneInboundT;
+      drawBanner(ctx, cx, upperY + 72, 'DRONE SWARM INBOUND', AMBER, 360, pulseAlpha(180) * (1 - age / 3200));
+    }
+    if (C.droneClearedT && now - C.droneClearedT < 2600) {
+      const age = now - C.droneClearedT;
+      drawBanner(ctx, cx, upperY + 36, 'SWARM CLEARED +1000', G, 340, 1 - age / 2600);
     }
     if (C.returnT && now - C.returnT < 2200) {
       drawBanner(ctx, cx, upperY, '[ RETURN LINE // REARMED & PATCHED ]', '#5fe8ff', 380, 1 - (now - C.returnT) / 2200);
