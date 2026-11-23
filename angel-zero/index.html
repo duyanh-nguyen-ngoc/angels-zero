@@ -726,35 +726,35 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s9d9';
-import { createAmbient } from './src/ambient.js?v=s9d9';
-import { createBlastFX } from './src/blastfx.js?v=s9d9';
-import { createHUD } from './src/hud.js?v=s9d9';
-import { createCockpit3D } from './src/cockpit3d.js?v=s9d9';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9d9';
-import { createEjection } from './src/eject.js?v=s9d9';
-import { createAudio } from './src/audio.js?v=s9d9';
-import { createRadio } from './src/radio.js?v=s9d9';
-import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9d9';
-import { createLivery } from './src/livery.js?v=s9d9';
-import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s9d9';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9d9';
-import { createCanopyFX } from './src/canopy.js?v=s9d9';
-import { createNVG } from './src/nvg.js?v=s9d9';
-import { createWorld, WORLD } from './src/world.js?v=s9d9';
-import { createSurfaces } from './src/surfaces.js?v=s9d9';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9d9';
-import { createFreeLook } from './src/freelook.js?v=s9d9';
-import { createCanopyGlass } from './src/canopyglass.js?v=s9d9';
-import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9d9';
-import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9d9';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9d9';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9d9';
-import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9d9';
-import { createRadioQueue } from './src/radioQueue.js?v=s9d9';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9d9';
+import { createVFX } from './src/vfx.js?v=s9dd';
+import { createAmbient } from './src/ambient.js?v=s9dd';
+import { createBlastFX } from './src/blastfx.js?v=s9dd';
+import { createHUD } from './src/hud.js?v=s9dd';
+import { createCockpit3D } from './src/cockpit3d.js?v=s9dd';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9dd';
+import { createEjection } from './src/eject.js?v=s9dd';
+import { createAudio } from './src/audio.js?v=s9dd';
+import { createRadio } from './src/radio.js?v=s9dd';
+import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9dd';
+import { createLivery } from './src/livery.js?v=s9dd';
+import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s9dd';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9dd';
+import { createCanopyFX } from './src/canopy.js?v=s9dd';
+import { createNVG } from './src/nvg.js?v=s9dd';
+import { createWorld, WORLD } from './src/world.js?v=s9dd';
+import { createSurfaces } from './src/surfaces.js?v=s9dd';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9dd';
+import { createFreeLook } from './src/freelook.js?v=s9dd';
+import { createCanopyGlass } from './src/canopyglass.js?v=s9dd';
+import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9dd';
+import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9dd';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9dd';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9dd';
+import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9dd';
+import { createRadioQueue } from './src/radioQueue.js?v=s9dd';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9dd';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
-  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9d9';
+  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9dd';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -1161,8 +1161,18 @@ for (const w of wingmen) {
   w.limping = false; w.limpDest = new THREE.Vector3();
   w.cat = { ph: 'NONE', t: 0, delay: 0, track: CAT_BOW[0], fired: false, blend: 4 };
   w.catPos = new THREE.Vector3(); w.catVel = new THREE.Vector3(); w.catQ = new THREE.Quaternion();
+  w.fwd = new THREE.Vector3(0, 0, -1); w.speed = 200; w.bank = 0; w.gNow = 1; w.ab = 0;
+  w.mode = 'FORM'; w.breakT = 0; w.flip = 1; w.joinT = 0;
 }
+// Bank-to-turn flight limits (one shared preallocated object per mode, zero per-frame allocation).
+const WING_LIM = { maxG: 7.5, rollRate: 2.62, vMin: 160, vMax: 330, acc: 9, accAB: 18, dec: 14, minAGL: 120 };
+const WING_LIMP_LIM = { maxG: 2, rollRate: 0.9, vMin: 100, vMax: 150, acc: 4, accAB: 4, dec: 6, minAGL: 150 };
+const FORM_KP = 0.28, FORM_CLOSE_MAX = 60, FORM_BANKMATCH_R = 40;
+const WING_SEP_R = 70, WING_OVERSHOOT_R = 250, WING_FIRE_COS = Math.cos(25 * Math.PI / 180), REJOIN_R = 400;
 const _ws = new THREE.Vector3();                   // wingman formation scratch
+const _wfSlot = new THREE.Vector3(), _wfDes = new THREE.Vector3(), _wfSep = new THREE.Vector3(),
+  _wfLead = new THREE.Vector3(), _wfRight = new THREE.Vector3(), _wfUp = new THREE.Vector3(0, 1, 0);
+let wingPhysLogT = 0;
 const _limpDir = new THREE.Vector3(), _limpStep = new THREE.Vector3(), _limpQ = new THREE.Quaternion(), FWD0 = new THREE.Vector3(0, 0, -1);  // limp-home steering
 // Reused contrail emitter descriptors (lead, WARDEN-2/3, CRIMSON-1/2): filled in place each frame.
 const contrailEm = Array.from({ length: 5 }, () => ({ pos: new THREE.Vector3(), quat: new THREE.Quaternion(), on: false }));
@@ -2270,6 +2280,8 @@ function updateWingCat(dt, a) {
           combatSys.setWingOrder(1);
         }
         w.pos.copy(w.catPos); w.vel.copy(w.catVel); w.quat.copy(w.catQ);
+        w.fwd.copy(_catFwd); w.speed = v; w.bank = 0; w.gNow = 1; w.ab = 1;
+        w.mode = 'REJOIN'; w.breakT = 0; w.joinT = 0;
       }
     }
   }
@@ -3965,6 +3977,104 @@ function updateHeadG(dt) {
   }
 }
 
+// Shared flight integrator drives every flying wingman. Pure scalars + module scratch.
+function updateWingmanFlight(dt) {
+  const flying = appMode === 'PLAY' && flightMode === 'FLY' && !autoland.on;
+  for (let i = 0; i < wingmen.length; i++) {
+    const w = wingmen[i];
+    if (!w.mesh) continue;
+    if (w.cat && w.cat.ph !== 'AIRBORNE' && w.cat.ph !== 'NONE') {
+      w.mesh.position.copy(w.catPos); w.mesh.quaternion.copy(w.catQ);
+      w.mesh.visible = modelReady && flightMode === 'FLY' && w.alive;
+      continue;
+    }
+    if (!w.pos.lengthSq()) {
+      w.pos.copy(_ws.copy(w.off).applyQuaternion(state.quaternion).add(state.position));
+      w.quat.copy(state.quaternion);
+      w.speed = Math.max(180, state.speed);
+    }
+    if (!w.fwd || w.fwd.lengthSq() < 0.5) w.fwd.set(0, 0, -1).applyQuaternion(w.quat);
+    if (w.vel.lengthSq() < 1) w.vel.copy(w.fwd).multiplyScalar(w.speed);
+    if (!flying) {
+      w.mesh.position.copy(w.pos); w.mesh.quaternion.copy(w.quat);
+      w.mesh.visible = modelReady && flightMode === 'FLY' && w.alive;
+      continue;
+    }
+    const beforeX = w.pos.x, beforeY = w.pos.y, beforeZ = w.pos.z;
+    if (w.limping) {
+      _wfDes.copy(w.limpDest).sub(w.pos);
+      if (_wfDes.lengthSq() < 1) _wfDes.copy(w.fwd);
+      _wfDes.normalize();
+      combatSys.flyBTT(w, _wfDes, 113, dt, WING_LIMP_LIM);
+    } else {
+      _wfSlot.copy(w.off).applyQuaternion(state.quaternion).add(state.position);
+      const slotErr = _wfSlot.distanceTo(w.pos);
+      const wantForm = combat.wingOrder === 0 || combat.wingHold || !w.tgt;
+      if (wantForm) {
+        if (w.mode === 'BREAK' || w.mode === 'FOCUS' || w.mode === 'COVER') w.mode = 'REJOIN';
+      } else if (w.mode === 'FORM' || w.mode === 'REJOIN') {
+        if (w.mode === 'FORM') { w.mode = 'BREAK'; w.breakT = 1.2; w.flip = i ? -1 : 1; }
+      }
+      if (w.mode === 'BREAK') {
+        w.breakT -= dt;
+        _wfRight.crossVectors(w.fwd, _wfUp).normalize();
+        _wfDes.copy(w.fwd).addScaledVector(_wfRight, w.flip * 1.05).addScaledVector(_wfUp, 0.18 * w.flip).normalize();
+        if (w.breakT <= 0) w.mode = w.tgt ? 'FOCUS' : 'COVER';
+        combatSys.flyBTT(w, _wfDes, 250, dt, WING_LIM);
+      } else if (w.mode === 'FOCUS' || w.mode === 'COVER') {
+        const d = w.tgt.pos.distanceTo(w.pos);
+        const tof = d / Math.max(w.speed + 300, 1);
+        _wfLead.copy(w.tgt.pos).addScaledVector(w.tgt.vel || _wfSep.set(0, 0, 0), tof);
+        if (d < WING_OVERSHOOT_R) {
+          _wfSep.copy(w.tgt.vel || _wfDes.set(0, 0, 0));
+          if (_wfSep.lengthSq() > 1) _wfLead.addScaledVector(_wfSep.normalize(), -300);
+        }
+        _wfDes.copy(_wfLead).sub(w.pos);
+        if (_wfDes.lengthSq() < 1) _wfDes.copy(w.fwd);
+        _wfDes.normalize();
+        combatSys.flyBTT(w, _wfDes, Math.min(WING_LIM.vMax, w.speed + 40), dt, WING_LIM);
+        // Existing missile envelope check stays in combat.updateWingmen; only the
+        // geometry gate is mirrored here for the new lead-pursuit break.
+      } else {
+        // FORM / REJOIN: fly the slot directly, closing speed rises with position error.
+        _wfDes.copy(_wfSlot).sub(w.pos);
+        if (_wfDes.lengthSq() > 1) _wfDes.normalize(); else _wfDes.copy(w.fwd);
+        let wSpd = THREE.MathUtils.clamp(state.speed + slotErr * FORM_KP * (w.mode === 'REJOIN' ? 1.5 : 1),
+          WING_LIM.vMin, WING_LIM.vMax);
+        if (slotErr < FORM_BANKMATCH_R) wSpd = THREE.MathUtils.clamp(state.speed, WING_LIM.vMin, WING_LIM.vMax);
+        if (slotErr < REJOIN_R) w.mode = 'FORM';
+        // Separation from the player and the other wingman.
+        _wfSep.copy(w.pos).sub(state.position);
+        const dp = _wfSep.length();
+        if (dp < WING_SEP_R && dp > 0.01) _wfDes.addScaledVector(_wfSep.divideScalar(dp), (WING_SEP_R - dp) * 0.6);
+        for (let j = 0; j < wingmen.length; j++) {
+          if (j === i) continue;
+          const o = wingmen[j];
+          _wfSep.copy(w.pos).sub(o.pos);
+          const doo = _wfSep.length();
+          if (doo < WING_SEP_R && doo > 0.01) _wfDes.addScaledVector(_wfSep.divideScalar(doo), (WING_SEP_R - doo) * 0.6);
+        }
+        if (_wfDes.lengthSq() < 1) _wfDes.copy(w.fwd);
+        _wfDes.normalize();
+        combatSys.flyBTT(w, _wfDes, wSpd, dt, WING_LIM);
+        if (slotErr < FORM_BANKMATCH_R) w.bank += (state.bank - w.bank) * Math.min(0.5, dt * 2);
+      }
+    }
+    const jump = Math.hypot(w.pos.x - beforeX - w.vel.x * dt, w.pos.y - beforeY - w.vel.y * dt, w.pos.z - beforeZ - w.vel.z * dt);
+    if (DEBUG && Q.has('wingphys')) {
+      wingPhysLogT += dt;
+      if (wingPhysLogT >= 1) {
+        wingPhysLogT = 0;
+        console.log('[ANGELS_ZERO] wing i=' + i + ' mode=' + w.mode + ' v=' + w.speed.toFixed(0) +
+          ' g=' + w.gNow.toFixed(1) + ' bank=' + (w.bank * 57.2958).toFixed(0) +
+          ' slotErr=' + (w.off ? _wfSlot.distanceTo(w.pos).toFixed(0) : '-') + ' jump=' + jump.toFixed(3));
+      }
+    }
+    w.mesh.position.copy(w.pos); w.mesh.quaternion.copy(w.quat);
+    w.mesh.visible = modelReady && flightMode === 'FLY' && w.alive;
+  }
+}
+
 function updateCameraAndVisuals(dt, now) {
   const q = state.quaternion;
   freeLook.update(dt);
@@ -3978,47 +4088,8 @@ function updateCameraAndVisuals(dt, now) {
     jet.quaternion.copy(q);
     jet.updateMatrixWorld();
   }
-  // WARDEN echelon: pooled scratch, no per-frame THREE allocations.
-  for (let i = 0; i < wingmen.length; i++) {
-    const w = wingmen[i];
-    if (!w.mesh) continue;
-    if (w.cat && w.cat.ph !== 'AIRBORNE' && w.cat.ph !== 'NONE') {
-      w.mesh.position.copy(w.catPos);
-      w.mesh.quaternion.copy(w.catQ);
-      w.mesh.visible = modelReady && flightMode === 'FLY' && w.alive;
-      continue;
-    }
-    if (w.limping) {
-      // Wounded WARDEN-2 limps home at 220 kt, holds >= 1500 m and ignores formation.
-      _limpDir.copy(w.limpDest).sub(w.pos);
-      const dist = _limpDir.length();
-      if (dist > 1) _limpDir.divideScalar(dist); else _limpDir.set(0, 0, -1).applyQuaternion(w.quat);
-      _limpStep.copy(_limpDir).multiplyScalar(Math.min(dist, 113 * dt));
-      w.pos.add(_limpStep);
-      if (w.pos.y < 1500) w.pos.y = Math.min(1500, w.pos.y + 60 * dt);   // gentle climb
-      w.vel.copy(_limpDir).multiplyScalar(113);
-      _ws.copy(_limpDir);
-      _ws.y = 0;
-      if (_ws.lengthSq() > 1e-4) {
-        _ws.normalize();
-        w.quat.slerp(_limpQ.setFromUnitVectors(FWD0, _ws), 1 - Math.exp(-dt * 0.5));  // ~2 G turn
-      }
-      w.mesh.position.copy(w.pos); w.mesh.quaternion.copy(w.quat);
-      w.mesh.visible = modelReady && flightMode === 'FLY' && w.alive;
-      continue;
-    }
-    _ws.copy(w.off).applyQuaternion(q).add(state.position);
-    if (!w.pos.lengthSq()) w.pos.copy(_ws);
-    const blendK = w.cat && w.cat.blend < 4 ? 0.9 : 2.2;
-    if (w.cat && w.cat.blend < 4) w.cat.blend += dt;
-    w.pos.lerp(_ws, 1 - Math.exp(-dt * blendK));
-    w.pos.y += 1.5 * Math.sin(now * 0.7 + i) * dt;
-    w.quat.slerp(q, 1 - Math.exp(-dt * 3));
-    w.vel.copy(state.velocity);
-    w.mesh.position.copy(w.pos);
-    w.mesh.quaternion.copy(w.quat);
-    w.mesh.visible = modelReady && flightMode === 'FLY' && w.alive;
-  }
+  // WARDEN echelon: real bank-to-turn jet flight (no teleport / rubber-banding).
+  updateWingmanFlight(dt);
 
   // --- sea-skim rooster tail: intensity gate, emitters, audio, micro-rumble ---
   const skimAlt = state.position.y, skimKt = state.speed * 1.94384;
@@ -5323,6 +5394,10 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
     let droneAtDone = false;
     const wingOrderAt = Q.has('wingorderat') ? Q.get('wingorderat').split(':').map(Number) : null;
     const limpAt = Q.has('limpat') ? Number(Q.get('limpat')) : -1;
+    const aceOnSixAt = Q.has('aceonsix') ? Number(Q.get('aceonsix')) : -1;
+    const aceMsAt = Q.has('acemslat') ? Q.get('acemslat').split(':') : null;
+    const yoyoAt = Q.has('yoyoat') ? Number(Q.get('yoyoat')) : -1;
+    const pairAt = Q.has('pairat') ? Number(Q.get('pairat')) : -1;
     const sunAt = Q.has('sunat') ? Number(Q.get('sunat')) : -1;
     const irMslAt = Q.has('irmslat') ? Number(Q.get('irmslat')) : -1;
     const mslShootAt = Q.has('mslshootat') ? Number(Q.get('mslshootat')) : -1;
@@ -5376,6 +5451,35 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
       if (limpAt >= t0 && limpAt < t1) {
         const ok = combatSys.triggerWoundedWingman(true);
         console.log('[ANGELS_ZERO] limp st=' + combat.limp.st + ' pursuers=' + combat.limp.n + ' forced=' + ok);
+      }
+      if (aceOnSixAt >= t0 && aceOnSixAt < t1) {
+        const e = combatSys.enemies.find(x => x.alive && (x.aceFlight || x.ace));
+        if (e) {
+          state.position.copy(e.pos).addScaledVector(e.fwd, -800);
+          state.velocity.copy(e.vel); state.quaternion.copy(e.quat);
+          console.log('[ANGELS_ZERO] aceonsix e=' + e.label);
+        }
+      }
+      if (yoyoAt >= t0 && yoyoAt < t1) {
+        const e = combatSys.enemies.find(x => x.alive && (x.aceFlight || x.ace));
+        if (e) {
+          state.position.copy(e.pos).addScaledVector(e.fwd, -900);
+          state.velocity.copy(e.fwd).multiplyScalar(e.speed + 120);
+          console.log('[ANGELS_ZERO] yoyo e=' + e.label);
+        }
+      }
+      if (pairAt >= t0 && pairAt < t1) {
+        console.log('[ANGELS_ZERO] pair spawn=' + combatSys.spawnAceFlight());
+      }
+      if (aceMsAt && Number(aceMsAt[0]) >= t0 && Number(aceMsAt[0]) < t1) {
+        const e = combatSys.enemies.find(x => x.alive && (x.aceFlight || x.ace));
+        if (e) {
+          combat.designated = e; combat.lockState = 'LOCK'; combat.lockProgress = 1;
+          combatSys.fireMissile();
+          const m = combatSys.lastPlayerMissile;
+          if (m) { m.guidance = aceMsAt[1] === 'RADAR' ? 'RADAR' : 'IR'; m.lostTrack = false; }
+          console.log('[ANGELS_ZERO] acemslat kind=' + (m ? m.guidance : 'none'));
+        }
       }
       if (strikeKillAt >= t0 && strikeKillAt < t1) { combatSys.killStrikes(); console.log('[ANGELS_ZERO] strike kill @', t1.toFixed(2), JSON.stringify(combatSys.stats().strike), 'score', combat.score); }
       if (nearAt >= t0 && nearAt < t1) { tele.event(EV.NEAR_MISS, state.position.x, state.position.z, simTime); console.log('[ANGELS_ZERO] near miss @', t1.toFixed(2)); }
@@ -5921,6 +6025,8 @@ if (DEBUG) {
     hurtEnemy: (i, f) => combatSys.damageEnemyAt(i, f),
     touch: (sink, surf) => onTouchdown(sink, surf || 'RUNWAY'),
     get engine() { return audio.engine; },
+    flyWingmen: dt => updateWingmanFlight(dt),
+    get wingState() { return wingmen.map(w => ({ mode: w.mode, v: w.speed, bank: w.bank, g: w.gNow, pos: w.pos.toArray() })); },
     get gforce() { return gforce; }, get simTime() { return simTime; },
     get ab() { return { prev: abPrev, k: state.afterburner, cd: abCD, count: audio.burnerCount }; },
     get trans() { return { k: transK, super: superK, quiet: audio.windQuiet, pulseCD: superCD }; },

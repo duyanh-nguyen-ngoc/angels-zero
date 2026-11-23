@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.44', title: 'REAL WINGMAN FLIGHT & ACE BFM', bullets: [
+    'WARDEN-2 and WARDEN-3 now fly as real bank-to-turn jets instead of rubber-banding onto formation slots. They visibly bank into turns, break out of formation on COVER / FOCUS orders, pursue with lead and rejoin at realistic jet speeds.',
+    'CRIMSON and SOL aces read the fight: high yo-yo energy attacks, rear-hemisphere scissors and cobra overshoot traps, plus missile-aware flares, chaff and beam notches. Two-ace flights bracket and swap drag / bag roles.',
+    'A shared allocation-free bank-to-turn integrator now drives the wingmen, with terrain clearance and seamless catapult / limp-home handoffs.'
+  ] },
   { version: 'v1.1.43', title: 'MID-SORTIE CARRIER AUTOLAND', bullets: [
     'The USS ENTERPRISE is recoverable any time you are flying near the boat, not only on RTB. Fly within 3.5 km astern and the [L] ENGAGE AUTOLAND prompt appears with the glideslope cues.',
     'A mid-sortie trap no longer ends the sortie or rewrites your objective: you rearm, repair, refuel on deck and cycle straight back onto the catapult. RTB traps still complete the mission as before.',
