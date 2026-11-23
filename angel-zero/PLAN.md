@@ -1672,6 +1672,11 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   - WARDEN-2 can enter LIMPING in AIR_SUPERIORITY / NAVAL_BATTLE (low HP or mid-stage): 220 kt low-G RTB to the carrier stern or RWY 36, grey pooled smoke ribbon, two assigned pursuers (revived from the bandit pool if needed) that steer toward her. Clearing them fires `WINGMAN SAVED +1500` as a STYLE entry, event banner, `WING_SAVED` telemetry and a thank-you call; losing her is a plain loss.
   - `?wingorderat=s:n` / `?limpat=s` and `__az.setWingOrder` / `__az.triggerWoundedWingman` make both deterministic. Headless checks confirm G cycling, COVER/FOCUS target sharing, smoke + 2 pursuers, SAVE reward and no limp in ACE_DUEL / CANYON_RUN, with zero JS errors and unchanged frame cost.
 
+- [x] **Solar IR blind + Vulcan missile intercepts** *(build `s96e`, v1.1.26, `src/combat.js`, `src/hud.js`, `index.html`)*
+  - `env.getSunDir` follows the live atmosphere sun; with the nose within 12° of it, clear skies and no cloud deck, `C.sunT` charges over 0.5 s. An IR seeker whose LOS to the player is within 18° of the sun then drops lock (`m.lostTrack`, `m.target=null`) for +350 with a radio call, event, `lockdrop` SFX and 3 s cooldown. RADAR/SAM and already-lost missiles are skipped; NIGHT disables it.
+  - Player gun rounds now test a swept segment–segment closest approach against each active enemy missile's `prevPos → pos` path (7 m). A hit detonates the missile safely, clears the warning/RWR, awards +800, fires slow-motion (with its own cooldown), a banner and a callout. All scratch vectors are preallocated.
+  - `?sunat=s` / `?irmslat=s` / `?mslshootat=s` plus `__az.launchIR` / `__az.spawnHeadOn` / `__az.aimAtSun` make both deterministic; warp logs and `stats().sun` / `stats().intercepts` expose the state.
+
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.
@@ -1751,7 +1756,7 @@ toggle, ejection, bridge fly-under. User-facing weapon labels unified to
 MSL / UGB (briefing, radio call, CCIP reload cue, stores list).
 
 ## Debug URL flags (require `?debug`)
-`wingorderat=s:n` (force wing order 0/1/2) · `limpat=s` (force wounded WARDEN-2) · `ambient=0` (kill all living-world effects) · `hold=s,a,...` (hold keys) · `keyat=s:key,...` (real keydown/keyup) · `carrierfinalat=s` (carrier final, 450 m behind the stern) · `duelahead=s` (CRIMSON 800 m ahead) · `nointro` · `cockpit` · `freeze` · `warp=s` · `pose=bank,pitch` · `mouse=x,y`
+`sunat=s` (hold nose on sun 1 s) · `irmslat=s` (IR missile from 3 km behind) · `mslshootat=s` (head-on missile in gun line) · `wingorderat=s:n` (force wing order 0/1/2) · `limpat=s` (force wounded WARDEN-2) · `ambient=0` (kill all living-world effects) · `hold=s,a,...` (hold keys) · `keyat=s:key,...` (real keydown/keyup) · `carrierfinalat=s` (carrier final, 450 m behind the stern) · `duelahead=s` (CRIMSON 800 m ahead) · `nointro` · `cockpit` · `freeze` · `warp=s` · `pose=bank,pitch` · `mouse=x,y`
 · `ab` · `highg` · `alt=m` · `spd=m/s` · `at=x,y,z,hdg|airbase|canyon|bridgeA|
 bridgeB|volcano|wind|harbor` · `overview[=h]` · `tod=NAME&az=deg` ·
 `todto=NAME:t` · `rolls=n` · `nvg` / `nvgat=s` · `camat=x,y,z` ·

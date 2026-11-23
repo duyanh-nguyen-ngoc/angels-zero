@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.26', title: 'SUN BLIND & MISSILE INTERCEPTS', bullets: [
+    'Put the sun behind an inbound IR missile and hold your nose on it: after half a second the seeker loses the lock and breaks, worth +350. Radar missiles are unaffected.',
+    'Your 20 mm Vulcan can now shoot an incoming missile out of the air for +800, with a mid-air detonation, a slow-motion beat and a clear warning reset.',
+    'Flares, chaff, cloud cover, radar notching and ECM all still work as before.'
+  ] },
   { version: 'v1.1.25', title: 'WARDEN FLIGHT ORDERS', bullets: [
     'Press G to cycle your wingmen through FORM, COVER and FOCUS. COVER hunts the bandit locking you from behind; FOCUS sends both WARDENs after your designated target.',
     'A badly damaged WARDEN-2 can now limp home on smoke with bandits on her tail. Clear the pursuers to earn WINGMAN SAVED +1500, or lose the wingman if she goes down first.',

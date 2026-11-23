@@ -6,7 +6,7 @@
 // clipped to the 3D combiner glass. Square tactical radar (bottom-left), stores
 // list + F-15C silhouette with per-pylon AIM-9 reload icons (bottom-right),
 // open-corner target brackets, edge pointers, minimal top-left telemetry.
-import { SPW } from './loadout.js?v=s95c';
+import { SPW } from './loadout.js?v=s96e';
 
 export function createHUD(THREE, A) {
   const canvas = A.canvas;
@@ -23,6 +23,7 @@ export function createHUD(THREE, A) {
   const CYAN = '#38b6ff';
   const FONT = "'Rajdhani', 'Share Tech Mono', sans-serif";
   const WING_ORDER_NAMES = ['FORM', 'COVER', 'FOCUS'];
+  const SUN_METERS = ['SUN ▯▯▯', 'SUN ▮▯▯', 'SUN ▮▮▯', 'SUN ▮▮▮'];
   const LW = 1.35;
   const f = (px, bold = false) => `${bold ? '700' : '600'} ${px}px ${FONT}`;
 
@@ -1391,6 +1392,10 @@ export function createHUD(THREE, A) {
       const label = '[ WINGMEN // ' + (WING_ORDER_NAMES[C.wingOrder] || 'FORM') + ' ]';
       drawBanner(ctx, cx, upperY + 72, label, '#5fe8ff', 340, 1 - age / 1600);
     }
+    if (C.interceptBannerT && now - C.interceptBannerT < 2500) {
+      const age = now - C.interceptBannerT;
+      drawBanner(ctx, cx, upperY + 144, 'MISSILE INTERCEPT +800', '#5fe8ff', 340, 1 - age / 2500);
+    }
     if (C.wingSavedBannerT && now - C.wingSavedBannerT < 3000) {
       const age = now - C.wingSavedBannerT;
       drawBanner(ctx, cx, upperY + 108, 'WINGMAN SAVED +1500', '#5fe8ff', 360, 1 - age / 3000);
@@ -1423,6 +1428,18 @@ export function createHUD(THREE, A) {
 
     if (alertOn()) {
       drawBanner(ctx, cx, upperY, 'MISSILE ALERT', WARN, 210, pulseAlpha(160));
+      // Sun-arc meter: fills while the nose is lined up with the sun and an IR seeker is inbound.
+      if (C.sunT > 0 && A.missiles) {
+        let ir = false;
+        for (let i = 0; i < A.missiles.length; i++) {
+          const m = A.missiles[i];
+          if (m.active && m.enemy && !m.lostTrack && (!m.guidance || m.guidance === 'IR')) { ir = true; break; }
+        }
+        if (ir) {
+          const lit = Math.min(3, Math.floor(C.sunT / 0.5 * 3 + 0.001));
+          drawBanner(ctx, cx, upperY + 36, SUN_METERS[lit], AMBER, 180, pulseAlpha(220));
+        }
+      }
     } else {
       const latest = (C.events || []).slice().reverse().find(ev => now - ev.born < 1500 && ev.kind !== 'NOTCHED');
       if (latest) {

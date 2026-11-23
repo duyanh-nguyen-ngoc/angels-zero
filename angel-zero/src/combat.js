@@ -8,11 +8,11 @@
 // burning wrecks that splash, scoring, waves, lock-on and threat warnings.
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { DIFFICULTY_PRESETS } from './difficulty.js?v=s95c';
-import { SPW } from './loadout.js?v=s95c';
-import { missionConfig } from './missions.js?v=s95c';
+import { DIFFICULTY_PRESETS } from './difficulty.js?v=s96e';
+import { SPW } from './loadout.js?v=s96e';
+import { missionConfig } from './missions.js?v=s96e';
 import { gorgeCentreX, gorgeSlope, gorgeHeading, gorgeDist, GORGE_GATE_Z, GORGE_GATE_N, GORGE_FLOOR_Y, GORGE_RIM_Y,
-  GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_FORT, CEIL_M } from './maps.js?v=s95c';
+  GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_FORT, CEIL_M } from './maps.js?v=s96e';
 
 const NM = 1852, FT = 0.3048, G0 = 9.81;
 // Allied CVN model: same 360 m deck as the procedural ship, re-anchored to the GLB.
@@ -79,6 +79,11 @@ export function createCombat(THREE, env) {
   const ORDER_TEXT = ['WARDEN, FORM ON ME', 'WARDEN, COVER MY SIX', 'WARDEN, FOCUS MY TARGET'];
   const COVER_R = 2500, COVER_REAR_COS = Math.cos(110 * Math.PI / 180), ORDER_BADGE_S = 2.0;
   const LIMP_HP_FRAC = 0.35, LIMP_SPD = 113, LIMP_PURSUERS = 2, LIMP_SAVE_PTS = 1500, LIMP_MIN_T = 60;
+  // Solar IR seeker blind + gun shootdown. All scratch is module-level.
+  const SUN_BLIND_COS = Math.cos(12 * Math.PI / 180), SUN_SEEKER_COS = Math.cos(18 * Math.PI / 180);
+  const SUN_BLIND_HOLD = 0.5, SUN_MIN_Y = 0.05, SUN_CLOUD_MAX = 0.2;
+  const SUN_BLIND_PTS = 350, SUN_BLIND_CD = 3.0;
+  const MSL_SHOOT_R = 7, MSL_SHOOT_PTS = 800;
   // Bandit seekers: within 3.2 NM, player inside a 22 deg cone off the bandit's nose
   // while the bandit sits in the player's rear hemisphere; ~2.2 s to a full lock.
   const B_LOCK_RANGE = 3.2 * NM, B_CONE = 22 * D2R, B_LOCK_TIME = 2.2, B_SOFT = 0.45;
@@ -106,7 +111,8 @@ export function createCombat(THREE, env) {
   Object.assign(C, { weapon: 'MSL', bombs: 0, bombMax: 0, bombReload: 0, ccip: null, ccipTof: 0, flares: FLR_MAX, flareMax: FLR_MAX, chaff: 0, chaffMax: 0, notchT: 0,
     wingOrder: 0, wingOrderT: 0, orderBadgeT: 0, gunRounds: 0, gunHitsP: 0, mslFiredP: 0, mslHitsP: 0, maxDmg: 0, traps: 0 });
   Object.assign(C, { limp: { st: 'IDLE', w: null, pursuers: new Int16Array(LIMP_PURSUERS).fill(-1), n: 0, used: false, graceT: 0 },
-    wingSavedBannerT: 0, wingNoDesignationT: 0 });
+    wingSavedBannerT: 0, wingNoDesignationT: 0,
+    sunT: 0, sunCD: 0, sunBlinds: 0, sunBannerT: 0, mslIntercepts: 0, interceptBannerT: 0, interceptSlowCD: 0 });
   Object.assign(C, { mcfg: missionConfig({}), stage: 0, stageT: 0,
     ceil: { st: 'CLEAR', phase: 'CLEAR', armed: false, t: 0, warnT: 0, salvoT: 0, rail: 0, railT: 0, fired: 0, lastSam: 0, live: true, belowT: 0 },
     climb: { on: false, t: 0, sams: 0, salvoT: 0, rail: 0, railT: 0 }, gateIdx: 0, weaponsLock: { msl: false, spw: false },
@@ -355,8 +361,8 @@ export function createCombat(THREE, env) {
     const parts = g.children.slice();
     const plume = new THREE.Mesh(plumeGeo, plumeMat); g.add(plume);
     g.visible = false; scene.add(g);
-    missiles.push({ mesh: g, parts, visual: null, plume, active: false, enemy: false, target: null, vel: new THREE.Vector3(), age: 0, life: 12, motor: false, losPrev: new THREE.Vector3(), smokeAcc: 0,
-      flybyTriggered: false, flyMinD: Infinity,
+    missiles.push({ idx: i, mesh: g, parts, visual: null, plume, active: false, enemy: false, target: null, vel: new THREE.Vector3(), age: 0, life: 12, motor: false, losPrev: new THREE.Vector3(), smokeAcc: 0,
+      flybyTriggered: false, flyMinD: Infinity, prevPos: new THREE.Vector3(),
       guidance: 'IR', notchT: 0, chaffSalvo: -1 });
   }
   const MSL_NOSE = new THREE.Vector3(0, 0, -1);
@@ -2826,12 +2832,75 @@ export function createCombat(THREE, env) {
   const _mFwd = new THREE.Vector3(), _mL2 = new THREE.Vector3(), _mLos = new THREE.Vector3();
   const _mLosRate = new THREE.Vector3(), _mRelVel = new THREE.Vector3(), _mAcc = new THREE.Vector3();
   const _mJit = new THREE.Vector3(), _mTail = new THREE.Vector3(), _mDir = new THREE.Vector3();
+  // Solar-blind + shootdown scratch. Preallocated; no vector is created in update().
+  const _sunDir = new THREE.Vector3(), _pf = new THREE.Vector3(), _ml = new THREE.Vector3();
+  const _iu = new THREE.Vector3(), _iv = new THREE.Vector3(), _iw = new THREE.Vector3(), _segHit = new THREE.Vector3();
+  // Closest approach of two segments; returns squared distance, writes the point on p1->q1 into out.
+  function segSeg(p1, q1, p2, q2, out) {
+    _iu.subVectors(q1, p1); _iv.subVectors(q2, p2); _iw.subVectors(p1, p2);
+    const a = _iu.dot(_iu), b = _iu.dot(_iv), c = _iv.dot(_iv);
+    const d = _iu.dot(_iw), e = _iv.dot(_iw), det = a * c - b * b;
+    let s, t;
+    if (det < 1e-8) { s = 0; t = Math.abs(b) > Math.abs(c) ? d / b : e / c; }
+    else { s = (b * e - c * d) / det; t = (a * e - b * d) / det; }
+    s = clamp(s, 0, 1); t = clamp(t, 0, 1);
+    out.copy(p1).addScaledVector(_iu, s);
+    _iw.copy(out).sub(p2).addScaledVector(_iv, -t);
+    return _iw.lengthSq();
+  }
+  function interceptMissile(m, d, point) {
+    if (!m.active) return;
+    explosion(point, 0.7);
+    hitSparks(point, m.vel);
+    m.active = false; m.mesh.visible = false;
+    if (env.onSfx) env.onSfx('explosion', point, 0.7);
+    let warn = false;
+    for (const o of missiles) if (o !== m && o.active && o.enemy && o.target && o.target.isPlayer) { warn = true; break; }
+    if (!warn) { C.missileWarning = 0; C.incoming = 0; }
+    C.mslIntercepts++; C.interceptBannerT = performance.now(); C.score += MSL_SHOOT_PTS;
+    pushEvent('INTERCEPT', 'MISSILE INTERCEPT', MSL_SHOOT_PTS, '#5fe8ff');
+    say('SPLASH THE MISSILE — NICE SHOOTING', 2.2, '#5fe8ff');
+    if (!warn && env.onSlowMo && C.interceptSlowCD <= 0) {
+      env.onSlowMo(); C.interceptSlowCD = 1.2;
+      if (env.debug) console.log('[ANGELS_ZERO] msl intercept slowmo fired');
+    }
+    if (env.debug) console.log('[ANGELS_ZERO] msl intercept d=' + d.toFixed(2) + ' pts=' + MSL_SHOOT_PTS + ' warnClear=' + !warn);
+  }
   function updateMissiles(dt, playerActive) {
     if (env.samFx) env.samFx(missiles, camera.position, performance.now() / 1000);
+    // Solar IR blind: one gate per frame, then a per-seeker geometry test.
+    if (env.getSunDir) env.getSunDir(_sunDir);
+    let sunOk = false;
+    const cw = env.getCloudWet ? env.getCloudWet() : 0;
+    if (_sunDir.y > SUN_MIN_Y && cw < SUN_CLOUD_MAX) {
+      const deck = env.getCloudDeck ? env.getCloudDeck() : null;
+      if (!(deck && S.position.y < deck.base)) {
+        _pf.set(0, 0, -1).applyQuaternion(S.quaternion);
+        sunOk = _pf.dot(_sunDir) >= SUN_BLIND_COS;
+      }
+    }
+    if (sunOk) C.sunT += dt; else C.sunT = Math.max(0, C.sunT - 2 * dt);
+    C.sunCD = Math.max(0, C.sunCD - dt);
+    C.interceptSlowCD = Math.max(0, C.interceptSlowCD - dt);
     for (const m of missiles) {
       if (!m.active) continue;
       m.age += dt;
       const pos = m.mesh.position;
+      m.prevPos.copy(pos);
+      if (C.sunT >= SUN_BLIND_HOLD && m.enemy && m.guidance === 'IR' && m.target && m.target.isPlayer && !m.lostTrack) {
+        _ml.copy(S.position).sub(pos).normalize();
+        if (_ml.dot(_sunDir) >= SUN_SEEKER_COS) {
+          m.lostTrack = true; m.target = null;
+          if (C.sunCD <= 0) {
+            C.sunCD = SUN_BLIND_CD; C.sunBlinds++; C.sunBannerT = performance.now(); C.score += SUN_BLIND_PTS;
+            say('SUN BLIND // IR LOCK BROKEN', 2.2, '#5fe8ff');
+            pushEvent('EVADED', 'SUN BLIND // IR LOCK BROKEN', SUN_BLIND_PTS, '#5fe8ff');
+            C.missileWarning = 0;
+            if (env.onSfx) env.onSfx('lockdrop', S.position, 1);
+            if (env.debug) console.log('[ANGELS_ZERO] sun blind m=' + m.idx + ' cos=' + _ml.dot(_sunDir).toFixed(3) + ' sunT=' + C.sunT.toFixed(2));
+          }
+        }
+      }
       if (!m.motor && m.age > (m.motorDelay || 0.18)) { m.motor = true; m.plume.visible = true; }
       const speed = m.vel.length();
       if (m.motor) {
@@ -4892,6 +4961,15 @@ export function createCombat(THREE, env) {
       return cp.copy(b.prev).addScaledVector(seg, t).distanceToSquared(center) < r * r;
     };
     playerTracers.step(dt, b => {
+      // Vulcan rounds can detonate an inbound missile in mid-air (always safe).
+      for (const m of missiles) {
+        if (!m.active || !m.enemy) continue;
+        if (m.mesh.position.distanceToSquared(S.position) > 1500 * 1500) continue;
+        const d2 = segSeg(b.prev, b.p, m.prevPos, m.mesh.position, _segHit);
+        if (d2 >= MSL_SHOOT_R * MSL_SHOOT_R) continue;
+        interceptMissile(m, Math.sqrt(d2), _segHit);
+        return true;
+      }
       for (const t of surface) {
         if (t.alive && segHit(b, t.pos, t.r * 0.6)) { C.gunHitsP++; damageSurface(t, t.strike ? 3 : t.ship ? 0.8 : 2); hitSparks(b.p, b.v); return true; }
       }
@@ -4953,6 +5031,8 @@ export function createCombat(THREE, env) {
       if (!C.weaponsLock.spw) rearm('bomb');
       if (C.mcfg.gunsOnly) { C.lockTarget = null; C.lockState = 'NONE'; C.lockProgress = 0; disarmSeeker(null); setMulti([]); }
       C.blockedLaunches = 0; C.aceRounds = 0; C.aceHits = 0;
+      C.sunT = 0; C.sunCD = 0; C.sunBlinds = 0; C.sunBannerT = 0;
+      C.mslIntercepts = 0; C.interceptBannerT = 0; C.interceptSlowCD = 0;
       const stages = C.mcfg.stages;
       if (stages && stages.length) {
         for (const e of enemies) if (!e.ace && !e.bomber) { e.alive = false; e.wreck = null; if (e.g) e.g.visible = false; }
@@ -5174,6 +5254,8 @@ export function createCombat(THREE, env) {
         cloud: { player: +(C.playerCloud || 0).toFixed(2), tgt: +((C.designated && C.designated.cloud) || 0).toFixed(2), obscured: !!C.targetObscured, breaks: C.cloudBreaks || 0,
           msl: missiles.filter(m => m.active).map(m => (m.q || MSL_FULL).tag + (m.cloudLost ? '/cloudLost' : m.lostTrack ? '/lost' : '') + (m.reacquired ? '/reacq' : '') + ' c' + (m.cloud || 0).toFixed(2)).join(' ') },
         bandit: { lock: +C.banditLock.toFixed(2), rwr: C.rwrTrack, incoming: C.incoming || 0, warn: +C.missileWarning.toFixed(2) },
+        sun: { t: +(C.sunT || 0).toFixed(2), blinds: C.sunBlinds || 0, cd: +(C.sunCD || 0).toFixed(2) },
+        intercepts: C.mslIntercepts || 0,
         shots: C.mslLog.map(l => l.tag + ':' + l.result + '@' + l.t).join(' '),
         stores: { wpn: C.weapon, msl: C.missiles, mslOnPylons: stores.msl.filter(s => s.node.visible).map(s => s.n).join(','),
           bombs: C.bombs, bombsOnPylons: stores.bomb.filter(s => s.node.visible).length,

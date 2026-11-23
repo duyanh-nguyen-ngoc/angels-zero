@@ -720,35 +720,35 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s95c';
-import { createAmbient } from './src/ambient.js?v=s95c';
-import { createBlastFX } from './src/blastfx.js?v=s95c';
-import { createHUD } from './src/hud.js?v=s95c';
-import { createCockpit3D } from './src/cockpit3d.js?v=s95c';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s95c';
-import { createEjection } from './src/eject.js?v=s95c';
-import { createAudio } from './src/audio.js?v=s95c';
-import { createRadio } from './src/radio.js?v=s95c';
-import { createProfile, LIVERIES, liveryById } from './src/profile.js?v=s95c';
-import { createLivery } from './src/livery.js?v=s95c';
-import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s95c';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s95c';
-import { createCanopyFX } from './src/canopy.js?v=s95c';
-import { createNVG } from './src/nvg.js?v=s95c';
-import { createWorld, WORLD } from './src/world.js?v=s95c';
-import { createSurfaces } from './src/surfaces.js?v=s95c';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s95c';
-import { createFreeLook } from './src/freelook.js?v=s95c';
-import { createCanopyGlass } from './src/canopyglass.js?v=s95c';
-import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s95c';
-import { SPW, SQUADRON, MODES, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode } from './src/loadout.js?v=s95c';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s95c';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s95c';
-import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s95c';
-import { createRadioQueue } from './src/radioQueue.js?v=s95c';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s95c';
+import { createVFX } from './src/vfx.js?v=s96e';
+import { createAmbient } from './src/ambient.js?v=s96e';
+import { createBlastFX } from './src/blastfx.js?v=s96e';
+import { createHUD } from './src/hud.js?v=s96e';
+import { createCockpit3D } from './src/cockpit3d.js?v=s96e';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s96e';
+import { createEjection } from './src/eject.js?v=s96e';
+import { createAudio } from './src/audio.js?v=s96e';
+import { createRadio } from './src/radio.js?v=s96e';
+import { createProfile, LIVERIES, liveryById } from './src/profile.js?v=s96e';
+import { createLivery } from './src/livery.js?v=s96e';
+import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s96e';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s96e';
+import { createCanopyFX } from './src/canopy.js?v=s96e';
+import { createNVG } from './src/nvg.js?v=s96e';
+import { createWorld, WORLD } from './src/world.js?v=s96e';
+import { createSurfaces } from './src/surfaces.js?v=s96e';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s96e';
+import { createFreeLook } from './src/freelook.js?v=s96e';
+import { createCanopyGlass } from './src/canopyglass.js?v=s96e';
+import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s96e';
+import { SPW, SQUADRON, MODES, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode } from './src/loadout.js?v=s96e';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s96e';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s96e';
+import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s96e';
+import { createRadioQueue } from './src/radioQueue.js?v=s96e';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s96e';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
-  GORGE_HALF_W, RUNWAY_BBOX } from './src/maps.js?v=s95c';
+  GORGE_HALF_W, RUNWAY_BBOX } from './src/maps.js?v=s96e';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -3956,6 +3956,9 @@ const combatSys = createCombat(THREE, { scene, camera, renderer, state, combat, 
   sectorAt: world.sectorAt, isTerrainOccluded: world.isTerrainOccluded, fleetLane: world.fleetLane, canyonCenter: world.canyonCenter,
   isReady: () => modelReady && flightMode === 'FLY', onPlayerDown: reason => triggerEject(reason), onSfx, onFlyby, onWing,
   onSlowMo: triggerSlowMo, getWingmen: () => wingmen, addBox: world.addBox, limpTrail,
+  // Live sun direction follows the time-of-day preset; NIGHT has no blinding sun.
+  getSunDir: out => todMode === 'NIGHT' ? out.set(0, -1, 0) : out.copy(SUN_DIR),
+  getCloudWet: () => cloudWet, getCloudDeck: () => (world.map && world.map.cloudSea) || null,
   aaTracer: (pos, dir, life, red) => vfx.aaTracer.add(pos, dir, life, red),
   samPuff: p => vfx.catSteam.stroke(p, _samPuffFwd, 0.6, 0.06),
   samFx: (list, camPos, now) => vfx.samFx.update(list, camPos, now),
@@ -4507,6 +4510,11 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
     const stageAt = Q.has('stageat') ? Number(Q.get('stageat')) : -1;
     const wingOrderAt = Q.has('wingorderat') ? Q.get('wingorderat').split(':').map(Number) : null;
     const limpAt = Q.has('limpat') ? Number(Q.get('limpat')) : -1;
+    const sunAt = Q.has('sunat') ? Number(Q.get('sunat')) : -1;
+    const irMslAt = Q.has('irmslat') ? Number(Q.get('irmslat')) : -1;
+    const mslShootAt = Q.has('mslshootat') ? Number(Q.get('mslshootat')) : -1;
+    let sunHold = 0;
+    const __sunDir = new THREE.Vector3(), __fwd0 = new THREE.Vector3(0, 0, -1);
     const fortKillAt = Q.has('fortkillat') ? Number(Q.get('fortkillat')) : -1;
     const ceilAt = Q.has('ceilat') ? Number(Q.get('ceilat')) : -1;
     const climbAt = Q.has('climbat') ? Number(Q.get('climbat')) : -1;
@@ -4558,6 +4566,17 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
         console.log('[ANGELS_ZERO] radio @', t1.toFixed(2), radioAt[1], radioEvent(radioAt[1]));
       }
       if (radarShotAt >= t0 && radarShotAt < t1) { combatSys.banditShot(0, false, true, 'RADAR'); console.log('[ANGELS_ZERO] radar shot @', t1.toFixed(2)); }
+      if (irMslAt >= t0 && irMslAt < t1) {
+        combatSys.placeAt(0, 180, 0, 8000);
+        combatSys.banditShot(0, false, true, 'IR');
+        console.log('[ANGELS_ZERO] irmsl @', t1.toFixed(2), 'enemy', combatSys.missiles.filter(m => m.active && m.enemy).length);
+      }
+      if (mslShootAt >= t0 && mslShootAt < t1) {
+        combatSys.placeAhead(0, 600);
+        combatSys.banditShot(0, false, true, 'IR');
+        console.log('[ANGELS_ZERO] mslshoot @', t1.toFixed(2));
+      }
+      if (sunAt >= t0 && sunAt < t1) { sunHold = 1; console.log('[ANGELS_ZERO] sunat @', t1.toFixed(2)); }
       if (chaffAt >= t0 && chaffAt < t1) { console.log('[ANGELS_ZERO] chaff @', t1.toFixed(2), combatSys.dispenseChaff()); }
       if (mphaseAt && t1 >= mphaseAt[0] && t0 < mphaseAt[0]) { console.log('[ANGELS_ZERO] mphase @', t1.toFixed(2), combatSys.setMissionPhase(mphaseAt[1])); }
       if (t1 >= debriefAt && t0 < debriefAt) { console.log('[ANGELS_ZERO] debrief @', t1.toFixed(2), JSON.stringify(combatSys.stats().tele)); endSortie('CLEARED'); }
@@ -4744,6 +4763,11 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
       if (appMode !== 'DEBRIEF') stepSim(h);           // same rule as animate(): the sim stops once the debrief is up
       if (DEBUG && Q.has('skimtest')) updateAudio();
       updateCameraAndVisuals(h, simTime);
+      if (sunHold > 0) {                               // after atmosphere's sun update
+        SUN_DIR.copy(__fwd0).applyQuaternion(state.quaternion);
+        SUN_DIR.y += 0.1; SUN_DIR.normalize();         // keep it above the horizon for the seeker gate
+        sunHold -= h;
+      }
       syncMusicScenario();                               // headless warp drives BGM transitions too
       canopyFx.update(h, combat.playerCloud || 0, state.speed, firstPerson, true, weather.rainHere);
       for (const t of logAt) if (t >= t0 && t < t1) console.log('[ANGELS_ZERO] SAMPLE', t, 'A', (state.alpha * 57.3).toFixed(0), 'HT', man.hammerT.toFixed(2), 'FW', _fw.y.toFixed(2), 'RI', rudderInput(0).toFixed(2), 'YR', state.yawRate.toFixed(2), 'YA', (man.yawAcc * 57.3).toFixed(0), 'GR', state.gear.toFixed(2), 'AS', state.assist, 'M', man.lastMan);
@@ -4776,7 +4800,8 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
         nearestRain: +weather.nearestVisible().toFixed(2), audio: audio.canopyRain }), 'fleet', JSON.stringify(combatSys.fleetStats()),
         'mcam', JSON.stringify({ active: mcam.active, k: +mcam.k.toFixed(2) }), 'slowmo', +timeScale.toFixed(2),
         'ambient', JSON.stringify(ambient.stats()),
-        'wingOrder', combatSys.stats().style.wingOrderName, 'limp', JSON.stringify(combatSys.stats().style.limp));
+        'wingOrder', combatSys.stats().style.wingOrderName, 'limp', JSON.stringify(combatSys.stats().style.limp),
+        'sun', JSON.stringify(combatSys.stats().sun), 'intercepts', combatSys.stats().intercepts, 'sunBlindMsgs', combat.comms.filter(c => /SUN BLIND/.test(c.text)).length);
   }
   if (DEBUG && Q.has('pause')) pauseSim();
   if (DEBUG && Q.has('fxhold')) fxHold = true;
@@ -4916,6 +4941,10 @@ if (DEBUG) {
     getCarrierBox() { const a = combat.ally; if (!a || !a.root) return null; const b = new THREE.Box3().setFromObject(a.root); return { min: b.min.toArray(), max: b.max.toArray() }; },
     get carrier() { return carrier; }, get jetGearDY() { return JET_GEAR_DY; },
     setWingOrder: n => combatSys.setWingOrder(n), triggerWoundedWingman: () => combatSys.triggerWoundedWingman(true), get limpTrail() { return limpTrail; },
+    launchIR: (behind = 3000) => { combatSys.placeAt(0, 180, 0, behind); combatSys.banditShot(0, false, true, 'IR'); },
+    spawnHeadOn: (dist = 600) => { combatSys.placeAhead(0, dist); combatSys.banditShot(0, false, true, 'IR'); },
+    aimAtSun: () => { state.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), SUN_DIR); state.velocity.set(0, 0, -(state.speed || 180)).applyQuaternion(state.quaternion); },
+    get sunDir() { return SUN_DIR; },
     radioEvent, get radioEvents() { return Object.keys(RADIO_BY_EVENT); }, get radioQueue() { return rq; }, radioPlay, clearBox };
 }
 /* ============================================================================

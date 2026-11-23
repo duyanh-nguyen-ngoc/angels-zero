@@ -24,7 +24,7 @@ export const RWY = { x: 900, z0: -1400, z1: 1600, width: 50, elev: 10 };       /
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { gorgeCentreX, gorgeDist, GORGE_FLOOR_Y, GORGE_RIM_Y, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_CRATER_Z,
-  GORGE_BBOX, GORGE_HALF_W, GORGE_RAMP_W, SEA_FLOOR_Y, RUNWAY_BBOX } from './maps.js?v=s95c';
+  GORGE_BBOX, GORGE_HALF_W, GORGE_RAMP_W, SEA_FLOOR_Y, RUNWAY_BBOX } from './maps.js?v=s96e';
 
 export function createWorld(THREE, env) {
   const { scene, createNoise2D, fbm } = env;

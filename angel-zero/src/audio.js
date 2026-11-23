@@ -9,7 +9,7 @@
 // to the procedural layers below. A master "hearing tunnel" low-pass sweeps
 // 12 kHz -> 550 Hz as the pilot approaches G-LOC.
 
-import { MISSIONS } from './missions.js?v=s95c';
+import { MISSIONS } from './missions.js?v=s96e';
 
 export function createAudio() {
   let ctx = null, master = null, cockpitLP = null, ready = false;
