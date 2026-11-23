@@ -6,7 +6,8 @@
 // clipped to the 3D combiner glass. Square tactical radar (bottom-left), stores
 // list + F-15C silhouette with per-pylon AIM-9 reload icons (bottom-right),
 // open-corner target brackets, edge pointers, minimal top-left telemetry.
-import { SPW } from './loadout.js?v=s99a';
+import { SPW } from './loadout.js?v=s99b';
+import { GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_FLOOR_Y } from './maps.js?v=s99b';
 
 export function createHUD(THREE, A) {
   const canvas = A.canvas;
@@ -1766,6 +1767,17 @@ export function createHUD(THREE, A) {
       labelText(ctx, txt, HW - 24, 94, G, 4);
       ctx.restore();
       return;
+    }
+    // Optional faint shortcut chevron at the ravine mouth (CANYON_RUN, once per sortie).
+    const sc = A.getShortcut ? A.getShortcut() : null;
+    if (sc && !sc.used && C.mcfg && C.mcfg.gatesPath === 'CANYON') {
+      _ov.set(GORGE_SC_X, GORGE_SC_FLOOR_Y + 90, GORGE_SC_ZA).project(cam);
+      if (_ov.z > -1 && _ov.z < 1 && Math.abs(_ov.x) < 0.9 && Math.abs(_ov.y) < 0.9) {
+        const sx = (_ov.x * 0.5 + 0.5) * HW, sy = (-_ov.y * 0.5 + 0.5) * HH;
+        ctx.save(); ctx.globalAlpha = 0.55; glow(ctx, AMBER, 3); ctx.fillStyle = AMBER;
+        ctx.font = f(11, true); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('◁ SHORTCUT', sx, sy); ctx.restore();
+      }
     }
     const p = C.missionPhase || 1, label = MP_LABELS[p] || 'COMPLETE';
     const targets = A.getPrimary ? A.getPrimary() : null;

@@ -52,6 +52,27 @@ export const GORGE_ARC_M = (() => {
   for (let z = GORGE_SPAWN_Z; z > GORGE_CRATER_Z; z -= 10) len += 10 * Math.sqrt(1 + gorgeSlope(z) ** 2);
   return len;
 })();
+// High-risk shortcut: a straight rock-lined ravine cuts across the first big S
+// bend (~5.3 km of trench arc reduced to 2.2 km). The carve is analytic so the
+// single height grid, CCIP, impacts and crash checks all see it for free.
+export const GORGE_SC_SAPEX = Math.PI * GORGE_L1;
+export const GORGE_SC_ZAPEX = GORGE_Z0 - GORGE_LEAD - GORGE_SC_SAPEX;
+export const GORGE_SC_ZA = GORGE_SC_ZAPEX + 1100, GORGE_SC_ZB = GORGE_SC_ZAPEX - 1100;
+export const GORGE_SC_X = (gorgeCentreX(GORGE_SC_ZA) + gorgeCentreX(GORGE_SC_ZB)) / 2;
+export const GORGE_SC_HALF_W = 45, GORGE_SC_RAMP_W = 90, GORGE_SC_FLOOR_Y = GORGE_FLOOR_Y + 25;
+export const GORGE_SC_ARCH_Z = GORGE_SC_ZAPEX;
+export const GORGE_SC_ARCH_Y0 = 170, GORGE_SC_ARCH_Y1 = 230;
+export const GORGE_SC_ARCH_W = 140, GORGE_SC_ARCH_D = 60;
+export const GORGE_SC_SAVE_M = (() => {
+  let len = 0;
+  for (let z = GORGE_SC_ZA; z > GORGE_SC_ZB; z -= 10) len += 10 * Math.sqrt(1 + gorgeSlope(z) ** 2);
+  return Math.round(len - 2200);
+})();
+export const GORGE_SC_SKIP = (() => {
+  const a = [], n = GORGE_GATE_Z.length;
+  for (let i = 0; i < n; i++) if (GORGE_GATE_Z[i] < GORGE_SC_ZA && GORGE_GATE_Z[i] > GORGE_SC_ZB) a.push(i);
+  return a.length ? [a[0], a[a.length - 1]] : [0, 0];
+})();
 // RWY 36 strip + 400 m margin: the canyon plateau must never cover the AFB.
 export const RUNWAY_BBOX = { x: [500, 1300], z: [-1800, 2000] };
 

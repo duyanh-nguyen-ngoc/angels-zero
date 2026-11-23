@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.30', title: 'FLIGHT ROLES & TRENCH SHORTCUT', bullets: [
+    'WARDEN-2 and WARDEN-3 now carry persistent CAP / STRIKE roles from the STANDBY menu. STRIKE wings hunt ships and radar masts first, switch to canyon SAM sites when nothing afloat remains, and still break off for a six-second self-defence intercept.',
+    'A narrow rock arch cuts across the first S-bend of CANYON_RUN. Fly the centreline under the span to skip the gates and bank TRENCH SHORTCUT +1200; clip the piers and you will find the normal crash path. WARDEN-2 has opinions either way.',
+    'A faint ◁ SHORTCUT marker shows the ravine mouth until you have used it.'
+  ] },
   { version: 'v1.1.29', title: 'AGILE DRONE SWARM', bullets: [
     'Instanced UAV swarms now ride in on mid/late AIR SUPERIORITY waves, NAVAL stage 2/3 and periodic FURBALLs. Compact radar diamonds and a SWARM n/8 bracket keep them distinct from full fighters.',
     'Agile drones orbit and peel off in pursuit, return fire in short cannon bursts, and fall to a single Vulcan round or 4AAM missile. Clear the whole swarm for a SWARM CLEARED +1000 bonus.',

@@ -8,11 +8,13 @@
 // burning wrecks that splash, scoring, waves, lock-on and threat warnings.
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { DIFFICULTY_PRESETS } from './difficulty.js?v=s99a';
-import { SPW } from './loadout.js?v=s99a';
-import { missionConfig } from './missions.js?v=s99a';
+import { DIFFICULTY_PRESETS } from './difficulty.js?v=s99b';
+import { SPW } from './loadout.js?v=s99b';
+import { missionConfig } from './missions.js?v=s99b';
 import { gorgeCentreX, gorgeSlope, gorgeHeading, gorgeDist, GORGE_GATE_Z, GORGE_GATE_N, GORGE_FLOOR_Y, GORGE_RIM_Y,
-  GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_FORT, GORGE_ARC_M, GORGE_SPAWN_Z, CEIL_M } from './maps.js?v=s99a';
+  GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_FORT, GORGE_ARC_M, GORGE_SPAWN_Z, CEIL_M,
+  GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_ZB, GORGE_SC_HALF_W, GORGE_SC_ARCH_Z, GORGE_SC_ARCH_Y0,
+  GORGE_SC_ARCH_W, GORGE_SC_SKIP, GORGE_SC_SAVE_M } from './maps.js?v=s99b';
 
 const NM = 1852, FT = 0.3048, G0 = 9.81;
 // Allied CVN model: same 360 m deck as the procedural ship, re-anchored to the GLB.
@@ -91,6 +93,8 @@ export function createCombat(THREE, env) {
   const LOCK_DECAY = 0.8;   // seeker half-angle / lock time: DIFF.seekerHalf / DIFF.lockTime
   // WARDEN orders + wounded-wingman save. All scalars / preallocated state.
   const WING_ORDERS = ['FORM', 'COVER', 'FOCUS'];
+  const WING_ROLES = ['CAP', 'STRIKE'];
+  const SHORTCUT_PTS = 1200, SEAD_CD = 12;
   const ORDER_TEXT = ['WARDEN, FORM ON ME', 'WARDEN, COVER MY SIX', 'WARDEN, FOCUS MY TARGET'];
   const COVER_R = 2500, COVER_REAR_COS = Math.cos(110 * Math.PI / 180), ORDER_BADGE_S = 2.0;
   const LIMP_HP_FRAC = 0.35, LIMP_SPD = 113, LIMP_PURSUERS = 2, LIMP_SAVE_PTS = 1500, LIMP_MIN_T = 60;
@@ -131,6 +135,8 @@ export function createCombat(THREE, env) {
     subKills: 0, siteKills: 0, flagBannerT: 0, salvoKills: 0,
     ambushActive: false, buzzTower: 0, buzzJet: 0,
     droneInboundT: 0, droneClearedT: 0,
+    wingRoles: { w2: 'CAP', w3: 'STRIKE' },
+    sc: { st: 'IDLE', used: false, pz: 0, px: 0, py: 0, logT: 0, bannerT: 0 },
     swarm: { on: false, n: 0, alive: 0, anchor: 'PLAYER', bonusPaid: true, t: 0 } });
   Object.assign(C, { mcfg: missionConfig({}), stage: 0, stageT: 0,
     ceil: { st: 'CLEAR', phase: 'CLEAR', armed: false, t: 0, warnT: 0, salvoT: 0, rail: 0, railT: 0, fired: 0, lastSam: 0, live: true, belowT: 0 },
@@ -2689,6 +2695,11 @@ export function createCombat(THREE, env) {
       for (let sideI = 0; sideI < SAM_SITE_PER_GATE; sideI++) {
         const side = sideI ? 1 : -1;
         const x = cx + side * 300 / n, zz = z - side * 300 * s / n, y = Math.max(terrainHeight(x, zz), GORGE_RIM_Y - 20);
+        // The shortcut ravine has no rim to mount a battery on.
+        if (Math.abs(x - GORGE_SC_X) < 150 && zz < GORGE_SC_ZA + 150 && zz > GORGE_SC_ZB - 150) {
+          if (env.debug) console.log('[ANGELS_ZERO] site skip sc', i, sideI);
+          continue;
+        }
         SITE_POS[k * 3] = x; SITE_POS[k * 3 + 1] = y; SITE_POS[k * 3 + 2] = zz; SITE_ON[k] = 1;
         RIM_SITES[k].set(x, y, zz); k++;
       }
@@ -2735,7 +2746,7 @@ export function createCombat(THREE, env) {
   const SUB_TGT = Array.from({ length: 16 }, () => ({ kind: 'SUB', label: 'RADAR / AA', r: SUB_HIT_R, hp: SUB_HP, hpMax: SUB_HP,
     pos: new THREE.Vector3(), alive: false, ship: null, isSub: true }));
   const SITE_TGT = Array.from({ length: SAM_SITE_N }, (_, i) => ({ kind: 'SITE', label: 'SAM SITE ' + (i + 1), r: SITE_HIT_R,
-    pos: RIM_SITES[i], alive: false, idx: i, isSite: true }));
+    pos: RIM_SITES[i], vel: new THREE.Vector3(), alive: false, idx: i, isSite: true }));
   function subWorld(s, out) { return out.copy(s.sub.off).applyQuaternion(s.g.quaternion).add(s.g.position); }
   function hitSub(s, dmg) {
     if (!s || !s.sub || !s.sub.on) return false;
@@ -2825,6 +2836,44 @@ export function createCombat(THREE, env) {
       }
     }
   }
+  // High-risk trench shortcut: swept z-plane crossings, no per-frame allocation.
+  let _scLoggedSecond = -1;
+  function updateCanyonShortcut(dt) {
+    const sc = C.sc;
+    if (!sc || C.mcfg.gatesPath !== 'CANYON' || C.rtb || C.climb.on) return;
+    const pz = sc.pz, x = S.position.x, y = S.position.y, z = S.position.z;
+    const xOff = Math.abs(x - GORGE_SC_X);
+    if (sc.st === 'IDLE' && pz > GORGE_SC_ZA && z <= GORGE_SC_ZA && xOff < GORGE_SC_HALF_W + 15 && y < CEIL_M) {
+      sc.st = 'IN';
+      if (env.onWing) env.onWing('ARE YOU CRAZY, LEAD?!', 'WARDEN-2', 'warn');
+      say('TRENCH SHORTCUT — KEEP IT CENTERED', 2.4, '#ffb838');
+      if (env.debug) console.log('[ANGELS_ZERO] sc IN z=' + z.toFixed(0) + ' y=' + y.toFixed(0) + ' x-off=' + xOff.toFixed(0));
+    } else if (sc.st === 'IN') {
+      if (pz > GORGE_SC_ARCH_Z && z <= GORGE_SC_ARCH_Z) {
+        sc.st = y < GORGE_SC_ARCH_Y0 ? 'ARCH_OK' : 'FAIL';
+        if (env.debug) console.log('[ANGELS_ZERO] sc arch ' + sc.st + ' y=' + y.toFixed(0));
+      } else if (xOff > GORGE_SC_HALF_W + 15) sc.st = 'FAIL';
+    }
+    if (sc.st === 'ARCH_OK' && xOff > GORGE_SC_HALF_W + 15) sc.st = 'FAIL';
+    if (sc.st === 'ARCH_OK' && pz > GORGE_SC_ZB && z <= GORGE_SC_ZB) {
+      sc.st = 'DONE'; sc.used = true; sc.bannerT = performance.now();
+      C.gateIdx = Math.max(C.gateIdx, Math.max(GORGE_SC_SKIP[0], GORGE_SC_SKIP[1]) + 1);
+      C.score += SHORTCUT_PTS;
+      pushEvent('SHORTCUT', 'TRENCH SHORTCUT', SHORTCUT_PTS, '#ffd45a');
+      say('TRENCH SHORTCUT +' + SHORTCUT_PTS, 2.6, '#ffd45a');
+      if (env.onWing) env.onWing('…REMIND ME NEVER TO FOLLOW YOU AGAIN.', 'WARDEN-2', '#00ff66');
+      if (env.debug) console.log('[ANGELS_ZERO] sc DONE skip=' + GORGE_SC_SKIP[0] + '..' + GORGE_SC_SKIP[1] +
+        ' save=' + GORGE_SC_SAVE_M + ' pts=' + SHORTCUT_PTS);
+    }
+    if ((sc.st === 'FAIL') && pz > GORGE_SC_ZB && z <= GORGE_SC_ZB) sc.st = 'DONE';
+    sc.px = x; sc.py = y; sc.pz = z;
+    const sec = Math.floor(performance.now() / 1000);
+    if (sec !== _scLoggedSecond && sc.st !== 'IDLE' && sc.st !== 'DONE') {
+      _scLoggedSecond = sec;
+      if (env.debug) console.log('[ANGELS_ZERO] sc st=' + sc.st + ' z=' + z.toFixed(0) + ' y=' + y.toFixed(0) + ' x-off=' + xOff.toFixed(0));
+    }
+  }
+
   // Gate frames face down the trench; matrices are static, so they are written once.
   const _cgM = new THREE.Matrix4(), _cgP = new THREE.Vector3(), _cgQ = new THREE.Quaternion(), _cgS = new THREE.Vector3(55 / 30, 3, 55 / 30);
   let canyonGatesBuilt = false;
@@ -3158,6 +3207,55 @@ export function createCombat(THREE, env) {
     if (env.debug) console.log('[ANGELS_ZERO] wing order=' + WING_ORDERS[i]);
     return WING_ORDERS[i];
   }
+  // Persistent CAP / STRIKE roles (src/loadout.js). COVER is the combat order that
+  // these drive; FORM and FOCUS keep their existing hard override.
+  function setWingRoles(r) {
+    if (r) {
+      C.wingRoles.w2 = r.w2 === 'STRIKE' ? 'STRIKE' : 'CAP';
+      C.wingRoles.w3 = r.w3 === 'CAP' ? 'CAP' : 'STRIKE';
+    }
+    const ws = env.getWingmen ? env.getWingmen() : null;
+    if (ws) for (let k = 0; k < ws.length; k++) if (ws[k]) {
+      ws[k].role = C.wingRoles['w' + (k + 2)] || 'CAP';
+      ws[k].tgt = null; ws[k].pickT = 0; ws[k].defT = 0; ws[k].seadT = 0;
+    }
+    if (env.debug) console.log('[ANGELS_ZERO] wing role w2=' + C.wingRoles.w2 + ' w3=' + C.wingRoles.w3 + ' tgt=ROLE');
+    return C.wingRoles;
+  }
+  // STRIKE priorities: subsystem mast -> surface ship -> canyon rim site ahead.
+  function pickStrikeTarget(w) {
+    const from = w.pos || S.position;
+    let best = null, bestScore = Infinity;
+    for (const v of SUB_TGT) {
+      if (!v.alive) continue;
+      const d = v.pos.distanceTo(from);
+      if (d > 8000 || d * 0.7 >= bestScore) continue;
+      bestScore = d * 0.7; best = v;
+    }
+    if (best) return best;
+    for (const t of taskForce) {
+      if (!t.alive || !t.pos) continue;
+      const d = t.pos.distanceTo(from);
+      if (d > 10000 || d >= bestScore) continue;
+      bestScore = d; best = t;
+    }
+    for (const t of strikeTargets) {
+      if (!t.alive || !t.pos) continue;
+      const d = t.pos.distanceTo(from);
+      if (d > 10000 || d >= bestScore) continue;
+      bestScore = d; best = t;
+    }
+    if (best) return best;
+    if (C.mcfg.gatesPath === 'CANYON') {
+      for (let i = 0; i < SAM_SITE_N; i++) {
+        if (!SITE_ON[i] || SITE_TGT[i].pos.z > S.position.z) continue;   // nearest site ahead
+        const d = SITE_TGT[i].pos.distanceTo(from);
+        if (d > 8000 || d * 1.2 >= bestScore) continue;
+        bestScore = d * 1.2; best = SITE_TGT[i];
+      }
+    }
+    return best;
+  }
   // Pick a target every 0.5 s per wingman. COVER scores rear-hemisphere lockers
   // at 0.35x range; FOCUS shares C.designated with a 400 m bracket for WARDEN-3.
   function pickWingTarget(w, wi, dt) {
@@ -3188,6 +3286,22 @@ export function createCombat(THREE, env) {
       const score = d * (threat ? 0.35 : 1);
       if (score < bestScore) { bestScore = score; best = e; }
     }
+    // Self-defence takes over for 6 s: a bandit in the rear hemisphere, inside
+    // 800 m, or one with a lock on us. Works for either role.
+    w.defT = (w.defT || 0) - 0.5;
+    if (w.defT > 0 && w.defTgt && w.defTgt.alive) { w.tgt = w.defTgt; return w.defTgt; }
+    for (const e of enemies) {
+      if (!e.alive) continue;
+      const d = e.pos.distanceTo(w.pos || S.position);
+      if (d > 800 || !(e.bLock > 0)) continue;
+      _wmRel.copy(e.pos).sub(w.pos || S.position).normalize();
+      if (_wmFwd.dot(_wmRel) < COVER_REAR_COS) { w.defTgt = e; w.defT = 6; w.tgt = e; return e; }
+    }
+    if ((w.role || 'CAP') === 'STRIKE') {
+      const st = pickStrikeTarget(w);
+      if (st) { w.tgt = st; return st; }                 // fallback to CAP when no surface target remains
+      if (env.debug && !w.seadLogged) { w.seadLogged = true; console.log('[ANGELS_ZERO] wing role fallback w=' + w.id + ' CAP'); }
+    } else w.seadLogged = false;
     if (!best && C.mcfg.stages) {                        // no bandits: finish damaged escorts only
       for (const t of stagedShips) {
         if (!t.alive || t.kind === 'CV_FLAG' || t.hp > 2) continue;
@@ -3341,6 +3455,17 @@ export function createCombat(THREE, env) {
     const ws = env.getWingmen ? env.getWingmen() : null;
     if (!ws || !ws.length) return;
     updateLimp(dt, ws);
+    const scActive = C.sc && (C.sc.st === 'IN' || C.sc.st === 'ARCH_OK');
+    if (scActive) {
+      _wmInv.copy(S.quaternion).invert();
+      for (let k = 0; k < ws.length; k++) {
+        const wk = ws[k]; if (!wk || !wk.alive) continue;
+        const zz = S.position.z + 150 * (k + 1), cx = gorgeCentreX(zz);
+        _wmTarget.set(cx - S.position.x, Math.min(S.position.y - 40, GORGE_FLOOR_Y + 100 - S.position.y), zz - S.position.z);
+        wk.off.copy(_wmTarget).applyQuaternion(_wmInv);
+      }
+      return;                                            // hold the centreline, no attacks during the run
+    }
     for (let wi = 0; wi < ws.length; wi++) {
       const w = ws[wi];
       if (!w || !w.alive) continue;
@@ -3351,13 +3476,23 @@ export function createCombat(THREE, env) {
       const best = pickWingTarget(w, wi, dt);
       if (!best) continue;
       wingSlot(w, wi, best);
+      if (best.isSite) {
+        // SEAD: fly the trench centreline and fire only inside a 15 deg cone at 2.5 km.
+        w.seadT = Math.max(0, (w.seadT || 0) - dt);
+        _wmRel.copy(best.pos).sub(w.pos || S.position);
+        const d = _wmRel.length();
+        _wmFwd.set(0, 0, -1).applyQuaternion(w.quat);
+        if (d > 2500 || d < 1 || _wmRel.divideScalar(d).dot(_wmFwd) < Math.cos(15 * Math.PI / 180)) continue;
+      }
       if (w.cd > 0 || C.wingOrder === 0) continue;
       let inFlight = 0;
       for (const m of missiles) if (m.active && m.wingman === w.id) inFlight++;
       if (inFlight) continue;
       const m = launch(w.pos, w.quat, w.vel, best, false, MSL_FULL, null);
       if (!m) continue;
-      m.friendly = true; m.wingman = w.id; w.cd = 7 + 4 * rand();
+      m.friendly = true; m.wingman = w.id;
+      w.cd = best.isSite ? SEAD_CD + rand() * 2 : 7 + 4 * rand();
+      if (best.isSite) { w.seadT = SEAD_CD; if (env.debug) console.log('[ANGELS_ZERO] wing sead site=' + best.idx + ' w=' + w.id); }
       if (env.onRadio) env.onRadio('ON_WINGMAN_ENGAGE');
     }
   }
@@ -5377,6 +5512,7 @@ export function createCombat(THREE, env) {
       lockProgress: 0, lockState: 'NONE', rwrTrack: false, banditLock: 0, events: [],
       gunRounds: 0, gunHitsP: 0, mslFiredP: 0, mslHitsP: 0, maxDmg: 0, traps: 0, furballKills: 0, lowHpSaid: false });
     furT = 0; furSwarmT = 75;
+    Object.assign(C.sc, { st: 'IDLE', used: false, pz: S.position.z, px: S.position.x, py: S.position.y, logT: 0, bannerT: 0 });
     clearDronePool(); droneSalvoT = 0; droneSalvoKills = 0; droneSalvoPaid = false;
     for (const e of enemies) e.bLock = 0;
     playerTracers.clear(); enemyTracers.clear();
@@ -5447,6 +5583,7 @@ export function createCombat(THREE, env) {
     allyStepped = false;
     updateGates(dt, now);
     updateCanyonGates(dt, now);
+    updateCanyonShortcut(dt);
     updateCeiling(dt, now);
     updateClimb(dt, now);
     // Return Line: crossing south-to-north resupplies the jet; 25 s re-arm cooldown.
@@ -5622,9 +5759,14 @@ export function createCombat(THREE, env) {
     configureMission(m, mapDef) {
       C.missionTitle = m.title; C.missionId = m.id; C.rtbType = m.rtbType; C.missionBgm = m.bgmScenario;
       C.wingOrder = 0; C.orderBadgeT = 0; resetLimp();
+      Object.assign(C.sc, { st: 'IDLE', used: false, pz: S.position.z, px: S.position.x, py: S.position.y, logT: 0, bannerT: 0 });
       C.subKills = 0; C.siteKills = 0; C.flagBannerT = 0;
       clearDronePool(); furSwarmT = 75; droneSalvoT = 0; droneSalvoKills = 0; droneSalvoPaid = false;
       SITE_HPV.fill(SITE_HP); SITE_ON.fill(1); sectorDead.fill(0);
+      // Rim batteries carved away by the shortcut stay disabled on every reset.
+      for (let i = 0; i < SAM_SITE_N; i++) {
+        if (Math.abs(SITE_POS[i * 3] - GORGE_SC_X) < 150 && SITE_POS[i * 3 + 2] < GORGE_SC_ZA + 150 && SITE_POS[i * 3 + 2] > GORGE_SC_ZB - 150) SITE_ON[i] = 0;
+      }
       for (const t of stagedShips) {
         t.aaOff = false; t.sub.on = !!SUB_OFF[t.kind]; t.sub.hp = SUB_HP;
         if (t.spin) t.spin.visible = true;
@@ -5690,6 +5832,8 @@ export function createCombat(THREE, env) {
     },
     get difficulty() { return C.difficulty; },
     fireSelected, pickleUp, dropBomb, setWeapon, toggleWeapon, dispenseFlares, dispenseChaff, fireAAM4, activateECM, setWingOrder, triggerWoundedWingman, spawnAceFlight, spawnAmbush,
+    setWingRoles,
+    get sc() { return C.sc; },
     spawnDroneSwarm(n = SWARM_MAX, anchor = 'PLAYER') { return spawnSwarm(n, anchor); },
     killDrone(i, how = 'GUN') { return killDrone(i, how); },
     get drones() { return DRONE_TGT; },
@@ -5870,6 +6014,7 @@ export function createCombat(THREE, env) {
         samLaunched: C.samLaunched || 0, samFlared: C.samFlared || 0, samMasked: C.samMasked || 0, samHit: C.samHit || 0, samLive: C.samLive || 0,
         subKills: C.subKills || 0, siteKills: C.siteKills || 0,
         ambush: { active: !!C.ambushActive, n: enemies.filter(e => e.alive && e.ambush).length },
+        shortcut: { st: C.sc.st, used: C.sc.used, gateIdx: C.gateIdx, save: GORGE_SC_SAVE_M, bannerT: C.sc.bannerT },
         buzz: { tower: C.buzzTower || 0, jet: C.buzzJet || 0 },
         weak: { sites: Array.from(SITE_ON).reduce((a, b) => a + b, 0), sectors: Array.from(sectorDead).reduce((a, b) => a + b, 0),
           salvos: stagedShips.filter(t => t.kind === 'CV_FLAG').map(t => t.salvo.st + ':' + t.salvo.fire).join(',') },
@@ -5883,6 +6028,7 @@ export function createCombat(THREE, env) {
           feed: C.styleFeed.map(s => s.text).join('|'), score: C.score, flr: C.flares,
           chf: C.chaff, chfMax: C.chaffMax, chaffClouds: chaff.length,
           notch: C.notchT > 0 ? +(performance.now() - C.notchT).toFixed(0) : null,
+          wingRoles: { w2: C.wingRoles.w2, w3: C.wingRoles.w3 },
           wingOrder: C.wingOrder, wingOrderName: WING_ORDERS[C.wingOrder],
           wingOrderAge: C.wingOrderT ? +(performance.now() - C.wingOrderT).toFixed(0) : null,
           limp: { st: C.limp.st, n: C.limp.n, w2hp: C.limp.w && C.limp.w.hp !== undefined ? Math.round(C.limp.w.hp) : null },

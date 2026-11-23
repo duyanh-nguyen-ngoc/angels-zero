@@ -404,6 +404,10 @@
   .rosterSub { font-size:12px; opacity:0.7; line-height:1.2; }
   .spwBadge { display:inline-block; margin-left:6px; padding:0 5px; font-size:11px; line-height:16px;
     border:1px solid currentColor; vertical-align:2px; }
+  .rolePill { pointer-events:none; display:inline-block; padding:0 5px; margin-left:3px; border:1px solid currentColor;
+    font-size:11px; line-height:16px; opacity:0.35; }
+  .rolePill.on { opacity:1; color:#00ff66; }
+  .roleBadge { color:#00ff66; }
   .spwBadge.spw-4AAM { color:#5fe8ff; }
   .spwBadge.spw-UGB { color:#ffbf3f; }
   .spwBadge.spw-QAAM { color:#ff4fd8; }
@@ -623,6 +627,7 @@
       <button class="sbRow" data-k="resume" type="button" hidden><span class="sbLabel">RESUME SORTIE</span><span class="sbValue"></span></button>
       <button class="sbRow" data-k="restart" type="button" hidden><span class="sbLabel">RESTART</span><span class="sbValue"></span></button>
       <button class="sbRow" data-k="mission" type="button"><span class="sbLabel">MISSION</span><span class="sbValue" id="sbMissionVal"></span></button>
+       <button class="sbRow" data-k="role" type="button"><span class="sbLabel">WINGMAN ROLES</span><span class="sbValue" id="sbRoleVal"></span></button>
       <button class="sbRow" data-k="diff" type="button"><span class="sbLabel">DIFFICULTY</span><span class="sbValue" id="sbDiffVal"></span></button>
       <button class="sbRow" data-k="spw" type="button"><span class="sbLabel">SPECIAL WEAPON</span><span class="sbValue" id="sbSpwVal"></span></button>
       <button class="sbRow" data-k="liv" type="button"><span class="sbLabel">AIRFRAME LIVERY</span><span class="sbValue" id="sbLivVal"></span></button>
@@ -633,8 +638,8 @@
     <div id="flightRoster">
       <div class="rosterHead">[ FLIGHT ]</div>
       <div class="rosterEntry"><div class="rosterCall">WARDEN-1<span class="spwBadge spw-4AAM" id="sbSpwBadge">4AAM</span></div><div class="rosterSub">F-15C</div></div>
-      <div class="rosterEntry"><div class="rosterCall">WARDEN-2</div><div class="rosterSub">F-15C</div></div>
-      <div class="rosterEntry"><div class="rosterCall">WARDEN-3</div><div class="rosterSub">F-15C</div></div>
+      <div class="rosterEntry"><div class="rosterCall">WARDEN-2<span class="spwBadge roleBadge" id="sbRole2">CAP</span></div><div class="rosterSub">F-15C</div></div>
+      <div class="rosterEntry"><div class="rosterCall">WARDEN-3<span class="spwBadge roleBadge" id="sbRole3">STRIKE</span></div><div class="rosterSub">F-15C</div></div>
     </div>
     <div id="missionBenchmark">
       <div class="bmHead">[ MISSION BENCHMARK ]</div>
@@ -720,35 +725,35 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s99a';
-import { createAmbient } from './src/ambient.js?v=s99a';
-import { createBlastFX } from './src/blastfx.js?v=s99a';
-import { createHUD } from './src/hud.js?v=s99a';
-import { createCockpit3D } from './src/cockpit3d.js?v=s99a';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s99a';
-import { createEjection } from './src/eject.js?v=s99a';
-import { createAudio } from './src/audio.js?v=s99a';
-import { createRadio } from './src/radio.js?v=s99a';
-import { createProfile, LIVERIES, liveryById } from './src/profile.js?v=s99a';
-import { createLivery } from './src/livery.js?v=s99a';
-import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s99a';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s99a';
-import { createCanopyFX } from './src/canopy.js?v=s99a';
-import { createNVG } from './src/nvg.js?v=s99a';
-import { createWorld, WORLD } from './src/world.js?v=s99a';
-import { createSurfaces } from './src/surfaces.js?v=s99a';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s99a';
-import { createFreeLook } from './src/freelook.js?v=s99a';
-import { createCanopyGlass } from './src/canopyglass.js?v=s99a';
-import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s99a';
-import { SPW, SQUADRON, MODES, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode } from './src/loadout.js?v=s99a';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s99a';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s99a';
-import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s99a';
-import { createRadioQueue } from './src/radioQueue.js?v=s99a';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s99a';
+import { createVFX } from './src/vfx.js?v=s99b';
+import { createAmbient } from './src/ambient.js?v=s99b';
+import { createBlastFX } from './src/blastfx.js?v=s99b';
+import { createHUD } from './src/hud.js?v=s99b';
+import { createCockpit3D } from './src/cockpit3d.js?v=s99b';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s99b';
+import { createEjection } from './src/eject.js?v=s99b';
+import { createAudio } from './src/audio.js?v=s99b';
+import { createRadio } from './src/radio.js?v=s99b';
+import { createProfile, LIVERIES, liveryById } from './src/profile.js?v=s99b';
+import { createLivery } from './src/livery.js?v=s99b';
+import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s99b';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s99b';
+import { createCanopyFX } from './src/canopy.js?v=s99b';
+import { createNVG } from './src/nvg.js?v=s99b';
+import { createWorld, WORLD } from './src/world.js?v=s99b';
+import { createSurfaces } from './src/surfaces.js?v=s99b';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s99b';
+import { createFreeLook } from './src/freelook.js?v=s99b';
+import { createCanopyGlass } from './src/canopyglass.js?v=s99b';
+import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s99b';
+import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s99b';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s99b';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s99b';
+import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s99b';
+import { createRadioQueue } from './src/radioQueue.js?v=s99b';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s99b';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
-  GORGE_HALF_W, RUNWAY_BBOX } from './src/maps.js?v=s99a';
+  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s99b';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -760,6 +765,12 @@ let selectedSPW = DEBUG && Q.has('spw') && SPW[Q.get('spw')] ? Q.get('spw') : lo
 let selectedLivery = DEBUG && Q.has('livery') && SQUADRON[Q.get('livery')] ? Q.get('livery') : loadLivery();
 let selectedMode = DEBUG && Q.has('mode') && MODES.includes(Q.get('mode')) ? Q.get('mode') : loadMode();
 let missionId = DEBUG && Q.has('mission') && MISSIONS[Q.get('mission')] ? Q.get('mission') : loadMission();
+// Wingman roles: persisted in localStorage, optionally overridden by ?roles=CAP,STRIKE.
+let selectedRoles = loadRoles();
+if (DEBUG && Q.has('roles')) {
+  const rv = Q.get('roles').split(',');
+  selectedRoles = { w2: ROLES.includes(rv[0]) ? rv[0] : selectedRoles.w2, w3: ROLES.includes(rv[1]) ? rv[1] : selectedRoles.w3 };
+}
 const mission = () => MISSIONS[missionId] || MISSIONS.AIR_SUPERIORITY;
 if (missionId === 'FURBALL') selectedMode = 'FURBALL';
 function cycleMission(dir = 1) {
@@ -1277,6 +1288,7 @@ function resetAircraft() {
   if (DEBUG && Q.has('at') && Q.get('at') !== 'carrier' && Q.get('at') !== 'carrierdeck') {
     const spots = {
       airbase: [RWY_X(), 140, 4300, 0], canyon: [world.canyonX(-5300), 120, -5300, 0],
+      scmouth: [GORGE_SC_X, 120, GORGE_SC_ZA + 20, 0],
       canyonlow: [gorgeCentreX(GORGE_SPAWN_Z), GORGE_FLOOR_Y + 0.5 * (CEIL_M - GORGE_FLOOR_Y), GORGE_SPAWN_Z, 0],
       bridgeA: [-4350, 32, -3880, 92], bridgeB: [2650, 32, -3990, 70],
       volcano: [2600, 850, -5600, 50], wind: [3300, 95, 3900, 46], harbor: [-4200, 160, -900, 88],
@@ -1579,6 +1591,7 @@ function loadMissionScene(m) {
   }
   if (limpTrail) { limpTrail.clear(); limpTrail.mesh.visible = false; }
   combatSys.configureMission(m, MAPS[m.mapTag] || MAPS.ARCHIPELAGO);
+  combatSys.setWingRoles(selectedRoles);
   ambient.configure(m.id);
   combat.missionPhase = 1; combat.rtb = null; combat.done = false;
   state.autobrake = false;
@@ -2120,6 +2133,25 @@ async function startSortie() {
       ' hR=' + hR.toFixed(1) + ' ahead=' + ahead.toFixed(1) + ' gate1Z=' + GORGE_GATE_Z[0].toFixed(0) +
       ' arc=' + (GORGE_ARC_M / 1000).toFixed(1) + 'km ' + (ok ? 'OK' : 'FAIL'));
   }
+  if (DEBUG && Q.get('at') === 'scmouth') {
+    // Deterministic shortcut run: just south of the mouth, centred, low and fast.
+    state.position.set(GORGE_SC_X, Number(Q.get('alt')) || 120, GORGE_SC_ZA + 20);
+    state.quaternion.identity();
+    state.speed = Number(Q.get('spd')) || 210;
+    state.velocity.set(0, 0, -state.speed);
+    state.onGround = false; state.gear = 0; state.gearDown = false; state.throttle = 0.85;
+    prevPlanePos.copy(state.position); camVelocity.set(0, 0, 0);
+    camera.position.copy(CAM_OFFSET).applyQuaternion(state.quaternion).add(state.position);
+    _catFwd.set(0, 0, -1);
+    for (let i = 0; i < wingmen.length; i++) {
+      const w = wingmen[i];
+      w.pos.copy(state.position).addScaledVector(_catFwd, -160 * (i + 1));
+      w.quat.copy(state.quaternion); w.vel.copy(state.velocity);
+      if (w.mesh) { w.mesh.position.copy(w.pos); w.mesh.quaternion.copy(w.quat); }
+    }
+    combat.sc.px = state.position.x; combat.sc.py = state.position.y; combat.sc.pz = state.position.z;
+    if (DEBUG) console.log('[ANGELS_ZERO] scmouth pose x=' + state.position.x.toFixed(1) + ' y=' + state.position.y.toFixed(1) + ' z=' + state.position.z.toFixed(1));
+  }
   if (DEBUG && Q.has('skimtest') && combat.ally) {
     audio.init(); audio.resume();
     const a = combat.ally;
@@ -2427,6 +2459,10 @@ function syncSBRoster() {
   const el = document.getElementById('sbSpwBadge'); if (!el) return;
   el.textContent = combat && combat.mcfg && combat.mcfg.wingmen === 'NONE' ? 'LEAD ONLY' : selectedSPW;
   el.className = 'spwBadge spw-' + selectedSPW;
+  const solo = combat && combat.mcfg && combat.mcfg.wingmen === 'NONE';
+  const r2 = document.getElementById('sbRole2'), r3 = document.getElementById('sbRole3');
+  if (r2) { r2.textContent = solo ? '—' : selectedRoles.w2; r2.style.display = solo ? 'none' : ''; }
+  if (r3) { r3.textContent = solo ? '—' : selectedRoles.w3; r3.style.display = solo ? 'none' : ''; }
 }
 function syncSBBenchmark() {
   const f = SPW_FILL[selectedSPW] || SPW_FILL['4AAM'];
@@ -4321,6 +4357,7 @@ const hud = createHUD(THREE, {
   getMissileCam: () => (mcam.active && mcam.m) ? { dist: mcam.m.target ? mcam.m.mesh.position.distanceTo(mcam.m.target.pos) : 0, k: mcam.k } : null,
   getStrikeTargets: () => combatSys.strikeTargets,
   getWeakTargets: () => combatSys.weakTargets,
+  getShortcut: () => combatSys.sc,
   getPrimary: () => combatSys.primaryTargets(),
   getCat: () => cat, getCatArmT: () => CAT_ARM_T, getCatMounted: () => !!(combat.ally && combat.ally.glbMounted),
   ilsVisible: () => ilsVisible(), getMissionT: () => missionT, inCutscene: () => inCutscene(),
@@ -5139,7 +5176,9 @@ if (DEBUG) {
     ilsVisible, inCutscene, get missionT() { return missionT; }, applyMapProps,
     getCarrierBox() { const a = combat.ally; if (!a || !a.root) return null; const b = new THREE.Box3().setFromObject(a.root); return { min: b.min.toArray(), max: b.max.toArray() }; },
     get carrier() { return carrier; }, get jetGearDY() { return JET_GEAR_DY; },
-    setWingOrder: n => combatSys.setWingOrder(n), triggerWoundedWingman: () => combatSys.triggerWoundedWingman(true), get limpTrail() { return limpTrail; },
+    setWingOrder: n => combatSys.setWingOrder(n), setWingRoles: r => { selectedRoles = combatSys.setWingRoles(r); saveRoles(selectedRoles); syncSBMenu(); return selectedRoles; },
+    get wingRoles() { return combatSys.stats().style.wingRoles; }, get sc() { return combatSys.sc; },
+    triggerWoundedWingman: () => combatSys.triggerWoundedWingman(true), get limpTrail() { return limpTrail; },
     launchIR: (behind = 3000) => { combatSys.placeAt(0, 180, 0, behind); combatSys.banditShot(0, false, true, 'IR'); },
     spawnHeadOn: (dist = 600) => { combatSys.placeAhead(0, dist); combatSys.banditShot(0, false, true, 'IR'); },
     aimAtSun: () => { state.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), SUN_DIR); state.velocity.set(0, 0, -(state.speed || 180)).applyQuaternion(state.quaternion); },
@@ -5160,6 +5199,7 @@ const SB_DESC = {
   resume: 'Resume the current sortie.',
   restart: 'Restart the current mission.',
   mission: 'Select a mission.',
+  role: '← W2 / W3   → toggle CAP / STRIKE',
   diff: 'Missile cap, lock forgiveness and damage.',
   spw: 'Special weapon carried beside the AIM-9s.',
   liv: 'Squadron paint, applied to Warden-2 and Warden-3 too.',
@@ -5169,7 +5209,7 @@ const SB_DESC = {
 };
 const sbMenuEl = document.getElementById('sbMenu');
 const sbRows = Array.from(sbMenuEl.querySelectorAll('.sbRow'));
-let sbActive = 0;
+let sbActive = 0, sbRoleIdx = 0;
 const sbVisibleRows = () => sbRows.filter(r => !r.hidden);
 function sbSetActive(i) {
   const vis = sbVisibleRows(); if (!vis.length) return;
@@ -5193,6 +5233,11 @@ function syncSBMenu(paused) {
   sbMenuEl.querySelector('[data-k="resume"]').hidden = !isPause;
   sbMenuEl.querySelector('[data-k="restart"]').hidden = !isPause;
   document.getElementById('sbMissionVal').textContent = mission().title;
+  document.getElementById('sbRoleVal').innerHTML = 'W2 <span class="rolePill' + (selectedRoles.w2 === 'CAP' ? ' on' : '') + '">CAP</span>' +
+    '<span class="rolePill' + (selectedRoles.w2 === 'STRIKE' ? ' on' : '') + '">STRIKE</span>' +
+    ' W3 <span class="rolePill' + (selectedRoles.w3 === 'CAP' ? ' on' : '') + '">CAP</span>' +
+    '<span class="rolePill' + (selectedRoles.w3 === 'STRIKE' ? ' on' : '') + '">STRIKE</span>';
+  sbMenuEl.querySelector('[data-k="role"]').hidden = missionConfigWingSolo(mission());
   document.getElementById('sbDiffVal').textContent = DIFFICULTY_PRESETS[diffMode] ? diffMode : 'NORMAL';
   document.getElementById('sbSpwVal').textContent = selectedSPW;
   document.getElementById('sbLivVal').textContent = selectedLivery;
@@ -5208,6 +5253,11 @@ function sbAction(k, dir) {
     case 'resume': resumeSim(); break;
     case 'restart': restartBtn.click(); break;
     case 'mission': cycleMission(dir || 1); break;
+    case 'role': {
+      const key = sbRoleIdx === 0 ? 'w2' : 'w3';
+      selectedRoles[key] = ROLES[(ROLES.indexOf(selectedRoles[key]) + 1) % ROLES.length];
+      saveRoles(selectedRoles); combatSys.setWingRoles(selectedRoles); syncSBRoster(); break;
+    }
     case 'diff': diffBtn.click(); break;
     case 'spw': {
       const ids = Object.keys(SPW), i = ids.indexOf(selectedSPW);
@@ -5229,6 +5279,7 @@ function sbConfirm() { const k = sbVisibleRows()[sbActive]?.dataset.k; if (k) sb
 function sbCycle(dir) {
   const k = sbVisibleRows()[sbActive]?.dataset.k; if (!k) return;
   if (k === 'wx') { (dir < 0 ? todBtn : wxBtn).click(); syncSBMenu(); return; }
+  if (k === 'role') { sbRoleIdx = ((sbRoleIdx || 0) + (dir > 0 ? 1 : -1) + 2) % 2; syncSBMenu(); return; }
   sbAction(k, dir);
 }
 for (const r of sbRows) {

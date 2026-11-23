@@ -24,7 +24,9 @@ export const RWY = { x: 900, z0: -1400, z1: 1600, width: 50, elev: 10 };       /
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { gorgeCentreX, gorgeDist, GORGE_FLOOR_Y, GORGE_RIM_Y, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_CRATER_Z,
-  GORGE_BBOX, GORGE_HALF_W, GORGE_RAMP_W, SEA_FLOOR_Y, RUNWAY_BBOX } from './maps.js?v=s99a';
+  GORGE_BBOX, GORGE_HALF_W, GORGE_RAMP_W, SEA_FLOOR_Y, RUNWAY_BBOX,
+  GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_ZB, GORGE_SC_HALF_W, GORGE_SC_RAMP_W, GORGE_SC_FLOOR_Y,
+  GORGE_SC_ARCH_Z, GORGE_SC_ARCH_Y0, GORGE_SC_ARCH_Y1, GORGE_SC_ARCH_W, GORGE_SC_ARCH_D } from './maps.js?v=s99b';
 
 export function createWorld(THREE, env) {
   const { scene, createNoise2D, fbm } = env;
@@ -52,7 +54,16 @@ export function createWorld(THREE, env) {
     const floor = GORGE_FLOOR_Y + (fbm(nDet, x * 0.012, z * 0.012, 2) * 0.5 + 0.5) * 6;
     const plateau = GORGE_RIM_Y + 30 * (fbm(nHill, x * 0.0014, z * 0.0014, 3) * 0.5 + 0.5);
     const corridor = 1 - ss(d, GORGE_HALF_W, GORGE_RAMP_W);   // 1 on the floor, 0 at the rim
-    return floor + (plateau - floor) * (1 - corridor);
+    let h = floor + (plateau - floor) * (1 - corridor);
+    // Shortcut ravine: a straight chord through the first S bend. The carve is
+    // part of the analytic surface, so heightAt / CCIP / crash checks all see it.
+    if (z < GORGE_SC_ZA + 300 && z > GORGE_SC_ZB - 300) {
+      const dS = Math.abs(x - GORGE_SC_X);
+      const carved = GORGE_SC_FLOOR_Y + (h - GORGE_SC_FLOOR_Y) * ss(dS, GORGE_SC_HALF_W, GORGE_SC_RAMP_W);
+      const fade = ss(z, GORGE_SC_ZB - 300, GORGE_SC_ZB) * ss(z, GORGE_SC_ZA + 300, GORGE_SC_ZA);
+      h += (Math.min(h, carved) - h) * fade;
+    }
+    return h;
   }
   let activeHeightFn = null;
 
@@ -1143,6 +1154,36 @@ export function createWorld(THREE, env) {
     return null;
   }
 
+  // Shortcut rock arch: one jittered slab mesh, three instances (deck + 2 piers).
+  // Pure visual geometry; its obstacle volumes are ordinary boxes pushed on rebuild.
+  const scSlab = new THREE.BoxGeometry(1, 1, 1);
+  {
+    const pa = scSlab.attributes.position;
+    for (let i = 0; i < pa.count; i++) {
+      const x = pa.getX(i), y = pa.getY(i), z = pa.getZ(i);
+      const j = (a, b, c) => Math.sin(a * 12.9898 + b * 78.233 + c * 37.719) * 0.045;
+      pa.setXYZ(i, x + j(x + 0.5, y, z), y + j(y, z, x + 0.5), z + j(z, x, y + 0.5));
+    }
+    scSlab.computeVertexNormals();
+  }
+  const scArch = new THREE.InstancedMesh(scSlab, new THREE.MeshStandardMaterial({ color: 0x4c5359, roughness: 0.96, metalness: 0, flatShading: true }), 3);
+  scArch.name = 'trenchArch'; scArch.visible = false; scArch.frustumCulled = true;
+  {
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), pos = new THREE.Vector3();
+    const put = (i, x, y, z, hx, hy, hz) => { pos.set(x, y, z); sc.set(hx * 2, hy * 2, hz * 2); m.compose(pos, q, sc); scArch.setMatrixAt(i, m); };
+    const deckY = (GORGE_SC_ARCH_Y0 + GORGE_SC_ARCH_Y1) / 2, pierY = (GORGE_SC_FLOOR_Y + GORGE_SC_ARCH_Y1) / 2;
+    put(0, GORGE_SC_X, deckY, GORGE_SC_ARCH_Z, GORGE_SC_ARCH_W / 2, (GORGE_SC_ARCH_Y1 - GORGE_SC_ARCH_Y0) / 2, GORGE_SC_ARCH_D / 2);
+    put(1, GORGE_SC_X - (GORGE_SC_HALF_W + 20), pierY, GORGE_SC_ARCH_Z, 20, (GORGE_SC_ARCH_Y1 - GORGE_SC_FLOOR_Y) / 2, GORGE_SC_ARCH_D / 2);
+    put(2, GORGE_SC_X + (GORGE_SC_HALF_W + 20), pierY, GORGE_SC_ARCH_Z, 20, (GORGE_SC_ARCH_Y1 - GORGE_SC_FLOOR_Y) / 2, GORGE_SC_ARCH_D / 2);
+    scArch.instanceMatrix.needsUpdate = true; scArch.computeBoundingSphere();
+  }
+  scene.add(scArch);
+  const scBoxes = [
+    { c: new THREE.Vector3(GORGE_SC_X, (GORGE_SC_ARCH_Y0 + GORGE_SC_ARCH_Y1) / 2, GORGE_SC_ARCH_Z), hx: GORGE_SC_ARCH_W / 2, hy: (GORGE_SC_ARCH_Y1 - GORGE_SC_ARCH_Y0) / 2, hz: GORGE_SC_ARCH_D / 2, yaw: 0 },
+    { c: new THREE.Vector3(GORGE_SC_X - (GORGE_SC_HALF_W + 20), (GORGE_SC_FLOOR_Y + GORGE_SC_ARCH_Y1) / 2, GORGE_SC_ARCH_Z), hx: 20, hy: (GORGE_SC_ARCH_Y1 - GORGE_SC_FLOOR_Y) / 2, hz: GORGE_SC_ARCH_D / 2, yaw: 0 },
+    { c: new THREE.Vector3(GORGE_SC_X + (GORGE_SC_HALF_W + 20), (GORGE_SC_FLOOR_Y + GORGE_SC_ARCH_Y1) / 2, GORGE_SC_ARCH_Z), hx: 20, hy: (GORGE_SC_ARCH_Y1 - GORGE_SC_FLOOR_Y) / 2, hz: GORGE_SC_ARCH_D / 2, yaw: 0 }
+  ];
+
   // --- map switching: reuse the terrain geometry and materials, reset collision sets.
   const baseBoxes = boxes.slice(), baseCyls = cyls.slice();
   let activeMap = null;
@@ -1188,7 +1229,9 @@ export function createWorld(THREE, env) {
       const bb = def.bbox, inBB = (x, z) => x > bb.x[0] - 600 && x < bb.x[1] + 600 && z < bb.z[0] + 600 && z > bb.z[1] - 600;
       for (const b of baseBoxes) if (!inBB(b.c.x, b.c.z)) boxes.push(b);
       for (const q of baseCyls) if (!inBB(q.x, q.z)) cyls.push(q);
+      for (const b of scBoxes) boxes.push(b);                  // rock arch: fly under it, not through it
     }
+    scArch.visible = mode === 'gorge';
     // Light points: hidden on open-ocean maps, masked inside the trench bbox on GORGE.
     const mk = lightMat.uniforms.uMask.value;
     if (mode === 'gorge' && def.bbox) mk.set(def.bbox.x[0] - 600, def.bbox.x[1] + 600, def.bbox.z[1] - 600, def.bbox.z[0] + 600);

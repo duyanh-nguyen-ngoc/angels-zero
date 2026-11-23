@@ -1691,6 +1691,11 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   - Boids/orbit steering with periodic peel-off pursuit and short cannon bursts. Virtual `DRONE_TGT` lock objects feed the normal seeker and 4AAM (0.6× lock time); a single Vulcan round or missile kills one, with 12 m splash, `SWARM KILL +200`, `QUAD SPLASH` and a `SWARM CLEARED +1000` finish. HUD draws compact `◇` markers, an amber `SWARM n/8` bracket, radar diamonds and inbound/cleared banners; a persistent sawtooth hum tracks the nearest drone.
   - `?drones=1` / `?droneat=s`, `__az.spawnDroneSwarm()` / `__az.killDrone(i)`, once-per-second warp logs and `stats().drones` make headless verification deterministic.
 
+- [x] **Wingman roles + canyon trench shortcut** *(build `s99b`, v1.1.30, `src/loadout.js`, `src/combat.js`, `src/maps.js`, `src/world.js`, `src/hud.js`, `index.html`)*
+  - Persistent `angelsZero_wingRoles` ({w2:'CAP', w3:'STRIKE'}), STANDBY role row with sub-cursor pills and roster tags, `?roles=CAP,STRIKE`. STRIKE wings prioritise subsystem masts, ships and (in CANYON) rim SAM sites, with a 6 s rear-hemisphere self-defence override and CAP fallback; FORM/FOCUS orders still override the role. SEAD shots use the trench centreline, a 15°/2.5 km firing gate and a 12 s cadence.
+  - `GORGE_SC_*` constants define a 2.2 km straight ravine across the first S-bend: analytic carve in `gorgeHeight()` (one height grid, no extra draw calls), one three-instance jittered rock arch with three AABB blockers, rim sites inside the ravine suppressed. Swept z-plane state machine (`IDLE→IN→ARCH_OK→DONE`) awards `TRENCH SHORTCUT +1200`, skips gates 5..5 and calls WARDEN-2; flying high or wide fails cleanly.
+  - `?at=scmouth` / `?alt=200` headless poses, `sc` logs and `stats().shortcut` / `stats().style.wingRoles`. Cached GORGE rebuild stays under 15 ms because the carve costs only a few scalar ops per grid cell.
+
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.
