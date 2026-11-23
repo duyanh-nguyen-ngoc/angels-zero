@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.27', title: 'LINKED WEAK POINTS', bullets: [
+    'CG cruisers and the flagship now have a destructible RADAR / AA mast. Knock it out to silence their flak and SAMs, claim an AA DISABLED reward and cancel the flagship salvo.',
+    'Canyon rim batteries can be destroyed individually. A dead sector stops local barrages while neighbouring batteries fire reduced volleys; searchlights over dead sites go dark.',
+    'The flagship now paints the sky with a three-second charge beam before launching a spread of six VLS missiles. Break hard to defeat them.'
+  ] },
   { version: 'v1.1.26', title: 'SUN BLIND & MISSILE INTERCEPTS', bullets: [
     'Put the sun behind an inbound IR missile and hold your nose on it: after half a second the seeker loses the lock and breaks, worth +350. Radar missiles are unaffected.',
     'Your 20 mm Vulcan can now shoot an incoming missile out of the air for +800, with a mid-air detonation, a slow-motion beat and a clear warning reset.',

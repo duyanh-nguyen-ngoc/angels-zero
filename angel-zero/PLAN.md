@@ -1677,6 +1677,11 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   - Player gun rounds now test a swept segment–segment closest approach against each active enemy missile's `prevPos → pos` path (7 m). A hit detonates the missile safely, clears the warning/RWR, awards +800, fires slow-motion (with its own cooldown), a banner and a callout. All scratch vectors are preallocated.
   - `?sunat=s` / `?irmslat=s` / `?mslshootat=s` plus `__az.launchIR` / `__az.spawnHeadOn` / `__az.aimAtSun` make both deterministic; warp logs and `stats().sun` / `stats().intercepts` expose the state.
 
+- [x] **Linked weak points + flagship VLS telegraph** *(build `s97d`, v1.1.27, `src/combat.js`, `src/vfx.js`, `src/audio.js`, `src/hud.js`, `src/ambient.js`, `index.html`)*
+  - CG and CV_FLAG ships carry a destructible RADAR / AA mast (pooled virtual ground target, `◇ AA` HUD box). Gun, missile and bomb hits route to `hitSub()`; at zero HP the ship's flak, CIWS and SAM timers stop, an explosion/smoke column and `AA DISABLED +600` fire, and ambient flak density drops via `combat.activeAAShips`.
+  - Canyon rim sites have their own HP pool and virtual targets; destroyed sites flip `SITE_ON`, stop searchlights and are skipped by the barrage picker. Once both sites in a sector die, that sector fires nothing and neighbours fire half-size volleys. State is fully restored on mission switch.
+  - The flagship telegraphs a salvo with a 3 s red charge beam and rising tone, then fires six spread VLS missiles that fly straight for 1.2 s before homing. Destroying the mast cancels it. `?subkillat=s` / `?sitekillat=s:i` / `?flagsalvoat=s` and matching `__az` helpers make all three deterministic.
+
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.
@@ -1756,7 +1761,7 @@ toggle, ejection, bridge fly-under. User-facing weapon labels unified to
 MSL / UGB (briefing, radio call, CCIP reload cue, stores list).
 
 ## Debug URL flags (require `?debug`)
-`sunat=s` (hold nose on sun 1 s) · `irmslat=s` (IR missile from 3 km behind) · `mslshootat=s` (head-on missile in gun line) · `wingorderat=s:n` (force wing order 0/1/2) · `limpat=s` (force wounded WARDEN-2) · `ambient=0` (kill all living-world effects) · `hold=s,a,...` (hold keys) · `keyat=s:key,...` (real keydown/keyup) · `carrierfinalat=s` (carrier final, 450 m behind the stern) · `duelahead=s` (CRIMSON 800 m ahead) · `nointro` · `cockpit` · `freeze` · `warp=s` · `pose=bank,pitch` · `mouse=x,y`
+`subkillat=s` (cripple nearest AA mast) · `sitekillat=s:i` (destroy rim site i) · `flagsalvoat=s` (force flagship telegraph) · `sunat=s` (hold nose on sun 1 s) · `irmslat=s` (IR missile from 3 km behind) · `mslshootat=s` (head-on missile in gun line) · `wingorderat=s:n` (force wing order 0/1/2) · `limpat=s` (force wounded WARDEN-2) · `ambient=0` (kill all living-world effects) · `hold=s,a,...` (hold keys) · `keyat=s:key,...` (real keydown/keyup) · `carrierfinalat=s` (carrier final, 450 m behind the stern) · `duelahead=s` (CRIMSON 800 m ahead) · `nointro` · `cockpit` · `freeze` · `warp=s` · `pose=bank,pitch` · `mouse=x,y`
 · `ab` · `highg` · `alt=m` · `spd=m/s` · `at=x,y,z,hdg|airbase|canyon|bridgeA|
 bridgeB|volcano|wind|harbor` · `overview[=h]` · `tod=NAME&az=deg` ·
 `todto=NAME:t` · `rolls=n` · `nvg` / `nvgat=s` · `camat=x,y,z` ·

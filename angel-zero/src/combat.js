@@ -8,11 +8,11 @@
 // burning wrecks that splash, scoring, waves, lock-on and threat warnings.
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { DIFFICULTY_PRESETS } from './difficulty.js?v=s96e';
-import { SPW } from './loadout.js?v=s96e';
-import { missionConfig } from './missions.js?v=s96e';
+import { DIFFICULTY_PRESETS } from './difficulty.js?v=s97d';
+import { SPW } from './loadout.js?v=s97d';
+import { missionConfig } from './missions.js?v=s97d';
 import { gorgeCentreX, gorgeSlope, gorgeHeading, gorgeDist, GORGE_GATE_Z, GORGE_GATE_N, GORGE_FLOOR_Y, GORGE_RIM_Y,
-  GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_FORT, CEIL_M } from './maps.js?v=s96e';
+  GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_FORT, GORGE_ARC_M, GORGE_SPAWN_Z, CEIL_M } from './maps.js?v=s97d';
 
 const NM = 1852, FT = 0.3048, G0 = 9.81;
 // Allied CVN model: same 360 m deck as the procedural ship, re-anchored to the GLB.
@@ -38,6 +38,12 @@ const STRIKE_N = 4, STRIKE_HP_K = 2.2, STRIKE_SPLASH = 35, STRIKE_PTS = 1200, JA
 // Staged naval escalation / trench run / guns-only duel.
 const SHIP_HP = { DDG: 3, CG: 5, CV_FLAG: 10 }, SHIP_SCALE = { DDG: 1, CG: 1.25, CV_FLAG: 1.9 };
 const SHIP_SAM_CD = 9;
+// Linked weak points + flagship VLS telegraph.
+const SUB_HP = 2, SUB_HIT_R = 14, SUB_PTS = 600;
+const SUB_OFF = { CG: [0, 24, -8], CV_FLAG: [0, 34, -20] };
+const SITE_HP = 1, SITE_HIT_R = 12, SITE_SECTOR_M = 1800, SITE_PTS = 300;
+const FLAG_SALVO_MIN = 18, FLAG_SALVO_MAX = 22, FLAG_TELE_S = 3.0;
+const FLAG_SALVO_N = 6, FLAG_SPREAD_DEG = 14, FLAG_VLS_STAGGER = 0.15;
 const AA_RANGE = 3200, AA_ALT = 3000, AA_CD = 1.4, AA_DMG = 0.015;
 const CANYON_SAM_MAX = 24, CEIL_ARM_DELAY = 8.0, CEIL_HYST_M = 10;
 const CEIL_WARN_S = 1.5, CEIL_SALVO_MIN = 4, CEIL_SALVO_MAX = 6, CEIL_SALVO_CD = 1.8, CEIL_STAGGER = 0.12;
@@ -112,7 +118,8 @@ export function createCombat(THREE, env) {
     wingOrder: 0, wingOrderT: 0, orderBadgeT: 0, gunRounds: 0, gunHitsP: 0, mslFiredP: 0, mslHitsP: 0, maxDmg: 0, traps: 0 });
   Object.assign(C, { limp: { st: 'IDLE', w: null, pursuers: new Int16Array(LIMP_PURSUERS).fill(-1), n: 0, used: false, graceT: 0 },
     wingSavedBannerT: 0, wingNoDesignationT: 0,
-    sunT: 0, sunCD: 0, sunBlinds: 0, sunBannerT: 0, mslIntercepts: 0, interceptBannerT: 0, interceptSlowCD: 0 });
+    sunT: 0, sunCD: 0, sunBlinds: 0, sunBannerT: 0, mslIntercepts: 0, interceptBannerT: 0, interceptSlowCD: 0,
+    subKills: 0, siteKills: 0, flagBannerT: 0, salvoKills: 0 });
   Object.assign(C, { mcfg: missionConfig({}), stage: 0, stageT: 0,
     ceil: { st: 'CLEAR', phase: 'CLEAR', armed: false, t: 0, warnT: 0, salvoT: 0, rail: 0, railT: 0, fired: 0, lastSam: 0, live: true, belowT: 0 },
     climb: { on: false, t: 0, sams: 0, salvoT: 0, rail: 0, railT: 0 }, gateIdx: 0, weaponsLock: { msl: false, spw: false },
@@ -2190,15 +2197,23 @@ export function createCombat(THREE, env) {
       const t = destroyerShip();
       Object.assign(t, { staged: true, fleet: true, alive: false, stagePos: new THREE.Vector3(),
         pos: new THREE.Vector3(), vel: new THREE.Vector3(), fwd: new THREE.Vector3(0, 0, 1),
-        quat: t.g.quaternion, ciwsT: 0, ciwsAcc: 0, flakCD: 0, samCD: 0, secondaries: null, secT: 0 });
+        quat: t.g.quaternion, ciwsT: 0, ciwsAcc: 0, flakCD: 0, samCD: 0, secondaries: null, secT: 0,
+        sub: { on: false, hp: SUB_HP, off: new THREE.Vector3(), lastGunT: 0 }, aaOff: false,
+        salvo: { st: 'IDLE', t: FLAG_SALVO_MIN + rand() * (FLAG_SALVO_MAX - FLAG_SALVO_MIN), fire: 0, fireT: 0 } });
       t.wake = makeWake(t); t.g.add(t.wake); t.g.visible = false;
       scene.add(t.g); surface.push(t); taskForce.push(t); stagedShips.push(t);
+      if (SUB_TGT[stagedShips.length - 1]) SUB_TGT[stagedShips.length - 1].ship = t;
     }
     const t = stagedShips[idx];
     t.kind = kind; t.label = kind + ' ' + (idx + 1); t.id = 'S' + idx;
     t.hpMax = t.hp = SHIP_HP[kind] || 3;
     t.g.scale.setScalar(SHIP_SCALE[kind] || 1);
     t.samMount = kind === 'CG' || kind === 'CV_FLAG';
+    const o = SUB_OFF[kind];
+    t.sub.on = !!o; t.sub.hp = SUB_HP; t.aaOff = false;
+    if (o) t.sub.off.set(o[0], o[1], o[2]);
+    t.salvo.st = 'IDLE'; t.salvo.t = FLAG_SALVO_MIN + rand() * (FLAG_SALVO_MAX - FLAG_SALVO_MIN);
+    t.salvo.fire = 0; t.salvo.fireT = 0;
     return t;
   }
   const stagedMission = () => !!(C.mcfg && C.mcfg.stages && C.mcfg.stages.length && C.mode !== 'FURBALL');
@@ -2305,6 +2320,129 @@ export function createCombat(THREE, env) {
     }
   }
   buildSamSites();
+  // Linked weak points: pooled virtual targets, scratch vectors, sector map.
+  const _subW = new THREE.Vector3(), _lane = new THREE.Vector3(), _bq = new THREE.Vector3();
+  const _aaPos = new Float32Array(32), _weakOut = [];
+  let AA_SHIPS_N = 0;
+  const AA_SHIPS_OBJ = { get n() { return AA_SHIPS_N; }, positions: _aaPos };
+  const SITE_HPV = new Int8Array(SAM_SITE_N).fill(SITE_HP), SITE_SECTOR = new Float32Array(SAM_SITE_N);
+  const SECTOR_N = Math.max(1, Math.ceil(GORGE_ARC_M / (2 * SITE_SECTOR_M)));
+  const sectorDead = new Uint8Array(SECTOR_N);
+  function siteArc(z) {
+    let a = 0;
+    for (let zz = GORGE_SPAWN_Z; zz > z; zz -= 20) a += 20 * Math.sqrt(1 + gorgeSlope(zz) ** 2);
+    return a;
+  }
+  for (let i = 0; i < SAM_SITE_N; i++) SITE_SECTOR[i] = siteArc(SITE_POS[i * 3 + 2]);
+  function siteSector(i) {
+    if (i >= SAM_SITE_N - CRATER_SITE_N) return -1;
+    return Math.min(SECTOR_N - 1, Math.floor(SITE_SECTOR[i] / (2 * SITE_SECTOR_M)));
+  }
+  function siteSectorOfPlayer() {
+    const arc = siteArc(S.position.z), sec = Math.floor(arc / (2 * SITE_SECTOR_M));
+    return sec < 0 || sec >= SECTOR_N ? -1 : sec;
+  }
+  function refreshSectors() {
+    sectorDead.fill(0);
+    for (let sec = 0; sec < SECTOR_N; sec++) {
+      let live = 0;
+      for (let i = 0; i < SAM_SITE_N - CRATER_SITE_N; i++) if (SITE_ON[i] && siteSector(i) === sec) live++;
+      if (!live) sectorDead[sec] = 1;
+    }
+  }
+  const SUB_TGT = Array.from({ length: 16 }, () => ({ kind: 'SUB', label: 'RADAR / AA', r: SUB_HIT_R, hp: SUB_HP, hpMax: SUB_HP,
+    pos: new THREE.Vector3(), alive: false, ship: null, isSub: true }));
+  const SITE_TGT = Array.from({ length: SAM_SITE_N }, (_, i) => ({ kind: 'SITE', label: 'SAM SITE ' + (i + 1), r: SITE_HIT_R,
+    pos: RIM_SITES[i], alive: false, idx: i, isSite: true }));
+  function subWorld(s, out) { return out.copy(s.sub.off).applyQuaternion(s.g.quaternion).add(s.g.position); }
+  function hitSub(s, dmg) {
+    if (!s || !s.sub || !s.sub.on) return false;
+    s.sub.hp -= dmg;
+    if (env.debug) console.log('[ANGELS_ZERO] sub hit ship=' + s.label + ' hp=' + s.sub.hp);
+    if (s.sub.hp > 0) return false;
+    s.sub.on = false; s.aaOff = true; s.samMount = false;
+    subWorld(s, _subW);
+    if (env.onSfx) env.onSfx('explosion', _subW, 0.8);
+    explosion(_subW, 0.6, { delay: 0.35 });
+    if (env.onSmoke) env.onSmoke(_subW);
+    if (s.spin) s.spin.visible = false;
+    if (s.kind === 'CV_FLAG') cancelFlagSalvo(s, 'mast down');
+    C.subKills++; C.score += SUB_PTS;
+    pushEvent('SUBSYS', 'AA DISABLED', SUB_PTS, '#5fe8ff');
+    say('AA DISABLED — HE\'S DEFENSELESS', 2.4, '#5fe8ff');
+    if (env.debug) console.log('[ANGELS_ZERO] sub DOWN kind=' + s.kind + ' pts=' + SUB_PTS);
+    return true;
+  }
+  function hitSite(i, dmg) {
+    if (i < 0 || i >= SAM_SITE_N || !SITE_ON[i]) return false;
+    SITE_HPV[i] -= dmg;
+    if (SITE_HPV[i] > 0) return false;
+    SITE_ON[i] = 0; C.siteKills++; C.score += SITE_PTS;
+    const pos = RIM_SITES[i], sec = siteSector(i);
+    if (env.onSfx) env.onSfx('explosion', pos, 0.6);
+    if (env.samPuff) env.samPuff(_bq.copy(pos));
+    if (env.onSmoke) env.onSmoke(pos);
+    refreshSectors();
+    pushEvent('SITE', 'SAM SITE DOWN', SITE_PTS, '#5fe8ff');
+    if (env.debug) console.log('[ANGELS_ZERO] site DOWN i=' + i + ' sector=' + sec + ' dead=' + sectorDead[Math.max(0, sec)]);
+    return true;
+  }
+  function cancelFlagSalvo(s, why) {
+    const v = s.salvo;
+    if (v.st === 'IDLE' || v.st === 'DEAD') return;
+    v.st = 'DEAD'; v.fire = 0;
+    if (env.flagBeam) env.flagBeam.hide();
+    if (env.onSfx) env.onSfx('flagCharge', null, 0);
+    say('FLAGSHIP VLS DOWN!', 2.4, '#5fe8ff');
+    if (env.debug) console.log('[ANGELS_ZERO] flag cancelled ' + why);
+  }
+  function updateFlagSalvo(dt) {
+    for (const s of stagedShips) {
+      if (!s.alive || s.kind !== 'CV_FLAG' || !s.sub.on) continue;
+      const v = s.salvo;
+      if (v.st === 'DEAD') continue;
+      if (v.st === 'IDLE') {
+        v.t -= dt;
+        if (v.t <= 0) {
+          v.st = 'TELEGRAPH'; v.t = FLAG_TELE_S; C.flagBannerT = performance.now();
+          if (env.debug) console.log('[ANGELS_ZERO] flag tele t=' + v.t.toFixed(2));
+        }
+        continue;
+      }
+      if (v.st === 'TELEGRAPH') {
+        v.t -= dt;
+        const charge = clamp(1 - v.t / FLAG_TELE_S, 0, 1);
+        subWorld(s, _subW);
+        _lane.copy(S.position).addScaledVector(S.velocity, FLAG_TELE_S + 2.5);
+        _bq.lerpVectors(_subW, _lane, charge < 0.67 ? charge / 0.67 : 1);
+        if (env.flagBeam) env.flagBeam.set(_subW, _bq, charge);
+        if (env.onSfx) env.onSfx('flagCharge', null, charge);
+        C.flagSalvoT = v.t; C.flagSalvoActive = 1;
+        if (v.t <= 0) {
+          v.st = 'FIRE'; v.fire = FLAG_SALVO_N; v.fireT = 0;
+          C.flagSalvoActive = 0; C.flagBannerT = 0;
+          if (env.debug) console.log('[ANGELS_ZERO] flag fire n=' + FLAG_SALVO_N);
+        }
+        continue;
+      }
+      if (v.st === 'FIRE') {
+        v.fireT -= dt;
+        if (v.fire > 0 && v.fireT <= 0) {
+          subWorld(s, _subW);
+          _lane.copy(S.position).addScaledVector(S.velocity, FLAG_TELE_S + 2.5);
+          const ang = ((v.fire - 1) / Math.max(1, FLAG_SALVO_N - 1) - 0.5) * FLAG_SPREAD_DEG * D2R;
+          _bq.copy(_lane).sub(_subW).applyAxisAngle(UP, ang).add(_subW);
+          if (surfaceSAM(_subW, 'VLS', _bq, 1.2)) v.fire--;
+          v.fireT = FLAG_VLS_STAGGER;
+          if (v.fire <= 0) {
+            v.st = 'IDLE'; v.t = FLAG_SALVO_MIN + rand() * (FLAG_SALVO_MAX - FLAG_SALVO_MIN);
+            if (env.flagBeam) env.flagBeam.hide();
+            if (env.onSfx) env.onSfx('flagCharge', null, 0);
+          }
+        }
+      }
+    }
+  }
   // Gate frames face down the trench; matrices are static, so they are written once.
   const _cgM = new THREE.Matrix4(), _cgP = new THREE.Vector3(), _cgQ = new THREE.Quaternion(), _cgS = new THREE.Vector3(55 / 30, 3, 55 / 30);
   let canyonGatesBuilt = false;
@@ -2400,9 +2538,21 @@ export function createCombat(THREE, env) {
         if (C.ceil.fired >= C.ceil.rail) C.ceil.rail = 0;
       }
       if (C.ceil.salvoT <= 0 && C.samLive < CANYON_SAM_MAX) {
-        const sites = pickSamSites(_siteIdx, 3, true);
+        let sites = pickSamSites(_siteIdx, 6, true);
+        const pse = siteSectorOfPlayer();
+        const suppressed = pse >= 0 && sectorDead[pse] === 1;
+        if (suppressed) {
+          let k = 0;
+          for (let j = 0; j < sites; j++) {
+            const sec = siteSector(_siteIdx[j]);
+            if (sec >= 0 && sectorDead[sec]) continue;
+            _siteIdx[k++] = _siteIdx[j];
+          }
+          sites = k;
+        }
         if (sites > 0) {
-          const n = Math.min(CANYON_SAM_MAX - C.samLive, CEIL_SALVO_MIN + (rand() * (CEIL_SALVO_MAX - CEIL_SALVO_MIN + 1) | 0));
+          let n = Math.min(CANYON_SAM_MAX - C.samLive, CEIL_SALVO_MIN + (rand() * (CEIL_SALVO_MAX - CEIL_SALVO_MIN + 1) | 0));
+          if (suppressed) n = Math.max(1, n >> 1);
           for (let i = 0; i < n; i++) SALVO_Q[i] = _siteIdx[i % sites];
           C.ceil.rail = n; C.ceil.fired = 0; C.ceil.railT = 0; C.ceil.salvoT = CEIL_SALVO_CD;
           C.ceilLaunchBanner = performance.now();
@@ -2904,6 +3054,7 @@ export function createCombat(THREE, env) {
       if (!m.motor && m.age > (m.motorDelay || 0.18)) { m.motor = true; m.plume.visible = true; }
       const speed = m.vel.length();
       if (m.motor) {
+        if (m.homingDelay > 0) m.homingDelay = Math.max(0, m.homingDelay - dt);
         const burning = m.age < 3.2;
         const fwd = _mFwd.copy(m.vel).normalize();
         m.vel.addScaledVector(fwd, (burning ? 320 : -40) * dt);
@@ -2979,7 +3130,7 @@ export function createCombat(THREE, env) {
               say('MISSILE DEFEATED!', 1.6);
             }
           }
-          if (!m.lostTrack) {
+          if (!m.lostTrack && !(m.homingDelay > 0)) {
             _mLosRate.copy(_mLos).sub(m.losPrev).divideScalar(Math.max(dt, 1e-4));
             m.losPrev.copy(_mLos);
             const vc = -_mRelVel.copy(tgt.vel).sub(m.vel).dot(_mLos);
@@ -3003,7 +3154,13 @@ export function createCombat(THREE, env) {
               }
               else if (tgt.isChaff) { explosion(pos, 0.5); }
               else if (tgt.isFlare) { explosion(pos, 0.6); tgt.alive = false; }
-              else if (tgt.fleet) { explosion(pos, 1.3, { kind: 'ship' }); damageSurface(tgt, 90); }          // ship: multi-hit
+              else if (tgt.fleet) {
+                explosion(pos, 1.3, { kind: 'ship' });
+                if (tgt.sub && tgt.sub.on && pos.distanceTo(subWorld(tgt, _subW)) < SUB_HIT_R) { hitSub(tgt, 2); damageSurface(tgt, 22); }
+                else damageSurface(tgt, 90);
+              }
+              else if (tgt.isSub && tgt.ship) { explosion(pos, 0.8); hitSub(tgt.ship, 2); }
+              else if (tgt.isSite) { explosion(pos, 0.8); hitSite(tgt.idx, 2); }
               else { explosion(pos, 0.8, { vel: tgt.vel }); heavyHit(tgt, m.wingman ? 'WINGMAN' : m.aam ? 'AAM4' : m.friendly ? 'BASE' : undefined); }
               logShot(m, tgt.isChaff ? 'CHAFF' : tgt.isFlare ? 'FLARE' : 'HIT');
               if (m.sam) { C.samLive = Math.max(0, C.samLive - 1); if (m.target && m.target.isPlayer) C.samHit++; }
@@ -3289,6 +3446,12 @@ export function createCombat(THREE, env) {
       if (t.strike && d < STRIKE_SPLASH) { damageSurface(t, t.hpMax * 0.75); continue; }
       if (d < BOMB_RADIUS + t.r * 0.5) damageSurface(t, 160 * (1 - d / (BOMB_RADIUS + t.r * 0.5)) + 20);
     }
+    // Weak points take blast damage without changing the ship's hull HP.
+    for (let i = 0; i < SUB_TGT.length; i++) {
+      const v = SUB_TGT[i];
+      if (v.alive && v.ship && pos.distanceTo(subWorld(v.ship, _subW)) < SUB_HIT_R * 1.5) hitSub(v.ship, 2);
+    }
+    for (let i = 0; i < SITE_TGT.length; i++) if (SITE_ON[i] && RIM_SITES[i].distanceTo(pos) < SITE_HIT_R * 1.5) hitSite(i, 2);
     if (playerActiveNow && S.position.distanceTo(pos) < BOMB_RADIUS * 0.8) damagePlayer(30);
   }
   // Water geyser or ground fireball (bombs and crashing wrecks).
@@ -3693,6 +3856,13 @@ export function createCombat(THREE, env) {
     if (t.hp <= 0) destroySurface(t);
   }
   function updateSurface(dt) {
+    // Keep pooled weak-point targets in sync before any hit test this frame.
+    for (let i = 0; i < SUB_TGT.length; i++) {
+      const v = SUB_TGT[i];
+      if (v.ship && v.ship.alive && v.ship.sub.on) { subWorld(v.ship, v.pos); v.alive = true; }
+      else { v.alive = false; v.ship = null; }
+    }
+    for (let i = 0; i < SITE_TGT.length; i++) SITE_TGT[i].alive = SITE_ON[i] === 1;
     let anyAlive = false;
     for (const t of surface) {
       if (t.spin) t.spin.rotation.y += dt * (t.alive ? 1.6 : 0);
@@ -3731,17 +3901,48 @@ export function createCombat(THREE, env) {
   }
   // Ground-map designation for >UGB: nearest live target within 45 deg of the
   // flight path and 25 km. cycle=true picks the next one by range.
+  const _gcPool = Array.from({ length: 64 }, () => ({ t: null, d: 0, ang: 0 })), _gcOut = [];
+  const _gcV = { x: 0, z: 0 };
   function groundCandidates() {
+    _gcOut.length = 0;
     const mp = env.getMapProps && env.getMapProps();
-    if (mp && !mp.islands && !mp.terrain) return [];
-    const vh = new THREE.Vector2(S.velocity.x, S.velocity.z);
-    if (vh.lengthSq() < 1) vh.set(0, -1);
-    vh.normalize();
-    return surface.filter(t => t.alive).map(t => {
+    if (mp && !mp.islands && !mp.terrain) return _gcOut;
+    _gcV.x = S.velocity.x; _gcV.z = S.velocity.z;
+    let vl = Math.hypot(_gcV.x, _gcV.z);
+    if (vl < 1) { _gcV.x = 0; _gcV.z = -1; vl = 1; }
+    _gcV.x /= vl; _gcV.z /= vl;
+    let n = 0;
+    const add = t => {
+      if (!t || !t.alive || n >= _gcPool.length) return;
       const dx = t.pos.x - S.position.x, dz = t.pos.z - S.position.z, d = Math.hypot(dx, dz);
-      const ang = Math.acos(clamp((dx * vh.x + dz * vh.y) / Math.max(d, 1), -1, 1));
-      return { t, d, ang };
-    }).filter(c => c.d < 25000 && c.ang < 45 * D2R).sort((a, b) => (b.t.strike ? 1 : 0) - (a.t.strike ? 1 : 0) || a.d - b.d);
+      if (d > 25000) return;
+      const ang = Math.acos(clamp((dx * _gcV.x + dz * _gcV.z) / Math.max(d, 1), -1, 1));
+      if (ang > 45 * D2R) return;
+      const c = _gcPool[n++]; c.t = t; c.d = d; c.ang = ang;
+    };
+    for (const t of surface) add(t);
+    // Linked weak points become ground-designatable virtual targets.
+    for (let i = 0; i < SUB_TGT.length; i++) {
+      const v = SUB_TGT[i];
+      if (v.ship && v.ship.alive && v.ship.sub.on) { subWorld(v.ship, v.pos); v.alive = true; }
+      else { v.alive = false; v.ship = null; }
+      add(v);
+    }
+    const canyon = !!(C.mcfg && C.mcfg.ceiling);
+    for (let i = 0; i < SITE_TGT.length; i++) {
+      const v = SITE_TGT[i];
+      v.alive = canyon && SITE_ON[i] === 1;
+      if (v.alive) add(v);
+    }
+    // Insertion sort, strike targets first then by range (no array allocations).
+    for (let i = 1; i < n; i++) {
+      const c = _gcPool[i]; let j = i - 1;
+      while (j >= 0 && ((_gcPool[j].t.strike ? 1 : 0) < (c.t.strike ? 1 : 0) ||
+        ((_gcPool[j].t.strike ? 1 : 0) === (c.t.strike ? 1 : 0) && _gcPool[j].d > c.d))) { _gcPool[j + 1] = _gcPool[j]; j--; }
+      _gcPool[j + 1] = c;
+    }
+    for (let i = 0; i < n; i++) _gcOut.push(_gcPool[i]);
+    return _gcOut;
   }
   function autoGroundTarget() {
     const g = C.groundTgt;
@@ -4294,15 +4495,16 @@ export function createCombat(THREE, env) {
   const PLAYER_TGT = { pos: S.position, vel: S.velocity, alive: true, isPlayer: true };
   function samsInAir() { let n = 0; for (const m of missiles) if (m.active && m.sam) n++; return n; }
   // Surface-to-air launch from a mount: boost up and toward the player.
-  function surfaceSAM(from, label) {
+  function surfaceSAM(from, label, aim, lockDelay) {
     if (C.samLive >= CANYON_SAM_MAX) return false;
-    _dv.copy(S.position).sub(from).normalize().lerp(UP, 0.45).normalize();
+    if (aim) _dv.copy(aim).sub(from).normalize();
+    else _dv.copy(S.position).sub(from).normalize().lerp(UP, 0.45).normalize();
     _q.setFromUnitVectors(MSL_NOSE, _dv);
     const m = launch(_da.copy(from), _q, _db.copy(_dv).multiplyScalar(SAM_V), PLAYER_TGT, true, SAM_Q, undefined, 'PN', 'SAM');
     if (!m) return false;
     m.sam = true; m.kind = 'SAM'; m.life = SAM_LIFE; m.samLabel = label;
     m.samFlared = rand() < 0.55;                          // one decoy decision per missile
-    m.maskT = 0;
+    m.maskT = 0; m.homingDelay = lockDelay || 0;
     C.samLive++; C.samLaunched++;
     if (env.samPuff) env.samPuff(_da.copy(from));
     if (env.onSfx) env.onSfx('sam', null, C.samLive);
@@ -4374,8 +4576,9 @@ export function createCombat(THREE, env) {
         }
       }
       // AAA flak bursts around the predicted position.
-      t.flakCD -= dt;
-      if (dist < 4800 && S.position.y > 120 && t.flakCD <= 0) {
+      if (t.aaOff) { t.flakCD = 1; t.aaCD = AA_CD; t.aaLeft = 0; }
+      else t.flakCD -= dt;
+      if (!t.aaOff && dist < 4800 && S.position.y > 120 && t.flakCD <= 0) {
         t.flakCD = 0.55 + rand() * 0.6;
         if (!occluded(_da.copy(t.pos).setY(t.aimH + 6), S.position)) {
           _dv.set(rand() - 0.5, rand() - 0.5, rand() - 0.5).normalize().multiplyScalar(35 + rand() * 150);
@@ -4383,7 +4586,7 @@ export function createCombat(THREE, env) {
         }
       }
       // Deck AAA: 8-round bursts, 900 m/s, 0.6 lead with a 1.8 deg cone.
-      if (dist < AA_RANGE && S.position.y < AA_ALT) {
+      if (!t.aaOff && dist < AA_RANGE && S.position.y < AA_ALT) {
         t.aaCD = (t.aaCD || 0) - dt;
         if (t.aaCD <= 0) { t.aaCD = AA_CD; t.aaLeft = 8; }
         if (t.aaLeft > 0) {
@@ -4403,9 +4606,9 @@ export function createCombat(THREE, env) {
           if (rand() < 0.12 && env.onSfx) env.onSfx('aaa', _db, 0.4);
         }
       }
-      // Shipborne SAM.
-      t.samCD -= dt;
-      if (t.samMount !== false && t.samCD <= 0 && dist < 7500 && S.position.y > 260) {
+      // Shipborne SAM (silenced once the radar/AA mast is destroyed).
+      if (t.aaOff) t.samCD = 1; else t.samCD -= dt;
+      if (!t.aaOff && t.samMount !== false && t.samCD <= 0 && dist < 7500 && S.position.y > 260) {
         t.samCD = t.staged ? SHIP_SAM_CD : 16 + rand() * 8;
         mountWorld(t, t.sams[Math.floor(rand() * t.sams.length)], _fp);
         if (!occluded(_fp, S.position) && !surfaceSAM(_fp.clone(), t.kind)) t.samCD = 2 + rand() * 2;   // director said wait
@@ -4950,6 +5153,7 @@ export function createCombat(THREE, env) {
     updateGunHeat(dt, opts.firing);
     updateDamage(dt, playerActive);
     updateSurface(dt);
+    updateFlagSalvo(dt);
 
     // Projectiles and hits.
     const seg = new THREE.Vector3(), cp = new THREE.Vector3();
@@ -4970,6 +5174,20 @@ export function createCombat(THREE, env) {
         interceptMissile(m, Math.sqrt(d2), _segHit);
         return true;
       }
+      // Linked weak points: gun rounds can cripple a mast or a rim battery.
+      let weakHit = false;
+      for (let i = 0; i < SUB_TGT.length && !weakHit; i++) {
+        const v = SUB_TGT[i];
+        if (!v.alive || !v.ship) continue;
+        if (performance.now() / 1000 - v.ship.sub.lastGunT < 0.1) continue;
+        if (segHit(b, v.pos, SUB_HIT_R)) { v.ship.sub.lastGunT = performance.now() / 1000; hitSub(v.ship, 1); weakHit = true; }
+      }
+      for (let i = 0; i < SITE_TGT.length && !weakHit; i++) {
+        const v = SITE_TGT[i];
+        if (!v.alive) continue;
+        if (segHit(b, v.pos, SITE_HIT_R)) { hitSite(v.idx, 1); weakHit = true; }
+      }
+      if (weakHit) { hitSparks(b.p, b.v); return true; }
       for (const t of surface) {
         if (t.alive && segHit(b, t.pos, t.r * 0.6)) { C.gunHitsP++; damageSurface(t, t.strike ? 3 : t.ship ? 0.8 : 2); hitSparks(b.p, b.v); return true; }
       }
@@ -5013,6 +5231,14 @@ export function createCombat(THREE, env) {
     configureMission(m, mapDef) {
       C.missionTitle = m.title; C.missionId = m.id; C.rtbType = m.rtbType; C.missionBgm = m.bgmScenario;
       C.wingOrder = 0; C.orderBadgeT = 0; resetLimp();
+      C.subKills = 0; C.siteKills = 0; C.flagBannerT = 0;
+      SITE_HPV.fill(SITE_HP); SITE_ON.fill(1); sectorDead.fill(0);
+      for (const t of stagedShips) {
+        t.aaOff = false; t.sub.on = !!SUB_OFF[t.kind]; t.sub.hp = SUB_HP;
+        if (t.spin) t.spin.visible = true;
+        t.salvo.st = 'IDLE'; t.salvo.fire = 0; t.salvo.t = FLAG_SALVO_MIN + rand() * (FLAG_SALVO_MAX - FLAG_SALVO_MIN);
+      }
+      if (env.flagBeam) env.flagBeam.hide();
       C.mcfg = missionConfig(m);
       C.stage = 0; C.stageT = 0; C.gateIdx = 0;
       C.samSitesOn = C.mcfg.gatesPath === 'CANYON';
@@ -5087,8 +5313,25 @@ export function createCombat(THREE, env) {
     },
     get allyRoot() { return C.ally ? (C.ally.root || C.ally.g) : null; },
     get rimSites() { return RIM_SITES; },               // ambient.js searchlights (read-only)
+    // Ambient flak density follows live AA masts; positions are a reused Float32Array.
+    get activeAAShips() {
+      let n = 0;
+      for (const t of stagedShips) if (t.alive && !t.aaOff && n < 16) { _aaPos[n++] = t.pos.x; _aaPos[n++] = t.pos.z; }
+      AA_SHIPS_N = n >> 1;
+      return AA_SHIPS_OBJ;
+    },
     setBaseDefencesVisible(v) { for (const g of baseDefG) g.visible = !!v; },
     get strikeTargets() { return strikeTargets; },
+    get siteOn() { return SITE_ON; },
+    get weakTargets() {
+      _weakOut.length = 0;
+      for (let i = 0; i < SUB_TGT.length; i++) if (SUB_TGT[i].alive) _weakOut.push(SUB_TGT[i]);
+      for (let i = 0; i < SITE_TGT.length; i++) if (SITE_TGT[i].alive) _weakOut.push(SITE_TGT[i]);
+      return _weakOut;
+    },
+    killSite(i) { return hitSite(i | 0, SITE_HP); },
+    killSub(i) { const t = stagedShips[i | 0]; return t ? hitSub(t, SUB_HP) : false; },
+    forceSalvo() { const t = stagedShips.find(s => s.alive && s.kind === 'CV_FLAG'); if (!t) return false; t.salvo.st = 'TELEGRAPH'; t.salvo.t = FLAG_TELE_S; C.flagBannerT = performance.now(); return true; },
     killStrikes() { for (const t of strikeTargets) if (t.alive) destroySurface(t); return strikeTargets.filter(t => t.alive).length; },
     killStrike(id) { const t = strikeTargets.find(x => x && x.id === id) || strikeTargets[0]; if (t && t.alive) damageSurface(t, 999); return t ? t.id : null; },
     get lockables() { return lockables(); },               // bandits + live task-force ships (HUD target boxes)
@@ -5113,6 +5356,7 @@ export function createCombat(THREE, env) {
     debugEngineFire(side) { C.fireArmed = true; return igniteEngine('DEBUG', side); },
     setRelightForce(v) { C.relightForce = v || null; },
     get taskForce() { return taskForce; },
+    get stagedShips() { return stagedShips; },
     get sector() { return C.sector || null; },
     // Debug: jump straight to a phase (1 strait sweep, 2 fleet + bombers, 3 canyon Ace).
     spawnPhase(p) { C.wave = Math.floor(C.wave / 3) * 3 + (p - 1); spawnWave(); },
@@ -5225,6 +5469,9 @@ export function createCombat(THREE, env) {
         tracers: playerTracers.list.length, enemyTracers: enemyTracers.list.length, missiles: missiles.filter(m => m.active).length, wave: C.wave,
         aceRounds: C.aceRounds || 0, aceHits: C.aceHits || 0, blockedLaunches: C.blockedLaunches || 0,
         samLaunched: C.samLaunched || 0, samFlared: C.samFlared || 0, samMasked: C.samMasked || 0, samHit: C.samHit || 0, samLive: C.samLive || 0,
+        subKills: C.subKills || 0, siteKills: C.siteKills || 0,
+        weak: { sites: Array.from(SITE_ON).reduce((a, b) => a + b, 0), sectors: Array.from(sectorDead).reduce((a, b) => a + b, 0),
+          salvos: stagedShips.filter(t => t.kind === 'CV_FLAG').map(t => t.salvo.st + ':' + t.salvo.fire).join(',') },
         tgt: { armed: C.seekerArmed, wpn: C.weapon, multi: C.multi.map((e, i) => e.label.slice(-2) + ':' + C.multiState[i][0]).join(' '), locked: C.multiLocked,
           aam4: C.aam4, aamRld: +C.aam4Reload.toFixed(1), aamFired: C.aamFired || 0, ripple: ripple.length,
           aamLive: missiles.filter(m => m.active && m.aam).map(m => (m.target && m.target.label ? m.target.label.slice(-2) : 'dumb') + '@' + (m.target && m.target.pos ? Math.round(m.target.pos.distanceTo(m.mesh.position)) : '-')).join(' ') },

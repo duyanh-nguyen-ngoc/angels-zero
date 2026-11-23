@@ -887,6 +887,48 @@ export function createVFX(THREE, env) {
     get stats() { return { trails: samTrails.filter(r => r.mesh.visible).length }; }
   };
 
+  /* ----------------------------- flagship VLS charge beam (single pooled mesh) */
+  const flagGeo = new THREE.CylinderGeometry(1.2, 1.2, 1, 8, 1, true);
+  flagGeo.translate(0, 0.5, 0);                         // base at the local origin
+  const flagMat = new THREE.ShaderMaterial({
+    uniforms: { uCharge: { value: 0 }, uTime: { value: 0 } },
+    vertexShader: LOG_V + `
+      varying float vAx;
+      void main() { vAx = clamp(position.y, 0.0, 1.0);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        #include <logdepthbuf_vertex>
+      }`,
+    fragmentShader: LOG_F + `
+      uniform float uCharge; uniform float uTime; varying float vAx;
+      void main() {
+        #include <logdepthbuf_fragment>
+        float pulse = 0.5 + 0.5 * sin(uTime * (2.0 + 8.0 * uCharge));
+        float a = (0.15 + 0.45 * uCharge) * (0.6 + 0.4 * pulse) * (1.0 - vAx * 0.25);
+        if (a < 0.004) discard;
+        gl_FragColor = vec4(1.0, 0.16 + 0.1 * pulse, 0.12, a);
+      }`,
+    transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending
+  });
+  const flagMesh = new THREE.Mesh(flagGeo, flagMat);
+  flagMesh.frustumCulled = false; flagMesh.visible = false; scene.add(flagMesh);
+  const _fbA = new THREE.Vector3(), _fbB = new THREE.Vector3(), _fbD = new THREE.Vector3(), _fbQ = new THREE.Quaternion();
+  const flagBeam = {
+    set(from, to, charge) {
+      _fbD.subVectors(to, from);
+      const len = _fbD.length();
+      if (len < 0.001) { flagMesh.visible = false; return; }
+      _fbD.divideScalar(len);
+      _fbQ.setFromUnitVectors(_fbA.set(0, 1, 0), _fbD);
+      flagMesh.position.copy(from);
+      flagMesh.quaternion.copy(_fbQ);
+      flagMesh.scale.set(1, len, 1);
+      flagMat.uniforms.uCharge.value = Math.max(0, Math.min(1, charge));
+      flagMat.uniforms.uTime.value = performance.now() / 1000;
+      flagMesh.visible = true;
+    },
+    hide() { flagMesh.visible = false; }
+  };
+
   /* ----------------------------------- ship AAA / enemy gun tracers (pooled) */
   const AA_TRACER_N = 128;
   const aaGeo = new THREE.BufferGeometry();
@@ -1601,8 +1643,8 @@ export function createVFX(THREE, env) {
   return {
     attachPlume,
     setWingtips(l, r) { tipL.copy(l); tipR.copy(r); buildVapor(); },
-    clearTrails() { for (const r of ribbons) r.clear(); for (const r of contrails) r.clear(); contrailStats.active = contrailStats.live = 0; vaporTarget = lexTarget = 0; for (const q of sprayP) q.on = false; vaporLevel = 0; vaporPoints.visible = false; catSteam.reset(); rooster.reset(); wake.reset(); samFx.clear(); },
-    catSteam, aaTracer, spray: rooster, wake, samFx,
+    clearTrails() { for (const r of ribbons) r.clear(); for (const r of contrails) r.clear(); contrailStats.active = contrailStats.live = 0; vaporTarget = lexTarget = 0; for (const q of sprayP) q.on = false; vaporLevel = 0; vaporPoints.visible = false; catSteam.reset(); rooster.reset(); wake.reset(); samFx.clear(); flagBeam.hide(); },
+    catSteam, aaTracer, spray: rooster, wake, samFx, flagBeam,
     updateContrails,
     get contrailStats() { return contrailStats; },
     update,

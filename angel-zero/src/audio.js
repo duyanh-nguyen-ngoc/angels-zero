@@ -9,7 +9,7 @@
 // to the procedural layers below. A master "hearing tunnel" low-pass sweeps
 // 12 kHz -> 550 Hz as the pilot approaches G-LOC.
 
-import { MISSIONS } from './missions.js?v=s96e';
+import { MISSIONS } from './missions.js?v=s97d';
 
 export function createAudio() {
   let ctx = null, master = null, cockpitLP = null, ready = false;
@@ -274,6 +274,11 @@ export function createAudio() {
     N.mist.connect(N.mistHP).connect(N.mistBP).connect(N.mistG).connect(cockpitLP);
     N.mistLFO = osc('square', 17); N.mistAM = gain(0);
     N.mistLFO.connect(N.mistAM).connect(N.mistG.gain);
+    // Flagship VLS charge: one persistent square tone with a pulse AM.
+    N.flagOsc = osc('square', 880); N.flagBP = filt('bandpass', 1100, 1.2);
+    N.flagG = gain(0); N.flagLFO = osc('square', 2); N.flagAM = gain(0);
+    N.flagOsc.connect(N.flagBP).connect(N.flagG).connect(master);
+    N.flagLFO.connect(N.flagAM).connect(N.flagG.gain);
 
     // Sea-skim rooster-tail rush + low hull rumble, both gated by setSpray().
     N.sprayNoise = loopNoise(N.whiteBuf); N.sprayHP = filt('highpass', 300, 0.7);
@@ -1705,6 +1710,15 @@ export function createAudio() {
 
   // Sea-skim audio: stores scalars only; the continuous mix ramps the nodes.
   function setSpray(k, kt) { sprayK = k || 0; sprayKt = kt || 0; }
+  // charge 0..1: pitch 880 -> 1760 Hz, pulse 2 -> 10 Hz, gain ramps with charge.
+  function setFlagCharge(charge) {
+    const k = Math.max(0, Math.min(1, charge || 0));
+    if (!ready || !N.flagOsc) return;
+    set(N.flagOsc.frequency, 880 + 880 * k, 0.08);
+    set(N.flagLFO.frequency, 2 + 8 * k, 0.08);
+    set(N.flagAM.gain, 0.02 + 0.05 * k, 0.08);
+    set(N.flagG.gain, k > 0 ? 0.035 + 0.04 * k : 0, 0.06);
+  }
 
   /* ------------------------------------------------------ continuous mix */
   function update(p) {
@@ -1841,7 +1855,7 @@ export function createAudio() {
   }
 
   return {
-    init, resume, suspend, update, updateMusic, setSpray, enemyGun, gunhit, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, samLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, setBgmPause, bumpBgmDwell() { dwell = MIN_DWELL; }, setBgmForce: v => { bgmForce = v || ''; }, switchTo, selectTrack, skip, setAuto, onBgmChange, get bgmTracks() { return allTracks() || []; }, radioSquelch, preloadRadio, playRadio, stopRadio, txOpen, txTail, txClose, preload,
+    init, resume, suspend, update, updateMusic, setSpray, setFlagCharge, enemyGun, gunhit, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, samLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, setBgmPause, bumpBgmDwell() { dwell = MIN_DWELL; }, setBgmForce: v => { bgmForce = v || ''; }, switchTo, selectTrack, skip, setAuto, onBgmChange, get bgmTracks() { return allTracks() || []; }, radioSquelch, preloadRadio, playRadio, stopRadio, txOpen, txTail, txClose, preload,
     get radioAnalyser() { return N.rAnalyser || null; }, get radioFreq() { return N.rFreq || null; }, get radioTime() { return N.rTime || null; },
     get radioCh() { return RADIO_CH; },
     get radioDsp() { return { pttOpen: !!N.pttOpen, pttTail: !!N.pttTail, static: !!N.rStatic, hp: N.rHP ? N.rHP.frequency.value : 0,

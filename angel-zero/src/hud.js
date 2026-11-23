@@ -6,7 +6,7 @@
 // clipped to the 3D combiner glass. Square tactical radar (bottom-left), stores
 // list + F-15C silhouette with per-pylon AIM-9 reload icons (bottom-right),
 // open-corner target brackets, edge pointers, minimal top-left telemetry.
-import { SPW } from './loadout.js?v=s96e';
+import { SPW } from './loadout.js?v=s97d';
 
 export function createHUD(THREE, A) {
   const canvas = A.canvas;
@@ -1353,6 +1353,22 @@ export function createHUD(THREE, A) {
     ctx.restore();
   }
 
+  // Linked weak points: small cyan ◇ AA / ◇ SITE boxes beside the ship or rim battery.
+  function drawWeakTargets(ctx) {
+    const list = A.getWeakTargets ? A.getWeakTargets() : null;
+    if (!list || !list.length) return;
+    ctx.save();
+    for (const t of list) {
+      _st.copy(t.pos); _st.y += (t.isSub ? 24 : 10);
+      const p = toScreen(_st);
+      if (!p.ok || p.x < 12 || p.x > HW - 12 || p.y < 12 || p.y > HH - 12) continue;
+      glow(ctx, '#5fe8ff', 4); ctx.strokeStyle = '#5fe8ff'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(p.x, p.y - 6); ctx.lineTo(p.x + 6, p.y); ctx.lineTo(p.x, p.y + 6); ctx.lineTo(p.x - 6, p.y); ctx.closePath(); ctx.stroke();
+      ctx.font = f(10, true); ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      labelText(ctx, t.isSub ? '◇ AA' : '◇ SITE', p.x, p.y + 8, '#5fe8ff', 3);
+    }
+    ctx.restore();
+  }
   const musicToast = { t: 0, text: '' };
   function drawCenterBanners(ctx, g) {
     const now = performance.now();
@@ -1391,6 +1407,11 @@ export function createHUD(THREE, A) {
       const age = now - C.wingOrderT;
       const label = '[ WINGMEN // ' + (WING_ORDER_NAMES[C.wingOrder] || 'FORM') + ' ]';
       drawBanner(ctx, cx, upperY + 72, label, '#5fe8ff', 340, 1 - age / 1600);
+    }
+    if (C.flagSalvoActive) {
+      const secs = Math.max(1, Math.ceil(C.flagSalvoT || 0));
+      const a = 0.55 + 0.45 * (Math.floor(now / 125) % 2);
+      drawBanner(ctx, cx, upperY + 180, '[ FLAGSHIP SALVO — BREAK! ] ' + secs, '#ff3b4d', 430, a);
     }
     if (C.interceptBannerT && now - C.interceptBannerT < 2500) {
       const age = now - C.interceptBannerT;
@@ -1880,7 +1901,7 @@ export function createHUD(THREE, A) {
     }
 
     if (!C.dead) { drawTargets(hctx); drawWingmen(hctx); }
-    drawStrikeTargets(hctx);
+    drawStrikeTargets(hctx); drawWeakTargets(hctx);
     drawRadio(hctx);
     drawTopLeft(hctx);
     if (!C.dead) drawKillFlash(hctx, g);

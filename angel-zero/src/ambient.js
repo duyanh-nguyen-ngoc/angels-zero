@@ -9,7 +9,7 @@
 // disposed — configure()/reset() only toggle flags and visibility, so switching
 // missions can never leak one theatre's props into another.
 
-import { GORGE_FLOOR_Y, GORGE_GATE_Z, GORGE_GATE_N, gorgeCentreX } from './maps.js?v=s96e';
+import { GORGE_FLOOR_Y, GORGE_GATE_Z, GORGE_GATE_N, gorgeCentreX } from './maps.js?v=s97d';
 
 const WIND_X = 6.0, WIND_Z = -2.5;
 const SKY_BLEND_S = 18, RTB_BLEND_S = 25;
@@ -148,9 +148,15 @@ export function createAmbient(THREE, env) {
   let flakHead = 0, flakAcc = 0, flakLive = 0;
   function spawnFlak() {
     if (!cs) return;
-    const ships = cs.taskForce;
+    const aa = cs.activeAAShips;
     let cx = 0, cz = 0, n = 0;
-    for (let i = 0; i < ships.length; i++) { const t = ships[i]; if (t.alive && t.g && t.g.visible) { cx += t.pos.x; cz += t.pos.z; n++; } }
+    if (aa && aa.n > 0) {
+      for (let i = 0; i < aa.n; i++) { cx += aa.positions[i * 2]; cz += aa.positions[i * 2 + 1]; }
+      n = aa.n;
+    } else {
+      const ships = cs.taskForce;
+      for (let i = 0; i < ships.length; i++) { const t = ships[i]; if (t.alive && t.g && t.g.visible) { cx += t.pos.x; cz += t.pos.z; n++; } }
+    }
     if (!n) return;
     cx /= n; cz /= n;
     const P = S.position, minD2 = FLAK_MIN_PLAYER_D * FLAK_MIN_PLAYER_D;
@@ -301,11 +307,12 @@ export function createAmbient(THREE, env) {
   const searchMesh = new THREE.InstancedMesh(searchGeo, searchMat, SEARCH_N);
   searchMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   searchMesh.frustumCulled = false; searchMesh.visible = false; scene.add(searchMesh);
-  const searchBase = new Float32Array(SEARCH_N * 3), searchDir = new Float32Array(SEARCH_N * 3);
+  const searchBase = new Float32Array(SEARCH_N * 3), searchDir = new Float32Array(SEARCH_N * 3), searchSite = new Int16Array(SEARCH_N).fill(-1);
   {
     const sites = cs && cs.rimSites;
     for (let i = 0; i < SEARCH_N; i++) {
-      const s = sites && sites[(i * 2) % sites.length];
+      searchSite[i] = (i * 2) % Math.max(1, sites ? sites.length : 1);
+      const s = sites && sites[searchSite[i]];
       if (s) { searchBase[i * 3] = s.x; searchBase[i * 3 + 1] = s.y + 10; searchBase[i * 3 + 2] = s.z; }
       else { const z = GORGE_GATE_Z[i % GORGE_GATE_N]; searchBase[i * 3] = gorgeCentreX(z) + 300; searchBase[i * 3 + 1] = GORGE_FLOOR_Y + 300; searchBase[i * 3 + 2] = z; }
     }
@@ -328,7 +335,9 @@ export function createAmbient(THREE, env) {
       searchDir[b] = dx; searchDir[b + 1] = dy; searchDir[b + 2] = dz;
       _a0.set(searchBase[b], searchBase[b + 1], searchBase[b + 2]);
       _aq.setFromUnitVectors(_down, _a2.set(dx, dy, dz));
-      _a3.set(1, 1, 1); _am.compose(_a0, _aq, _a3);
+      const dead = cs && cs.siteOn && searchSite[i] >= 0 && cs.siteOn[searchSite[i]] === 0;
+      _a3.set(dead ? 0 : 1, dead ? 0 : 1, dead ? 0 : 1);
+      _am.compose(_a0, _aq, _a3);
       searchMesh.setMatrixAt(i, _am);
     }
     searchMesh.count = SEARCH_N; searchMesh.visible = true;
