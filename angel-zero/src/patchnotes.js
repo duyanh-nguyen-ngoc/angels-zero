@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.37', title: 'DLZ, TTI & JHMCS', bullets: [
+    'A live dynamic launch zone bar now sits beside the altitude tape, with Rmax / Rne / Rmin marks, a range caret and closing velocity; fired missiles report a counting TTI that flips to PITBULL inside 1.5 s.',
+    'In the cockpit, holding Free Look brings up a JHMCS helmet sight with airspeed, altitude, heading, boresight reference and target diamonds. QAAM seekers can acquire targets up to 65 degrees off the nose inside the helmet circle.',
+    'Both the DLZ and TTI feed the cockpit MFD repaint signature, so the extra symbology costs no draw calls at rest.'
+  ] },
   { version: 'v1.1.36', title: 'G-LOC PHYSIOLOGY', bullets: [
     'G-strain now builds faster from 4.8 G with a hold-then-drain recovery, gradually heavy controls, and a true 1.8 s blackout that unloads the jet and wakes you with blurred vision before control returns.',
     'AGSM breathing, a 4.5 G suit-inflation hiss, a pounding heartbeat, high-G tinnitus and a recovery gasp share a dedicated body-sound bus; the world and music muffles as you grey out.',

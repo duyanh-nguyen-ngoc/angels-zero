@@ -726,35 +726,35 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s9bf';
-import { createAmbient } from './src/ambient.js?v=s9bf';
-import { createBlastFX } from './src/blastfx.js?v=s9bf';
-import { createHUD } from './src/hud.js?v=s9bf';
-import { createCockpit3D } from './src/cockpit3d.js?v=s9bf';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9bf';
-import { createEjection } from './src/eject.js?v=s9bf';
-import { createAudio } from './src/audio.js?v=s9bf';
-import { createRadio } from './src/radio.js?v=s9bf';
-import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9bf';
-import { createLivery } from './src/livery.js?v=s9bf';
-import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s9bf';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9bf';
-import { createCanopyFX } from './src/canopy.js?v=s9bf';
-import { createNVG } from './src/nvg.js?v=s9bf';
-import { createWorld, WORLD } from './src/world.js?v=s9bf';
-import { createSurfaces } from './src/surfaces.js?v=s9bf';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9bf';
-import { createFreeLook } from './src/freelook.js?v=s9bf';
-import { createCanopyGlass } from './src/canopyglass.js?v=s9bf';
-import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9bf';
-import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9bf';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9bf';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9bf';
-import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9bf';
-import { createRadioQueue } from './src/radioQueue.js?v=s9bf';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9bf';
+import { createVFX } from './src/vfx.js?v=s9c0';
+import { createAmbient } from './src/ambient.js?v=s9c0';
+import { createBlastFX } from './src/blastfx.js?v=s9c0';
+import { createHUD } from './src/hud.js?v=s9c0';
+import { createCockpit3D } from './src/cockpit3d.js?v=s9c0';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9c0';
+import { createEjection } from './src/eject.js?v=s9c0';
+import { createAudio } from './src/audio.js?v=s9c0';
+import { createRadio } from './src/radio.js?v=s9c0';
+import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9c0';
+import { createLivery } from './src/livery.js?v=s9c0';
+import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s9c0';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9c0';
+import { createCanopyFX } from './src/canopy.js?v=s9c0';
+import { createNVG } from './src/nvg.js?v=s9c0';
+import { createWorld, WORLD } from './src/world.js?v=s9c0';
+import { createSurfaces } from './src/surfaces.js?v=s9c0';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9c0';
+import { createFreeLook } from './src/freelook.js?v=s9c0';
+import { createCanopyGlass } from './src/canopyglass.js?v=s9c0';
+import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9c0';
+import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9c0';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9c0';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9c0';
+import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9c0';
+import { createRadioQueue } from './src/radioQueue.js?v=s9c0';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9c0';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
-  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9bf';
+  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9c0';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -1212,6 +1212,13 @@ const mcam = { held: false, heldT: 0, active: false, m: null, abortT: 0, k: 0 };
 const PAD_SLEW = 6.0, PAD_RETURN = 4.0, PAD_YAW_MAX = 2.79, PAD_PITCH_MIN = -0.61, PAD_PITCH_MAX = 1.66, PAD_CHASE_LOOK = 0.55;
 const pad = { held: false, k: 0, yaw: 0, pitch: 0 };
 const _padL = new THREE.Vector3(), _padQi = new THREE.Quaternion(), _padLook = new THREE.Vector3(), _padOff = new THREE.Vector3();
+// Helmet-cued look vector (single scratch set, no per-frame allocation).
+const _jlDir = new THREE.Vector3(), _jlEuler = new THREE.Euler(0, 0, 0, 'YXZ'), _jlWorld = new THREE.Vector3();
+function updateLookVector() {
+  _jlDir.set(0, 0, -1).applyEuler(_jlEuler.set(freeLook.view.pitch, freeLook.view.yaw, 0));
+  _jlWorld.copy(_jlDir).applyQuaternion(state.quaternion);
+  return _jlDir;
+}
 // Cloud punch + mission update beat.
 const PUNCH_MIN_V = 120, PUNCH_T = 0.45;
 let punchT = 0, punchCool = 0, lastInDeck = null, mupdateAt = -1e9;
@@ -3754,6 +3761,7 @@ function updateHeadG(dt) {
 function updateCameraAndVisuals(dt, now) {
   const q = state.quaternion;
   freeLook.update(dt);
+  updateLookVector();
   // The chase spring keeps its state in camera.position: undo last frame's free-look orbit first.
   const orbitWas = chaseOrbited; chaseOrbited = false;
   if (flightMode === 'EJECT') {
@@ -4437,6 +4445,13 @@ const combatSys = createCombat(THREE, { scene, camera, renderer, state, combat, 
   sectorAt: world.sectorAt, isTerrainOccluded: world.isTerrainOccluded, fleetLane: world.fleetLane, canyonCenter: world.canyonCenter,
   isReady: () => modelReady && flightMode === 'FLY', onPlayerDown: reason => triggerEject(reason), onSfx, onFlyby, onWing,
   onSlowMo: triggerSlowMo, getWingmen: () => wingmen, addBox: world.addBox, limpTrail,
+    getLook(out) {
+      out.active = firstPerson && freeLook.active && appMode === 'PLAY' && flightMode === 'FLY';
+      out.offBore = Math.acos(THREE.MathUtils.clamp(-_jlDir.z, -1, 1));
+      out.x = _jlWorld.x; out.y = _jlWorld.y; out.z = _jlWorld.z;
+      out.yaw = freeLook.view.yaw; out.pitch = freeLook.view.pitch;
+      return out;
+    },
     onHitStamp: (pos, kind) => hud.addStamp(pos, kind), onMissionUpdate: kind => missionUpdate(kind),
     onESM(on) { if (on) rq.say('OVERLORD: YOU ARE IN MY UMBRELLA, ANGEL — ESM LINK UP', { pri: 2, bypass: true, ch: 'AWACS' }); },
     onIntrusion(phase) {
@@ -4684,6 +4699,7 @@ const hud = createHUD(THREE, {
   getStrikeTargets: () => combatSys.strikeTargets,
   getWeakTargets: () => combatSys.weakTargets,
   getShortcut: () => combatSys.sc, getESM: () => combatSys.esm,
+  getLook: out => { out.active = firstPerson && freeLook.active; out.offBore = Math.acos(THREE.MathUtils.clamp(-_jlDir.z, -1, 1)); out.yaw = freeLook.view.yaw; out.pitch = freeLook.view.pitch; out.x = _jlWorld.x; out.y = _jlWorld.y; out.z = _jlWorld.z; return out; },
   getPad: () => pad, getPunch: punchValue, getRadarZoom: () => [4000, 10000, 25000][hud.radarZoom], getRadarPulse: () => hud.radarPulseT,
   getPrimary: () => combatSys.primaryTargets(),
   getCat: () => cat, getCatArmT: () => CAT_ARM_T, getCatMounted: () => !!(combat.ally && combat.ally.glbMounted),
@@ -5009,6 +5025,7 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
     const mupdateAtHook = Q.has('mupdateat') ? Q.get('mupdateat').split(':') : null;
     const punchAt = Q.has('punchat') ? Number(Q.get('punchat')) : -1;
     const gforceParts = Q.has('gforce') ? Q.get('gforce').split(':') : null;
+    const freelookAt = Q.has('freelookat') ? Q.get('freelookat').split(':') : null;
     const engOutAt = Q.has('engoutat') ? Q.get('engoutat').split(':') : null;
     const intrusionAt = Q.has('intrusionat') ? Number(Q.get('intrusionat')) : -1;
     const awacsAt = Q.has('awacsat') ? Number(Q.get('awacsat')) : -1;
@@ -5240,6 +5257,15 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
       if (padlockAt >= t0 && padlockAt < t1) { pad.held = true; console.log('[ANGELS_ZERO] padlock HOLD @', t1.toFixed(2)); }
       if (padlockAt >= 0 && padlockAt + 3 >= t0 && padlockAt + 3 < t1) { pad.held = false; console.log('[ANGELS_ZERO] padlock RELEASE @', t1.toFixed(2)); }
       if (mupdateAtHook && Number(mupdateAtHook[0]) >= t0 && Number(mupdateAtHook[0]) < t1) missionUpdate(mupdateAtHook[1] || 'test');
+      if (freelookAt && Number(freelookAt[0]) >= t0 && Number(freelookAt[0]) < t1 && !freeLook.active) {
+        const [ly, lp] = (freelookAt[1] || '0,0').split(',').map(Number);
+        freeLook.debugHold(true, ly || 0, lp || 0);
+        console.log('[ANGELS_ZERO] freelookat HOLD @', t1.toFixed(2), 'yaw', ly, 'pitch', lp);
+      }
+      if (freelookAt && Number(freelookAt[0]) + 3 >= t0 && Number(freelookAt[0]) + 3 < t1) {
+        freeLook.debugHold(false);
+        console.log('[ANGELS_ZERO] freelookat RELEASE @', t1.toFixed(2));
+      }
       if (gforceParts && Number(gforceParts[1]) >= t0 && Number(gforceParts[1]) < t1) {
         gforce.g = Number(gforceParts[0]) || 0; gforce.until = simTime + Math.max(0.5, Number(gforceParts[1]) || 1);
         console.log('[ANGELS_ZERO] gforce', gforce.g, 's', gforceParts[1]);
@@ -5391,6 +5417,7 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
       'aero', JSON.stringify({ aoa: +(state.alpha * 57.3).toFixed(1), beta: +(state.beta * 57.3).toFixed(1), kts: Math.round(state.speed * 1.94384),
         cl: +state.cl.toFixed(2), cd: +state.cd.toFixed(3), mass: Math.round(state.mass), p: +state.rollRate.toFixed(2), q: +state.pitchRate.toFixed(2), r: +state.yawRate.toFixed(2),
         vs: Math.round(state.velocity.y), fpvOff: +(Math.acos(Math.min(1, state.velocity.clone().normalize().dot(new THREE.Vector3(0, 0, -1).applyQuaternion(state.quaternion)))) * 57.3).toFixed(1) }),
+      ...(Q.get('dlz') === '1' ? ['dlz', JSON.stringify(combatSys.stats().dlz), 'tti', String(combatSys.stats().tti)] : []),
       'gloc', JSON.stringify({ G: +state.gLoad.toFixed(1), S: +state.gStrain.toFixed(2), pilotK: +state.pilotK.toFixed(2), gloc: +state.glocT.toFixed(2), neg: +state.gNeg.toFixed(2), bpm: audio.gmix && audio.gmix.bpm, lp: audio.gmix && Math.round(audio.gmix.lp), filter: glFilter, sfx: audio.sfxStatus }),
       'wx', JSON.stringify({ name: weather.active.name, rain: +weather.rainHere.toFixed(2), rainVis: weather.rainVisible, flashes: weather.lightningCount,
         gust: +weather.gust.g.toFixed(2), fog: +scene.fog.density.toFixed(6), layers: vfx.cloudLayers, cov: vfx.cloudCoverage,
@@ -5549,7 +5576,7 @@ if (DEBUG) {
     setESMDisabled: on => combatSys.setESMDisabled(on),
     get pad() { return pad; }, get punch() { return punchValue(); }, missionUpdate, get mupdateT() { return combat.mupdateT || 0; },
     get gState() { return { G: state.gLoad, S: state.gStrain, pilotK: state.pilotK, gloc: state.glocT, neg: state.gNeg, gPeak: state.gPeak, head: { y: head.y, z: head.z, r: head.r } }; },
-    get gPass() { return nvg && nvg.gActive ? nvg.gActive : false; },
+    get gPass() { return nvg && nvg.gActive ? nvg.gActive : false; }, get lookVec() { return { x: _jlWorld.x, y: _jlWorld.y, z: _jlWorld.z, offBore: Math.acos(THREE.MathUtils.clamp(-_jlDir.z, -1, 1)), active: freeLook.active }; },
     awardBrokenWing: k => combatSys.awardBrokenWing(k), forceIntrusion: () => combatSys.forceIntrusion(),
     ilsVisible, inCutscene, get missionT() { return missionT; }, applyMapProps,
     getCarrierBox() { const a = combat.ally; if (!a || !a.root) return null; const b = new THREE.Box3().setFromObject(a.root); return { min: b.min.toArray(), max: b.max.toArray() }; },

@@ -6,8 +6,8 @@
 // clipped to the 3D combiner glass. Square tactical radar (bottom-left), stores
 // list + F-15C silhouette with per-pylon AIM-9 reload icons (bottom-right),
 // open-corner target brackets, edge pointers, minimal top-left telemetry.
-import { SPW } from './loadout.js?v=s9bf';
-import { GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_FLOOR_Y } from './maps.js?v=s9bf';
+import { SPW } from './loadout.js?v=s9c0';
+import { GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_FLOOR_Y } from './maps.js?v=s9c0';
 
 export function createHUD(THREE, A) {
   const canvas = A.canvas;
@@ -132,6 +132,7 @@ export function createHUD(THREE, A) {
   }
   // Drone marker scratch: reused projection object, zero per-frame allocations.
   const _drScr = new THREE.Vector3(), _drPr = { x: 0, y: 0, ok: false }, _drCentroid = new THREE.Vector3();
+  const LOOKV = { active: false, offBore: 0, yaw: 0, pitch: 0, x: 0, y: 0, z: 0 };
   // Frost vignette gradient, rasterised once; only globalAlpha changes per frame.
   const frostCv = document.createElement('canvas'); frostCv.width = frostCv.height = 256;
   {
@@ -1348,6 +1349,88 @@ export function createHUD(THREE, A) {
     ctx.restore();
   }
 
+  function drawDLZ(ctx) {
+    const D = C.dlz;
+    if (!D || !D.on || C.dead) return;
+    const x = HW - 92, top = HH * 0.30, h = 120;
+    const scale = h / Math.max(1, D.rmax * 1.1);
+    const yy = r => top + h - THREE.MathUtils.clamp(r, 0, D.rmax * 1.1) * scale;
+    ctx.save();
+    ctx.font = f(11, true); ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.strokeStyle = '#00ff66'; ctx.fillStyle = '#00ff66'; ctx.lineWidth = 1;
+    noGlow(ctx);
+    ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, top + h); ctx.stroke();
+    // No-escape bracket.
+    const y1 = yy(D.rne), y0 = yy(D.rmin);
+    ctx.fillStyle = D.inNez ? 'rgba(0,255,102,0.45)' : 'rgba(0,255,102,0.18)';
+    ctx.fillRect(x - 7, y1, 6, Math.max(1, y0 - y1));
+    // Rmax / Rmin ticks.
+    for (const [r, lab] of [[D.rmax, 'MAX'], [D.rmin, 'MIN']]) {
+      const y = yy(r);
+      ctx.beginPath(); ctx.moveTo(x - 3, y); ctx.lineTo(x + 6, y); ctx.stroke();
+      ctx.fillText(lab + ' ' + Math.round(r / 100) * 100, x + 9, y);
+    }
+    // Range caret + closing velocity.
+    const yr = yy(D.r);
+    ctx.fillStyle = '#00ff66'; ctx.fillText('◄', x - 17, yr);
+    const vcKt = Math.round(D.vc * 1.94384 / 10) * 10;
+    ctx.fillText('VC ' + vcKt, x + 9, yr - 12);
+    // TTI readout under the bar.
+    if (C.tti !== undefined && Number.isFinite(C.tti)) {
+      const pit = C.pitbull, flash = !pit || Math.floor(performance.now() / 125) % 2 === 0;
+      ctx.font = f(12, true);
+      if (flash) ctx.fillText((pit ? 'PITBULL' : 'TTI ' + C.tti.toFixed(1) + 's') + ((C.multiLive || 0) > 1 ? ' ×' + C.multiLive : ''), x - 12, top + h + 18);
+    }
+    ctx.restore();
+  }
+  function drawJHMCS(ctx) {
+    if (!A.getLook || !A.isFirstPerson || !A.isFirstPerson()) return;
+    A.getLook(LOOKV);
+    if (!LOOKV.active) return;
+    const cx = HW / 2, cy = HH / 2, R = 45;
+    ctx.save();
+    ctx.font = f(11, true); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.strokeStyle = '#00ff66'; ctx.fillStyle = '#00ff66'; ctx.lineWidth = 1; noGlow(ctx);
+    // Helmet reticle: 90 px ring + centre pip.
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx - 5, cy); ctx.lineTo(cx + 5, cy); ctx.moveTo(cx, cy - 5); ctx.lineTo(cx, cy + 5); ctx.stroke();
+    // Flanks: KCAS left, altitude right.
+    ctx.textAlign = 'left'; ctx.fillText('KCAS ' + Math.round(S.speed * 1.94384), cx - R - 92, cy);
+    ctx.textAlign = 'right'; ctx.fillText('ALT ' + Math.round(S.position.y * 3.28084), cx + R + 92, cy);
+    // Heading caret from look direction.
+    const hd = ((Math.atan2(LOOKV.x, -LOOKV.z) / (Math.PI / 180)) + 360) % 360;
+    ctx.textAlign = 'center';
+    ctx.fillText('▴ ' + Math.round(hd).toString().padStart(3, '0') + '°', cx, cy - R - 18);
+    // Nose reference.
+    _drScr.set(0, 0, -1).applyQuaternion(S.quaternion).multiplyScalar(1000).add(S.position);
+    const np = droneScreen(_drScr);
+    if (np.ok) {
+      ctx.beginPath(); ctx.moveTo(np.x - 5, np.y - 5); ctx.lineTo(np.x + 5, np.y + 5);
+      ctx.moveTo(np.x + 5, np.y - 5); ctx.lineTo(np.x - 5, np.y + 5); ctx.stroke();
+    }
+    const ob = LOOKV.offBore * 180 / Math.PI;
+    ctx.fillText('OB ' + Math.round(ob) + '°', cx, cy + R + 18);
+    // Targets inside the helmet circle.
+    const list = A.getTargets ? A.getTargets() : A.getEnemies();
+    for (const e of list) {
+      if (!e || !e.alive || !e.pos) continue;
+      const p = droneScreen(e.pos);
+      if (!p.ok || Math.hypot(p.x - cx, p.y - cy) > R) continue;
+      const locked = C.designated === e && C.lockState === 'LOCK';
+      const tracking = C.designated === e;
+      const sz = tracking && !locked ? 8 - 5 * (C.lockProgress || 0) : 6;
+      ctx.beginPath();
+      for (let k = 0; k < 4; k++) {
+        const a = k * Math.PI / 2, px = p.x + Math.sin(a) * sz, py = p.y - Math.cos(a) * sz;
+        k ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+      }
+      ctx.closePath();
+      if (locked) ctx.fill(); else ctx.stroke();
+      if (locked) ctx.fillText('QAAM', p.x, p.y - sz - 9);
+    }
+    if (ob > 65 && Math.floor(performance.now() / 200) % 2 === 0) ctx.fillText('OB LIMIT', cx, cy + R + 36);
+    ctx.restore();
+  }
   function addStamp(pos, kind) {
     const i = stampNext; stampNext = (stampNext + 1) % STAMP_N;
     STAMP_POS[i * 3] = pos.x; STAMP_POS[i * 3 + 1] = pos.y; STAMP_POS[i * 3 + 2] = pos.z;
@@ -2104,6 +2187,7 @@ export function createHUD(THREE, A) {
       drawSquareRadar(hctx);
       hctx.restore();
     } else drawSquareRadar(hctx);
+    drawDLZ(hctx); drawJHMCS(hctx);
     drawSectorBadge(hctx);
     drawBottomRight(hctx);
     drawObjective(hctx);

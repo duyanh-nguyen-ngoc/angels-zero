@@ -837,7 +837,8 @@ export function createCockpit3D(THREE, env) {
     const pulse = env.getRadarPulse ? Math.floor(env.getRadarPulse() * 10) : 99;
     return [C.missiles || 0, ammo || 0, Math.round((rld || 0) * 10), C.flares || 0,
       C.chaff === undefined ? -1 : C.chaff, Math.round(100 - (C.health ?? 100)), code(C.engL), code(C.engR),
-      C.esmOn ? 1 : 0, C.inESM ? 1 : 0, env.getRadarZoom ? env.getRadarZoom() : 1, pulse].join('');
+      C.esmOn ? 1 : 0, C.inESM ? 1 : 0, env.getRadarZoom ? env.getRadarZoom() : 1, pulse,
+      C.dlz && C.dlz.on ? Math.round(C.dlz.r / 100) : -1, C.tti === undefined ? -1 : Math.round(C.tti * 10)].join('');
   }
   function gaugeSignature(k, kts, altFt, vs, ffL, ffR, fuel, hydP) {
     switch (k) {

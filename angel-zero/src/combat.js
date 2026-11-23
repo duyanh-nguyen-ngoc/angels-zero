@@ -8,13 +8,13 @@
 // burning wrecks that splash, scoring, waves, lock-on and threat warnings.
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { DIFFICULTY_PRESETS } from './difficulty.js?v=s9be';
-import { SPW } from './loadout.js?v=s9be';
-import { missionConfig } from './missions.js?v=s9be';
+import { DIFFICULTY_PRESETS } from './difficulty.js?v=s9c0';
+import { SPW } from './loadout.js?v=s9c0';
+import { missionConfig } from './missions.js?v=s9c0';
 import { gorgeCentreX, gorgeSlope, gorgeHeading, gorgeDist, GORGE_GATE_Z, GORGE_GATE_N, GORGE_FLOOR_Y, GORGE_RIM_Y,
   GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_FORT, GORGE_ARC_M, GORGE_SPAWN_Z, CEIL_M,
   GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_ZB, GORGE_SC_HALF_W, GORGE_SC_ARCH_Z, GORGE_SC_ARCH_Y0,
-  GORGE_SC_ARCH_W, GORGE_SC_SKIP, GORGE_SC_SAVE_M } from './maps.js?v=s9be';
+  GORGE_SC_ARCH_W, GORGE_SC_SKIP, GORGE_SC_SAVE_M } from './maps.js?v=s9c0';
 
 const NM = 1852, FT = 0.3048, G0 = 9.81;
 // Allied CVN model: same 360 m deck as the procedural ship, re-anchored to the GLB.
@@ -139,6 +139,8 @@ export function createCombat(THREE, env) {
     ambushActive: false, buzzTower: 0, buzzJet: 0,
     droneInboundT: 0, droneClearedT: 0, scrambleT: 0, bwBannerT: 0, intrBannerT: 0,
     shootCue: false, shootT: 0, shootAspect: 0,
+    dlz: { on: false, rmin: 0, rmax: 0, rne: 0, r: 0, vc: 0, inNez: false, inRange: false },
+    tti: undefined, pitbull: false,
     wingRoles: { w2: 'CAP', w3: 'STRIKE' },
     inESM: false, esmOn: false, esmBaseOn: false, esmDisabled: false, iceSlow: false,
     esmPos: new THREE.Vector3(), esmT: 0, esmTheta: 0, esmMsgT: 0, esmLogT: 0,
@@ -775,6 +777,7 @@ export function createCombat(THREE, env) {
     m.q = quality || MSL_FULL; m.lostTrack = false; m.breakChecked = false; m.flareSalvo = -1;
     m.aam = false; m.minD = Infinity; m.closeCall = false; m.hitPlayer = false;
     m.flybyTriggered = false; m.flyMinD = Infinity;
+    m.tti = undefined; m.pitbullSaid = false;
     m.guidance = guidance || (quality === SAM_Q ? 'RADAR' : 'IR'); m.notchT = 0; m.chaffSalvo = -1;
     m.cloudLost = false; m.cloudT = 0; m.cloud = 0; m.reacquired = false;
     m.terrainLost = false; m.maskT = 0; m.sam = false; m.friendly = false;
@@ -2460,6 +2463,11 @@ export function createCombat(THREE, env) {
   const RADAR_HALF = 30 * D2R, RADAR_RANGE = 8 * NM;
   const AAM4_RANGE = 4.5 * NM, AAM4_MAX = 20, AAM4_RELOAD = 12, AAM4_RACK = 3.5, AAM4_STAGGER = 0.09;
   const QAAM_MAX = 12, QAAM_RELOAD = 10, QAAM_HALF = 60 * D2R, QAAM_LOCK = 0.6, QAAM_RANGE = 2.6 * NM, QAAM_INTERVAL = 0.35;
+  // Dynamic launch zone + helmet-cued seeker.
+  const DLZ_NEZ_REAR = 0.45, DLZ_NEZ_HEAD = 0.75, DLZ_ASPECT_SCALE = 0.35;
+  const TTI_MIN_VC = 120, TTI_PITBULL = 1.5;
+  const QUAL_RNG = { MSL: [600, 12000], QAAM: [300, 8000], AAM4: [800, 14000] };
+  const JHMCS_CONE_COS = Math.cos(12 * D2R), JHMCS_MAX_OFF = 65 * D2R, JHMCS_LOCK_T_K = 1.2;
   const SEEKER_GIVEUP = 5;
   // Cloud cover: IR seekers and radar lose their picture through thick cloud.
   const CLOUD_T = 0.35;                                      // cloudDensity above this = "in cloud"
@@ -2470,6 +2478,10 @@ export function createCombat(THREE, env) {
     spw: '4AAM', qaam: QAAM_MAX, qaamMax: QAAM_MAX, qaamReload: 0, qaamReloadMax: QAAM_RELOAD, lowHpSaid: false });
   let seekerT = 0, seekerHadLock = false;
   const fwdOf = () => new THREE.Vector3(0, 0, -1).applyQuaternion(S.quaternion);
+  const _dlzLos = new THREE.Vector3(), _dlzRel = new THREE.Vector3(), _dlzAxis = new THREE.Vector3(), _dlzVel = new THREE.Vector3();
+  const JLOOK = { active: false, offBore: 0, x: 0, y: 0, z: -1 };
+  let lastPitbullT = -1e9;
+  const _dlzZeroStatic = new THREE.Vector3();
 
   // Forward radar picture, best first (off-boresight angle + small range weight).
   function radarCandidates(half = RADAR_HALF, range = RADAR_RANGE) {
@@ -2582,19 +2594,55 @@ export function createCombat(THREE, env) {
     // NEXT cue: the bandit C would cycle to once locked.
     const nx = C.seekerArmed ? radarCandidates().filter(c => c.e !== C.designated).sort((a, b) => a.d - b.d)[0] : null;
     C.nextTarget = nx ? nx.e : null;
-    const t = C.designated;
+    let t = C.designated;
     if (!t) { C.lockProgress = 0; C.lockState = 'NONE'; C.lockTarget = null; C.seekerOff = 0; C.targetRange = 0; C.targetObscured = false; return; }
+    // Helmet-cued QAAM: look vector replaces the boresight as seeker cone axis.
+    let jhmcs = false;
+    _dlzAxis.set(0, 0, -1).applyQuaternion(S.quaternion);
+    if (C.weapon === 'QAAM' && env.getLook) {
+      env.getLook(JLOOK);
+      if (JLOOK.active && JLOOK.offBore <= JHMCS_MAX_OFF) {
+        _dlzAxis.set(JLOOK.x, JLOOK.y, JLOOK.z).normalize();
+        let bestE = null, bestA = JHMCS_CONE_COS;
+        for (const e of lockables()) {
+          if (!e.alive || e.fleet || e.isSite || e.isSub) continue;   // aircraft + drones only
+          _dlzRel.copy(e.pos).sub(S.position);
+          const dl = _dlzRel.length(); if (dl < 1 || dl > QAAM_RANGE) continue;
+          _dlzRel.divideScalar(dl);
+          const cs = _dlzRel.dot(_dlzAxis);
+          if (cs > bestA) { bestA = cs; bestE = e; }
+        }
+        if (bestE) { jhmcs = true; if (C.designated !== bestE) designate(bestE); t = bestE; }
+        if (env.debug && jhmcs) console.log('[ANGELS_ZERO] jhmcs ob=' + (JLOOK.offBore / D2R).toFixed(0) + ' cand=' + t.label + ' lock=' + C.lockState);
+      }
+    }
     const to = t.pos.clone().sub(S.position), d = to.length();
-    const off = Math.acos(clamp(to.divideScalar(d).dot(fwdOf()), -1, 1));
+    const off = Math.acos(clamp(to.divideScalar(d).dot(_dlzAxis), -1, 1));
     const obscured = (t.cloud || 0) > CLOUD_T;
     const wasObscured = C.targetObscured;
     C.targetObscured = obscured; C.seekerOff = off; C.targetRange = d;
+    // Dynamic launch zone: tail chase shortens the no-escape envelope, head-on extends Rmax.
+    {
+      const D = C.dlz;
+      const rng = C.weapon === 'QAAM' ? QUAL_RNG.QAAM : C.weapon === 'AAM4' ? QUAL_RNG.AAM4 : QUAL_RNG.MSL;
+      _dlzLos.copy(to).divideScalar(Math.max(d, 1e-3));
+      _dlzVel.copy(t.vel || _dlzZeroStatic);
+      const vc = -_dlzRel.copy(S.velocity).sub(_dlzVel).dot(_dlzLos);
+      let cosA = 0;
+      if (_dlzVel.lengthSq() > 1) cosA = clamp(_dlzVel.dot(_dlzLos) / _dlzVel.length(), -1, 1);
+      const rmaxBase = rng[1], rmin = rng[0];
+      const rmax = rmaxBase * (1 + DLZ_ASPECT_SCALE * Math.max(0, -cosA)) * clamp(1 + vc / 600, 0.8, 1.3);
+      const rne = rmax * (DLZ_NEZ_REAR + (DLZ_NEZ_HEAD - DLZ_NEZ_REAR) * (1 - cosA) / 2);
+      D.on = d < rmax * 1.3;
+      D.rmin = rmin; D.rmax = rmax; D.rne = rne; D.r = d; D.vc = vc;
+      D.inRange = d > rmin && d < rmax; D.inNez = d > rmin && d < rne;
+    }
     if (!C.seekerArmed) { C.lockProgress = 0; C.lockState = 'NONE'; C.lockTarget = null; return; }
     // Progressive IR seeker: build while inside the 14 deg circle and 3.5 NM, decay when it leaves.
     const qaam = C.weapon === 'QAAM';
     const inSeeker = C.jamming <= 0.5 && d < (qaam ? QAAM_RANGE : LOCK_RANGE) && off < (qaam ? QAAM_HALF : DIFF.seekerHalf) &&
       (qaam ? C.qaam > 0 && C.qaamReload <= 0 : C.missiles > 0 && C.missileReload <= 0);
-    const lockT = (qaam ? QAAM_LOCK : DIFF.lockTime) * (t.kind === 'DRONE' ? 0.6 : 1);
+    const lockT = (qaam ? QAAM_LOCK : DIFF.lockTime) * (t.kind === 'DRONE' ? 0.6 : 1) * (jhmcs ? JHMCS_LOCK_T_K : 1);
     C.lockProgress = clamp(C.lockProgress + (obscured ? -1.0 * dt : inSeeker ? dt / lockT * (C.inESM ? ESM_LOCK_K : 1) : -LOCK_DECAY * dt), 0, 1);
     const prev = C.lockState;
     if (obscured && !wasObscured) {
@@ -3741,6 +3789,7 @@ export function createCombat(THREE, env) {
     if (env.debug) console.log('[ANGELS_ZERO] msl intercept d=' + d.toFixed(2) + ' pts=' + MSL_SHOOT_PTS + ' warnClear=' + !warn);
   }
   function updateMissiles(dt, playerActive) {
+    C.tti = undefined; C.pitbull = false;
     if (env.samFx) env.samFx(missiles, camera.position, performance.now() / 1000);
     // Solar IR blind: one gate per frame, then a per-seeker geometry test.
     if (env.getSunDir) env.getSunDir(_sunDir);
@@ -3759,6 +3808,25 @@ export function createCombat(THREE, env) {
     for (const m of missiles) {
       if (!m.active) continue;
       m.age += dt;
+      if (!m.enemy && m.target && m.target.pos) {
+        const tp = m.target.pos;
+        _dlzLos.copy(tp).sub(m.mesh.position);
+        const dd = _dlzLos.length();
+        if (dd > 1) {
+          _dlzLos.divideScalar(dd);
+          _dlzVel.copy(m.target.vel || _dlzZeroStatic);
+          const vcm = Math.max(_dlzRel.copy(m.vel).sub(_dlzVel).dot(_dlzLos), TTI_MIN_VC);
+          m.tti = dd / vcm;
+          const nowMs = performance.now();
+          if (!m.pitbullSaid && m.tti < TTI_PITBULL && nowMs - lastPitbullT > 2000) {
+            m.pitbullSaid = true; lastPitbullT = nowMs;
+            say('PITBULL', 1.4, '#00ff66');
+            if (env.debug) console.log('[ANGELS_ZERO] tti m=' + m.idx + ' t=' + m.tti.toFixed(2) + ' pitbull=1');
+          }
+          C.tti = C.tti === undefined ? m.tti : Math.min(C.tti, m.tti);
+          C.pitbull = C.pitbull || m.tti < TTI_PITBULL;
+        }
+      }
       const pos = m.mesh.position;
       m.prevPos.copy(pos);
       if (C.sunT >= SUN_BLIND_HOLD && m.enemy && m.guidance === 'IR' && m.target && m.target.isPlayer && !m.lostTrack) {
@@ -5763,7 +5831,7 @@ export function createCombat(THREE, env) {
     flareRecharge = 0;
     chaff.length = 0; chaffCD = 0; chaffRecharge = 0; C.chaff = C.chaffMax; C.notchT = 0;
     Object.assign(C, { ammo: GUN_MAX, missiles: MSL_MAX, reload: 0, missileReload: 0, lockTarget: null, nextTarget: null, designated: null, health: 100, dead: false, hitFlash: 0, missileWarning: 0,
-      lockProgress: 0, lockState: 'NONE', rwrTrack: false, banditLock: 0, events: [],
+      lockProgress: 0, lockState: 'NONE', rwrTrack: false, banditLock: 0, events: [], tti: undefined, pitbull: false,
       gunRounds: 0, gunHitsP: 0, mslFiredP: 0, mslHitsP: 0, maxDmg: 0, traps: 0, furballKills: 0, lowHpSaid: false });
     furT = 0; furSwarmT = 75;
     Object.assign(C.bw, { eligible: false, landed: false, logged: false });
@@ -5873,6 +5941,7 @@ export function createCombat(THREE, env) {
     C.mslPylons = stores.msl.map(st => st.node.visible);      // HUD per-pylon AIM-9 icons
     // Cloud densities for the player and every bandit (missiles sample their own).
     C.playerCloud = playerActive ? cloudAt(S.position) : 0;
+    if (!playerActive) { C.dlz.on = false; C.tti = undefined; C.pitbull = false; }
     C.playerInCloud = C.playerCloud > CLOUD_T;
     for (const e of enemies) e.cloud = e.alive ? cloudAt(e.pos) : 0;
     cloudClear = Math.max(0, cloudClear - dt);
@@ -6047,6 +6116,7 @@ export function createCombat(THREE, env) {
       C.ceil.warnT = 0; C.ceil.salvoT = 0; C.ceil.rail = 0; C.ceil.railT = 0; C.ceil.fired = 0;
       C.ceil.lastSam = 0; C.ceil.live = !!C.mcfg.ceiling; C.ceil.belowT = 0;
       C.climb.on = false; C.climb.t = 0; C.climb.sams = 0; C.climb.salvoT = 0; C.climb.rail = 0; C.climb.railT = 0; C.climb.fired = 0;
+      C.dlz.on = false; C.tti = undefined; C.pitbull = false; lastPitbullT = -1e9;
       C.weaponsLock.msl = !C.mcfg.weapons.msl || C.mcfg.gunsOnly; C.weaponsLock.spw = !C.mcfg.weapons.spw || C.mcfg.gunsOnly;
       if (C.weaponsLock.msl && C.weapon === 'MSL') C.weapon = 'GUN';
       if (C.weaponsLock.spw && C.weapon === 'BOMB') C.weapon = 'GUN';
@@ -6107,7 +6177,7 @@ export function createCombat(THREE, env) {
     setIntrusionForce(on) { intrForce = !!on; return intrForce; }, setIntrusionDisabled(on) { intrDisabled = !!on; return intrDisabled; }, forceIntrusion() { return startIntrusion(); },
     get intrusion() { return C.intr; },
     get esm() { return { on: !!C.esmOn, in: !!C.inESM, x: C.esmPos.x, z: C.esmPos.z, r: ESM_R }; },
-    get inESM() { return !!C.inESM; }, get shootCue() { return !!C.shootCue; },
+    get inESM() { return !!C.inESM; }, get shootCue() { return !!C.shootCue; }, get dlz() { return C.dlz; }, get tti() { return C.tti; }, get look() { return JLOOK; },
     setESMDisabled(on) { C.esmDisabled = !!on; return C.esmDisabled; },
     get sc() { return C.sc; },
     spawnDroneSwarm(n = SWARM_MAX, anchor = 'PLAYER') { return spawnSwarm(n, anchor); },
@@ -6325,6 +6395,8 @@ export function createCombat(THREE, env) {
         lock: { next: C.nextTarget?.label || null, tgt: C.designated?.label || null, state: C.lockState, prog: +C.lockProgress.toFixed(2), off: +((C.seekerOff || 0) / D2R).toFixed(1), nm: +((C.targetRange || 0) / NM).toFixed(2) },
         esm: { on: !!C.esmOn, in: !!C.inESM, t: +C.esmT.toFixed(1) },
         shoot: { cue: !!C.shootCue, aspect: Math.round(C.shootAspect || 0) },
+        dlz: { on: !!C.dlz.on, rmin: Math.round(C.dlz.rmin), rmax: Math.round(C.dlz.rmax), rne: Math.round(C.dlz.rne), r: Math.round(C.dlz.r), vc: Math.round(C.dlz.vc), nez: !!C.dlz.inNez },
+        tti: C.tti === undefined ? null : +C.tti.toFixed(2), pitbull: !!C.pitbull,
         cloud: { player: +(C.playerCloud || 0).toFixed(2), tgt: +((C.designated && C.designated.cloud) || 0).toFixed(2), obscured: !!C.targetObscured, breaks: C.cloudBreaks || 0, ice: !!C.iceSlow,
           msl: missiles.filter(m => m.active).map(m => (m.q || MSL_FULL).tag + (m.cloudLost ? '/cloudLost' : m.lostTrack ? '/lost' : '') + (m.reacquired ? '/reacq' : '') + ' c' + (m.cloud || 0).toFixed(2)).join(' ') },
         bandit: { lock: +C.banditLock.toFixed(2), rwr: C.rwrTrack, incoming: C.incoming || 0, warn: +C.missileWarning.toFixed(2) },

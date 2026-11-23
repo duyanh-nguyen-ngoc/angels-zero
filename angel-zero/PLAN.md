@@ -1716,6 +1716,11 @@ Status legend: `[x]` implemented and verified Â· `[ ]` open — gaps listed.
   - Procedural AGSM breathing, G-suit hiss, 110–165 BPM lub-dub heartbeat, tinnitus and wake gasp are built once and look-ahead scheduled on a body bus that bypasses the hearing tunnel; tunnel LP and a separate BGM gain duck under strain and blackout.
   - Final `gPass` in the nvg composer: desaturation, heartbeat-pulsing tunnel, blackout, red negative-G tint and a staged grey-then-colour wake; HUD dims and jitters with strain. Pass is disabled at rest.
 
+- [x] **DLZ / TTI / JHMCS** *(build `s9c0`, v1.1.37, `src/combat.js`, `src/hud.js`, `src/cockpit3d.js`, `index.html`)*
+  - `C.dlz` computes Rmin / Rne / Rmax / Vc from aspect and closing speed each lock frame; the HUD draws a vertical DLZ bar with no-escape bracket, range caret and VC in knots. Active player missiles carry `m.tti`; `C.tti` / `C.pitbull` drive the countdown and PITBULL call (2 s cooldown). `stats().dlz` / `.tti` exposed.
+  - Free look lives in the `freeLook` global in `index.html` (there is no `src/freelook.js`); its yaw/pitch are converted to a scratch world look vector and passed to combat via `env.getLook`. QAAM can acquire inside a 12° helmet cone out to 65° off-boresight with a 1.2× lock penalty; other weapons stay boresight-only. `drawJHMCS()` renders the 90 px helmet ring, KCAS/ALT flanks, look heading, nose reference, OB readout and target diamonds.
+  - `?freelookat=s:yaw,pitch` and `?dlz=1` provide deterministic verification; cockpit MFD signature includes DLZ/TTI buckets.
+
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.
