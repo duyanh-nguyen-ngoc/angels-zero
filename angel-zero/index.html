@@ -1218,7 +1218,7 @@ const CAT_SNAP_TOL = 0.5;
 const SCR_CHANCE = 0.30, SCR_RAIDERS = 2, SCR_PASS_T = 7, SCR_ALT = 180, SCR_V = 260, SCR_OFF_X = 220;
 const CIWS_RPS = 25, SCR_SPLASH_RATE = 10;
 const scramble = { st: 'IDLE', t: 0, ids: new Int16Array(SCR_RAIDERS).fill(-1), rolled: false, ciwsAcc: 0, splashT: 0, whooshT: 0 };
-const _scrMuzzle = new THREE.Vector3(), _scrAim = new THREE.Vector3(), _scrVel = new THREE.Vector3();
+const _scrMuzzle = new THREE.Vector3(), _scrAim = new THREE.Vector3(), _scrVel = new THREE.Vector3(), _scrRefs = [];
 const _catFwd = new THREE.Vector3(), _catPos = new THREE.Vector3(), _catQ = new THREE.Quaternion();
 const _catBox = new THREE.Box3(), _catRay = new THREE.Raycaster(), _catDown = new THREE.Vector3(0, -1, 0);
 const _catDiagOrigin = new THREE.Vector3(), _catHitTargets = [];
@@ -1610,7 +1610,7 @@ function loadMissionScene(m) {
   cat.ph = 'NONE'; cat.t = 0; cat.arm = 0; cat.grace = 0; cat.forceAB = false;
   scramble.st = 'IDLE'; scramble.t = 0; scramble.ids.fill(-1); scramble.rolled = false;
   if (FORCE_INTRUSION) combatSys.setIntrusionForce(true);
-  if (NO_INTRUSION) combatSys.setIntrusionForce(false);
+  if (NO_INTRUSION) combatSys.setIntrusionDisabled(true);
   for (const w of wingmen) { w.cat.ph = 'NONE'; w.cat.t = 0; w.cat.delay = 0; }
 }
 function missionConfigWingSolo(m) {
@@ -2013,6 +2013,12 @@ function stepHotScramble(dt) {
   if (scramble.st === 'INBOUND') {
     const n = combatSys.spawnRaiders(SCR_RAIDERS, scramble.ids);
     if (!n) return;
+    _scrRefs.length = 0;
+    for (const id of scramble.ids) {
+      let ref = null;
+      for (const e of combatSys.enemies) if (e && e.id === id) { ref = e; break; }
+      _scrRefs.push(ref);
+    }
     scramble.st = 'PASS'; scramble.t = 0; scramble.splashT = 0;
     combat.scrambleT = performance.now();
     musicCtx.scramble = 1;
@@ -2026,9 +2032,9 @@ function stepHotScramble(dt) {
   const a = combat.ally;
   if (a && a.root) {
     scramble.ciwsAcc += CIWS_RPS * dt;
-    for (const id of scramble.ids) {
-      const e = combatSys.enemies.find(x => x && x.id === id && x.alive);
-      if (!e) continue;
+    for (let ri = 0; ri < _scrRefs.length; ri++) {
+      const e = _scrRefs[ri], id = scramble.ids[ri];
+      if (!e || !e.alive) continue;
       const d = Math.hypot(e.pos.x - state.position.x, e.pos.z - state.position.z);
       if (d < 240 && scramble.whooshT <= 0) {
         blastShake = Math.max(blastShake, 0.22); audio.flybyWhoosh(0.7, firstPerson); scramble.whooshT = 1.5;

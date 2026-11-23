@@ -1204,7 +1204,7 @@ export function createCombat(THREE, env) {
   }
 
   // ---- Mid-mission CRIMSON-1 intrusion -------------------------------------
-  let intrForce = false;
+  let intrForce = false, intrDisabled = false;
   function intrBgm(scn) { if (env.onIntrusion) env.onIntrusion(scn); }
   function spawnIntruder() {
     const slots = enemies.filter(e => !e.alive && !e.ace && !e.bomber && !e.scripted);
@@ -1234,7 +1234,7 @@ export function createCombat(THREE, env) {
     return true;
   }
   function startIntrusion() {
-    if (C.intr.used || C.intr.st !== 'IDLE') return false;
+    if (intrDisabled || C.intr.used || C.intr.st !== 'IDLE') return false;
     C.intr.st = 'CUT'; C.intr.t = INTR_CUT_S; C.intr.farT = 0;
     C.intrBannerT = performance.now();
     say('SIGNAL INTRUSION — CRIMSON-1 INBOUND', 2, '#ff3b5c');
@@ -5930,7 +5930,7 @@ export function createCombat(THREE, env) {
     configureMission(m, mapDef) {
       C.missionTitle = m.title; C.missionId = m.id; C.rtbType = m.rtbType; C.missionBgm = m.bgmScenario;
       C.wingOrder = 0; C.orderBadgeT = 0; resetLimp();
-      intrForce = false;
+      intrForce = false; intrDisabled = false;
       Object.assign(C.bw, { eligible: false, landed: false, logged: false });
       Object.assign(C.intr, { st: 'IDLE', t: 0, ace: -1, used: false, farT: 0 }); C.wingHold = false;
       if (env.onIntrusion) env.onIntrusion('RESET');
@@ -5990,7 +5990,7 @@ export function createCombat(THREE, env) {
     },
     // Mission switch: return every pooled actor to its pool without allocating.
     resetMission() {
-      intrForce = false;
+      intrForce = false; intrDisabled = false;
       Object.assign(C.bw, { eligible: false, landed: false, logged: false });
       Object.assign(C.intr, { st: 'IDLE', t: 0, ace: -1, used: false, farT: 0 }); C.wingHold = false;
       for (const e of enemies) { e.alive = false; e.wreck = null; if (e.g) e.g.visible = false; }
@@ -6013,7 +6013,7 @@ export function createCombat(THREE, env) {
     fireSelected, pickleUp, dropBomb, setWeapon, toggleWeapon, dispenseFlares, dispenseChaff, fireAAM4, activateECM, setWingOrder, triggerWoundedWingman, spawnAceFlight, spawnAmbush,
     setWingRoles,
     awardBrokenWing, spawnRaiders, handoffRaiders,
-    setIntrusionForce(on) { intrForce = !!on; return intrForce; }, forceIntrusion() { return startIntrusion(); },
+    setIntrusionForce(on) { intrForce = !!on; return intrForce; }, setIntrusionDisabled(on) { intrDisabled = !!on; return intrDisabled; }, forceIntrusion() { return startIntrusion(); },
     get intrusion() { return C.intr; },
     get sc() { return C.sc; },
     spawnDroneSwarm(n = SWARM_MAX, anchor = 'PLAYER') { return spawnSwarm(n, anchor); },
