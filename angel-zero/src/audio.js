@@ -81,7 +81,10 @@ export function createAudio() {
   const gain = (v = 0) => { const g = ctx.createGain(); g.gain.value = v; return g; };
   const filt = (type, f, q = 0.7) => { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; return b; };
   const osc = (type, f) => { const o = ctx.createOscillator(); o.type = type; o.frequency.value = f; o.start(); return o; };
-  const set = (p, v, t = tc) => p.setTargetAtTime(v, ctx.currentTime, t);
+  const set = (p, v, t = tc) => {
+    if (p._t !== undefined && Math.abs(v - p._t) < 1e-3) return;   // avoid redundant automation events
+    p._t = v; p.setTargetAtTime(v, ctx.currentTime, t);
+  };
   const sm = (x, a, b) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
   // F100 waveshaper curves: one Float32Array(2048) each, built once at factory time.
   function mkEngineCurve(fn) {
@@ -90,7 +93,7 @@ export function createAudio() {
     return c;
   }
   const CURVE_EXH = mkEngineCurve(x => x > 0 ? Math.tanh(2.4 * x) : Math.tanh(3.2 * x) / 1.15);
-  const CURVE_CRACK = mkEngineCurve(x => Math.max(0, Math.abs(x) - 0.55) * 4.5);
+  const CURVE_SIZZLE = mkEngineCurve(x => 0.55 + 0.45 * Math.tanh(1.6 * x));
   const CURVE_BURST = mkEngineCurve(x => Math.tanh(6 * x));
   const RPM_IDLE = 0.28, RPM_MIL = 1.0, TAU_UP = 1.8, TAU_DN = 2.4, RPM_WINDMILL = 0.08;
   const AB_TAU_UP = 0.35, AB_TAU_DN = 0.6, DETUNE = Math.pow(2, 7 / 1200);
@@ -174,13 +177,22 @@ export function createAudio() {
     cockpitLP.connect(master); master.connect(N.slowLP).connect(N.slowShelf).connect(N.duck); N.duck.connect(N.tunnel); N.tunnel.connect(comp); comp.connect(N.analyser); N.analyser.connect(ctx.destination);
     // Body bus: the pilot's own breathing / heartbeat and the headset chime skip the tunnel.
     N.body = gain(muted ? 0 : volume); N.body.connect(comp);
+    // White noise must exist BEFORE the body graph: loopNoise(undefined) is silent.
+    const white = noiseBuffer('white'), pink = noiseBuffer('pink'), brown = noiseBuffer('brown');
+    if (!white || !white.length) console.log('[ANGELS_ZERO] body noise MISSING');
+    N.whiteBuf = white; N.white = white; N.brown = brown;
     // Pilot physiology: all nodes built once. Body sounds bypass the hearing tunnel.
-    const pNoise = loopNoise(N.white);
+    // Envelope gains (breathEnv/hissEnv/gaspEnv) are retriggered; level gains are per-frame.
+    const pNoise = loopNoise(white);
     N.breathBP1 = filt('bandpass', 550, 1.1); N.breathBP2 = filt('bandpass', 1500, 1.4);
-    N.breathG = gain(0); pNoise.connect(N.breathBP1).connect(N.breathG).connect(N.body);
-    pNoise.connect(N.breathBP2).connect(N.breathG);
-    N.hissHP = filt('highpass', 2500, 0.7); N.hissG = gain(0); pNoise.connect(N.hissHP).connect(N.hissG).connect(N.body);
-    N.gaspBP = filt('bandpass', 800, 1.2); N.gaspG = gain(0); pNoise.connect(N.gaspBP).connect(N.gaspG).connect(N.body);
+    N.breathEnv = gain(0); N.breathG = gain(0);
+    pNoise.connect(N.breathBP1).connect(N.breathEnv);
+    pNoise.connect(N.breathBP2).connect(N.breathEnv);
+    N.breathEnv.connect(N.breathG).connect(N.body);
+    N.hissHP = filt('highpass', 2500, 0.7); N.hissEnv = gain(0); N.hissG = gain(0);
+    pNoise.connect(N.hissHP).connect(N.hissEnv).connect(N.hissG).connect(N.body);
+    N.gaspBP = filt('bandpass', 800, 1.2); N.gaspEnv = gain(0); N.gaspG = gain(1);
+    pNoise.connect(N.gaspBP).connect(N.gaspEnv).connect(N.gaspG).connect(N.body);
     N.heartA = osc('sine', 55); N.heartB = osc('sine', 42); N.heartG = gain(0);
     N.heartAGain = gain(0); N.heartBGain = gain(0);
     N.heartA.connect(N.heartAGain).connect(N.heartG); N.heartB.connect(N.heartBGain).connect(N.heartG); N.heartG.connect(N.body);
@@ -222,8 +234,6 @@ export function createAudio() {
     N.rFreq = new Uint8Array(128); N.rTime = new Uint8Array(128);
     N.rVoiceG = [gain(1), gain(1)]; N.voiceIdx = 0;
     N.rVoiceG[0].connect(N.rHP); N.rVoiceG[1].connect(N.rHP);
-    const white = noiseBuffer('white'), pink = noiseBuffer('pink'), brown = noiseBuffer('brown');
-    N.whiteBuf = white;
     N.rStatic = loopNoise(pink);
     N.rStaticBP = filt('bandpass', 1500, 0.6);
     N.rStaticG = gain(0);
@@ -242,7 +252,7 @@ export function createAudio() {
     E.ckTrim = gain(0.025); E.chTrim = gain(0.18);  // ~-18 dBFS chase / -22 dBFS cockpit at full AB
     E.ckBus.connect(E.ckTrim).connect(E.ckMixG).connect(E.comp);
     E.chBus.connect(E.chTrim).connect(E.chMixG).connect(E.comp);
-    E.out = gain(1); E.comp.connect(E.out).connect(master);
+    E.out = gain(0); E.comp.connect(E.out).connect(master);
     E.ana = ctx.createAnalyser(); E.ana.fftSize = 512; E.anaBuf = new Float32Array(512); E.out.connect(E.ana);
     // Per-engine, per-view panners (cockpit narrow, chase wide).
     E.pan = [];
@@ -258,14 +268,14 @@ export function createAudio() {
     // Compressor fan choir: 3 triangle oscillators + 3 resonant noise bands per engine/view.
     E.choir = [];
     for (let e = 0; e < 2; e++) for (const v of ['ck', 'ch']) {
-      const bus = gain(1); bus.connect(E.pan[e][v]);
+      const bus = gain(0); bus.connect(E.pan[e][v]);
       const hs = [];
       for (let h = 0; h < 3; h++) {
         const base = h === 0 ? 0.11 : h === 1 ? 0.07 : 0.05;
         const trim = base * (v === 'ck' ? (h ? 1.4 : 1) : 0.8);
-        const amp = gain(trim); amp.connect(bus);
+        const amp = gain(0); amp.connect(bus);
         const oscN = osc('triangle', 700); oscN.connect(amp);
-        const bp = filt('bandpass', 700, 18), ng = gain(0.11);
+        const bp = filt('bandpass', 700, 18), ng = gain(0);
         loopNoise(pink).connect(bp).connect(ng).connect(amp);
         hs.push({ o: oscN, bp, amp, sent: 0 });
       }
@@ -287,14 +297,17 @@ export function createAudio() {
       fl1.connect(flSum); fl2.connect(flSum); flSum.connect(am.gain);
       E.exh.push({ hp, form, drive, g, fl1, fl2, flSum, ckLP });
     }
-    // AB crackle: brown noise through a threshold shaper drives the gain of HP'd white noise.
+    // AB sizzle: smoothed brown-noise modulation of a soft-saturated white-noise bed.
+    // No threshold, no dead zone, no clicks at full burner.
     {
-      const src = loopNoise(brown), lp = filt('lowpass', 30), shaper = mkShaper(CURVE_CRACK), vca = gain(0);
-      src.connect(lp).connect(shaper).connect(vca.gain);
-      const noise = loopNoise(white), hp = filt('highpass', 900), g = gain(0);
-      noise.connect(hp).connect(vca).connect(g);
+      const src = loopNoise(brown), lp = filt('lowpass', 30), modLP = filt('lowpass', 45, 0.5);
+      const shaper = mkShaper(CURVE_SIZZLE), vca = gain(0);
+      src.connect(lp).connect(modLP).connect(shaper).connect(vca.gain);
+      const noise = loopNoise(white), hp = filt('highpass', 2200), lpf = filt('lowpass', 9000);
+      const soft = gain(0.8), exhShape = mkShaper(CURVE_EXH), g = gain(0);
+      noise.connect(hp).connect(lpf).connect(soft).connect(exhShape).connect(vca).connect(g);
       g.connect(gain(0.3)).connect(E.ckBus); g.connect(gain(1)).connect(E.chBus);
-      E.crackG = g;
+      E.crackG = g; E.crackVCA = vca;
     }
     // Sub-bass thrust: 41 / 43.5 Hz twin beat + brown noise through a resonant 36-85 Hz LP.
     {
@@ -510,12 +523,27 @@ export function createAudio() {
     N.clankN.connect(N.clankBP).connect(N.clankG).connect(cockpitLP);
     N.clankOsc = osc('square', 220); N.clankToneG = gain(0); N.clankOsc.connect(N.clankToneG).connect(cockpitLP);
 
+    // Persistent list of every continuous flight gain, built once for silenceFlight().
+    N.silenceParams = [
+      E.out.gain, E.ckMixG.gain, E.chMixG.gain,
+      ...E.choir.map(c => c.bus.gain),
+      ...E.exh.map(x => x.g.gain),
+      E.crackG.gain, E.sub && E.sub.bus.gain,
+      N.lockGain && N.lockGain.gain, N.growlGain && N.growlGain.gain, N.alertGain && N.alertGain.gain,
+      N.tinG && N.tinG.gain, N.flagG && N.flagG.gain, N.droneG && N.droneG.gain,
+      N.breathG && N.breathG.gain, N.breathEnv && N.breathEnv.gain,
+      N.hissG && N.hissG.gain, N.hissEnv && N.hissEnv.gain,
+      N.gaspG && N.gaspG.gain, N.gaspEnv && N.gaspEnv.gain,
+      N.heartG && N.heartG.gain, N.hydG && N.hydG.gain,
+      N.windGain && N.windGain.gain, N.buffGain && N.buffGain.gain,
+      N.groanGain && N.groanGain.gain, N.lugGain && N.lugGain.gain
+    ].filter(Boolean);
+
     // Procedural fallbacks for the sampled layers.
     N.buffNoise = loopNoise(brown); N.buffBP = filt('bandpass', 75, 1.1); N.buffFGain = gain(0);
     N.buffNoise.connect(N.buffBP).connect(N.buffFGain).connect(cockpitLP);
     N.nextBeat = 0;
 
-    N.white = white; N.brown = brown;
     ready = true;
     resume();
     return true;
@@ -981,7 +1009,7 @@ export function createAudio() {
     N.gaspBP.frequency.linearRampToValueAtTime(2200, t + 0.35);
     N.gaspBP.frequency.setValueAtTime(900, t + 0.5);
     N.gaspBP.frequency.linearRampToValueAtTime(2000, t + 0.85);
-    const gp = N.gaspG.gain;
+    const gp = N.gaspEnv.gain;
     gp.cancelScheduledValues(t); gp.setValueAtTime(0, t);
     for (const [a, dur] of [[0, 0.45], [0.52, 0.45]]) {
       gp.linearRampToValueAtTime(amp, t + a + 0.08);
@@ -2095,7 +2123,7 @@ export function createAudio() {
     const flutterHz = 16 + 14 * rpmL + 4 * abK;
     set(E.shearG.gain, 0.12 * Math.pow(Math.min(1, (p.speed || 0) / 400), 2) * (p.cockpit ? 0 : 1));
     set(E.ecsG.gain, 0.025 + 0.015 * Math.min(1, (p.speed || 0) / 300) * live);
-    set(E.crackG.gain, 0.35 * Math.pow(abK, 1.4) * live);
+    set(E.crackG.gain, 0.12 * Math.pow(abK, 1.4) * live);
     E.sub.lp.frequency && set(E.sub.lp.frequency, 36 + 49 * (0.6 * rpmL + 0.4 * abK), 0.25);
     set(E.sub.bus.gain, (0.12 * rpmL + 0.75 * Math.pow(abK, 1.3)) * live, 0.25);
     const bothAlive = (live && aliveL && aliveR) ? 1 : 0;
@@ -2137,9 +2165,28 @@ export function createAudio() {
       mix: p.cockpit ? 'CK' : 'CH', rms: +E.rms.toFixed(1), thumps: burnerCount };
   }
 
+  // Mute every continuous flight voice without stopping sources or touching BGM/radio/UI.
+  function silenceFlight(tc = 0.08) {
+    if (!ready || !N.silenceParams) return;
+    const now = ctx.currentTime;
+    for (let i = 0; i < N.silenceParams.length; i++) {
+      const p = N.silenceParams[i];
+      p.cancelScheduledValues(now);
+      p.setTargetAtTime(0, now, tc);
+      p._t = 0;
+    }
+    N.flightSilent = true;
+  }
+
   /* ------------------------------------------------------ continuous mix */
   function update(p) {
     if (!ready) return;
+    // Menus / pause / debrief: mute every continuous flight voice, keep BGM + radio + UI.
+    if (p.flightActive === false) {
+      if (!N.flightSilent) silenceFlight();
+      return;
+    }
+    N.flightSilent = false;
     const ab = (p.ab === undefined ? p.afterburner : p.ab) || 0;
     const th = Math.min(1, Math.max(0, Number.isFinite(p.throttle) ? p.throttle : 0));
     const live = p.engineOn ? 1 : 0;
@@ -2171,41 +2218,39 @@ export function createAudio() {
     set(N.tunnel.frequency, tunnelHz, 0.15);
     if (N.gBgmG) set(N.gBgmG.gain, gloc ? 0.1 : 1 - 0.7 * S, 0.15);
     const tNow = ctx.currentTime;
-    // AGSM: 3 s cycle from 4.5 G. Strain phase = 2.5 s of 4 Hz grunts, then a
-    // 0.5 s exhale / inhale burst. Gain envelope only; the noise source is persistent.
-    const breathK = (gloc ? 0.85 : 0.65 * sm(gl, 4.5, 8.5)) * live;
+    // AGSM: 3 s cycle from 4 G. The level gain is per-frame; the envelope is
+    // retriggered on its own param so the 0.1 s look-ahead ramps are never cancelled.
+    const breathK = (gloc ? 0.85 : 0.65 * sm(gl, 4.0, 8.5)) * live;
     set(N.breathG.gain, breathK, 0.1);
     if (breathK > 0.02 && tNow + 0.1 >= N.nextGBreath) {
       const at = Math.max(tNow, N.nextGBreath);
-      const bg = N.breathG.gain;
-      bg.setValueAtTime(0.15 * breathK, at);
+      const be = N.breathEnv.gain;
+      be.cancelScheduledValues(at);
+      be.setValueAtTime(0.15, at);
       for (let i = 0; i < 10; i++) {
         const p0 = at + i * 0.25;
-        bg.setValueAtTime(0.15 * breathK, p0);
-        bg.linearRampToValueAtTime(0.55 * breathK, p0 + 0.07);
-        bg.linearRampToValueAtTime(0.15 * breathK, p0 + 0.2);
+        be.setValueAtTime(0.15, p0);
+        be.linearRampToValueAtTime(0.55, p0 + 0.07);
+        be.linearRampToValueAtTime(0.15, p0 + 0.2);
       }
-      bg.setValueAtTime(0.9 * breathK, at + 2.6); bg.linearRampToValueAtTime(0.1 * breathK, at + 3);
+      be.setValueAtTime(0.9, at + 2.6); be.linearRampToValueAtTime(0.1, at + 3);
       N.nextGBreath = at + 3;
     }
-    // G-suit inflation hiss at 4.5 G, re-armed below 4.2; soft deflation on unloading.
-    if (gl >= 4.5 && N.gSuitArm && live) {
+    // G-suit inflation hiss from 4 G, re-armed below 3.7 G.
+    if (gl >= 4.0 && N.gSuitArm && live) {
       N.gSuitArm = false;
-      N.hissG.gain.cancelScheduledValues(tNow); N.hissG.gain.setValueAtTime(0, tNow);
-      N.hissG.gain.linearRampToValueAtTime(0.28, tNow + 0.03);
-      N.hissG.gain.setTargetAtTime(0, tNow + 0.03, 0.2);
-    } else if (gl < 4.2) {
-      if (!N.gSuitArm) {
-        N.hissG.gain.cancelScheduledValues(tNow);
-        N.hissG.gain.setValueAtTime(N.hissG.gain.value, tNow);
-        N.hissG.gain.linearRampToValueAtTime(0.06, tNow + 0.05);
-        N.hissG.gain.setTargetAtTime(0, tNow + 0.05, 0.25);
-      }
+      const he = N.hissEnv.gain;
+      he.cancelScheduledValues(tNow); he.setValueAtTime(0, tNow);
+      he.linearRampToValueAtTime(1, tNow + 0.03);
+      he.setTargetAtTime(0, tNow + 0.03, 0.2);
+      set(N.hissG.gain, 0.28, 0.05);
+    } else if (gl < 3.7) {
+      if (!N.gSuitArm) { set(N.hissG.gain, 0, 0.25); }
       N.gSuitArm = true;
     }
     // Heartbeat: lub-dub pair 0.12 s apart, BPM 110 -> 165 with strain.
-    const bpm = 110 + 55 * sm(gStrain, 0.30, 1.0);
-    const heartK = (gloc ? 1 : 0.62 * sm(gStrain, 0.30, 0.6)) * live;
+    const bpm = 110 + 55 * sm(gStrain, 0.25, 1.0);
+    const heartK = (gloc ? 1 : 0.62 * sm(gStrain, 0.25, 0.6)) * live;
     set(N.heartG.gain, heartK, 0.08);
     if (heartK > 0.02 && tNow + 0.1 >= N.nextGBeat) {
       const at = Math.max(tNow, N.nextGBeat), period = 60 / bpm;
@@ -2229,7 +2274,9 @@ export function createAudio() {
     set(N.hydG.gain, 0.12 * hd * sm(stick, 0.08, 0.6), hd > 0 && stick > 0.08 ? 0.05 : 0.25);
     set(N.hydOsc.frequency, 380 + 220 * stick, 0.1);
     vwsUpdate(p.dt || 0.016);
-    N.gmix = { lp: N.tunnel.frequency.value, bpm: bpm, breath: breathK, tin: tin, beatPhase: N.beatPhase || 0, neg: gNeg, hyd: N.hydG.gain.value };
+    N.gmix = { lp: N.tunnel.frequency.value, bpm: bpm, breath: breathK,
+      breathEnv: N.breathEnv ? +N.breathEnv.gain.value.toFixed(4) : 0, breathNext: N.nextGBreath ? +N.nextGBreath.toFixed(2) : 0, tNow: +ctx.currentTime.toFixed(2), whiteOK: !!N.whiteBuf,
+      tin: tin, beatPhase: N.beatPhase || 0, neg: gNeg, hyd: N.hydG.gain.value };
     N.dbg = { groanK: +groanK.toFixed(2), lugK: +lugK.toFixed(2), buffK: +buffK.toFixed(2), breathK: +breathK.toFixed(2), heartK: +heartK.toFixed(2), tunnel: Math.round(N.tunnel.frequency.value), bpm: Math.round(bpm), neg: +gNeg.toFixed(2) };
     if (p.glocWarn && (!N.chimeT || ctx.currentTime - N.chimeT > 2.4)) { glocChime(); N.chimeT = ctx.currentTime; }
     if (!p.glocWarn) N.chimeT = 0;
@@ -2348,6 +2395,8 @@ export function createAudio() {
     get layers() { return N.dbg || null; },
     get gmix() { return N.gmix || null; }, get dbg() { return N.dbg || null; }, gasp,
     burnerThump, get burnerCount() { return burnerCount; }, get windQuiet() { return N.windQuiet || 1; },
+    silenceFlight, get flightSilent() { return !!N.flightSilent; },
+    get engineGains() { return N.E ? { out: +N.E.out.gain.value.toFixed(4), choir: +N.E.choir[0].bus.gain.value.toFixed(4), crack: +N.E.crackG.gain.value.toFixed(4), params: N.silenceParams ? N.silenceParams.length : -1 } : null; },
     tyreChirp, noseThump, shuttleClank,
     get feelCounts() { return { tyre: tyreCount, nose: noseCount, clank: clankCount }; },    get engine() { return N.engineDbg || null; },
     vws: { say: vwsSay }, get vwsLast() { return { ...vwsLast }; },

@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.42', title: 'COCKPIT AUDIO & G-FEEL FIXES', bullets: [
+    'Mach 0.96-1.03 now gives a subtle tactile rumble instead of violent camera thrashing, and the afterburner sizzle is a continuous smooth bed with no clacking at full power.',
+    'Menus, pause and debrief are silent: every continuous flight voice is muted at its gain and only ramps back when you return to the flight. The 700 Hz choir, stuck lock tones and tinnitus no longer follow you into the briefing.',
+    'AGSM breathing, the G-suit hiss and recovery gasps are audible again with separate rhythm and level gains, and a hard loop now builds real greyout and breathing at 4-6 G without an instant blackout.'
+  ] },
   { version: 'v1.1.41', title: 'F100 ENGINE OVERHAUL', bullets: [
     'Both F100s now spool with real inertia: roughly 1.8 s up and 2.4 s down, with the right engine detuned and lagging slightly so the pair beats naturally. The compressor whine is a six-oscillator, six-band harmonic choir instead of a single flat tone.',
     'Exhaust is waveshaped and torn by an audio-rate combustion flutter, with a resonant duct formant and deep 36-85 Hz sub-bass thrust. Afterburner adds sparse crackle and a harder sub punch on light-off.',
