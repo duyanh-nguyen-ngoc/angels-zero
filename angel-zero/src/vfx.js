@@ -136,19 +136,23 @@ export function createVFX(THREE, env) {
     outer.frustumCulled = core.frustumCulled = glow.frustumCulled = false;
     outer.renderOrder = 2; core.renderOrder = 3; glow.renderOrder = 2;
     const light = new THREE.PointLight(0xff8a30, 2.5, 26, 2);
-    light.position.z = 1.4;
-    g.add(outer, core, glow, light);
+    const lightOff = localPos.clone().add(new THREE.Vector3(0, 0, 1.85));
+    g.add(outer, core, glow);
     jet.add(g);
-    plumes.push({ g, light });
+    scene.add(light);                                // keep light in scene so hiding plume/jet never changes NUM_POINT_LIGHTS
+    plumes.push({ g, light, lightOff });
   }
   const CORE_COOL = new THREE.Color(0.75, 0.30, 0.08), CORE_HOT = new THREE.Color(2.5, 1.65, 1.05);
   let engineOut = -1;
   function setEngineOut(i) {                         // battle damage: the dead F100's plume + glow go out
     if (i === engineOut) return;
     engineOut = i;
-    plumes.forEach((p, k) => { p.g.visible = k !== i; });
+    plumes.forEach((p, k) => {
+      p.g.visible = k !== i;
+      if (k === i) p.light.intensity = 0;
+    });
   }
-  function updatePlumes(s, now) {
+  function updatePlumes(s, now, visible = true) {
     const t = s.throttle, ab = s.afterburner;
     const pulse = 1 + ab * 0.24 * Math.sin(now * 17.0) + ab * 0.08 * Math.sin(now * 41.0);
     const coreLen = 1.5 + 3.2 * t + 4.6 * ab;
@@ -165,7 +169,10 @@ export function createVFX(THREE, env) {
     // Incandescent core: warm orange scaled by throttle below the burner, HDR white-peach in AB.
     const shimmer = 1 + ab * 0.08 * (0.6 * Math.sin(now * 2 * Math.PI * 23) + 0.4 * Math.sin(now * 2 * Math.PI * 31));
     glowCoreMat.uniforms.uCol.value.copy(CORE_COOL).multiplyScalar(0.4 + 0.6 * t).lerp(CORE_HOT, smooth(ab, 0, 1)).multiplyScalar(shimmer);
-    for (const p of plumes) {
+    for (let k = 0; k < plumes.length; k++) {
+      const p = plumes[k];
+      p.light.position.copy(p.lightOff).applyQuaternion(s.quaternion).add(s.position);
+      if (!visible || k === engineOut) { p.light.intensity = 0; continue; }
       p.light.intensity = (0.8 + t * 2.0 + ab * 6.5) * pulse;
       p.light.color.setRGB(1.0, 0.55 + 0.15 * (1 - ab), 0.25 + 0.35 * (1 - ab));
     }
@@ -319,7 +326,7 @@ export function createVFX(THREE, env) {
     let active = 0, live = 0;
     const n = Math.min(5, emitters.length);
     for (let j = 0; j < n; j++) {
-      const e = emitters[j], a = e.on ? smooth(e.pos.y, 3505, 3810) : 0;
+      const e = emitters[j], a = e.on ? 0.35 * smooth(e.pos.y, 3658, 4458) : 0;
       if (a > 0) active++;
       for (let k = 0; k < 2; k++) {
         const r = contrails[j * 2 + k];
@@ -1568,7 +1575,7 @@ export function createVFX(THREE, env) {
   const _w = new THREE.Vector3();
   function update(dt, now, s, opts) {
     const q = s.quaternion;
-    updatePlumes(s, now);
+    updatePlumes(s, now, opts.visible);
 
     // Wingtip condensation: brisk pulls / banks (> 2 G, |AoA| > 7.5 deg, |roll| > 1.2 rad/s)
     // above 160 kt; +40 % in humid / overcast / rain air or inside cloud; dries out above 22,000 ft.

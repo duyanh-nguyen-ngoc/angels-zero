@@ -8,13 +8,13 @@
 // burning wrecks that splash, scoring, waves, lock-on and threat warnings.
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { DIFFICULTY_PRESETS } from './difficulty.js?v=s9bc';
-import { SPW } from './loadout.js?v=s9bc';
-import { missionConfig } from './missions.js?v=s9bc';
+import { DIFFICULTY_PRESETS } from './difficulty.js?v=s9bd';
+import { SPW } from './loadout.js?v=s9bd';
+import { missionConfig } from './missions.js?v=s9bd';
 import { gorgeCentreX, gorgeSlope, gorgeHeading, gorgeDist, GORGE_GATE_Z, GORGE_GATE_N, GORGE_FLOOR_Y, GORGE_RIM_Y,
   GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_FORT, GORGE_ARC_M, GORGE_SPAWN_Z, CEIL_M,
   GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_ZB, GORGE_SC_HALF_W, GORGE_SC_ARCH_Z, GORGE_SC_ARCH_Y0,
-  GORGE_SC_ARCH_W, GORGE_SC_SKIP, GORGE_SC_SAVE_M } from './maps.js?v=s9bc';
+  GORGE_SC_ARCH_W, GORGE_SC_SKIP, GORGE_SC_SAVE_M } from './maps.js?v=s9bd';
 
 const NM = 1852, FT = 0.3048, G0 = 9.81;
 // Allied CVN model: same 360 m deck as the procedural ship, re-anchored to the GLB.
@@ -138,6 +138,7 @@ export function createCombat(THREE, env) {
     subKills: 0, siteKills: 0, flagBannerT: 0, salvoKills: 0,
     ambushActive: false, buzzTower: 0, buzzJet: 0,
     droneInboundT: 0, droneClearedT: 0, scrambleT: 0, bwBannerT: 0, intrBannerT: 0,
+    shootCue: false, shootT: 0, shootAspect: 0,
     wingRoles: { w2: 'CAP', w3: 'STRIKE' },
     inESM: false, esmOn: false, esmBaseOn: false, esmDisabled: false, iceSlow: false,
     esmPos: new THREE.Vector3(), esmT: 0, esmTheta: 0, esmMsgT: 0, esmLogT: 0,
@@ -162,6 +163,23 @@ export function createCombat(THREE, env) {
     C.events.push({ kind, text, points, color, born: now, until: now + 2600 });
     if (C.events.length > 5) C.events.shift();
   };
+  // Pooled HUD hit stamps: one per target per 0.25 s, no per-hit allocation.
+  function emitStamp(e, kind) {
+    if (!e || !e.pos || !env.onHitStamp) return;
+    const now = performance.now();
+    if (e.stampT && now - e.stampT < 250) return;
+    e.stampT = now;
+    env.onHitStamp(e.pos, kind);
+    if (env.debug) console.log('[ANGELS_ZERO] stamp kind=' + kind + ' d=' + Math.round(e.pos.distanceTo(S.position)));
+  }
+  let lastMUpdate = -1e9;
+  function missionUpdate(kind) {
+    const now = performance.now();
+    if (now - lastMUpdate < 4000) return;
+    lastMUpdate = now;
+    if (env.onMissionUpdate) env.onMissionUpdate(kind);
+    if (env.debug) console.log('[ANGELS_ZERO] mupdate kind=' + kind + ' dip');
+  }
 
   /* ============================================================ particles */
   class Particles {
@@ -474,6 +492,7 @@ export function createCombat(THREE, env) {
     C.droneInboundT = performance.now();
     say('BANDITS — DRONE SWARM, LOW AND FAST!', 2.6, '#ffbf3f');
     if (env.onRadio) env.onRadio('DRONE_INBOUND');
+    missionUpdate('ambush');
     if (env.debug) console.log('[ANGELS_ZERO] drone swarm spawned n=' + placed + ' anchor=' + C.swarm.anchor);
     return placed;
   }
@@ -685,8 +704,7 @@ export function createCombat(THREE, env) {
   jet.add(muzzleStreak);
   let muzzleT = 0;
   const muzzleLight = new THREE.PointLight(0xffb050, 0, 32, 1.6);   // lights the starboard wing / canopy frame
-  muzzleLight.position.copy(muzzle.position);
-  jet.add(muzzleLight);
+  scene.add(muzzleLight);                            // keep in scene so hiding jet never changes NUM_POINT_LIGHTS
 
   /* ============================================================ missiles */
   const mslBody = new THREE.CylinderGeometry(0.064, 0.064, 2.9, 10); mslBody.rotateX(Math.PI / 2);
@@ -872,6 +890,7 @@ export function createCombat(THREE, env) {
     muzzleT = Math.max(0, muzzleT - dt);
     muzzle.visible = muzzleStreak.visible = muzzleT > 0;
     muzzleLight.intensity = muzzleT > 0 ? 18 + rand() * 14 : 0;
+    if (muzzleLight.intensity > 0) muzzleLight.position.copy(muzzle.position).applyQuaternion(S.quaternion).add(S.position);
     // Cordite gun gas streaming back over the starboard wing.
     smokeAcc += dt * 45;
     while (smokeAcc >= 1) {
@@ -1241,6 +1260,7 @@ export function createCombat(THREE, env) {
     C.intr.st = 'CUT'; C.intr.t = INTR_CUT_S; C.intr.farT = 0;
     C.intrBannerT = performance.now();
     say('SIGNAL INTRUSION — CRIMSON-1 INBOUND', 2, '#ff3b5c');
+    missionUpdate('intrusion');
     if (env.debug) console.log('[ANGELS_ZERO] intr trigger combo=' + C.comboMult.toFixed(2));
     intrBgm('CUT');
     return true;
@@ -1323,13 +1343,14 @@ export function createCombat(THREE, env) {
       e.hp -= BOMBER.msl; e.rollVel += (rand() - 0.5) * 0.6;
       if (e.hp <= 0) { destroyEnemy(e, true, how); return; }
       C.hitFlash = 0.15; pushEvent('DAMAGED', `[ HIT ] ${e.type} ${e.label} — ${Math.round(100 * e.hp / e.hpMax)}%`, 0, '#ffbf3f');
-      if (how !== 'BASE') say(`${e.label} HIT — BOMBER STILL INBOUND!`, 1.6, '#ffbf3f');
+      if (how !== 'BASE') { emitStamp(e, 0); say(`${e.label} HIT — BOMBER STILL INBOUND!`, 1.6, '#ffbf3f'); }
       return;
     }
     if (!e.ace) { destroyEnemy(e, true, how); return; }
     e.hp -= ACE.msl; e.rollVel += (rand() - 0.5) * 1.2; e.dipV -= 6;
     if (e.hp <= 0) { destroyEnemy(e, true, how); return; }
     C.hitFlash = 0.2;
+    emitStamp(e, 0);
     pushEvent('DAMAGED', `[ ACE HIT ] ${e.label} — ${Math.round(100 * e.hp / e.hpMax)}%`, 0, '#ff5566');
     say(`DIRECT HIT — ${e.label} STILL FLYING!`, 1.8, '#ff5566');
     aceHurt(e);
@@ -1982,6 +2003,7 @@ export function createCombat(THREE, env) {
 
   function destroyEnemy(e, byMissile, how) {
     if (!e.alive) return;
+    emitStamp(e, 1);
     e.alive = false;
     // A limping WARDEN-2 is saved once every assigned pursuer is destroyed.
     if (C.limp && C.limp.st === 'LIMPING') {
@@ -2237,6 +2259,7 @@ export function createCombat(THREE, env) {
       e.hp -= 10;
     }
     e.zoneLog = zone;
+    if (e.hp > 0) emitStamp(e, 0);
     if (e.ace && e.hp > 0) aceHurt(e);
     if (e.hp <= 0) destroyEnemy(e, false);
   }
@@ -2579,6 +2602,24 @@ export function createCombat(THREE, env) {
       if (prev === 'LOCK' && env.onSfx) env.onSfx('lockdrop', null, 1);
     }
     C.lockState = C.lockProgress >= 1 ? 'LOCK' : C.lockProgress > 0 ? 'ACQ' : 'NONE';
+    // Optimal-aspect SHOOT cue: only fighters / drones, never surface targets.
+    {
+      const aerial = t.kind === 'DRONE' || (t.fleet === undefined && !t.isSite && !t.isSub);
+      let good = false;
+      if (aerial && t.vel) {
+        let lx = t.pos.x - S.position.x, lz = t.pos.z - S.position.z;
+        const ld = Math.hypot(lx, lz) || 1; lx /= ld; lz /= ld;
+        const vx = t.vel.x, vy = t.vel.y, vz = t.vel.z, vl = Math.hypot(vx, vy, vz) || 1;
+        const asp = Math.acos(clamp((vx * lx + vz * lz) / vl, -1, 1)) / D2R;
+        C.shootAspect = asp;
+        const rmax = C.weapon === 'QAAM' ? QAAM_RANGE : C.weapon === 'AAM4' ? AAM4_RANGE : LOCK_RANGE;
+        good = C.lockState === 'LOCK' && d > 300 && d < rmax && (asp < 30 || asp > 165) && (asp < 30 ? d < 0.7 * rmax : true);
+      }
+      C.shootT = good ? 0.25 : Math.max(0, C.shootT - dt);
+      C.shootCue = C.shootT > 0;
+      if (good && env.debug && !C.shootLogged) { C.shootLogged = true; console.log('[ANGELS_ZERO] shoot cue aspect=' + C.shootAspect.toFixed(0) + ' d=' + Math.round(d)); }
+      if (!good) C.shootLogged = false;
+    }
     if (C.lockState === 'LOCK' && prev !== 'LOCK') say('LOCK — ' + t.label + ' — SHOOT', 1.2);
     C.lockTarget = C.lockState === 'LOCK' ? t : null;
     if (C.lockProgress > 0.05) seekerHadLock = true;
@@ -2715,6 +2756,7 @@ export function createCombat(THREE, env) {
     t.hpMax = t.hp = SHIP_HP[kind] || 3;
     t.g.scale.setScalar(SHIP_SCALE[kind] || 1);
     t.samMount = kind === 'CG' || kind === 'CV_FLAG';
+    if (kind === 'CV_FLAG') missionUpdate('flagship');
     const o = SUB_OFF[kind];
     t.sub.on = !!o; t.sub.hp = SUB_HP; t.aaOff = false;
     if (o) t.sub.off.set(o[0], o[1], o[2]);
@@ -2786,6 +2828,7 @@ export function createCombat(THREE, env) {
     }
     writeFleet();
     const wingAlive = env.getWingmen ? env.getWingmen().filter(w => w && w.alive).length : 0;
+    if (i >= 2) missionUpdate('stage3');
     if (env.debug) console.log('[ANGELS_ZERO] stage', i, st.label, 'ships=' + shipN, 'bandits=' + banditN, 'wing=' + wingAlive);
   }
   // Wave-off ambush: revive pooled bandits ahead of the carrier bow. Indices are
@@ -3837,6 +3880,7 @@ export function createCombat(THREE, env) {
               else if (tgt.isChaff) { explosion(pos, 0.5); }
               else if (tgt.isFlare) { explosion(pos, 0.6); tgt.alive = false; }
               else if (tgt.fleet) {
+                emitStamp(tgt, 0);
                 explosion(pos, 1.3, { kind: 'ship' });
                 if (tgt.sub && tgt.sub.on && pos.distanceTo(subWorld(tgt, _subW)) < SUB_HIT_R) { hitSub(tgt, 2); damageSurface(tgt, 22); }
                 else damageSurface(tgt, 90);
@@ -6062,7 +6106,7 @@ export function createCombat(THREE, env) {
     setIntrusionForce(on) { intrForce = !!on; return intrForce; }, setIntrusionDisabled(on) { intrDisabled = !!on; return intrDisabled; }, forceIntrusion() { return startIntrusion(); },
     get intrusion() { return C.intr; },
     get esm() { return { on: !!C.esmOn, in: !!C.inESM, x: C.esmPos.x, z: C.esmPos.z, r: ESM_R }; },
-    get inESM() { return !!C.inESM; },
+    get inESM() { return !!C.inESM; }, get shootCue() { return !!C.shootCue; },
     setESMDisabled(on) { C.esmDisabled = !!on; return C.esmDisabled; },
     get sc() { return C.sc; },
     spawnDroneSwarm(n = SWARM_MAX, anchor = 'PLAYER') { return spawnSwarm(n, anchor); },
@@ -6279,6 +6323,7 @@ export function createCombat(THREE, env) {
           fleet: taskForce.map(t => t.id + (t.alive ? ':' + Math.round(100 * t.hp / t.hpMax) : 'x')).join(' '), bombers: enemies.filter(e => e.bomber).map(e => e.label.slice(-1) + (e.alive ? (e.bombed ? 'B' : 'I') : 'x')).join('') },
         lock: { next: C.nextTarget?.label || null, tgt: C.designated?.label || null, state: C.lockState, prog: +C.lockProgress.toFixed(2), off: +((C.seekerOff || 0) / D2R).toFixed(1), nm: +((C.targetRange || 0) / NM).toFixed(2) },
         esm: { on: !!C.esmOn, in: !!C.inESM, t: +C.esmT.toFixed(1) },
+        shoot: { cue: !!C.shootCue, aspect: Math.round(C.shootAspect || 0) },
         cloud: { player: +(C.playerCloud || 0).toFixed(2), tgt: +((C.designated && C.designated.cloud) || 0).toFixed(2), obscured: !!C.targetObscured, breaks: C.cloudBreaks || 0, ice: !!C.iceSlow,
           msl: missiles.filter(m => m.active).map(m => (m.q || MSL_FULL).tag + (m.cloudLost ? '/cloudLost' : m.lostTrack ? '/lost' : '') + (m.reacquired ? '/reacq' : '') + ' c' + (m.cloud || 0).toFixed(2)).join(' ') },
         bandit: { lock: +C.banditLock.toFixed(2), rwr: C.rwrTrack, incoming: C.incoming || 0, warn: +C.missileWarning.toFixed(2) },

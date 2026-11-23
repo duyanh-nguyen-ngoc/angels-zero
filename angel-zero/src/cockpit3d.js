@@ -834,9 +834,10 @@ export function createCockpit3D(THREE, env) {
     const ammo = spw === '4AAM' ? C.aam4 : spw === 'UGB' ? C.bombs : C.qaam;
     const rld = spw === '4AAM' ? C.aam4Reload : spw === 'UGB' ? C.bombReload : C.qaamReload;
     const code = st => st === 'HEALTHY' ? 1 : st === 'ON_FIRE' ? 2 : st === 'EXTINGUISHED' ? 3 : st === 'SEIZED' ? 4 : st === 'RELIGHTING' ? 5 : 0;
+    const pulse = env.getRadarPulse ? Math.floor(env.getRadarPulse() * 10) : 99;
     return [C.missiles || 0, ammo || 0, Math.round((rld || 0) * 10), C.flares || 0,
       C.chaff === undefined ? -1 : C.chaff, Math.round(100 - (C.health ?? 100)), code(C.engL), code(C.engR),
-      C.esmOn ? 1 : 0, C.inESM ? 1 : 0].join('');
+      C.esmOn ? 1 : 0, C.inESM ? 1 : 0, env.getRadarZoom ? env.getRadarZoom() : 1, pulse].join('');
   }
   function gaugeSignature(k, kts, altFt, vs, ffL, ffR, fuel, hydP) {
     switch (k) {
@@ -897,9 +898,10 @@ export function createCockpit3D(THREE, env) {
 
   // ---- VSD sub-pages: all three paint into the same 512-unit dCell canvas ----
   function paintTacRadar(x, hRad, now) {
-    const cx = 256, cy = 300, R = 190, scale = R / (10 * 1852);
+    const rangeM = env.getRadarZoom ? env.getRadarZoom() : 10000;
+    const cx = 256, cy = 300, R = 190, scale = R / rangeM;
     x.strokeStyle = 'rgba(0,255,102,0.32)'; x.lineWidth = 1.5;
-    for (const nm of [2.5, 5, 10]) { x.beginPath(); x.arc(cx, cy, R * nm / 10, 0, Math.PI * 2); x.stroke(); }
+    for (const fr of [0.25, 0.5, 1]) { x.beginPath(); x.arc(cx, cy, R * fr, 0, Math.PI * 2); x.stroke(); }
     for (let a = 0; a < 360; a += 30) {
       const r = a * D2R;
       x.beginPath(); x.moveTo(cx + Math.sin(r) * R * 0.94, cy - Math.cos(r) * R * 0.94);
@@ -946,7 +948,12 @@ export function createCockpit3D(THREE, env) {
       x.moveTo(px, py - 7); x.lineTo(px + 7, py); x.lineTo(px, py + 7); x.lineTo(px - 7, py); x.closePath(); x.stroke();
     }
     x.fillStyle = '#00ff66'; x.beginPath(); x.moveTo(cx, cy - 13); x.lineTo(cx + 9, cy + 9); x.lineTo(cx - 9, cy + 9); x.closePath(); x.fill();
-    x.font = `13px ${FONT}`; x.textAlign = 'right'; x.textBaseline = 'top'; x.fillText('10 NM', 500, 484);
+    x.font = `13px ${FONT}`; x.textAlign = 'right'; x.textBaseline = 'top'; x.fillText(Math.round(rangeM / 1852) + ' NM', 500, 484);
+    if (env.getRadarPulse && env.getRadarPulse() < 0.9) {
+      const p = env.getRadarPulse();
+      x.save(); x.globalAlpha = 1 - p / 0.9; x.strokeStyle = '#00ff66'; x.lineWidth = 3;
+      x.beginPath(); x.arc(cx, cy, (p / 0.9) * R, 0, Math.PI * 2); x.stroke(); x.restore();
+    }
   }
   function paintStores(x, now) {
     const sc = 512 * 0.6 / 2, cx = 256, cy = 232;

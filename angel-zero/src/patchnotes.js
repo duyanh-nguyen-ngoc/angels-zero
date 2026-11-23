@@ -3,6 +3,15 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.35', title: 'ZERO-FREEZE COMBAT LIGHTS', bullets: [
+    'Eliminated the multi-second freeze when taking missile hits, igniting an engine, or ejecting: nozzle plume lights and gun muzzle light now stay anchored in the scene so hiding a dead engine or aircraft never changes Three.js point-light shader counts.',
+    'Verified 0 mid-flight shader recompiles across engine fire, crash ejection, cockpit cannon fire, and sortie respawn.'
+  ] },
+  { version: 'v1.1.34', title: 'ACE COMBAT FEEL', bullets: [
+    'Hold T to padlock the designated bandit: the camera smoothly swings onto the target in chase or cockpit view and springs back on release. Y cycles the square radar between 4/10/25 km ranges.',
+    'Hits and kills now stamp HIT / DESTROYED in the world, and a green SHOOT cue lights up when you pull into a rear or head-on firing aspect. Mission escalations hit with a short music dip, radar pulse and [ MISSION UPDATE ] banner.',
+    'Punching through a cloud deck flashes the canopy and kicks up mist, and high-altitude contrails now ease in above 12,000 ft using the existing pooled ribbons.'
+  ] },
   { version: 'v1.1.33', title: 'ESM UMBRELLA & AIRFRAME ICING', bullets: [
     'Fly into the carrier or AWACS ESM umbrella for faster lock-on, quicker missile reloading and sharper turns on shots launched inside the Zone. A cyan radar ring and ESM ACTIVE badge show the coverage.',
     'Thick cloud now ices the airframe: controls get sluggish, drag rises and a white-blue frost creeps in from the canopy edges. Break into clear air or light the afterburner to melt it off before the ICING caution takes over.',

@@ -6,8 +6,8 @@
 // clipped to the 3D combiner glass. Square tactical radar (bottom-left), stores
 // list + F-15C silhouette with per-pylon AIM-9 reload icons (bottom-right),
 // open-corner target brackets, edge pointers, minimal top-left telemetry.
-import { SPW } from './loadout.js?v=s9bc';
-import { GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_FLOOR_Y } from './maps.js?v=s9bc';
+import { SPW } from './loadout.js?v=s9bd';
+import { GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_FLOOR_Y } from './maps.js?v=s9bd';
 
 export function createHUD(THREE, A) {
   const canvas = A.canvas;
@@ -36,6 +36,8 @@ export function createHUD(THREE, A) {
   const _wv = new THREE.Vector3();
   const _ov = new THREE.Vector3(), _rl = new THREE.Vector3();
   const MP_LABELS = ['', 'SWEEP BANDITS', 'CANYON/BRIDGE STRIKE', 'CRIMSON ACE INTERCEPT', 'CARRIER RTB'];
+  const RADAR_ZOOMS = [4000, 10000, 25000], RADAR_ZOOM_TAG = ['CLOSE 4', 'TAC 10', 'THTR 25'];
+  const STAMP_N = 8, STAMP_LIFE = 0.8;
   const P_RDR = '[ Z ] CHAFF / NOTCH 90°', P_IR = '[ X ] FLARES', P_RTB = '[ CARRIER RTB ]',
     P_MCAM = '[ HOLD FIRE ] MISSILE CAM', P_WING = '[ G ] WINGMEN ENGAGE';
   const CHEAT_ROWS = [
@@ -46,11 +48,18 @@ export function createHUD(THREE, A) {
     ['SHIFT/CTRL/UP/DN/WHEEL', 'Throttle'],
     ['SPACE', 'View'], ['[ ]', 'MFD'], ['ALT', 'Free look'],
     ['TABx2', 'Debrief'], ['F1', 'This sheet'],
+    ['T (hold)', 'Padlock'], ['Y', 'Radar zoom'],
     [', . /', 'Music prev / next / AUTO'],
     ['B+SHIFT <290KT', 'PSM: Cobra / Kulbit'],
     ['RUDDER+OPP ROLL @STALL', 'Flat spin (neutral+opp rudder recovers)']
   ];
   let promptKey = '', promptT = 0;
+  let radarZoom = 1, radarPulseT = 99;
+  try { const rz = Number(localStorage.getItem('angelsZero_radarZoom')); if (Number.isInteger(rz) && rz >= 0 && rz < 3) radarZoom = rz; } catch (e) { /* storage unavailable */ }
+  // Pooled in-world hit stamps.
+  const STAMP_POS = new Float32Array(STAMP_N * 3), STAMP_T = new Float32Array(STAMP_N), STAMP_K = new Uint8Array(STAMP_N);
+  STAMP_T.fill(99);
+  let stampNext = 0;
 
   function resize() {
     DPR = Math.min(devicePixelRatio || 1, 3);
@@ -523,6 +532,11 @@ export function createHUD(THREE, A) {
     };
     drawAcquisitionRing(ctx);
     drawSeekerCircle(ctx);
+    if (A.getPad && A.getPad().k > 0.2) {
+      ctx.save(); glow(ctx, '#00c8ff', 4); ctx.fillStyle = '#00c8ff';
+      ctx.font = f(11, true); ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillText('◁ PADLOCK', HW / 2, HH * 0.16); ctx.restore();
+    }
 
     const prim = C.designated && C.designated.alive ? C.designated : null;
     const nextTgt = C.nextTarget && C.nextTarget.alive ? C.nextTarget : null;
@@ -589,8 +603,8 @@ export function createHUD(THREE, A) {
         ctx.lineWidth = 1.2;
         ctx.beginPath(); ctx.arc(p.x, p.y, s + 7, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * rk); ctx.stroke();
         ctx.font = f(13, true); ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-        const cue = range < shootRange && Math.floor(now / 240) % 2 ? '[ SHOOT ]' : 'LOCK' + tag;
-        labelText(ctx, cue, p.x, p.y - s - 10, WARN, 5);
+        const cue = C.shootCue && Math.floor(now / 125) % 2 ? '[ SHOOT ]' : 'LOCK' + tag;
+        labelText(ctx, cue, p.x, p.y - s - 10, C.shootCue ? '#00ff66' : WARN, 5);
       } else if (st === 'ACQ') {
         // Rotating outer diamond shrinking cleanly onto the bracket as lock builds.
         const k = 1 + 1.15 * (1 - info.prog);
@@ -1033,7 +1047,7 @@ export function createHUD(THREE, A) {
     const cx = x0 + s / 2, cy = y0 + s * 0.54, half = s / 2;
     // 4 NM scale: islands, straits and the canyon gorge are readable for instrument
     // navigation at night / in cloud; bandits beyond range ride the rim.
-    const RANGE_NM = 4, MAX_M = RANGE_NM * 1852, k = (half * 0.90) / MAX_M, hRad = S.heading * D2R;
+    const MAX_M = RADAR_ZOOMS[radarZoom], k = (half * 0.90) / MAX_M, hRad = S.heading * D2R;
     const border = flashRed() || C.banditLock >= 1 ? WARN : C.rwrTrack ? AMBER : G;
 
     ctx.save();
@@ -1181,6 +1195,13 @@ export function createHUD(THREE, A) {
       ctx.restore();
     }
 
+    // Mission-update sweep pulse: one expanding ring inside the radar frame.
+    if (radarPulseT < 0.9) {
+      const pr = (radarPulseT / 0.9) * half * 0.95;
+      ctx.save(); ctx.globalAlpha = 1 - radarPulseT / 0.9;
+      ctx.strokeStyle = '#00ff66'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(cx, cy, pr, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+    }
     // Ownship triangle.
     glow(ctx, GB, 5);
     ctx.beginPath(); ctx.moveTo(cx, cy - 8); ctx.lineTo(cx + 5.5, cy + 6); ctx.lineTo(cx, cy + 3); ctx.lineTo(cx - 5.5, cy + 6); ctx.closePath(); ctx.fill();
@@ -1192,7 +1213,7 @@ export function createHUD(THREE, A) {
     ctx.lineWidth = 1;
     ctx.stroke(frame);
     ctx.font = f(11, true); ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-    labelText(ctx, RANGE_NM + 'NM', x0 + 6, y0 + 5, G, 2);
+    labelText(ctx, RADAR_ZOOM_TAG[radarZoom], x0 + 6, y0 + 5, G, 2);
     if (C.ecmState && C.ecmState !== 'READY') {
       const act = C.ecmState === 'ACTIVE';
       const txt = act ? `[ ECM ACTIVE ]  ${C.ecmT.toFixed(1)}` : `[ ECM RECHARGE ]  ${C.ecmT.toFixed(1)}`;
@@ -1325,6 +1346,30 @@ export function createHUD(THREE, A) {
     ctx.restore();
   }
 
+  function addStamp(pos, kind) {
+    const i = stampNext; stampNext = (stampNext + 1) % STAMP_N;
+    STAMP_POS[i * 3] = pos.x; STAMP_POS[i * 3 + 1] = pos.y; STAMP_POS[i * 3 + 2] = pos.z;
+    STAMP_T[i] = 0; STAMP_K[i] = kind ? 1 : 0;
+  }
+  function drawStamps(ctx, dt) {
+    for (let i = 0; i < STAMP_N; i++) {
+      if (STAMP_T[i] === 99) continue;
+      STAMP_T[i] += dt;
+      const t = STAMP_T[i];
+      if (t >= STAMP_LIFE) { STAMP_T[i] = 99; continue; }
+      _drScr.set(STAMP_POS[i * 3], STAMP_POS[i * 3 + 1], STAMP_POS[i * 3 + 2]);
+      const p = droneScreen(_drScr);
+      if (!p.ok) continue;
+      const rise = 40 * t / STAMP_LIFE, a = 1 - (t / STAMP_LIFE) * (t / STAMP_LIFE);
+      const dead = STAMP_K[i] === 1;
+      ctx.save(); ctx.globalAlpha = a; glow(ctx, dead ? '#ff3344' : '#ffb000', 4);
+      ctx.font = dead ? f(18, true) : f(16, true);
+      ctx.fillStyle = dead ? '#ff3344' : '#ffb000';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(dead ? 'DESTROYED' : 'HIT', p.x, p.y - 14 - rise);
+      ctx.restore();
+    }
+  }
   /* ------------------------------------------- center AC7 warning banners */
   function drawBanner(ctx, cx, y, text, col, w = 220, alpha = 1) {
     ctx.save();
@@ -1513,6 +1558,10 @@ export function createHUD(THREE, A) {
     if (C.intr && C.intr.st === 'CUT') {
       const glitch = (Math.floor(now / 85) % 3) ? 'SIGNAL INTRUSION' : '▒▒▒ SIGNAL LOST ▒▒▒';
       drawBanner(ctx, cx, upperY, glitch, WARN, 460, 0.55 + 0.45 * (Math.floor(now / 70) % 2));
+    }
+    if (C.mupdateT && now - C.mupdateT < 2200) {
+      const age = now - C.mupdateT, flash = age > 600 ? 1 : (Math.floor(now / 125) % 2 ? 1 : 0.35);
+      drawBanner(ctx, cx, upperY + 180, '[ MISSION UPDATE ]', '#00ff66', 400, flash);
     }
     if (C.interceptBannerT && now - C.interceptBannerT < 2500) {
       const age = now - C.interceptBannerT;
@@ -2000,6 +2049,12 @@ export function createHUD(THREE, A) {
       hctx.drawImage(frostCv, 0, 0, HW, HH); hctx.restore();
     }
 
+    if (A.getPunch && A.getPunch() > 0.01) {
+      hctx.save(); hctx.fillStyle = 'rgba(235,242,255,' + (A.getPunch() * 0.75).toFixed(3) + ')';
+      hctx.fillRect(0, 0, HW, HH);
+      hctx.globalAlpha = A.getPunch() * 0.7; hctx.drawImage(frostCv, 0, 0, HW, HH); hctx.restore();
+    }
+
     if (A.getMode && A.getMode() === 'EJECT') {
       drawRadio(hctx);
       drawTopLeft(hctx);
@@ -2031,6 +2086,7 @@ export function createHUD(THREE, A) {
     drawRadio(hctx);
     drawTopLeft(hctx);
     if (!C.dead) drawKillFlash(hctx, g);
+    drawStamps(hctx, dt); radarPulseT += dt;
     if (C.jamming > 0) {
       // EW jitter: radar is painted directly on this canvas, so translate the
       // draw by +/-2 px instead of a drawImage source-offset.
@@ -2426,6 +2482,10 @@ export function createHUD(THREE, A) {
     get stallWarn() { return stallOn(); },
     get hudAlertState() { return alertState; },
     setAlertState(s) { alertOverride = s; },
-    setMusicToast(text) { musicToast.text = text || ''; musicToast.t = musicToast.text ? performance.now() : 0; }
+    setMusicToast(text) { musicToast.text = text || ''; musicToast.t = musicToast.text ? performance.now() : 0; },
+    addStamp, radarPulse() { radarPulseT = 0; },
+    setRadarZoom(i) { radarZoom = ((i | 0) % 3 + 3) % 3; try { localStorage.setItem('angelsZero_radarZoom', String(radarZoom)); } catch (e) { /* storage unavailable */ } return RADAR_ZOOM_TAG[radarZoom]; },
+    get radarZoom() { return radarZoom; },
+    get radarPulse() { return radarPulseT; }
   };
 }

@@ -1705,6 +1705,11 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   - Carrier (NAVAL) and orbiting AWACS (AIR_SUPERIORITY) broadcast a 4.5 km friendly ESM umbrella with hysteresis. Inside: 1.6× lock build, 1.3× missile reload and 1.25× turn on missiles latched at launch. Cyan radar ring, ESM ACTIVE badge and VSD circle show coverage; ACE_DUEL / CANYON never get it.
   - `state.cloudIce` builds in thick cloud (0.45 threshold), melts in clear air and twice as fast on burner. At high ice, pitch/roll authority fades 20 % and drag rises 12 %; `[ ICING ]` banner, master caution, radio call, canopy frost shader and a cached HUD frost vignette make the risk legible. `?esm=0`, `?awacsat=s`, `?icecloud=s`, `?ice=v` provide deterministic tests.
 
+- [x] **Ace Combat feel pass** *(build `s9bd`, v1.1.34, `index.html`, `src/combat.js`, `src/hud.js`, `src/audio.js`, `src/vfx.js`, `src/cockpit3d.js`, `src/canopyglass.js`)*
+  - Hold-T padlock springs the chase / cockpit camera onto `C.designated` with neck limits, releasing cleanly without disturbing freelook or the missile cam. Y cycles radar zoom 4/10/25 km with persistence; both views and the F1 sheet show the new keys.
+  - Pooled in-world `HIT` / `DESTROYED` stamps (0.8 s, 8 slots) fire from `env.onHitStamp`; `C.shootCue` lights `[ SHOOT ]` on rear/head-on aspects with a 0.25 s hold.
+  - `env.onMissionUpdate` + `audio.bgmDip(1.2)` + `hud.radarPulse()` + `[ MISSION UPDATE ]` banner fire on stage escalation, flagship spawn, ambush and intrusion CUT with a 4 s cooldown. Cloud-deck punch flashes the canopy and boosts mist; contrails ease in above 12,000 ft on the existing pooled ribbons (no new draw calls).
+
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.

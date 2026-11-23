@@ -9,7 +9,7 @@
 // to the procedural layers below. A master "hearing tunnel" low-pass sweeps
 // 12 kHz -> 550 Hz as the pilot approaches G-LOC.
 
-import { MISSIONS } from './missions.js?v=s9bc';
+import { MISSIONS } from './missions.js?v=s9bd';
 
 export function createAudio() {
   let ctx = null, master = null, cockpitLP = null, ready = false;
@@ -1553,6 +1553,14 @@ export function createAudio() {
     if (N.rStaticBP) N.rStaticBP.frequency.setValueAtTime(1400, t);
     setTimeout(() => { rampDuck(bgmPausedByUser ? DUCK_GAIN : 1, 0.25); }, dur * 1000);
   }
+  // Mission-update sting: a short, clean music dip with no radio static. The
+  // decks keep playing; index.html schedules the scenario snap at the low point.
+  function bgmDip(secs = 1.2) {
+    if (!ready || !N.duckG) return;
+    const dur = Math.max(0.4, secs);
+    rampDuck(0.03, 0.1);
+    setTimeout(() => { rampDuck(bgmPausedByUser ? DUCK_GAIN : 1, 0.1); }, Math.max(0.2, dur - 0.1) * 1000);
+  }
   function bgmStaticEnd() {
     if (!ready || !N.rStaticG) return;
     const t = ctx.currentTime, sg = N.rStaticG.gain;
@@ -1886,7 +1894,7 @@ export function createAudio() {
   }
 
   return {
-    init, resume, suspend, update, updateMusic, bgmCut, bgmStaticEnd, setSpray, setFlagCharge, setDroneHum, enemyGun, gunhit, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, samLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, setBgmPause, bumpBgmDwell() { dwell = MIN_DWELL; }, setBgmForce: v => { bgmForce = v || ''; }, switchTo, selectTrack, skip, setAuto, onBgmChange, get bgmTracks() { return allTracks() || []; }, radioSquelch, preloadRadio, playRadio, stopRadio, txOpen, txTail, txClose, preload,
+    init, resume, suspend, update, updateMusic, bgmCut, bgmDip, bgmStaticEnd, setSpray, setFlagCharge, setDroneHum, enemyGun, gunhit, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, samLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, setBgmPause, bumpBgmDwell() { dwell = MIN_DWELL; }, setBgmForce: v => { bgmForce = v || ''; }, switchTo, selectTrack, skip, setAuto, onBgmChange, get bgmTracks() { return allTracks() || []; }, radioSquelch, preloadRadio, playRadio, stopRadio, txOpen, txTail, txClose, preload,
     get radioAnalyser() { return N.rAnalyser || null; }, get radioFreq() { return N.rFreq || null; }, get radioTime() { return N.rTime || null; },
     get radioCh() { return RADIO_CH; },
     get radioDsp() { return { pttOpen: !!N.pttOpen, pttTail: !!N.pttTail, static: !!N.rStatic, hp: N.rHP ? N.rHP.frequency.value : 0,
