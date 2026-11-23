@@ -490,14 +490,15 @@ export function createVFX(THREE, env) {
   machConeInner.renderOrder = 5; machConeOuter.renderOrder = 4;
   machConeInner.visible = false; machConeOuter.visible = false;
   jet.add(machConeInner, machConeOuter);
-  let coneClock = 0;
+  let coneClock = 0, machPulseK = 0;
   function updateMachCone(dt, mach, isCockpit) {
     coneClock += dt;
+    machPulseK = Math.max(0, machPulseK - dt / 0.4);
     const win = force.cone ? 1 : smooth(mach, 0.98, 1.0) * (1 - smooth(mach, 1.02, 1.05));
     const show = !isCockpit && win > 0.005;
     machConeInner.visible = machConeOuter.visible = show;
-    machConeInner.material.uniforms.uOp.value = win * 0.22;
-    machConeOuter.material.uniforms.uOp.value = win * 0.12;
+    machConeInner.material.uniforms.uOp.value = win * 0.22 + machPulseK * 0.6;
+    machConeOuter.material.uniforms.uOp.value = win * 0.12 + machPulseK * 0.35;
     machConeInner.material.uniforms.uTime.value = coneClock;
     machConeOuter.material.uniforms.uTime.value = coneClock;
   }
@@ -1708,6 +1709,7 @@ export function createVFX(THREE, env) {
     get vaporLevel() { return vaporLevel; },
     // Time-of-day tint for condensation (white at noon, rose at dawn, dim blue-grey at night).
     setVaporTint(c) { vaporTint.copy(c); },
+    machPulse(k = 1) { machPulseK = Math.max(0, Math.min(1, k)); },
     get coneOpacity() { return machConeInner.material.uniforms.uOp.value; },
     get sprayCount() { return sprayP.filter(q => q.on).length; },
     clouds

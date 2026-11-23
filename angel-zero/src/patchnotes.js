@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.28', title: 'WAVE-OFF & TOWER BUZZ', bullets: [
+    'Carrier recoveries can now spring a wave-off ambush: a clean go-around with full burner, a priority bandit call, and a Last Stand score until the bow is clear and you are cleared to land again.',
+    'Buzz the carrier island or the AFB tower supersonically — or thunder past a bandit — for a shockwave jolt, a sonic crack, bonus points and a radio call.',
+    'Autoland always releases its carrier hold on an abort, so the jet cannot stick to the deck or leave the ship frozen.'
+  ] },
   { version: 'v1.1.27', title: 'LINKED WEAK POINTS', bullets: [
     'CG cruisers and the flagship now have a destructible RADAR / AA mast. Knock it out to silence their flak and SAMs, claim an AA DISABLED reward and cancel the flagship salvo.',
     'Canyon rim batteries can be destroyed individually. A dead sector stops local barrages while neighbouring batteries fire reduced volleys; searchlights over dead sites go dark.',

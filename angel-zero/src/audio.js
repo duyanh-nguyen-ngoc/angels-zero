@@ -9,7 +9,7 @@
 // to the procedural layers below. A master "hearing tunnel" low-pass sweeps
 // 12 kHz -> 550 Hz as the pilot approaches G-LOC.
 
-import { MISSIONS } from './missions.js?v=s97d';
+import { MISSIONS } from './missions.js?v=s98b';
 
 export function createAudio() {
   let ctx = null, master = null, cockpitLP = null, ready = false;
@@ -279,6 +279,10 @@ export function createAudio() {
     N.flagG = gain(0); N.flagLFO = osc('square', 2); N.flagAM = gain(0);
     N.flagOsc.connect(N.flagBP).connect(N.flagG).connect(master);
     N.flagLFO.connect(N.flagAM).connect(N.flagG.gain);
+    // Sonic boom: one persistent noise crack + one 45 Hz thump, retriggered by envelopes.
+    N.boomN = loopNoise(N.whiteBuf); N.boomLP = filt('lowpass', 180, 0.8); N.boomNG = gain(0);
+    N.boomN.connect(N.boomLP).connect(N.boomNG).connect(cockpitLP);
+    N.boomSub = osc('sine', 45); N.boomSubG = gain(0); N.boomSub.connect(N.boomSubG).connect(cockpitLP);
 
     // Sea-skim rooster-tail rush + low hull rumble, both gated by setSpray().
     N.sprayNoise = loopNoise(N.whiteBuf); N.sprayHP = filt('highpass', 300, 0.7);
@@ -418,25 +422,18 @@ export function createAudio() {
     N.lastBlast = { k: +k.toFixed(2), crackHz: [3000, 850], crackAt: +t.toFixed(3), subHz: [110, 36], boomAt: +tb.toFixed(3), delay: +(tb - t).toFixed(3), count: N.blastCount };
   }
   // Mach-1 sonic boom: two short band-pass cracks 110 ms apart + a long 62->28 Hz sub.
-  function sonicBoom() {
-    if (!ready) return;
-    const t = ctx.currentTime;
-    for (let i = 0; i < 2; i++) {
-      const at = t + i * 0.11;
-      const n = ctx.createBufferSource(); n.buffer = N.white;
-      const bp = filt('bandpass', 1800, 1.4);
-      bp.frequency.setValueAtTime(1800, at); bp.frequency.exponentialRampToValueAtTime(600, at + 0.08);
-      const g = gain(0); g.gain.setValueAtTime(0, at);
-      g.gain.linearRampToValueAtTime(i ? 0.65 : 0.9, at + 0.002);
-      g.gain.exponentialRampToValueAtTime(0.001, at + 0.08);
-      n.connect(bp).connect(g).connect(cockpitLP); n.start(at, Math.random()); n.stop(at + 0.1);
-    }
-    const sub = ctx.createOscillator(); sub.type = 'sine';
-    sub.frequency.setValueAtTime(62, t); sub.frequency.exponentialRampToValueAtTime(28, t + 1.2);
-    const sg = gain(0); sg.gain.setValueAtTime(0, t);
-    sg.gain.linearRampToValueAtTime(1.0, t + 0.012);
-    sg.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
-    sub.connect(sg).connect(cockpitLP); sub.start(t); sub.stop(t + 1.25);
+  function sonicBoom(cockpit) {
+    if (!ready || !N.boomNG) return;
+    const t = ctx.currentTime, k = cockpit ? 0.6 : 1;
+    const ng = N.boomNG.gain, sg = N.boomSubG.gain;
+    ng.cancelScheduledValues(t); ng.setValueAtTime(0.0001, t);
+    ng.linearRampToValueAtTime(0.9 * k, t + 0.005);
+    ng.exponentialRampToValueAtTime(0.0001, t + 0.5);
+    sg.cancelScheduledValues(t); sg.setValueAtTime(0.0001, t);
+    sg.linearRampToValueAtTime(0.8 * k, t + 0.012);
+    sg.exponentialRampToValueAtTime(0.0001, t + 0.25);
+    N.boomSub.frequency.setValueAtTime(45, t);
+    N.boomSub.frequency.exponentialRampToValueAtTime(28, t + 0.25);
     duckWorld(0.55, 0.25);
     N.boomCount = (N.boomCount || 0) + 1;
     N.lastBoom = { t: +t.toFixed(3), count: N.boomCount };
@@ -1314,6 +1311,7 @@ export function createAudio() {
     if (bgmForce) return bgmForce;
     if (!c) return '01_hangar';
     if (c.debrief || c.landed) return '12_debrief';
+    if (c.ambush) return '10_last_stand';
     if (c.rtb) return '11_rtb';
     if (c.app === 'MENU') return '01_hangar';
     if (c.onGround && !c.launched) return '02_catapult';

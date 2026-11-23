@@ -720,35 +720,35 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s97d';
-import { createAmbient } from './src/ambient.js?v=s97d';
-import { createBlastFX } from './src/blastfx.js?v=s97d';
-import { createHUD } from './src/hud.js?v=s97d';
-import { createCockpit3D } from './src/cockpit3d.js?v=s97d';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s97d';
-import { createEjection } from './src/eject.js?v=s97d';
-import { createAudio } from './src/audio.js?v=s97d';
-import { createRadio } from './src/radio.js?v=s97d';
-import { createProfile, LIVERIES, liveryById } from './src/profile.js?v=s97d';
-import { createLivery } from './src/livery.js?v=s97d';
-import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s97d';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s97d';
-import { createCanopyFX } from './src/canopy.js?v=s97d';
-import { createNVG } from './src/nvg.js?v=s97d';
-import { createWorld, WORLD } from './src/world.js?v=s97d';
-import { createSurfaces } from './src/surfaces.js?v=s97d';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s97d';
-import { createFreeLook } from './src/freelook.js?v=s97d';
-import { createCanopyGlass } from './src/canopyglass.js?v=s97d';
-import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s97d';
-import { SPW, SQUADRON, MODES, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode } from './src/loadout.js?v=s97d';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s97d';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s97d';
-import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s97d';
-import { createRadioQueue } from './src/radioQueue.js?v=s97d';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s97d';
+import { createVFX } from './src/vfx.js?v=s98b';
+import { createAmbient } from './src/ambient.js?v=s98b';
+import { createBlastFX } from './src/blastfx.js?v=s98b';
+import { createHUD } from './src/hud.js?v=s98b';
+import { createCockpit3D } from './src/cockpit3d.js?v=s98b';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s98b';
+import { createEjection } from './src/eject.js?v=s98b';
+import { createAudio } from './src/audio.js?v=s98b';
+import { createRadio } from './src/radio.js?v=s98b';
+import { createProfile, LIVERIES, liveryById } from './src/profile.js?v=s98b';
+import { createLivery } from './src/livery.js?v=s98b';
+import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s98b';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s98b';
+import { createCanopyFX } from './src/canopy.js?v=s98b';
+import { createNVG } from './src/nvg.js?v=s98b';
+import { createWorld, WORLD } from './src/world.js?v=s98b';
+import { createSurfaces } from './src/surfaces.js?v=s98b';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s98b';
+import { createFreeLook } from './src/freelook.js?v=s98b';
+import { createCanopyGlass } from './src/canopyglass.js?v=s98b';
+import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s98b';
+import { SPW, SQUADRON, MODES, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode } from './src/loadout.js?v=s98b';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s98b';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s98b';
+import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s98b';
+import { createRadioQueue } from './src/radioQueue.js?v=s98b';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s98b';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
-  GORGE_HALF_W, RUNWAY_BBOX } from './src/maps.js?v=s97d';
+  GORGE_HALF_W, RUNWAY_BBOX } from './src/maps.js?v=s98b';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -1567,6 +1567,7 @@ function loadMissionScene(m) {
   combatSys.resetMission();
   world.rebuild(MAPS[m.mapTag] || MAPS.ARCHIPELAGO);
   applyMapProps(MAPS[m.mapTag] || MAPS.ARCHIPELAGO);
+  setupBuzzAnchors();
   vfx.clearTrails();
   ambient.reset();
   tele.reset();
@@ -1582,6 +1583,9 @@ function loadMissionScene(m) {
   combat.missionPhase = 1; combat.rtb = null; combat.done = false;
   state.autobrake = false;
   autoland.on = false; autoland.ph = ''; autoland.prevLz = Infinity; combat.allyHold = false;
+  waveoff.used = false; waveoff.rolled = false; waveoff.st = 'IDLE'; waveoff.t = 0; waveoff.n = 0;
+  waveoff.ids.fill(-1); waveoff.pitchBias = 0; combat.ambushActive = false;
+  BUZZ_CDV.fill(0);
   cat.ph = 'NONE'; cat.t = 0; cat.arm = 0; cat.grace = 0; cat.forceAB = false;
   for (const w of wingmen) { w.cat.ph = 'NONE'; w.cat.t = 0; w.cat.delay = 0; }
 }
@@ -1601,8 +1605,17 @@ function missionConfigWingSolo(m) {
    All scratch objects are preallocated: zero per-frame allocations.
    -------------------------------------------------------------------------- */
 const AL_FLARE_D = 90, AL_TD_DZ = 78, AL_GATE_D = 400, AL_TRAP_T = 1.6, AL_ROLL_T = 1.1;
+// Wave-off ambush + supersonic proximity buzz.
+const WO_CHANCE = 0.25, WO_D_MIN = 600, WO_D_MAX = 1200, WO_PITCH_DEG = 12, WO_BURNER_S = 2.5, WO_CLIMB_MIN = 150;
+const WO_BANDITS_MIN = 2, WO_BANDITS_MAX = 3, WO_SPAWN_D = 6000, WO_SPAWN_ALT = 2500;
+const BUZZ_MACH = 1.0, BUZZ_R = 90, BUZZ_CD = 10, BUZZ_TOWER_PTS = 500, BUZZ_JET_PTS = 250;
+const BUZZ_SHAKE = 0.35, BUZZ_SHAKE_CP = 0.12;
 const autoland = { on: false, ph: '', t: 0, T: AL_CAPTURE_T, d: 0, off: new THREE.Vector3(), tdZ: 0, vRel: 0,
   prevLz: Infinity, q0: new THREE.Quaternion(), p0: new THREE.Vector3(), target: null };
+const waveoff = { used: false, rolled: false, st: 'IDLE', t: 0, n: 0, bannerT: 0, pitchBias: 0, ids: new Int16Array(3).fill(-1) };
+const BUZZ_ANCH = new Float32Array(8 * 3), BUZZ_KIND = new Uint8Array(8), BUZZ_CDV = new Float32Array(8);
+const _bz0 = new THREE.Vector3(), _bz1 = new THREE.Vector3(), _bzSeg = new THREE.Vector3(), _bzLocal = new THREE.Vector3();
+const ISLAND_LOCAL = [24, 30, 20];
 const _alLocal = new THREE.Vector3(), _alW = new THREE.Vector3(), _alPrevW = new THREE.Vector3(), _alDir = new THREE.Vector3(),
   _alQ = new THREE.Quaternion(), _alInv = new THREE.Quaternion(), _alM = new THREE.Matrix4(), _alZero = new THREE.Vector3(),
   _alFlare = new THREE.Quaternion(), _alStern = new THREE.Vector3();
@@ -1616,7 +1629,7 @@ function alSlope(a, d, out) { return out.set(0, a.deckY + GEAR_H + Math.max(0, d
 function autolandPrompt() {
   const a = combat.ally;
   if (!ilsVisible() || !a || !a.root || !combat.rtb || !combat.rtb.on || combat.rtb.type !== 'CARRIER' || !sortie.active) return false;
-  if (flightMode !== 'FLY' || carrier.phase || autoland.on) return false;
+  if (flightMode !== 'FLY' || carrier.phase || autoland.on || combat.ambushActive) return false;
   _alStern.copy(a.pos).addScaledVector(a.fwd, -a.len / 2);
   return Math.hypot(state.position.x - _alStern.x, state.position.z - _alStern.z) < AUTOLAND_R;   // same test as the HUD pill
 }
@@ -1662,6 +1675,105 @@ function autolandPhase(ph) {
     ' kts=' + (state.speed * 1.94384).toFixed(0));
   autoland.ph = ph; autoland.t = 0;
 }
+function triggerWaveOff() {
+  if (waveoff.used || waveoff.st !== 'IDLE') return false;
+  const a = combat.ally;
+  waveoff.st = 'ABORT'; waveoff.t = WO_BURNER_S; waveoff.used = true;
+  waveoff.bannerT = performance.now();
+  autoland.on = false; autoland.ph = ''; autoland.prevLz = Infinity;
+  combat.allyHold = false;
+  // Keep the jet's pose and velocity: no snap, no deck clipping.
+  state.gearDown = false; gearAutoLock = false;
+  flightMode = 'FLY'; mouse.nx = 0; mouse.ny = 0; kbActive = false; kbHold = 0; kbHeld.clear();
+  combat.waveoffBannerT = performance.now();
+  if (typeof rq !== 'undefined') rq.say('WAVE OFF! BANDITS ON THE BOW!', { pri: 3, bypass: true, cat: 'MISSILE', ch: 'AWACS' });
+  audio.masterCaution();
+  const n = WO_BANDITS_MIN + ((Math.random() * (WO_BANDITS_MAX - WO_BANDITS_MIN + 1)) | 0);
+  _bz0.copy(a.root.position);
+  _bz1.set(0, 0, -1).applyQuaternion(a.root.quaternion);
+  waveoff.n = combatSys.spawnAmbush(n, _bz0, _bz1, waveoff.ids);
+  waveoff.st = 'AMBUSH'; combat.ambushActive = true;
+  if (DEBUG) console.log('[ANGELS_ZERO] waveoff ABORT d=' + autoland.d.toFixed(0) + ' vs=' + state.speed.toFixed(1) + ' alt=' + state.position.y.toFixed(1));
+  return true;
+}
+function updateWaveOff(dt) {
+  if (waveoff.st === 'ABORT') {
+    waveoff.t -= dt;
+    state.afterburner = 1; state.throttle = 1;
+    waveoff.pitchBias = WO_PITCH_DEG * D2R;
+    const a = combat.ally;
+    const alt = a ? state.position.y - a.deckY : 999;
+    if (waveoff.t <= 0 || alt > WO_CLIMB_MIN) { waveoff.pitchBias = 0; waveoff.t = 0; }
+    return;
+  }
+  if (waveoff.st !== 'AMBUSH') return;
+  let live = 0;
+  for (let i = 0; i < waveoff.ids.length; i++) {
+    const id = waveoff.ids[i];
+    if (id >= 0 && combatSys.enemies[id] && combatSys.enemies[id].alive) live++;
+  }
+  if (live) return;
+  waveoff.st = 'CLEAR'; waveoff.ids.fill(-1); waveoff.n = 0;
+  combat.ambushActive = false;
+  if (typeof rq !== 'undefined') rq.say('BOW IS CLEAR — CLEARED TO LAND, OVERLORD', { pri: 3, bypass: true, ch: 'AWACS' });
+  combat.score += 800;
+  combat.ambushClearT = performance.now();
+  if (DEBUG) console.log('[ANGELS_ZERO] ambush clear t=' + simTime.toFixed(2));
+}
+let buzzTowerReady = false;
+function setupBuzzAnchors() {
+  buzzTowerReady = false;
+  const list = world.envProps && world.envProps.baseBldg;
+  if (!list || !list.length) return;
+  let tower = null;
+  for (const o of list) if (o.visible !== false && (!tower || o.position.y > tower.position.y)) tower = o;
+  if (!tower) return;
+  BUZZ_ANCH[3] = tower.position.x; BUZZ_ANCH[4] = tower.position.y + 30; BUZZ_ANCH[5] = tower.position.z;
+  BUZZ_KIND[1] = 0; buzzTowerReady = true;
+}
+function buzzSwept(p) {
+  _bzSeg.subVectors(state.position, prevPlanePos);
+  const len2 = _bzSeg.lengthSq();
+  const t = len2 > 0 ? THREE.MathUtils.clamp(_bz1.subVectors(p, prevPlanePos).dot(_bzSeg) / len2, 0, 1) : 0;
+  _bz1.copy(prevPlanePos).addScaledVector(_bzSeg, t);
+  return _bz1.distanceTo(p);
+}
+function onBuzz(kind, pos) {
+  blastShake = Math.max(blastShake, firstPerson ? BUZZ_SHAKE_CP : BUZZ_SHAKE);
+  vfx.machPulse(1);
+  onSfx('sonic', null, firstPerson ? 1 : 0);
+  const tower = kind === 'TOWER';
+  combat.score += tower ? BUZZ_TOWER_PTS : BUZZ_JET_PTS;
+  if (tower) combat.buzzTower = (combat.buzzTower || 0) + 1; else combat.buzzJet = (combat.buzzJet || 0) + 1;
+  combat.buzzBannerT = performance.now();
+  combat.buzzLabel = tower ? 'TOWER BUZZ +' + BUZZ_TOWER_PTS : 'SONIC PASS +' + BUZZ_JET_PTS;
+  if (DEBUG) console.log('[ANGELS_ZERO] buzz kind=' + kind + ' d=' + BUZZ_R + ' mach=' + state.mach.toFixed(2) + ' pts=' + (tower ? BUZZ_TOWER_PTS : BUZZ_JET_PTS));
+  if (!tower) { if (typeof onWing === 'function') onWing('HAH — RATTLED HIS CANOPY!', 'WARDEN-2', '#00ff66'); return; }
+  const carrierIsland = !!(combat.ally && combat.ally.root && combat.carrierVisible !== false);
+  const line = carrierIsland ? 'OVERLORD TOWER: WHO JUST BUZZED MY ISLAND?!' : 'TOWER: COFFEE\'S ON THE FLOOR, ONE!';
+  if (typeof rq !== 'undefined') rq.say({ id: 'BUZZ_TOWER', ch: carrierIsland ? 'AWACS' : 'DEFAULT', text: line, pri: 1, cat: 'COMBAT', duration: 3 }, { bypass: true });
+}
+function updateBuzz(dt) {
+  for (let i = 0; i < BUZZ_CDV.length; i++) if (BUZZ_CDV[i] > 0) BUZZ_CDV[i] = Math.max(0, BUZZ_CDV[i] - dt);
+  if (state.mach < BUZZ_MACH || flightMode !== 'FLY' || autoland.on || waveoff.st === 'ABORT') return;
+  if (cat && (cat.ph === 'HOLD' || cat.ph === 'LAUNCH')) return;
+  if (typeof combat.catFireT === 'number' && simTime - combat.catFireT < 3) return;
+  const a = combat.ally;
+  if (a && a.root && combat.carrierVisible !== false) {
+    _bzLocal.set(ISLAND_LOCAL[0], ISLAND_LOCAL[1], ISLAND_LOCAL[2]);
+    alToWorld(a, _bzLocal, _bz0);
+    BUZZ_ANCH[0] = _bz0.x; BUZZ_ANCH[1] = _bz0.y; BUZZ_ANCH[2] = _bz0.z; BUZZ_KIND[0] = 0;
+    if (BUZZ_CDV[0] <= 0 && buzzSwept(_bz0) < BUZZ_R) { BUZZ_CDV[0] = BUZZ_CD; onBuzz('TOWER', _bz0); }
+  }
+  if (buzzTowerReady && world.map && world.map.props && world.map.props.baseBldg) {
+    _bz0.set(BUZZ_ANCH[3], BUZZ_ANCH[4], BUZZ_ANCH[5]);
+    if (BUZZ_CDV[1] <= 0 && buzzSwept(_bz0) < BUZZ_R) { BUZZ_CDV[1] = BUZZ_CD; onBuzz('TOWER', _bz0); }
+  }
+  for (const e of combatSys.enemies) {
+    if (!e.alive || e.buzzCD > 0) continue;
+    if (buzzSwept(e.pos) < BUZZ_R) { e.buzzCD = BUZZ_CD; onBuzz('JET', e.pos); }
+  }
+}
 function updateAutoland(dt) {
   const a = combat.ally;
   if (!a || !a.root || combat.dead) { autoland.on = false; combat.allyHold = false; return; }
@@ -1670,6 +1782,14 @@ function updateAutoland(dt) {
   state.pitchRate = state.rollRate = state.yawRate = 0;     // pilot input is locked out
   state.gearDown = true; state.gear = Math.min(1, state.gear + dt / GEAR_TRAVEL);
   state.afterburner = 0;
+  if (!waveoff.rolled && !waveoff.used && autoland.ph === 'GLIDE' && combat.carrierVisible !== false &&
+      (missionId === 'NAVAL_BATTLE' || missionId === 'AIR_SUPERIORITY') && !carrier.phase) {
+    waveoff.rolled = true;
+    const chance = Q.has('waveoff') ? Number(Q.get('waveoff')) : WO_CHANCE;
+    const hit = Math.random() < chance;
+    if (DEBUG) console.log('[ANGELS_ZERO] waveoff roll p=' + chance + ' hit=' + hit);
+    if (hit && triggerWaveOff()) return;
+  }
   if (autoland.ph === 'CAPTURE' || autoland.ph === 'GLIDE' || autoland.ph === 'FLARE') {
     autoland.d -= AL_VAPP * dt;
     const k = autoland.ph === 'CAPTURE' ? sstep(Math.min(1, autoland.t / autoland.T), 0, 1) : 1;
@@ -2991,6 +3111,10 @@ function updatePhysics(dt) {
   // Storm gusts kick the body rates (src/weather.js).
   if (weather && weather.current.turb > 0.01) { state.rollRate += weather.gust.roll * 6 * dt; state.pitchRate += weather.gust.pitch * 6 * dt; }
 
+  if (waveoff.pitchBias > 0) {
+    if (Math.abs(pitchIn0) > 0.3 || Math.abs(kbAxis.pitch) > 0.3) waveoff.pitchBias = 0;  // pilot override
+    else rotateBody(AX_X, waveoff.pitchBias * dt);
+  }
   rotateBody(AX_X, state.pitchRate * dt);
   rotateBody(AX_Z, state.rollRate * dt);
   rotateBody(AX_Y, state.yawRate * dt);
@@ -3787,7 +3911,7 @@ const musicCtx = { debrief: false, landed: false, rtb: false, app: 'MENU', onGro
   inCombat: false, dmg: 0, msl: 0, storm: false, rain: 0, night: false, nvg: false,
   wxOverride: false, bgmScenario: '03_air_superiority',
   // Legacy synth fallback fields (no per-frame allocation; kept for browsers w/o Ogg).
-  airborne: false, banditDist: Infinity, combo: 1, ace: false };
+  airborne: false, banditDist: Infinity, combo: 1, ace: false, ambush: 0 };
 function getMusicCtx() {
   const C = combat, S = combatSys, M = mission();
   musicCtx.debrief = !debriefEl.hidden;
@@ -3810,22 +3934,24 @@ function getMusicCtx() {
   musicCtx.banditDist = musicCtx.airborne ? nearestBandit() : Infinity;
   musicCtx.combo = C.comboMult || 1;
   musicCtx.ace = !!(C.ace && C.ace.alive);
+  musicCtx.ambush = waveoff.st === 'AMBUSH' ? 1 : 0;
   return musicCtx;
 }
 // Scenario transitions are state-driven, not time-driven. Scalars are compared
 // first so the composite key string is only built on a real transition (zero
 // per-frame allocations in the steady state).
 let lastMusicKey = '';
-const musicKeyParts = ['', '', '', '', false, 0, ''];
+const musicKeyParts = ['', '', '', '', false, 0, '', 0];
 function syncMusicScenario(force = false) {
   const C = combat;
   const a = appMode, f = flightMode, cp = cat.ph, ap = autoland.ph;
-  const rt = !!(C.rtb && C.rtb.on), ph = C.missionPhase | 0, mid = missionId;
+  const rt = !!(C.rtb && C.rtb.on), ph = C.missionPhase | 0, mid = missionId, amb = waveoff.st === 'AMBUSH' ? 1 : 0;
   if (!force && musicKeyParts[0] === a && musicKeyParts[1] === f && musicKeyParts[2] === cp &&
-      musicKeyParts[3] === ap && musicKeyParts[4] === rt && musicKeyParts[5] === ph && musicKeyParts[6] === mid) return;
+      musicKeyParts[3] === ap && musicKeyParts[4] === rt && musicKeyParts[5] === ph && musicKeyParts[6] === mid &&
+      musicKeyParts[7] === amb) return;
   musicKeyParts[0] = a; musicKeyParts[1] = f; musicKeyParts[2] = cp; musicKeyParts[3] = ap;
-  musicKeyParts[4] = rt; musicKeyParts[5] = ph; musicKeyParts[6] = mid;
-  lastMusicKey = a + '|' + f + '|' + cp + '|' + ap + '|' + rt + '|' + ph + '|' + mid;
+  musicKeyParts[4] = rt; musicKeyParts[5] = ph; musicKeyParts[6] = mid; musicKeyParts[7] = amb;
+  lastMusicKey = a + '|' + f + '|' + cp + '|' + ap + '|' + rt + '|' + ph + '|' + mid + '|' + amb;
   // force=true bypasses MIN_DWELL exactly like the existing 11_rtb path.
   audio.switchTo(audio.resolveScenario(getMusicCtx()), true);
 }
@@ -3919,7 +4045,8 @@ function onSfx(type, pos, scale = 1) {
   else if (type === 'whoosh') audio.missileWhoosh();
   else if (type === 'steam') audio.steamHiss();
   else if (type === 'clack') audio.flareClack();
-  else if (type === 'sonicboom') audio.sonicBoom();
+  else if (type === 'sonicboom') audio.sonicBoom(firstPerson);
+  else if (type === 'sonic') audio.sonicBoom(firstPerson);
   else if (type === 'flyby') audio.flybyWhoosh(scale, firstPerson);
 }
 const vfx = createVFX(THREE, { scene, camera, jet, renderer, terrainHeight, sunDir: SUN_DIR, canyonX: world.canyonX, runway: world.runway,
@@ -4519,6 +4646,8 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
     const subKillAt = Q.has('subkillat') ? Number(Q.get('subkillat')) : -1;
     const siteKillAts = Q.getAll('sitekillat').map(v => v.split(':').map(Number));
     const flagSalvoAt = Q.has('flagsalvoat') ? Number(Q.get('flagsalvoat')) : -1;
+    const waveOffAt = Q.has('waveoffat') ? Number(Q.get('waveoffat')) : -1;
+    const buzzAts = Q.getAll('buzzat').map(v => v.split(':'));
     let sunHold = 0;
     const __sunDir = new THREE.Vector3(), __fwd0 = new THREE.Vector3(0, 0, -1);
     const fortKillAt = Q.has('fortkillat') ? Number(Q.get('fortkillat')) : -1;
@@ -4609,6 +4738,34 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
         console.log('[ANGELS_ZERO] rtb @', t1.toFixed(2), combat.rtb.type);
       }
       if (autoAt >= t0 && autoAt < t1) { engageAutoland(); console.log('[ANGELS_ZERO] autoland @', t1.toFixed(2)); }
+      if (waveOffAt >= t0 && waveOffAt < t1 && combat.ally) {
+        const a = combat.ally;
+        _lp.set(0, a.deckY + 900 * AL_TAN, a.len / 2 + 900);
+        alToWorld(a, _lp, state.position);
+        state.quaternion.copy(a.root.quaternion);
+        state.speed = 110; state.velocity.set(0, 0, -110).applyQuaternion(state.quaternion).add(a.vel);
+        state.onGround = false; state.gearDown = true; state.gear = 1;
+        engageAutoland();
+        console.log('[ANGELS_ZERO] waveoffat @', t1.toFixed(2), 'ph=' + autoland.ph);
+      }
+      for (const ba of buzzAts) if (t1 >= Number(ba[0]) && t0 < Number(ba[0])) {
+        const kind = ba[1] || 'carrier';
+        if (kind === 'jet') {
+          const e = combatSys.enemies.find(x => x.alive);
+          if (e) { _bz0.copy(e.pos).add(new THREE.Vector3(1200, 0, 0)); state.position.copy(_bz0); state.velocity.copy(e.vel).multiplyScalar(-1); }
+        } else if (kind === 'tower' && buzzTowerReady) {
+          _bz0.set(BUZZ_ANCH[3] + 1200, BUZZ_ANCH[4] - 30, BUZZ_ANCH[5]); state.position.copy(_bz0);
+          state.velocity.set(0, 0, -400); state.quaternion.identity();
+        } else if (combat.ally) {
+          _bzLocal.set(ISLAND_LOCAL[0], ISLAND_LOCAL[1], ISLAND_LOCAL[2]);
+          alToWorld(combat.ally, _bzLocal, _bz0);
+          state.position.copy(_bz0).add(new THREE.Vector3(1200, 0, 0));
+          state.velocity.set(-400, 0, 0); state.quaternion.identity();
+        }
+        state.speed = 400; state.mach = 1.15; prevPlanePos.copy(state.position);
+        BUZZ_CDV.fill(0);
+        console.log('[ANGELS_ZERO] buzzat @', t1.toFixed(2), kind);
+      }
       if (returnAts.some(rt => rt >= t0 && rt < t1)) {
         const rz = combatSys.RETURN_Z;
         state.position.set(0, 600, rz - 50);
@@ -4821,7 +4978,8 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
         'mcam', JSON.stringify({ active: mcam.active, k: +mcam.k.toFixed(2) }), 'slowmo', +timeScale.toFixed(2),
         'ambient', JSON.stringify(ambient.stats()),
         'wingOrder', combatSys.stats().style.wingOrderName, 'limp', JSON.stringify(combatSys.stats().style.limp),
-        'sun', JSON.stringify(combatSys.stats().sun), 'intercepts', combatSys.stats().intercepts, 'sunBlindMsgs', combat.comms.filter(c => /SUN BLIND/.test(c.text)).length);
+        'sun', JSON.stringify(combatSys.stats().sun), 'intercepts', combatSys.stats().intercepts, 'sunBlindMsgs', combat.comms.filter(c => /SUN BLIND/.test(c.text)).length,
+        'waveoff', waveoff.st + ':' + waveoff.n, 'buzz', JSON.stringify(combatSys.stats().buzz));
   }
   if (DEBUG && Q.has('pause')) pauseSim();
   if (DEBUG && Q.has('fxhold')) fxHold = true;
@@ -4900,6 +5058,8 @@ function stepSim(dt) {
   combat.allyHold = autoland.on || !!carrier.phase || cat.ph === 'HOLD' || cat.ph === 'LAUNCH';
   if (flightMode === 'FLY' && !autoland.on) autolandGateCheck();   // final approach gate -> CARRIER_AUTOLAND
   if (flightMode === 'FLY') updatePhysics(dt);
+  updateWaveOff(dt);
+  updateBuzz(dt);
   combatSys.update(dt, simTime, { playerActive: flightMode === 'FLY', firing: keys.fire || DEBUG_FIRE });
   radioSys.update(dt, flightMode === 'FLY');
   if (flightMode === 'EJECT' && eject.update(dt)) finishEject();
@@ -4967,6 +5127,8 @@ if (DEBUG) {
     get sunDir() { return SUN_DIR; },
     killSub: i => combatSys.killSub(i), killSite: i => combatSys.killSite(i), forceSalvo: () => combatSys.forceSalvo(),
     get siteOn() { return combatSys.siteOn; },
+    get waveoff() { return waveoff; }, triggerWaveOff, onBuzz,
+    buzz: { tower: 0, jet: 0 },
     radioEvent, get radioEvents() { return Object.keys(RADIO_BY_EVENT); }, get radioQueue() { return rq; }, radioPlay, clearBox };
 }
 /* ============================================================================

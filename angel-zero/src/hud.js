@@ -6,7 +6,7 @@
 // clipped to the 3D combiner glass. Square tactical radar (bottom-left), stores
 // list + F-15C silhouette with per-pylon AIM-9 reload icons (bottom-right),
 // open-corner target brackets, edge pointers, minimal top-left telemetry.
-import { SPW } from './loadout.js?v=s97d';
+import { SPW } from './loadout.js?v=s98b';
 
 export function createHUD(THREE, A) {
   const canvas = A.canvas;
@@ -1412,6 +1412,18 @@ export function createHUD(THREE, A) {
       const secs = Math.max(1, Math.ceil(C.flagSalvoT || 0));
       const a = 0.55 + 0.45 * (Math.floor(now / 125) % 2);
       drawBanner(ctx, cx, upperY + 180, '[ FLAGSHIP SALVO — BREAK! ] ' + secs, '#ff3b4d', 430, a);
+    }
+    if (C.waveoffBannerT && now - C.waveoffBannerT < 3000) {
+      const age = now - C.waveoffBannerT;
+      drawBanner(ctx, cx, upperY + 216, 'WAVE OFF — BANDITS ON THE BOW', WARN, 440, 1 - age / 3000);
+    }
+    if (C.ambushClearT && now - C.ambushClearT < 2500) {
+      const age = now - C.ambushClearT;
+      drawBanner(ctx, cx, upperY + 252, 'AMBUSH CLEARED +800', G, 360, 1 - age / 2500);
+    }
+    if (C.buzzBannerT && now - C.buzzBannerT < 1800) {
+      const age = now - C.buzzBannerT;
+      drawBanner(ctx, cx, upperY + 288, C.buzzLabel || 'SONIC PASS', '#5fe8ff', 330, 1 - age / 1800);
     }
     if (C.interceptBannerT && now - C.interceptBannerT < 2500) {
       const age = now - C.interceptBannerT;

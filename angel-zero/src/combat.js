@@ -8,11 +8,11 @@
 // burning wrecks that splash, scoring, waves, lock-on and threat warnings.
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { DIFFICULTY_PRESETS } from './difficulty.js?v=s97d';
-import { SPW } from './loadout.js?v=s97d';
-import { missionConfig } from './missions.js?v=s97d';
+import { DIFFICULTY_PRESETS } from './difficulty.js?v=s98b';
+import { SPW } from './loadout.js?v=s98b';
+import { missionConfig } from './missions.js?v=s98b';
 import { gorgeCentreX, gorgeSlope, gorgeHeading, gorgeDist, GORGE_GATE_Z, GORGE_GATE_N, GORGE_FLOOR_Y, GORGE_RIM_Y,
-  GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_FORT, GORGE_ARC_M, GORGE_SPAWN_Z, CEIL_M } from './maps.js?v=s97d';
+  GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_FORT, GORGE_ARC_M, GORGE_SPAWN_Z, CEIL_M } from './maps.js?v=s98b';
 
 const NM = 1852, FT = 0.3048, G0 = 9.81;
 // Allied CVN model: same 360 m deck as the procedural ship, re-anchored to the GLB.
@@ -38,6 +38,7 @@ const STRIKE_N = 4, STRIKE_HP_K = 2.2, STRIKE_SPLASH = 35, STRIKE_PTS = 1200, JA
 // Staged naval escalation / trench run / guns-only duel.
 const SHIP_HP = { DDG: 3, CG: 5, CV_FLAG: 10 }, SHIP_SCALE = { DDG: 1, CG: 1.25, CV_FLAG: 1.9 };
 const SHIP_SAM_CD = 9;
+const AMB_SPAWN_D = 6000, AMB_SPAWN_ALT = 2500, AMB_MAX = 3;
 // Linked weak points + flagship VLS telegraph.
 const SUB_HP = 2, SUB_HIT_R = 14, SUB_PTS = 600;
 const SUB_OFF = { CG: [0, 24, -8], CV_FLAG: [0, 34, -20] };
@@ -119,7 +120,8 @@ export function createCombat(THREE, env) {
   Object.assign(C, { limp: { st: 'IDLE', w: null, pursuers: new Int16Array(LIMP_PURSUERS).fill(-1), n: 0, used: false, graceT: 0 },
     wingSavedBannerT: 0, wingNoDesignationT: 0,
     sunT: 0, sunCD: 0, sunBlinds: 0, sunBannerT: 0, mslIntercepts: 0, interceptBannerT: 0, interceptSlowCD: 0,
-    subKills: 0, siteKills: 0, flagBannerT: 0, salvoKills: 0 });
+    subKills: 0, siteKills: 0, flagBannerT: 0, salvoKills: 0,
+    ambushActive: false, buzzTower: 0, buzzJet: 0 });
   Object.assign(C, { mcfg: missionConfig({}), stage: 0, stageT: 0,
     ceil: { st: 'CLEAR', phase: 'CLEAR', armed: false, t: 0, warnT: 0, salvoT: 0, rail: 0, railT: 0, fired: 0, lastSam: 0, live: true, belowT: 0 },
     climb: { on: false, t: 0, sams: 0, salvoT: 0, rail: 0, railT: 0 }, gateIdx: 0, weaponsLock: { msl: false, spw: false },
@@ -687,7 +689,8 @@ export function createCombat(THREE, env) {
       flaresLeft: 2, flareCD: 0, trailAcc: 0, avoiding: false, noBreak: false,
       rollRate: 125 * D2R, rollRateNow: 0, gMax: 6.4,
       wingL: 30, wingR: 30, wingOffL: false, wingOffR: false, engHits: 0, engineFire: false, speedCap: 1,
-      crippled: null, crippleT: 0, crRoll: 0, sinkTarget: 25, rollVel: 0, dipV: 0
+      crippled: null, crippleT: 0, crRoll: 0, sinkTarget: 25, rollVel: 0, dipV: 0,
+      ambush: false, ambushT: 0, buzzCD: 0
     };
   }
   for (let i = 0; i < WAVE_SIZE; i++) enemies.push(makeEnemy(i));
@@ -703,7 +706,7 @@ export function createCombat(THREE, env) {
     e.flaresLeft = rand() < 0.5 ? 1 : 2; e.flareCD = 0; e.trailAcc = 0; e.rollPhase = 0; e.avoiding = false;
     Object.assign(e, { wingL: WING_HP, wingR: WING_HP, wingOffL: false, wingOffR: false, engHits: 0, engineFire: false, speedCap: 1,
       crippled: null, crippleT: 0, rollVel: 0, dipV: 0, zoneLog: null,
-      aceFlight: false, decoys: 0, chaffN: 0, decoyCD: 0 });
+      aceFlight: false, decoys: 0, chaffN: 0, decoyCD: 0, ambush: false, ambushT: 0 });
   }
 
   /* ------------------------------------------------ mission phases + Ace */
@@ -997,6 +1000,8 @@ export function createCombat(THREE, env) {
   }
 
   function updateEnemy(e, dt, playerActive) {
+    if (e.ambush) { e.ambushT -= dt; if (e.ambushT <= 0 || e.pos.distanceTo(S.position) < 2000) e.ambush = false; }
+    if (e.buzzCD > 0) e.buzzCD -= dt;
     e.prev.copy(e.pos);
     // Limp-home pursuers fly to the wounded wingman instead of the player.
     const tp = (e.wingTarget && e.wingTarget.alive) ? e.wingTarget.pos : S.position;
@@ -2278,6 +2283,41 @@ export function createCombat(THREE, env) {
     const wingAlive = env.getWingmen ? env.getWingmen().filter(w => w && w.alive).length : 0;
     if (env.debug) console.log('[ANGELS_ZERO] stage', i, st.label, 'ships=' + shipN, 'bandits=' + banditN, 'wing=' + wingAlive);
   }
+  // Wave-off ambush: revive pooled bandits ahead of the carrier bow. Indices are
+  // written into a caller-owned Int16Array so the mission can watch for a clear.
+  function spawnAmbush(n, anchorPos, bowDir, ids) {
+    const want = clamp(n | 0, 1, AMB_MAX);
+    let placed = 0;
+    let free = 0;
+    for (const e of enemies) if (!e.alive && !e.aceFlight && !e.bomber) free++;
+    if (free < want) {
+      for (const e of enemies) {
+        if (free >= want) break;
+        if (!e.alive || e.aceFlight || e.bomber || e.ace) continue;
+        e.alive = false; e.wreck = null; free++;      // retire a stage bandit to free a slot
+      }
+    }
+    _afTo.set(0, 0, -1).applyQuaternion(S.quaternion);
+    _afR.set(1, 0, 0).applyQuaternion(S.quaternion);
+    for (const e of enemies) {
+      if (placed >= want) break;
+      if (e.alive || e.aceFlight || e.bomber || e.ace) continue;
+      resetAI(e); clearAce(e);
+      e.pos.copy(anchorPos).addScaledVector(bowDir, AMB_SPAWN_D);
+      e.pos.y = AMB_SPAWN_ALT + placed * 220;
+      e.fwd.copy(anchorPos).sub(e.pos).normalize();
+      e.speed = e.cruise; e.vel.copy(e.fwd).multiplyScalar(e.speed); e.prev.copy(e.pos);
+      e.hp = e.hpMax = 100; e.alive = true; e.wreck = null;
+      e.tac = e.mode = 'ENGAGE'; e.mslCD = 6 + placed; e.bLock = 0;
+      e.ambush = true; e.ambushT = 6; e.buzzCD = 0;
+      orient(e);
+      if (ids) ids[placed] = e.id;
+      placed++;
+    }
+    if (placed) writeFleet();
+    if (env.debug) console.log('[ANGELS_ZERO] ambush spawn n=' + placed);
+    return placed;
+  }
   function stageClear(i) {
     const st = C.mcfg.stages && C.mcfg.stages[i];
     if (!st) return false;
@@ -2645,7 +2685,7 @@ export function createCombat(THREE, env) {
     if (p === 3) { aceFlightDone = false; spawnAceFlight(); }
   }
   function updateMissionPhase() {
-    if (C.mode === 'FURBALL') return;
+    if (C.mode === 'FURBALL' || C.ambushActive) return;
     const stages = C.mcfg.stages;
     if (stages && stages.length) {
       if (C.rtb) { C.obj = { done: 0, total: 1 }; return; }
@@ -5297,7 +5337,7 @@ export function createCombat(THREE, env) {
       if (env.onMissionComplete) env.onMissionComplete();
     },
     get difficulty() { return C.difficulty; },
-    fireSelected, pickleUp, dropBomb, setWeapon, toggleWeapon, dispenseFlares, dispenseChaff, fireAAM4, activateECM, setWingOrder, triggerWoundedWingman, spawnAceFlight,
+    fireSelected, pickleUp, dropBomb, setWeapon, toggleWeapon, dispenseFlares, dispenseChaff, fireAAM4, activateECM, setWingOrder, triggerWoundedWingman, spawnAceFlight, spawnAmbush,
     repairEngines() { resetEngines(); return C.engState; },
     get surface() { return surface; }, awardStyle, loadCarrier, placeCarrier, allyCollision, updateJbd, mountJbd, onCarrierMounted, CARRIER_GLB, RETURN_Z, cullFleet,
     // Single visibility writer for the carrier root (and the one shared for heading).
@@ -5470,6 +5510,8 @@ export function createCombat(THREE, env) {
         aceRounds: C.aceRounds || 0, aceHits: C.aceHits || 0, blockedLaunches: C.blockedLaunches || 0,
         samLaunched: C.samLaunched || 0, samFlared: C.samFlared || 0, samMasked: C.samMasked || 0, samHit: C.samHit || 0, samLive: C.samLive || 0,
         subKills: C.subKills || 0, siteKills: C.siteKills || 0,
+        ambush: { active: !!C.ambushActive, n: enemies.filter(e => e.alive && e.ambush).length },
+        buzz: { tower: C.buzzTower || 0, jet: C.buzzJet || 0 },
         weak: { sites: Array.from(SITE_ON).reduce((a, b) => a + b, 0), sectors: Array.from(sectorDead).reduce((a, b) => a + b, 0),
           salvos: stagedShips.filter(t => t.kind === 'CV_FLAG').map(t => t.salvo.st + ':' + t.salvo.fire).join(',') },
         tgt: { armed: C.seekerArmed, wpn: C.weapon, multi: C.multi.map((e, i) => e.label.slice(-2) + ':' + C.multiState[i][0]).join(' '), locked: C.multiLocked,

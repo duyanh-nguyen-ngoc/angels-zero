@@ -1682,6 +1682,10 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   - Canyon rim sites have their own HP pool and virtual targets; destroyed sites flip `SITE_ON`, stop searchlights and are skipped by the barrage picker. Once both sites in a sector die, that sector fires nothing and neighbours fire half-size volleys. State is fully restored on mission switch.
   - The flagship telegraphs a salvo with a 3 s red charge beam and rising tone, then fires six spread VLS missiles that fly straight for 1.2 s before homing. Destroying the mast cancels it. `?subkillat=s` / `?sitekillat=s:i` / `?flagsalvoat=s` and matching `__az` helpers make all three deterministic.
 
+- [x] **Carrier wave-off ambush + supersonic tower buzz** *(build `s98b`, v1.1.28, `index.html`, `src/combat.js`, `src/hud.js`, `src/audio.js`, `src/vfx.js`)*
+  - A once-per-sortie 25 % roll during autoland GLIDE aborts cleanly (pose and velocity preserved, `allyHold` released, gear up, burner + pitch assist), switches BGM to `10_last_stand` via the `ambush` music-key component, and spawns 2–3 pooled ambush bandits ahead of the bow with a CRITICAL radio call and red banner. Clearing them restores `11_rtb`, scores +800 and re-enables the autoland prompt.
+  - Mach ≥ 1 sweeps the jet's frame against the carrier island, AFB tower and live bandits with pooled `Float32Array` anchors + per-enemy cooldowns. Hits fire a `TOWER BUZZ +500` / `SONIC PASS +250` banner, camera impulse, mach-cone pulse, persistent sonic-boom nodes and a callout. A 10 s cooldown prevents farming. `?waveoffat=s` / `?buzzat=s:kind` make both deterministic.
+
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.
