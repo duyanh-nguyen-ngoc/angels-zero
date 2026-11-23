@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.43', title: 'MID-SORTIE CARRIER AUTOLAND', bullets: [
+    'The USS ENTERPRISE is recoverable any time you are flying near the boat, not only on RTB. Fly within 3.5 km astern and the [L] ENGAGE AUTOLAND prompt appears with the glideslope cues.',
+    'A mid-sortie trap no longer ends the sortie or rewrites your objective: you rearm, repair, refuel on deck and cycle straight back onto the catapult. RTB traps still complete the mission as before.',
+    'The HUD prompt now reads the same engagement check as the L key, so the pill and the key can never disagree.'
+  ] },
   { version: 'v1.1.42', title: 'COCKPIT AUDIO & G-FEEL FIXES', bullets: [
     'Mach 0.96-1.03 now gives a subtle tactile rumble instead of violent camera thrashing, and the afterburner sizzle is a continuous smooth bed with no clacking at full power.',
     'Menus, pause and debrief are silent: every continuous flight voice is muted at its gain and only ramps back when you return to the flight. The 700 Hz choir, stuck lock tones and tinnitus no longer follow you into the briefing.',

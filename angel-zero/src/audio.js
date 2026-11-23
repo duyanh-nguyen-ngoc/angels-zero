@@ -1653,6 +1653,7 @@ export function createAudio() {
     if (c.debrief || c.landed) return '12_debrief';
     if (c.ambush) return '10_last_stand';
     if (c.intrusion) return '08_crimson_duel';
+    if (c.pitstop) return '02_catapult';
     if (c.rtb) return '11_rtb';
     if (c.app === 'MENU') return '01_hangar';
     if (c.onGround && !c.launched) return '02_catapult';

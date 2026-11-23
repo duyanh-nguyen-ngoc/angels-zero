@@ -6214,10 +6214,12 @@ export function createCombat(THREE, env) {
       return { enemies, missiles, surface, taskForce };
     },
     primaryTargets,
-    onCarrierTrap() {
+    onCarrierTrap(opts) {
       awardBrokenWing('TRAP');
       C.health = 100; C.score += 1000;
       pushEvent('BONUS', 'TRAP BONUS', 1000, '#ffd45a');
+      // Mid-sortie recovery (autoland / practice trap): awards only, no mission state.
+      if (opts && opts.midSortie) return;
       if (C.mode === 'FURBALL' || C.missionPhase !== 4) return;
       C.missionPhase = 5; C.obj = { done: 1, total: 1 }; C.mpT = performance.now();
       if (env.onMissionComplete) env.onMissionComplete();

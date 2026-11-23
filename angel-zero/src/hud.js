@@ -53,7 +53,7 @@ export function createHUD(THREE, A) {
     ['B+SHIFT <290KT', 'PSM: Cobra / Kulbit'],
     ['RUDDER+OPP ROLL @STALL', 'Flat spin (neutral+opp rudder recovers)']
   ];
-  let promptKey = '', promptT = 0;
+  let promptKey = '', promptT = 0, lastPromptText = '';
   let radarZoom = 1, radarPulseT = 99;
   try { const rz = Number(localStorage.getItem('angelsZero_radarZoom')); if (Number.isInteger(rz) && rz >= 0 && rz < 3) radarZoom = rz; } catch (e) { /* storage unavailable */ }
   // Pooled in-world hit stamps.
@@ -2046,10 +2046,9 @@ export function createHUD(THREE, A) {
     }
     if (cat && cat.ph === 'LAUNCH') { promptKey = ''; promptT = 0; return; }
     let txt = '', prio = 0;
-    if (C.rtb && C.rtb.on && C.rtb.type === 'CARRIER' && C.ally && C.ally.pos && !(A.isAutoland && A.isAutoland())) {
-      const sternX = C.ally.pos.x - C.ally.fwd.x * C.ally.len / 2;
-      const sternZ = C.ally.pos.z - C.ally.fwd.z * C.ally.len / 2;
-      if (Math.hypot(sternX - S.position.x, sternZ - S.position.z) < 3500) { txt = '[L] ENGAGE AUTOLAND'; prio = 0; }
+    lastPromptText = '';
+    if (A.autolandPrompt && A.autolandPrompt() && !(A.isAutoland && A.isAutoland())) {
+      txt = '[L] ENGAGE AUTOLAND'; prio = 0;
     }
     const rwr = C.rwr || [];
     for (let i = 0; i < rwr.length; i++) if (rwr[i].kind === 'msl' && rwr[i].g === 'RADAR') { txt = P_RDR; prio = 1; break; }
@@ -2070,6 +2069,7 @@ export function createHUD(THREE, A) {
     }
     if (!txt) { promptKey = ''; promptT = 0; return; }
     const now = performance.now();
+    lastPromptText = txt;
     if (txt !== promptKey) { promptKey = txt; promptT = now; }
     const a = Math.min(1, (now - promptT) / 150), cx = HW / 2, cy = HH - 96;
     ctx.save();
@@ -2602,6 +2602,7 @@ export function createHUD(THREE, A) {
     get inertia() { return { x: inertia.x, y: inertia.y }; },
     get stallWarn() { return stallOn(); },
     get hudAlertState() { return alertState; },
+    get promptText() { return lastPromptText; },
     setAlertState(s) { alertOverride = s; },
     setMusicToast(text) { musicToast.text = text || ''; musicToast.t = musicToast.text ? performance.now() : 0; },
     addStamp, glitch(t = 0.55) { glitchT = Math.max(glitchT, Math.min(0.55, t)); },

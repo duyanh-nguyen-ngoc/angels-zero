@@ -726,35 +726,35 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s9d5';
-import { createAmbient } from './src/ambient.js?v=s9d5';
-import { createBlastFX } from './src/blastfx.js?v=s9d5';
-import { createHUD } from './src/hud.js?v=s9d5';
-import { createCockpit3D } from './src/cockpit3d.js?v=s9d5';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9d5';
-import { createEjection } from './src/eject.js?v=s9d5';
-import { createAudio } from './src/audio.js?v=s9d5';
-import { createRadio } from './src/radio.js?v=s9d5';
-import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9d5';
-import { createLivery } from './src/livery.js?v=s9d5';
-import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s9d5';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9d5';
-import { createCanopyFX } from './src/canopy.js?v=s9d5';
-import { createNVG } from './src/nvg.js?v=s9d5';
-import { createWorld, WORLD } from './src/world.js?v=s9d5';
-import { createSurfaces } from './src/surfaces.js?v=s9d5';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9d5';
-import { createFreeLook } from './src/freelook.js?v=s9d5';
-import { createCanopyGlass } from './src/canopyglass.js?v=s9d5';
-import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9d5';
-import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9d5';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9d5';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9d5';
-import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9d5';
-import { createRadioQueue } from './src/radioQueue.js?v=s9d5';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9d5';
+import { createVFX } from './src/vfx.js?v=s9d9';
+import { createAmbient } from './src/ambient.js?v=s9d9';
+import { createBlastFX } from './src/blastfx.js?v=s9d9';
+import { createHUD } from './src/hud.js?v=s9d9';
+import { createCockpit3D } from './src/cockpit3d.js?v=s9d9';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9d9';
+import { createEjection } from './src/eject.js?v=s9d9';
+import { createAudio } from './src/audio.js?v=s9d9';
+import { createRadio } from './src/radio.js?v=s9d9';
+import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9d9';
+import { createLivery } from './src/livery.js?v=s9d9';
+import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s9d9';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9d9';
+import { createCanopyFX } from './src/canopy.js?v=s9d9';
+import { createNVG } from './src/nvg.js?v=s9d9';
+import { createWorld, WORLD } from './src/world.js?v=s9d9';
+import { createSurfaces } from './src/surfaces.js?v=s9d9';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9d9';
+import { createFreeLook } from './src/freelook.js?v=s9d9';
+import { createCanopyGlass } from './src/canopyglass.js?v=s9d9';
+import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9d9';
+import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9d9';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9d9';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9d9';
+import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9d9';
+import { createRadioQueue } from './src/radioQueue.js?v=s9d9';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9d9';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
-  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9d5';
+  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9d9';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -1209,10 +1209,18 @@ function inCutscene() {
   return cat.ph === 'WAIT' || cat.ph === 'HOLD' || cat.ph === 'LAUNCH' || state.onGround ||
     autoland.on || combat.climb.on || timeScale < 1 || appMode !== 'PLAY' || !debriefEl.hidden;
 }
+// RTB is an object flag ({on,type,t0}) in combat; tolerate the boolean legacy form too.
+const rtbOn = () => combat.rtb === true || !!combat.rtb?.on;
+const CAT_IDLE = 'NONE';
+let ilsLatchUntil = 0, alSternDist = Infinity, pitstopCat = false, alPromptPrev = false;
+function carrierLive() { return !!(combat.ally && combat.ally.root && combat.carrierVisible !== false); }
 function ilsVisible() {
+  const now = performance.now();
+  const recovery = carrierLive() && rtbOn() && combat.rtb && combat.rtb.type === 'CARRIER';
+  if (autolandPrompt() || autoland.on || recovery || alSternDist < AUTOLAND_R + 500) ilsLatchUntil = now + 1000;
+  if (now < ilsLatchUntil) return true;
   const cfg = combat.mcfg || {};
-  if (!cfg.ilsOnRtbOnly) return true;
-  return !!(combat.rtb && combat.rtb.on && combat.rtb.type === 'CARRIER');
+  return !cfg.ilsOnRtbOnly;
 }
 // Hold-to-track missile camera (M / RMB). Scratch vectors: zero per-frame allocations.
 const mcam = { held: false, heldT: 0, active: false, m: null, abortT: 0, k: 0 };
@@ -1781,10 +1789,18 @@ function alToWorld(a, p, out) { return out.copy(p).applyQuaternion(a.root.quater
 function alSlope(a, d, out) { return out.set(0, a.deckY + GEAR_H + Math.max(0, d) * AL_TAN, a.len / 2 - AL_TD_DZ + d); }
 function autolandPrompt() {
   const a = combat.ally;
-  if (!ilsVisible() || !a || !a.root || !combat.rtb || !combat.rtb.on || combat.rtb.type !== 'CARRIER' || !sortie.active) return false;
-  if (flightMode !== 'FLY' || carrier.phase || autoland.on || combat.ambushActive) return false;
-  _alStern.copy(a.pos).addScaledVector(a.fwd, -a.len / 2);
-  return Math.hypot(state.position.x - _alStern.x, state.position.z - _alStern.z) < AUTOLAND_R;   // same test as the HUD pill
+  alSternDist = Infinity;
+  if (!carrierLive() || !sortie.active || appMode !== 'PLAY') return false;
+  // 'NONE' before the first launch, 'AIRBORNE' after a cat shot: both are free to recover.
+  if (flightMode !== 'FLY' || carrier.phase || autoland.on || combat.ambushActive ||
+      (cat.ph !== CAT_IDLE && cat.ph !== 'AIRBORNE')) return false;
+  // Stern point in the carrier root frame: local +Z is aft (bow = -Z).
+  _alStern.copy(_alLocal.set(0, a.deckY, a.len / 2)).applyQuaternion(a.root.quaternion).add(a.root.position);
+  alSternDist = Math.hypot(state.position.x - _alStern.x, state.position.z - _alStern.z);
+  if (alSternDist >= AUTOLAND_R) return false;
+  // Do not offer the prompt while flying away past the bow.
+  alToLocal(a, state.position, _alLocal);
+  return _alLocal.z > -a.len / 2;
 }
 // Final approach gate (the 400 m frame behind the stern): flying through it engages.
 function autolandGateCheck() {
@@ -1801,8 +1817,7 @@ function autolandGateCheck() {
 function engageAutoland() {
   const a = combat.ally;
   if (autoland.on || !a || !a.root || flightMode !== 'FLY') return;
-  if (!combat.rtb) { combat.missionPhase = 4; combat.rtb = { on: true, type: 'CARRIER', t0: performance.now() }; }
-  combat.missionPhase = 4;
+  autoland.rtbAtEngage = rtbOn();                         // logging only -- never rewrite mission state
   alToLocal(a, state.position, _alLocal);
   const tdZ = a.len / 2 - AL_TD_DZ;
   let d0 = Math.max(_alLocal.z - tdZ, 0);
@@ -1821,7 +1836,7 @@ function engageAutoland() {
   state.pitchRate = state.rollRate = state.yawRate = 0;
   combat.allyHold = true;                                    // no carrier turnaround while we are on approach
   combatSys.say('AUTOLAND ENGAGED — USS ENTERPRISE', 2, '#5fe8ff');
-  if (DEBUG) console.log('[ANGELS_ZERO] autoland CAPTURE d0=' + d0.toFixed(0) + ' off=' + autoland.off.length().toFixed(0) + ' T=' + T.toFixed(1));
+  if (DEBUG) console.log('[ANGELS_ZERO] autoland engage rtb=' + autoland.rtbAtEngage + ' d0=' + d0.toFixed(0) + ' off=' + autoland.off.length().toFixed(0) + ' T=' + T.toFixed(1));
 }
 function autolandPhase(ph) {
   if (DEBUG) console.log('[ANGELS_ZERO] autoland ' + autoland.ph + '->' + ph + ' t=' + autoland.t.toFixed(2) +
@@ -1927,6 +1942,29 @@ function updateBuzz(dt) {
     if (buzzSwept(e.pos) < BUZZ_R) { e.buzzCD = BUZZ_CD; onBuzz('JET', e.pos); }
   }
 }
+// One trap-finish path for autoland and manual traps. RTB completes the sortie;
+// a mid-sortie trap rearms / repairs / refuels and cycles straight onto the catapult.
+function finishCarrierTrap(src) {
+  const mid = !(rtbOn() && combat.missionPhase === 4);
+  if (DEBUG) console.log('[ANGELS_ZERO] trap finish src=' + src + ' mid=' + mid);
+  if (src === 'AUTO') {
+    if (mid) combatSys.onCarrierTrap({ midSortie: true });
+    else { combatSys.onCarrierTrap(); if (sortie.active) missionComplete('CARRIER'); }
+  }
+  if (!mid) return;                                       // RTB: combat.onCarrierTrap already opened the debrief
+  combatSys.pitStop();
+  if (state.fuel !== undefined) state.fuel = 13455;
+  if (hud.clearGlitch) hud.clearGlitch();
+  autoland.on = false; autoland.ph = ''; autoland.prevLz = Infinity;
+  combat.allyHold = false; vyPrev = 0;
+  pitstopCat = true;
+  if (typeof rq !== 'undefined') rq.say('OVERLORD: TURNAROUND COMPLETE — CAT ONE, YOU\'RE UP', { pri: 2, ch: 'AWACS' });
+  combatSys.say('REARMED · REPAIRED · REFUELED', 2.5, '#52ff9c');
+  if (DEBUG) console.log('[ANGELS_ZERO] pitstop rearm=ok hp=' + combat.health + ' fuel=' + state.fuel);
+  enterCarrierLaunch(mission());                          // snap to the bow cat track: WAIT -> DECK PREP -> HOLD
+  if (DEBUG) console.log('[ANGELS_ZERO] pitstop cat → hold');
+}
+
 function updateAutoland(dt) {
   const a = combat.ally;
   if (!a || !a.root || combat.dead) { autoland.on = false; combat.allyHold = false; return; }
@@ -1994,10 +2032,8 @@ function updateAutoland(dt) {
     if (autoland.ph === 'TRAP' && Math.floor(autoland.t / 0.35) !== Math.floor((autoland.t - dt) / 0.35)) blastShake = Math.max(blastShake, 0.18);
     if (autoland.ph === 'TRAP' && autoland.t >= AL_TRAP_T) autolandPhase('ROLLOUT');
     else if (autoland.ph === 'ROLLOUT' && autoland.t >= AL_ROLL_T) {
-      autoland.on = false; combat.allyHold = false;
-      if (DEBUG) console.log('[ANGELS_ZERO] autoland COMPLETE kts=' + (vRel * 1.94384).toFixed(1) + ' -> 12_debrief');
-      combatSys.onCarrierTrap();                              // trap bonus + MISSION COMPLETE (phase 4)
-      if (sortie.active) missionComplete('CARRIER');
+      if (DEBUG) console.log('[ANGELS_ZERO] autoland COMPLETE kts=' + (vRel * 1.94384).toFixed(1));
+      finishCarrierTrap('AUTO');
     }
   }
 }
@@ -2139,6 +2175,7 @@ function catRelease() {
   _catFwd.set(0, 0, -1).applyQuaternion(state.quaternion);
   state.velocity.copy(_catFwd).multiplyScalar(CAT_VEND).add(a.vel);
   state.speed = CAT_VEND; state.onGround = false; gearAutoLock = false;
+  pitstopCat = false;
   audio.bumpBgmDwell();                                  // switch to the mission track on this frame
   if (scramble.st === 'PASS') {
     const n = combatSys.handoffRaiders(scramble.ids);
@@ -3122,7 +3159,7 @@ function updateCarrierOp(dt) {
     place(); state.onGround = true; state.throttle = 0.2; state.afterburner = 0;
     if (carrier.t >= 3) {                                // trap -> deck turnaround -> new bow catapult hold
       carrier.phase = null; carrier.t = 0; carrier.cool = 0; combat.carrierPhase = null;
-      enterCarrierLaunch(mission());                       // trap -> turnaround -> bow catapult hold
+      finishCarrierTrap('MANUAL');                         // shares the mid-sortie pit-stop flow with autoland
     }
   }
 }
@@ -4464,7 +4501,7 @@ window.__audioDebug = () => ({ state: audio.state, rms: +audio.rms.toFixed(4), m
 // Seeker / alert / gun state -> procedural audio mix, once per frame.
 const _audioFwd = new THREE.Vector3();
 // Preallocated music context: one object, updated in place every frame (no allocations).
-const musicCtx = { debrief: false, landed: false, rtb: false, app: 'MENU', onGround: false, launched: false,
+const musicCtx = { debrief: false, landed: false, rtb: false, app: 'MENU', onGround: false, launched: false, pitstop: false,
   inCombat: false, dmg: 0, msl: 0, storm: false, rain: 0, night: false, nvg: false,
   wxOverride: false, bgmScenario: '03_air_superiority', intrusion: 0, scramble: 0,
   // Legacy synth fallback fields (no per-frame allocation; kept for browsers w/o Ogg).
@@ -4476,6 +4513,7 @@ function getMusicCtx() {
   musicCtx.rtb = !!(C.rtb && C.rtb.on);
   musicCtx.app = appMode;
   musicCtx.onGround = cat.ph === 'HOLD' || cat.ph === 'LAUNCH' || !!state.onGround;
+  musicCtx.pitstop = !!pitstopCat && (cat.ph === 'WAIT' || cat.ph === 'HOLD' || cat.ph === 'LAUNCH');
   musicCtx.launched = cat.ph === 'AIRBORNE' || (cat.ph === 'NONE' && !!sortie.active);
   musicCtx.inCombat = appMode === 'PLAY' && S.enemies.some(e => e.alive);
   musicCtx.dmg = Math.max(0, (100 - C.health) / 100);
@@ -4500,17 +4538,19 @@ function getMusicCtx() {
 // first so the composite key string is only built on a real transition (zero
 // per-frame allocations in the steady state).
 let lastMusicKey = '';
-const musicKeyParts = ['', '', '', '', false, 0, '', 0, 0];
+const musicKeyParts = ['', '', '', '', false, 0, '', 0, 0, false];
 function syncMusicScenario(force = false) {
   const C = combat;
   const a = appMode, f = flightMode, cp = cat.ph, ap = autoland.ph;
   const rt = !!(C.rtb && C.rtb.on), ph = C.missionPhase | 0, mid = missionId, amb = waveoff.st === 'AMBUSH' ? 1 : 0;
+  const ps = !!musicCtx.pitstop;
   if (!force && musicKeyParts[0] === a && musicKeyParts[1] === f && musicKeyParts[2] === cp &&
       musicKeyParts[3] === ap && musicKeyParts[4] === rt && musicKeyParts[5] === ph && musicKeyParts[6] === mid &&
-      musicKeyParts[7] === amb && musicKeyParts[8] === musicCtx.intrusion) return;
+      musicKeyParts[7] === amb && musicKeyParts[8] === musicCtx.intrusion && musicKeyParts[9] === ps) return;
   musicKeyParts[0] = a; musicKeyParts[1] = f; musicKeyParts[2] = cp; musicKeyParts[3] = ap;
   musicKeyParts[4] = rt; musicKeyParts[5] = ph; musicKeyParts[6] = mid; musicKeyParts[7] = amb; musicKeyParts[8] = musicCtx.intrusion;
-  lastMusicKey = a + '|' + f + '|' + cp + '|' + ap + '|' + rt + '|' + ph + '|' + mid + '|' + amb + '|' + musicCtx.intrusion;
+  musicKeyParts[9] = ps;
+  lastMusicKey = a + '|' + f + '|' + cp + '|' + ap + '|' + rt + '|' + ph + '|' + mid + '|' + amb + '|' + musicCtx.intrusion + '|' + ps;
   // force=true bypasses MIN_DWELL exactly like the existing 11_rtb path.
   audio.switchTo(audio.resolveScenario(getMusicCtx()), true);
 }
@@ -4942,6 +4982,7 @@ const hud = createHUD(THREE, {
   getCat: () => cat, getCatArmT: () => CAT_ARM_T, getCatMounted: () => !!(combat.ally && combat.ally.glbMounted),
   ilsVisible: () => ilsVisible(), getMissionT: () => missionT, inCutscene: () => inCutscene(),
   isAutoland: () => autoland.on,
+  autolandPrompt: () => autolandPrompt(),
   getCombinerOutline: () => (cockpit.active ? cockpit.glassOutlineWorld() : null),
   missionClock: () => cockpit.missionClock(simTime)
 });
@@ -5791,6 +5832,13 @@ function stepSim(dt) {
   if (cat.ph === 'WAIT') return;                          // deck prep: sim frozen until the GLB is mounted
   combat.allyHold = autoland.on || !!carrier.phase || cat.ph === 'HOLD' || cat.ph === 'LAUNCH';
   if (flightMode === 'FLY' && !autoland.on) autolandGateCheck();   // final approach gate -> CARRIER_AUTOLAND
+  if (DEBUG && Q.has('alprompt')) {
+    const np = autolandPrompt();
+    if (np !== alPromptPrev) {
+      alPromptPrev = np;
+      console.log('[ANGELS_ZERO] alprompt @' + simTime.toFixed(2) + ' ' + (np ? 'on d=' + alSternDist.toFixed(0) + ' rtb=' + rtbOn() : 'off cat=' + cat.ph + ' amb=' + combat.ambushActive + ' cp=' + carrier.phase));
+    }
+  }
   // Remember the last airborne sink before updatePhysics can zero it at contact.
   if (flightMode === 'FLY' && !state.onGround && !carrier.phase && cat.ph === 'NONE') vyPrev = state.velocity.y;
   if (flightMode === 'FLY') updatePhysics(dt);
@@ -5888,7 +5936,7 @@ if (DEBUG) {
     killDrone: (i, how) => combatSys.killDrone(i, how), get swarm() { return combat.swarm; },
     get model() { return model; }, get ready() { return modelReady; },
     get missionId() { return missionId; }, get mission() { return mission(); }, cycleMission, loadMissionScene, startSortie, launchSortie,
-    get autoland() { return autoland; }, autolandPrompt, engageAutoland, getMusicCtx, get debrief() { return !debriefEl.hidden; },
+    get autoland() { return autoland; }, autolandPrompt, engageAutoland, finishCarrierTrap, getMusicCtx, get hudPrompt() { return hud.promptText; }, get debrief() { return !debriefEl.hidden; },
     get cat() { return cat; }, get skimK() { return skimK; }, catEnter, catTick, catFire, catSnapAll, carrierDiag, enterCarrierLaunch, carrierReady,
     get scramble() { return scramble; }, get bw() { return combat.bw; }, get intrusion() { return combat.intr; },
     get inESM() { return combatSys.inESM; }, get esm() { return combatSys.esm; }, get cloudIce() { return state.cloudIce; },
