@@ -51,7 +51,7 @@ export function createGear(THREE, model) {
     // Bay well (only visible while the door is open).
     const well = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.2, L * 0.92), bayMat);
     well.position.set(x, y + 0.13, z + (axis === 'x' ? -L * 0.45 : -L * 0.38)); root.add(well);
-    return { hinge, door, well, axis, angle, doorSide, wheel: axle };
+    return { hinge, door, well, axis, angle, doorSide, wheel: axle, wheelY: -L };
   }
   // Tyre bottoms at -GEAR_H: hingeY - L - r = -2.90.
   const units = {
@@ -61,7 +61,10 @@ export function createGear(THREE, model) {
     mainR: unit({ x: 1.3, y: -1.24, z: 0.7, L: 1.24, r: 0.42, w: 0.3, twin: false, axis: 'xz', angle: 1.55, doorSide: 1 })
   };
   const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-  let progress = 0, spin = 0;
+  let progress = 0, spin = 0, compression = 0;
+  // Touchdown oleo travel: lift the wheels into their struts (0..0.35 m).
+  // Collision / GEAR_H are untouched, so the jet still rests level on its wheels.
+  function compress(amount) { compression = Math.max(0, Math.min(0.35, amount || 0)); }
   // Pose for a progress value: doors 0-0.3 open (and close again at the top),
   // struts swing 0.18-0.95, wheels spin with ground speed.
   function pose(p, groundSpeed = 0, dt = 0) {
@@ -77,8 +80,9 @@ export function createGear(THREE, model) {
       const vis = p > 0.015;
       u.hinge.visible = vis; u.door.visible = vis; u.well.visible = p > 0.015 && doorOpen > 0.05;
       u.wheel.rotation.x = -spin / (k === 'nose' ? 0.28 : 0.42);
+      u.wheel.position.y = u.wheelY + compression * (k === 'nose' ? 0.5 : 1);
     }
   }
   pose(progress);
-  return { root, pose, get progress() { return progress; }, units };
+  return { root, pose, compress, get progress() { return progress; }, get compression() { return compression; }, units };
 }

@@ -32,6 +32,9 @@ const CAT_Z0 = -CARRIER_LEN / 2 + CAT_LEN;             // -72 m: stroke ends at 
 export const CAT_BOW = [{ x: -6, z: CAT_Z0, yaw: 0, key: 'bow0' }, { x: 6, z: CAT_Z0, yaw: 0, key: 'bow1' }];
 export const CAT_WAIST = [{ x: -22, z: CAT_Z0, yaw: -9, key: 'waist0' }];
 export const WING_CAT_DT = [0.6, 1.3];
+// Crippled-bandit damage tells: dark oil ribbons + intermittent hot-orange sparks.
+const DMG_SMOKE_FRAC = 0.5, DMG_TRAIL_N = 8;
+const SPARK_RATE = 6, SPARK_LIFE = 0.35, SPARK_V = 40, SPARK_DUTY = 0.35, SPARK_MAX_R = 3000;
 const CAT_JBD_UP = -55 * Math.PI / 180;
 const CAT_TRAP_X = 22;
 const CARRIER_TRAP_DY = 5.5;                             // ray fallback when a deck hit misses
@@ -934,6 +937,40 @@ export function createCombat(THREE, env) {
   const flameGeoC = new THREE.ConeGeometry(0.32, 2.6, 12, 1, true); flameGeoC.rotateX(Math.PI / 2);
   const WINGTIPS = [new THREE.Vector3(-6.6, -0.7, 4.4), new THREE.Vector3(6.6, -0.7, 4.4)];
   const enemies = [];
+  // Scratch for damage tells (no per-frame allocation).
+  const _tailPos = new THREE.Vector3(), _sparkVel = new THREE.Vector3(), _sparkDir = new THREE.Vector3();
+  function releaseDamageTell(e) {
+    if (e && e.dmgTrail >= 0) {
+      if (env.dmgTrails) env.dmgTrails.release(e.dmgTrail);
+      e.dmgTrail = -1;
+    }
+    if (e) { e.sparkT = 0; e.sparkAcc = 0; }
+  }
+  function resetDamageTell(e) { releaseDamageTell(e); e.sparkSeed = rand() * 6.283; }
+  function updateDamageTell(e, dt, now) {
+    // Any respawn / heal above the threshold releases the slot on its first frame,
+    // so every pool-reuse path stays clean without per-site bookkeeping.
+    if (!e.hpMax || e.hp > e.hpMax * DMG_SMOKE_FRAC || e.scripted) {
+      if (e.dmgTrail >= 0) releaseDamageTell(e);
+      return;
+    }
+    if (!e.alive) return;
+    // Oil ribbon: claim once, then keep feeding the tail point.
+    if (e.dmgTrail < 0 && env.dmgTrails) e.dmgTrail = env.dmgTrails.claim(e);
+    _tailPos.copy(e.fwd).multiplyScalar(-7).add(e.pos);
+    if (e.dmgTrail >= 0 && env.dmgTrails) env.dmgTrails.emit(e.dmgTrail, _tailPos, now);
+    // Sparks: duty-cycled per-enemy seeded sine, hot-orange through aaTracer.
+    e.sparkT += dt;
+    const duty = Math.sin(e.sparkT * 2.3 + (e.sparkSeed || 0)) > 1 - 2 * SPARK_DUTY;
+    if (duty && env.spark && e.pos.distanceToSquared(camera.position) < SPARK_MAX_R * SPARK_MAX_R) {
+      e.sparkAcc += dt * SPARK_RATE;
+      while (e.sparkAcc >= 1) {
+        e.sparkAcc -= 1;
+        _sparkDir.set(rand() - 0.5, rand() - 0.5, rand() - 0.5).normalize().addScaledVector(e.fwd, 0.6).normalize();
+        env.spark(_tailPos, _sparkVel.copy(e.vel).multiplyScalar(0.6).addScaledVector(_sparkDir, SPARK_V * (0.7 + 0.3 * rand())), SPARK_LIFE);
+      }
+    }
+  }
 
   function buildFleet(model, nozzleLocal) {
     model.updateMatrixWorld(true);
@@ -1052,7 +1089,8 @@ export function createCombat(THREE, env) {
       rollRate: 125 * D2R, rollRateNow: 0, gMax: 6.4,
       wingL: 30, wingR: 30, wingOffL: false, wingOffR: false, engHits: 0, engineFire: false, speedCap: 1,
       crippled: null, crippleT: 0, crRoll: 0, sinkTarget: 25, rollVel: 0, dipV: 0,
-      ambush: false, ambushT: 0, buzzCD: 0
+      ambush: false, ambushT: 0, buzzCD: 0,
+      dmgTrail: -1, sparkT: 0, sparkAcc: 0, sparkSeed: 0
     };
   }
   for (let i = 0; i < WAVE_SIZE; i++) enemies.push(makeEnemy(i));
@@ -1060,6 +1098,7 @@ export function createCombat(THREE, env) {
   const _fur = new THREE.Vector3();                          // recycler scratch (allocated once)
 
   function resetAI(e) {
+    resetDamageTell(e);
     e.cruise = (360 + rand() * 80) * KT;                     // 360-440 kt cruise
     e.abSpeed = (520 + rand() * 120) * KT;                   // 520-640 kt in afterburner
     e.speed = e.cruise; e.ab = 0; e.gNow = 1; e.bank = 0; e.rollRateNow = 0;
@@ -2008,6 +2047,7 @@ export function createCombat(THREE, env) {
 
   function destroyEnemy(e, byMissile, how) {
     if (!e.alive) return;
+    releaseDamageTell(e);
     emitStamp(e, 1);
     e.alive = false;
     // A limping WARDEN-2 is saved once every assigned pursuer is destroyed.
@@ -5961,8 +6001,10 @@ export function createCombat(THREE, env) {
       if (C.mode !== 'FURBALL' && !stagedMission() && C.missionPhase === 3 && !aceFlightDone && C.phase !== 3 && waveAlive() <= WAVE_SIZE * 0.5) spawnAceFlight();
       for (const e of enemies) {
         if (e.scripted && e.alive) { updateScriptedRaider(e, dt); continue; }
-        if (e.alive) { if (e.crippled) updateCrippled(e, dt); else updateEnemy(e, dt, playerActive); }
-        else if (e.wreck) updateWreck(e, dt);
+        if (e.alive) {
+          if (e.crippled) updateCrippled(e, dt); else updateEnemy(e, dt, playerActive);
+          updateDamageTell(e, dt, now);
+        } else if (e.wreck) updateWreck(e, dt);
       }
       updateIntrusion(dt);
       updateDrones(dt, playerActive);
@@ -6331,6 +6373,13 @@ export function createCombat(THREE, env) {
       orient(e); writeFleet();
     },
     killEnemy(i) { const e = enemies[i]; if (e && e.alive) destroyEnemy(e, true); },
+    // Debug: set a live bandit's HP fraction (drives the crippled smoke/spark tell).
+    damageEnemyAt(i, frac) {
+      const e = enemies[i | 0];
+      if (!e || !e.alive) return null;
+      e.hp = Math.max(1, Math.round(e.hpMax * Math.min(1, Math.max(0.01, frac))));
+      return { i: i | 0, hp: e.hp, hpMax: e.hpMax };
+    },
     // Debug: put bogey i on the player's six at `dist` metres, nose on, pursuing.
     placeBehind(i, dist) {
       const e = enemies[i]; if (!e) return;
@@ -6400,6 +6449,7 @@ export function createCombat(THREE, env) {
           ccrp: C.ccrp ? { along: Math.round(C.ccrp.along), cross: Math.round(C.ccrp.cross), ttr: +C.ccrp.ttr.toFixed(1), rng: Math.round(C.ccrp.range) } : null,
           armed: !!C.ccrpArmed, rel: C.ccrpRelease || null },
         dmg: { pct: Math.round(100 - C.health), hyd: !!C.hydraulic, out: C.engineOut || null, fire: !!C.engineFire, crack: C.crackLevel, seed: C.crackSeed },
+        dmgTrails: env.dmgTrails && env.dmgTrails.stats ? env.dmgTrails.stats : { active: 0, peak: 0 },
         eng: { L: C.engL, R: C.engR, side: C.engSide, fireT: +C.fireT.toFixed(1), relightT: +C.relightT.toFixed(2), used: C.relightUsed, result: C.relightResult, p: +(C.relightP || 0).toFixed(2), armed: C.fireArmed },
         zone: { sector: C.sector ? C.sector.code : null, terrainBreaks: C.terrainBreaks || 0, baseHits: C.baseHits || 0, baseKills: C.baseKills || 0,
           shots: C.mslLog.slice(-4).map(x => x.tag + ':' + x.result).join(' '), sams: missiles.filter(m => m.active && m.sam).length, provoked: fleetProvoked,

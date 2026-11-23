@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.40', title: 'CRIPPLED BANDITS & SOLID DECKS', bullets: [
+    'Bandits below half health now trail dark oil smoke and throw intermittent hot-orange sparks from the tail. The ribbons and sparks come from fixed pools, so kills and mission resets clean up without leaking geometry or textures.',
+    'Touchdowns have weight again: sink rate drives a two-beat tyre chirp, a metal ring on carrier decks, an oleo camera dip and a nose-wheel slap as the nose comes down. The gear struts visibly compress.',
+    'Sitting on the catapult now clanks the shuttle into place and kneels the nose strut under tension; the jet springs up as the shuttle releases. Verified CARRIER_OK with no deck clipping.'
+  ] },
   { version: 'v1.1.39', title: 'BURNER THUMP & SUPERSONIC QUIET', bullets: [
     'Pushing the throttle into afterburner now lands a sub-bass ignition thump with a manifold whoosh and a short forward camera kick, once per engagement. The nozzles flare as the burner lights, and the catapult keeps its own launch audio.',
     'Gun bursts stutter a warm glare across the canopy bow and glare shield in the cockpit, and missile shots add a white rail flash plus a spiralling launch-motor smoke puff. All of it is emissive or pooled; light count and draw calls stay constant.',

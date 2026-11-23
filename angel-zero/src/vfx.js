@@ -899,6 +899,52 @@ export function createVFX(THREE, env) {
     get stats() { return { trails: samTrails.filter(r => r.mesh.visible).length }; }
   };
 
+  /* ---------------------------- crippled bandit oil trails (fixed ribbon pool) */
+  // DMG_TRAIL_N ribbons are built once at init and hidden until a damaged bandit
+  // claims one. Dark oil fades from #2a2622 to #5a5550 as the sample ages (Ribbon
+  // already darkens alpha with age; the colour shift is a static tint between slots).
+  const DMG_TRAIL_N = 8;
+  const dmgRibbons = Array.from({ length: DMG_TRAIL_N }, (_, i) => {
+    const r = new Ribbon({ w0: 1.2, w1: 7, life: 3.5, alpha: 0.55, wisp: 1, step: 5, far: [900, 9000] });
+    r.mat.uniforms.uCol.value.setHex(i % 2 ? 0x5a5550 : 0x2a2622);
+    r.mesh.visible = false;
+    return r;
+  });
+  const dmgOwner = new Array(DMG_TRAIL_N).fill(null);
+  let dmgPeak = 0;
+  const dmgTrails = {
+    claim(owner) {
+      for (let i = 0; i < DMG_TRAIL_N; i++) if (!dmgOwner[i]) {
+        dmgOwner[i] = owner; dmgRibbons[i].clear(); dmgRibbons[i].mesh.visible = true;
+        const active = dmgOwner.reduce((n, o) => n + (o ? 1 : 0), 0);
+        if (active > dmgPeak) dmgPeak = active;
+        if (env.debug) console.log('[ANGELS_ZERO] dmgtrail claim i=' + i + ' e=' + (owner && owner.label));
+        return i;
+      }
+      return -1;
+    },
+    emit(i, pos, now) {
+      if (i < 0 || i >= DMG_TRAIL_N || !dmgOwner[i]) return;
+      const r = dmgRibbons[i];
+      r.emit(pos, 1, now); r.update(camera.position, now);
+      r.mesh.visible = true;
+    },
+    release(i) {
+      if (i < 0 || i >= DMG_TRAIL_N || !dmgOwner[i]) return;
+      if (env.debug) console.log('[ANGELS_ZERO] dmgtrail release i=' + i + ' e=' + (dmgOwner[i] && dmgOwner[i].label));
+      dmgOwner[i] = null; dmgRibbons[i].clear(); dmgRibbons[i].mesh.visible = false;
+    },
+    resetAll() {
+      dmgOwner.fill(null); dmgPeak = 0;
+      for (const r of dmgRibbons) { r.clear(); r.mesh.visible = false; }
+    },
+    get stats() {
+      let active = 0;
+      for (const o of dmgOwner) if (o) active++;
+      return { active, peak: dmgPeak };
+    }
+  };
+
   /* ----------------------------- flagship VLS charge beam (single pooled mesh) */
   const flagGeo = new THREE.CylinderGeometry(1.2, 1.2, 1, 8, 1, true);
   flagGeo.translate(0, 0.5, 0);                         // base at the local origin
@@ -964,7 +1010,7 @@ export function createVFX(THREE, env) {
         float d = length(gl_PointCoord - 0.5) * 2.0;
         float a = vA * pow(clamp(1.0 - d, 0.0, 1.0), 1.4);
         if (a < 0.004) discard;
-        vec3 col = mix(vec3(1.0, 0.70, 0.28), vec3(1.0, 0.18, 0.22), vT);
+        vec3 col = vT < -0.5 ? vec3(1.0, 0.60, 0.19) : mix(vec3(1.0, 0.70, 0.28), vec3(1.0, 0.18, 0.22), vT);
         gl_FragColor = vec4(col, a);
       }`,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
@@ -974,12 +1020,14 @@ export function createVFX(THREE, env) {
   const aaP = Array.from({ length: AA_TRACER_N }, () => ({ on: false, age: 0, life: 0.3, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0 }));
   let aaNext = 0;
   const aaTracer = {
-    add(pos, vel, life = 0.32, red = false) {
+    // tint: 0 = warm amber, 1 = red, -1 = hot orange (damage sparks).
+    add(pos, vel, life = 0.32, red = false, spark = false) {
       const q = aaP[aaNext]; aaNext = (aaNext + 1) % AA_TRACER_N;
       q.on = true; q.age = 0; q.life = life;
       q.x = pos.x; q.y = pos.y; q.z = pos.z; q.vx = vel.x; q.vy = vel.y; q.vz = vel.z;
-      q.red = red ? 1 : 0;
+      q.tint = spark ? -1 : (red ? 1 : 0);
     },
+    spark(pos, vel, life = 0.35) { this.add(pos, vel, life, false, true); },
     update(dt) {
       let live = 0;
       for (let i = 0; i < AA_TRACER_N; i++) {
@@ -989,7 +1037,7 @@ export function createVFX(THREE, env) {
         if (q.age >= q.life) { q.on = false; aaAlpha[i] = 0; continue; }
         q.x += q.vx * dt; q.y += q.vy * dt; q.z += q.vz * dt;
         aaPos[i * 3] = q.x; aaPos[i * 3 + 1] = q.y; aaPos[i * 3 + 2] = q.z;
-        aaAlpha[i] = 1 - q.age / q.life; aaTint[i] = q.red || 0;
+        aaAlpha[i] = 1 - q.age / q.life; aaTint[i] = q.tint || 0;
         live++;
       }
       aaPoints.visible = live > 0;
@@ -1732,8 +1780,8 @@ export function createVFX(THREE, env) {
   return {
     attachPlume,
     setWingtips(l, r) { tipL.copy(l); tipR.copy(r); buildVapor(); },
-    clearTrails() { for (const r of ribbons) r.clear(); for (const r of contrails) r.clear(); contrailStats.active = contrailStats.live = 0; vaporTarget = lexTarget = 0; for (const q of sprayP) q.on = false; vaporLevel = 0; vaporPoints.visible = false; catSteam.reset(); rooster.reset(); wake.reset(); samFx.clear(); flagBeam.hide(); },
-    catSteam, aaTracer, spray: rooster, wake, samFx, flagBeam, launchPuff,
+    clearTrails() { for (const r of ribbons) r.clear(); for (const r of contrails) r.clear(); contrailStats.active = contrailStats.live = 0; vaporTarget = lexTarget = 0; for (const q of sprayP) q.on = false; vaporLevel = 0; vaporPoints.visible = false; catSteam.reset(); rooster.reset(); wake.reset(); samFx.clear(); dmgTrails.resetAll(); aaTracer.reset(); flagBeam.hide(); },
+    catSteam, aaTracer, spray: rooster, wake, samFx, dmgTrails, flagBeam, launchPuff,
     burnerFlash(k) { burnerFlashK = Math.max(burnerFlashK, k || 1); },
     updateContrails,
     get contrailStats() { return contrailStats; },

@@ -24,6 +24,7 @@ export function createAudio() {
   const N = {};                                            // live nodes
   let sprayK = 0, sprayKt = 0;                             // sea-skim DSP targets (scalars only)
   let burnerCount = 0;                                     // MIL -> AB ignition thump counter (getter lives at module scope)
+  let tyreCount = 0, noseCount = 0, clankCount = 0;       // touchdown / nose slap / shuttle clank counters
   // --- streamed scenario soundtrack -------------------------------------------------
   const BGM_DIR = 'assets/audio/bgm/', XFADE = 1.5, DUCK_DB = -5, DUCK_GAIN = 0.5623, DUCK_T = 0.25, MIN_DWELL = 4.0;
   const BGM_OK = typeof Audio !== 'undefined' && new Audio().canPlayType('audio/ogg; codecs="vorbis"') !== '';
@@ -402,6 +403,19 @@ export function createAudio() {
     N.creakN = loopNoise(pink); N.creakBP = filt('bandpass', 140, 4); N.creakG = gain(0);
     N.creakN.connect(N.creakBP).connect(N.creakG).connect(cockpitLP);
 
+    // Touchdown feel: tyre chirp (two main-gear bursts + carrier deck ring), nose slap,
+    // and shuttle-lock clank. All persistent nodes, retriggered by envelopes only.
+    N.chirpN = loopNoise(white); N.chirpBP = filt('bandpass', 2600, 3); N.chirpG = gain(0);
+    N.chirpN.connect(N.chirpBP).connect(N.chirpG).connect(cockpitLP);
+    N.chirpRingBP = filt('bandpass', 3100, 12); N.chirpRingG = gain(0);
+    N.chirpN.connect(N.chirpRingBP).connect(N.chirpRingG).connect(cockpitLP);
+    N.noseOsc = osc('sine', 70); N.noseG = gain(0); N.noseOsc.connect(N.noseG).connect(cockpitLP);
+    N.noseClickN = loopNoise(white); N.noseClickHP = filt('highpass', 1800, 0.7); N.noseClickG = gain(0);
+    N.noseClickN.connect(N.noseClickHP).connect(N.noseClickG).connect(cockpitLP);
+    N.clankN = loopNoise(white); N.clankBP = filt('bandpass', 1800, 9); N.clankG = gain(0);
+    N.clankN.connect(N.clankBP).connect(N.clankG).connect(cockpitLP);
+    N.clankOsc = osc('square', 220); N.clankToneG = gain(0); N.clankOsc.connect(N.clankToneG).connect(cockpitLP);
+
     // Procedural fallbacks for the sampled layers.
     N.buffNoise = loopNoise(brown); N.buffBP = filt('bandpass', 75, 1.1); N.buffFGain = gain(0);
     N.buffNoise.connect(N.buffBP).connect(N.buffFGain).connect(cockpitLP);
@@ -471,6 +485,56 @@ export function createAudio() {
     wg.cancelScheduledValues(t); wg.setValueAtTime(0, t);
     wg.linearRampToValueAtTime(0.35, t + 0.02);
     wg.exponentialRampToValueAtTime(0.001, t + 0.4);
+  }
+
+  // Touchdown: two main-gear tyre chirps (0.07 s apart) + a metallic deck ring on carriers.
+  function tyreChirp(k = 0.5, carrier = false) {
+    if (!ready) return;
+    const t0 = ctx.currentTime, amp = 0.15 + 0.55 * Math.min(1, Math.max(0, k));
+    N.chirpBP.frequency.cancelScheduledValues(t0);
+    N.chirpBP.frequency.setValueAtTime(2600, t0);
+    N.chirpBP.frequency.linearRampToValueAtTime(1400, t0 + 0.18);
+    const g = N.chirpG.gain;
+    g.cancelScheduledValues(t0); g.setValueAtTime(0, t0);
+    g.linearRampToValueAtTime(amp, t0 + 0.008);
+    g.exponentialRampToValueAtTime(0.001, t0 + 0.055);
+    g.setValueAtTime(0.0001, t0 + 0.07);
+    g.linearRampToValueAtTime(amp * 0.85, t0 + 0.078);
+    g.exponentialRampToValueAtTime(0.001, t0 + 0.14);
+    const rg = N.chirpRingG.gain;
+    rg.cancelScheduledValues(t0); rg.setValueAtTime(0, t0);
+    if (carrier) { rg.linearRampToValueAtTime(amp * 0.45, t0 + 0.012); rg.exponentialRampToValueAtTime(0.001, t0 + 0.25); }
+    tyreCount++;
+  }
+  // Nose wheel slap: falling 70 -> 40 Hz thud plus a short noise click.
+  function noseThump(k = 0.5) {
+    if (!ready) return;
+    const t = ctx.currentTime, amp = 0.2 + 0.4 * Math.min(1, Math.max(0, k));
+    N.noseOsc.frequency.cancelScheduledValues(t);
+    N.noseOsc.frequency.setValueAtTime(70, t);
+    N.noseOsc.frequency.exponentialRampToValueAtTime(40, t + 0.12);
+    const g = N.noseG.gain;
+    g.cancelScheduledValues(t); g.setValueAtTime(0, t);
+    g.linearRampToValueAtTime(amp, t + 0.006);
+    g.exponentialRampToValueAtTime(0.001, t + 0.18);
+    const cg = N.noseClickG.gain;
+    cg.cancelScheduledValues(t); cg.setValueAtTime(0, t);
+    cg.linearRampToValueAtTime(amp * 0.35, t + 0.004);
+    cg.exponentialRampToValueAtTime(0.001, t + 0.05);
+    noseCount++;
+  }
+  // CATAPULT_HOLD shuttle lock: two metallic clanks (noise band + square ping), 0.18 s apart.
+  function shuttleClank() {
+    if (!ready) return;
+    const t0 = ctx.currentTime;
+    for (const dt of [0, 0.18]) {
+      const t = t0 + dt;
+      const ng = N.clankG.gain;
+      ng.setValueAtTime(0, t); ng.linearRampToValueAtTime(0.42, t + 0.004); ng.exponentialRampToValueAtTime(0.001, t + 0.12);
+      const tg = N.clankToneG.gain;
+      tg.setValueAtTime(0, t); tg.linearRampToValueAtTime(0.16, t + 0.003); tg.exponentialRampToValueAtTime(0.001, t + 0.12);
+    }
+    clankCount++;
   }
 
   /* ------------------------------------------------------- one-shot events */
@@ -2150,6 +2214,8 @@ export function createAudio() {
     get layers() { return N.dbg || null; },
     get gmix() { return N.gmix || null; }, get dbg() { return N.dbg || null; }, gasp,
     burnerThump, get burnerCount() { return burnerCount; }, get windQuiet() { return N.windQuiet || 1; },
+    tyreChirp, noseThump, shuttleClank,
+    get feelCounts() { return { tyre: tyreCount, nose: noseCount, clank: clankCount }; },
     vws: { say: vwsSay }, get vwsLast() { return { ...vwsLast }; },
     get vwsState() { return { q: Array.from(vwsQ), cd: Array.from(vwsCd), playing: vwsPlaying, until: vwsUntil }; }, get hydWhine() { return N.hydG ? +N.hydG.gain.value.toFixed(4) : 0; },
     preloadVWS(files) {

@@ -726,35 +726,35 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s9c4';
-import { createAmbient } from './src/ambient.js?v=s9c4';
-import { createBlastFX } from './src/blastfx.js?v=s9c4';
-import { createHUD } from './src/hud.js?v=s9c4';
-import { createCockpit3D } from './src/cockpit3d.js?v=s9c4';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9c4';
-import { createEjection } from './src/eject.js?v=s9c4';
-import { createAudio } from './src/audio.js?v=s9c4';
-import { createRadio } from './src/radio.js?v=s9c4';
-import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9c4';
-import { createLivery } from './src/livery.js?v=s9c4';
-import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s9c4';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9c4';
-import { createCanopyFX } from './src/canopy.js?v=s9c4';
-import { createNVG } from './src/nvg.js?v=s9c4';
-import { createWorld, WORLD } from './src/world.js?v=s9c4';
-import { createSurfaces } from './src/surfaces.js?v=s9c4';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9c4';
-import { createFreeLook } from './src/freelook.js?v=s9c4';
-import { createCanopyGlass } from './src/canopyglass.js?v=s9c4';
-import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9c4';
-import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9c4';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9c4';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9c4';
-import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9c4';
-import { createRadioQueue } from './src/radioQueue.js?v=s9c4';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9c4';
+import { createVFX } from './src/vfx.js?v=s9c6';
+import { createAmbient } from './src/ambient.js?v=s9c6';
+import { createBlastFX } from './src/blastfx.js?v=s9c6';
+import { createHUD } from './src/hud.js?v=s9c6';
+import { createCockpit3D } from './src/cockpit3d.js?v=s9c6';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9c6';
+import { createEjection } from './src/eject.js?v=s9c6';
+import { createAudio } from './src/audio.js?v=s9c6';
+import { createRadio } from './src/radio.js?v=s9c6';
+import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9c6';
+import { createLivery } from './src/livery.js?v=s9c6';
+import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s9c6';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9c6';
+import { createCanopyFX } from './src/canopy.js?v=s9c6';
+import { createNVG } from './src/nvg.js?v=s9c6';
+import { createWorld, WORLD } from './src/world.js?v=s9c6';
+import { createSurfaces } from './src/surfaces.js?v=s9c6';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9c6';
+import { createFreeLook } from './src/freelook.js?v=s9c6';
+import { createCanopyGlass } from './src/canopyglass.js?v=s9c6';
+import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9c6';
+import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9c6';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9c6';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9c6';
+import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9c6';
+import { createRadioQueue } from './src/radioQueue.js?v=s9c6';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9c6';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
-  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9c4';
+  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9c6';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -1297,6 +1297,62 @@ function onBurnerLight() {
   abKickT = AB_KICK_T;
   vfx.burnerFlash(1);
   audio.burnerThump(firstPerson);
+}
+
+/* --- tactile touchdown + catapult tension squat --- */
+const TD_VY_MIN = 0.6, TD_VY_MAX = 6.0, TD_DIP_MAX = 0.10;
+const STRUT_K = 90, STRUT_C = 2 * Math.sqrt(90) * 0.45;   // underdamped oleo bounce
+const NOSE_SLAP_PITCH = 2.0 * D2R;
+const CAT_SQUAT_M = 0.12, CAT_SQUAT_T = 0.5, CAT_VIB_HZ = 23, CAT_VIB_AMP = 0.006;
+const _catSquatQ = new THREE.Quaternion(), _tdNose = new THREE.Vector3(), _tdFwd = new THREE.Vector3();
+let vyPrev = 0, pitchPrev = 0, noseArmed = false, lastTouchT = -99;
+let tdCount = 0, slapCount = 0, clankCount = 0;
+const strut = { y: 0, v: 0 }, squat = { y: 0, target: 0 };
+let vibK = 0;
+function sinkFactor(vy) {
+  return THREE.MathUtils.clamp((-vy - TD_VY_MIN) / (TD_VY_MAX - TD_VY_MIN), 0, 1);
+}
+function onTouchdown(sink, surface) {
+  if (simTime - lastTouchT < 0.4) return;                 // bounces inside 0.4 s are one contact
+  lastTouchT = simTime;
+  strut.v -= 0.8 + 3.2 * sink;
+  blastShake = Math.max(blastShake, 0.03 + 0.12 * sink);
+  audio.tyreChirp(sink, surface === 'CARRIER');
+  noseArmed = true; tdCount++;
+  if (DEBUG) console.log('[ANGELS_ZERO] td sink=' + sink.toFixed(2) + ' surf=' + surface + ' dip=' + strut.v.toFixed(2));
+}
+function onNoseSlap(rate) {
+  noseArmed = false;
+  audio.noseThump(rate);
+  strut.v -= 0.6 * rate; slapCount++;
+  if (DEBUG) console.log('[ANGELS_ZERO] nose slap rate=' + rate.toFixed(2));
+}
+function onCatHold() {
+  squat.target = CAT_SQUAT_M; vibK = 0;
+  audio.shuttleClank(); clankCount++;
+  if (DEBUG) console.log('[ANGELS_ZERO] cat clank');
+}
+function onCatFire() {
+  squat.target = 0; vibK = 0; strut.v += 0.8; noseArmed = false;
+}
+function updateFeelState(dt) {
+  // Oleo spring (strut.y is the camera drop, negative = compressed).
+  strut.v += (-STRUT_K * strut.y - STRUT_C * strut.v) * dt;
+  strut.y += strut.v * dt;
+  const dipMax = TD_DIP_MAX * (firstPerson ? 1 : 2.5);
+  if (strut.y < -dipMax) { strut.y = -dipMax; strut.v = 0; }
+  if (strut.y > 0.02) { strut.y = 0.02; strut.v = 0; }
+  // Shuttle squat eases in over 0.25 s, rebounds in 0.08 s on release.
+  squat.y += (squat.target - squat.y) * (1 - Math.exp(-dt / (squat.target === 0 ? 0.08 : 0.25)));
+  if (cat.ph === 'HOLD' && cat.arm > 0) vibK = Math.min(1, vibK + dt / CAT_SQUAT_T);
+  if (landingGear) landingGear.compress(-strut.y + (cat.ph === 'HOLD' || cat.ph === 'LAUNCH' ? squat.y : 0));
+  // Nose wheel contact: nose height via the body-frame contact point, or pitch fallback.
+  const pitchNow = state.pitch;
+  if (noseArmed && state.onGround && pitchNow < NOSE_SLAP_PITCH) {
+    const rate = Math.min(1, Math.max(0, (pitchPrev - pitchNow) / Math.max(dt, 1e-3)));
+    onNoseSlap(rate);
+  }
+  pitchPrev = pitchNow;
 }
 const flybyPulse = document.getElementById('flybyPulse');
 function onFlyby({ dist, k, side }) {
@@ -1914,6 +1970,7 @@ function updateAutoland(dt) {
       // Hook down: wire 2. Arrested from AL_VAPP relative to 0 over AL_TRAP_T.
       autoland.vRel = AL_VAPP; autoland.d = 0;
       audio.cableScreech(); onSfx('trap'); blastShake = Math.max(blastShake, 0.45);
+      onTouchdown(sinkFactor(vyPrev), 'CARRIER');
       radioEvent('ON_CARRIER_TRAP');
       combat.trapT = performance.now(); combat.trapWire = 2; combat.traps = (combat.traps || 0) + 1;
       tele.event(EV.CARRIER_TRAP, state.position.x, state.position.z, simTime);
@@ -1953,12 +2010,16 @@ function catDeckY(track) {
 }
 function catTrackWorld(track, out, s = 0) {
   const root = combatSys.allyRoot;
-  return root.localToWorld(out.set(track.x, catDeckY(track) + JET_GEAR_DY + 0.05, track.z + CARRIER_FWD_SIGN * s));
+  // Tension squat kneels the nose strut during HOLD; -squat.y*0.5 drops the airframe.
+  return root.localToWorld(out.set(track.x, catDeckY(track) + JET_GEAR_DY + 0.05 - squat.y * 0.5, track.z + CARRIER_FWD_SIGN * s));
 }
 function catTrackQuat(track, out) {
   const root = combatSys.allyRoot;
   _catYaw.setFromAxisAngle(_catAxisY, (track.yaw || 0) * D2R);
-  return out.copy(root.quaternion).multiply(_catYaw);
+  out.copy(root.quaternion).multiply(_catYaw);
+  // Nose-down pitch about the main-gear axis, proportional to strut compression.
+  if (squat.y > 0.001) out.multiply(_catSquatQ.setFromAxisAngle(AX_X, -Math.atan(squat.y / 5.6)));
+  return out;
 }
 // Re-pose every carrier-relative actor from the mounted root's deck rays.
 function catSnapAll() {
@@ -2020,6 +2081,7 @@ function carrierDiag(tag) {
 async function enterCarrierLaunch(m) {
   const gen = launchGen;
   cat.ph = 'WAIT';
+  squat.y = squat.target = 0; strut.y = strut.v = 0; vibK = 0; noseArmed = false;
   const hintEl = document.getElementById('menuHint');
   const oldHint = hintEl ? hintEl.textContent : '';
   if (hintEl) hintEl.textContent = 'DECK PREP';
@@ -2040,6 +2102,7 @@ function catEnter() {
   const a = combat.ally;
   if (!a) return;
   cat.ph = 'HOLD'; cat.t = 0; cat.arm = 0; cat.trackIdx = 0; cat.grace = 0;
+  onCatHold();                                            // shuttle-lock clank + tension squat
   if (DEBUG && !catDiagEnterLogged) cat.diagAt = simTime + 1.0;
   cat.resnapLogged = false;
   state.onGround = true; state.gearDown = true; state.gear = 1; gearAutoLock = true;
@@ -2064,6 +2127,7 @@ function catEnter() {
 }
 function catFire() {
   cat.ph = 'LAUNCH'; cat.t = 0;
+  onCatFire();                                            // release squat + vibration, lift the camera
   audio.catapult(); blastShake = Math.max(blastShake, 0.6);
   flyShake.k = 0.35; flyShake.t = 0;
 }
@@ -3196,6 +3260,7 @@ function updatePhysics(dt) {
         combatSys.onCarrierTrap();
         blastShake = Math.max(blastShake, 0.45);
         onSfx('trap');
+        onTouchdown(sinkFactor(vyPrev), 'CARRIER');
       }
     }
   }
@@ -3661,6 +3726,7 @@ function enterGround(td) {
   state.pit.done = false; state.pit.active = false; state.pit.t = 0;
   const firm = Math.min(1, -td.vy / 9.5);
   audio.tireScreech(0.6 + 0.6 * firm);
+  onTouchdown(Math.max(sinkFactor(td.vy), sinkFactor(vyPrev)), 'RUNWAY');
   // Twin white touchdown puffs at the main tyres.
   for (const k of ['mainL', 'mainR']) {
     const pt = GEAR_PTS[k];
@@ -4114,6 +4180,14 @@ function updateCameraAndVisuals(dt, now) {
     abKickT = Math.max(0, abKickT - dt);
     const j = (firstPerson ? AB_KICK * 0.33 : AB_KICK) * (abKickT / AB_KICK_T);
     camera.position.addScaledVector(_abFwd.set(0, 0, -1).applyQuaternion(state.quaternion), j);
+  }
+  // Oleo strut dip and catapult tension squat (position-only, no spring disturbance).
+  if (strut.y !== 0) camera.position.y += strut.y * (firstPerson ? 1 : 0.6);
+  if (squat.y > 0.001) camera.position.y -= squat.y * (firstPerson ? 0.6 : 0.35);
+  if (cat.ph === 'HOLD' && vibK > 0) {
+    camera.position.y += vibK * CAT_VIB_AMP * Math.sin(now * 2 * Math.PI * CAT_VIB_HZ) * (firstPerson ? 1 : 0.4);
+    if (DEBUG && Math.floor(now * 4) !== Math.floor((now - dt) * 4))
+      console.log('[ANGELS_ZERO] squat y=' + squat.y.toFixed(3) + ' vib k=' + vibK.toFixed(2));
   }
   if (DEBUG && (transK > 0.01 || superK > 0.01)) {
     feelLogT += dt;
@@ -4592,6 +4666,9 @@ const combatSys = createCombat(THREE, { scene, camera, renderer, state, combat, 
   getSunDir: out => todMode === 'NIGHT' ? out.set(0, -1, 0) : out.copy(SUN_DIR),
   getCloudWet: () => cloudWet, getCloudDeck: () => (world.map && world.map.cloudSea) || null,
   aaTracer: (pos, dir, life, red) => vfx.aaTracer.add(pos, dir, life, red),
+  // Crippled-bandit damage tells: pooled oil ribbons + hot-orange sparks.
+  dmgTrails: vfx.dmgTrails,
+  spark: (pos, vel, life) => vfx.aaTracer.spark(pos, vel, life),
   // Feel pass: player-only weapon feedback (cockpit glare + launch-motor puff).
   onGunRound: () => { if (firstPerson) cockpit.flash('GUN'); },
   onPlayerLaunch: (p, q, v) => {
@@ -5165,6 +5242,8 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
     const punchAt = Q.has('punchat') ? Number(Q.get('punchat')) : -1;
     const gforceParts = Q.has('gforce') ? Q.get('gforce').split(':') : null;
     const dmgAt = Q.has('dmgat') ? Q.get('dmgat').split(':') : null;
+    const enemyDmgAt = Q.has('dmgenemyat') ? Q.get('dmgenemyat').split(':') : null;
+    const tdAt = Q.has('tdat') ? Q.get('tdat').split(':') : null;
     const hydAt = Q.has('hydat') ? Number(Q.get('hydat')) : -1;
     const vwsAts = Q.getAll('vwsat').map(v => v.split(':'));
     const freelookAt = Q.has('freelookat') ? Q.get('freelookat').split(':') : null;
@@ -5414,6 +5493,26 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
         const wantHp = Math.max(1, Number(dmgAt[1]) || 60);
         combatSys.damagePlayer(Math.max(0, combat.health - wantHp));
         if (DEBUG) console.log('[ANGELS_ZERO] dmgat hp=' + combat.health + ' crack=' + combat.crackLevel);
+      }
+      if (enemyDmgAt && Number(enemyDmgAt[0]) >= t0 && Number(enemyDmgAt[0]) < t1) {
+        const frac = Number(enemyDmgAt[1]) || 0.4;
+        const live = combatSys.enemies.filter(e => e.alive);
+        let best = -1, bestD = Infinity;
+        for (const e of live) { const d = e.pos.distanceToSquared(state.position); if (d < bestD) { bestD = d; best = e.id; } }
+        const r = best >= 0 ? combatSys.damageEnemyAt(best, frac) : null;
+        console.log('[ANGELS_ZERO] dmgenemyat @', t1.toFixed(2), JSON.stringify(r));
+      }
+      if (tdAt && Number(tdAt[0]) >= t0 && Number(tdAt[0]) < t1) {
+        vyPrev = -Math.abs(Number(tdAt[1]) || 3);
+        state.velocity.y = vyPrev;
+        state.onGround = false;
+        noseArmed = false; lastTouchT = -99;
+        const deck = !!(carrier.phase || cat.ph === 'HOLD' || cat.ph === 'LAUNCH') ||
+          (!!combat.ally && state.position.distanceTo(combat.ally.pos) < 400 &&
+           Math.abs(state.position.y - (combat.ally.deckY + GEAR_H)) < 12);
+        onTouchdown(sinkFactor(vyPrev), deck ? 'CARRIER' : 'RUNWAY');
+        enterGround({ ok: true, why: '', kts: state.speed * 1.94384, vy: vyPrev, bank: 0, pitch: state.pitch * 57.2958 });
+        console.log('[ANGELS_ZERO] tdat @', t1.toFixed(2), 'vy=' + vyPrev.toFixed(2));
       }
       if (hydAt >= t0 && hydAt < t1) {
         combat.health = Math.min(combat.health, 60);
@@ -5668,7 +5767,10 @@ function stepSim(dt) {
   if (cat.ph === 'WAIT') return;                          // deck prep: sim frozen until the GLB is mounted
   combat.allyHold = autoland.on || !!carrier.phase || cat.ph === 'HOLD' || cat.ph === 'LAUNCH';
   if (flightMode === 'FLY' && !autoland.on) autolandGateCheck();   // final approach gate -> CARRIER_AUTOLAND
+  // Remember the last airborne sink before updatePhysics can zero it at contact.
+  if (flightMode === 'FLY' && !state.onGround && !carrier.phase && cat.ph === 'NONE') vyPrev = state.velocity.y;
   if (flightMode === 'FLY') updatePhysics(dt);
+  updateFeelState(dt);
   updateWaveOff(dt);
   updateBuzz(dt);
   combatSys.update(dt, simTime, { playerActive: flightMode === 'FLY', firing: keys.fire || DEBUG_FIRE });
@@ -5742,6 +5844,10 @@ if (DEBUG) {
     get appMode() { return appMode; },
     // Feel-pass scalars / test hooks (all reads are snapshot objects allocated on demand, never per frame).
     get dbgFeel() { return { spdHold, aoaHoldDeg, aoaHoldT, abatAt, abCD, transK, superK, wrK, wrPhase }; },
+    get feel() { return { strutY: strut.y, strutV: strut.v, squatY: squat.y, squatT: squat.target, vibK, noseArmed, vyPrev, td: tdCount, slap: slapCount, clank: clankCount, audio: audio.feelCounts }; },
+    get dmgTrails() { return vfx.dmgTrails.stats; },
+    hurtEnemy: (i, f) => combatSys.damageEnemyAt(i, f),
+    touch: (sink, surf) => onTouchdown(sink, surf || 'RUNWAY'),
     get ab() { return { prev: abPrev, k: state.afterburner, cd: abCD, count: audio.burnerCount }; },
     get trans() { return { k: transK, super: superK, quiet: audio.windQuiet, pulseCD: superCD }; },
     get wr() { return { k: wrK, phase: wrPhase, roll: wrRoll, aoa: wrAoa, bank: state.bank * 57.2958 }; },
