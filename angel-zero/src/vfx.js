@@ -250,7 +250,9 @@ export function createVFX(THREE, env) {
       else this.setSample(this.head, p, now, a);          // live head rides the emitter
     }
     update(camPos, now) {
+      const wasVis = this.mesh.visible;
       const n = this.count, px = this.px;
+      if (n === 0 && !wasVis) return;
       const pos = this.geo.attributes.position.array, uv = this.geo.attributes.uv.array, al = this.geo.attributes.aAlpha.array;
       this.mat.uniforms.uTime.value = now;
       let live = 0;
@@ -276,11 +278,13 @@ export function createVFX(THREE, env) {
         if (a > 0.002) live++;
       }
       this.live = live;
-      this.geo.setDrawRange(0, n > 1 ? (n - 1) * 6 : 0);
-      this.geo.attributes.position.needsUpdate = true;
-      this.geo.attributes.uv.needsUpdate = true;
-      this.geo.attributes.aAlpha.needsUpdate = true;
       this.mesh.visible = live > 0;
+      if (live > 0 || wasVis) {
+        this.geo.setDrawRange(0, n > 1 ? (n - 1) * 6 : 0);
+        this.geo.attributes.position.needsUpdate = true;
+        this.geo.attributes.uv.needsUpdate = true;
+        this.geo.attributes.aAlpha.needsUpdate = true;
+      }
     }
   }
   // Wingtip vortex cores: 0.14 m at the tip -> 0.65 m diffused, ~2.1 s dissipation.
@@ -530,7 +534,7 @@ export function createVFX(THREE, env) {
   scene.add(spray);
   const sprayP = Array.from({ length: SP }, () => ({ on: false, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, age: 0, life: 1, s0: 1, s1: 6 }));
   const _spDir = new THREE.Vector3();
-  let sprayAcc = 0, sprayNext = 0;
+  let sprayAcc = 0, sprayNext = 0, sprayWasLive = false;
   function updateSpray(s, dt, visible) {
     const p = s.position;
     const overWater = terrainHeight(p.x, p.z) < -1;
@@ -550,11 +554,13 @@ export function createVFX(THREE, env) {
       q.vy = 6 + rand() * 16 * (0.4 + 0.6 * k);
       q.age = 0; q.life = 0.9 + rand() * 1.4; q.s0 = 1.5 + rand() * 2.0; q.s1 = 6 + rand() * 9;
     }
+    let live = 0;
     for (let i = 0; i < SP; i++) {
       const q = sprayP[i];
       if (!q.on) { spAlpha[i] = 0; continue; }
       q.age += dt;
       if (q.age >= q.life) { q.on = false; spAlpha[i] = 0; continue; }
+      live++;
       q.vy -= 9.81 * dt;
       const drag = 1 - 0.9 * dt; q.vx *= drag; q.vz *= drag;
       q.x += q.vx * dt; q.y = Math.max(0.2, q.y + q.vy * dt); q.z += q.vz * dt;
@@ -563,10 +569,14 @@ export function createVFX(THREE, env) {
       spAlpha[i] = Math.pow(1 - f, 1.3) * Math.min(1, q.age * 10) * 0.65;
       spSize[i] = q.s0 + (q.s1 - q.s0) * f;
     }
-    spGeo.attributes.position.needsUpdate = true;
-    spGeo.attributes.aAlpha.needsUpdate = true;
-    spGeo.attributes.aSize.needsUpdate = true;
-    spMat.uniforms.uScale.value = renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+    spray.visible = live > 0;
+    if (live > 0 || sprayWasLive) {
+      spGeo.attributes.position.needsUpdate = true;
+      spGeo.attributes.aAlpha.needsUpdate = true;
+      spGeo.attributes.aSize.needsUpdate = true;
+      if (live > 0) spMat.uniforms.uScale.value = renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+    }
+    sprayWasLive = live > 0;
   }
 
   /* ------------------------------- sea-skim rooster tail + foam wake (pooled) */
@@ -599,7 +609,7 @@ export function createVFX(THREE, env) {
   const rzPoints = new THREE.Points(rzGeo, rzMat);
   rzPoints.frustumCulled = false; rzPoints.visible = false; scene.add(rzPoints);
   const rzVel = new Float32Array(SPRAY_N * 3), rzAge = new Float32Array(SPRAY_N), rzLife = new Float32Array(SPRAY_N), rzK = new Float32Array(SPRAY_N);
-  let rzHead = 0, rzAcc = 0, rzAlive = 0;
+  let rzHead = 0, rzAcc = 0, rzAlive = 0, rzWasLive = false;
   const rooster = {
     emit(x, z, fwdX, fwdZ, speed, k, dt) {
       rzAcc += SPRAY_RATE_MAX * k * dt;
@@ -608,6 +618,7 @@ export function createVFX(THREE, env) {
       const latX = -fwdZ, latZ = fwdX;
       while (n-- > 0) {
         const i = rzHead; rzHead = (rzHead + 1) % SPRAY_N;
+        if (rzAge[i] >= rzLife[i]) rzAlive++;
         const side = (rzHead & 1) ? 1 : -1, lat = (3 + 3 * k) * side;
         const px = x - fwdX * 9 + latX * lat, pz = z - fwdZ * 9 + latZ * lat;
         rzPos[i * 3] = px; rzPos[i * 3 + 1] = SPRAY_Y; rzPos[i * 3 + 2] = pz;
@@ -617,14 +628,16 @@ export function createVFX(THREE, env) {
         rzVel[i * 3 + 2] = -fwdZ * back + latZ * out;
         rzAge[i] = 0; rzLife[i] = SPRAY_LIFE_MIN + rand() * (SPRAY_LIFE_MAX - SPRAY_LIFE_MIN); rzK[i] = k;
         rzAlpha[i] = 0; rzSize[i] = 3;
-        rzAlive++;
       }
     },
     update(dt) {
-      if (!rzAlive) { rzPoints.visible = false; return; }
+      if (!rzAlive && !rzWasLive) { rzPoints.visible = false; return; }
+      let live = 0;
       for (let i = 0; i < SPRAY_N; i++) {
         if (rzAge[i] >= rzLife[i]) { rzAlpha[i] = 0; continue; }
         rzAge[i] += dt;
+        if (rzAge[i] >= rzLife[i]) { rzAlpha[i] = 0; continue; }
+        live++;
         const j = i * 3;
         rzVel[j + 1] -= 9.8 * dt;
         const drag = 1 - 1.4 * dt;
@@ -633,16 +646,18 @@ export function createVFX(THREE, env) {
         const t = Math.min(1, rzAge[i] / rzLife[i]), k = rzK[i];
         rzSize[i] = 3 + (8 + 12 * k - 3) * t;
         rzAlpha[i] = k * 0.75 * smooth(0, 0.08, rzAge[i]) * Math.pow(1 - t, 1.5);
-        if (rzAge[i] >= rzLife[i]) { rzAlpha[i] = 0; rzAlive--; }
       }
-      rzPoints.visible = rzAlive > 0;
-      if (!rzAlive) return;
-      rzGeo.attributes.position.needsUpdate = true;
-      rzGeo.attributes.aSize.needsUpdate = true;
-      rzGeo.attributes.aAlpha.needsUpdate = true;
-      rzMat.uniforms.uScale.value = renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+      rzAlive = live;
+      rzPoints.visible = live > 0;
+      if (live > 0 || rzWasLive) {
+        rzGeo.attributes.position.needsUpdate = true;
+        rzGeo.attributes.aSize.needsUpdate = true;
+        rzGeo.attributes.aAlpha.needsUpdate = true;
+        if (live > 0) rzMat.uniforms.uScale.value = renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+      }
+      rzWasLive = live > 0;
     },
-    reset() { for (let i = 0; i < SPRAY_N; i++) { rzAlpha[i] = 0; rzAge[i] = rzLife[i] = 0; } rzAlive = 0; rzAcc = 0; rzPoints.visible = false; },
+    reset() { for (let i = 0; i < SPRAY_N; i++) { rzAlpha[i] = 0; rzAge[i] = rzLife[i] = 0; } rzAlive = 0; rzWasLive = false; rzAcc = 0; rzPoints.visible = false; },
     get stats() { return { k: rzK[rzHead] || 0, alive: rzAlive }; }
   };
   // Foam wake: one additive instanced quad every 12 m travelled while skimming.
@@ -653,10 +668,10 @@ export function createVFX(THREE, env) {
   wakeMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   wakeMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(WAKE_N * 3), 3);
   wakeMesh.frustumCulled = false; wakeMesh.visible = false; scene.add(wakeMesh);
-  const wakePos = new Float32Array(WAKE_N * 3), wakeAge = new Float32Array(WAKE_N), wakeK = new Float32Array(WAKE_N);
+  const wakePos = new Float32Array(WAKE_N * 3), wakeAge = new Float32Array(WAKE_N).fill(WAKE_LIFE), wakeK = new Float32Array(WAKE_N), wakeYaw = new Float32Array(WAKE_N);
   const _rzM4 = new THREE.Matrix4(), _rzQ = new THREE.Quaternion(), _rzV = new THREE.Vector3(), _rzS = new THREE.Vector3();
   const _rzYaw = new THREE.Vector3(0, 1, 0), _rzLast = new THREE.Vector3();
-  let wakeHead = 0, wakeAcc = 0, wakeLastValid = false, wakeAlive = 0;
+  let wakeHead = 0, wakeAcc = 0, wakeLastValid = false, wakeAlive = 0, wakeWasLive = false;
   const wake = {
     drop(x, z, yaw, k, dt) {
       if (k <= 0.15) { wakeLastValid = false; wakeAcc = 0; return; }
@@ -666,31 +681,45 @@ export function createVFX(THREE, env) {
       if (wakeAcc < WAKE_STEP_M) return;
       wakeAcc -= WAKE_STEP_M;
       const i = wakeHead; wakeHead = (wakeHead + 1) % WAKE_N;
+      if (wakeAge[i] >= WAKE_LIFE) wakeAlive++;
       wakePos[i * 3] = x; wakePos[i * 3 + 1] = WAKE_Y; wakePos[i * 3 + 2] = z;
-      wakeAge[i] = 0; wakeK[i] = k; wakeAlive++;
+      wakeAge[i] = 0; wakeK[i] = k; wakeYaw[i] = yaw || 0;
     },
     update(dt) {
-      if (!wakeAlive) { wakeMesh.visible = false; return; }
+      if (!wakeAlive && !wakeWasLive) { wakeMesh.visible = false; return; }
       const col = wakeMesh.instanceColor.array;
+      let live = 0;
       for (let i = 0; i < WAKE_N; i++) {
-        if (wakeAge[i] >= WAKE_LIFE) { col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = 0; continue; }
+        if (wakeAge[i] >= WAKE_LIFE) {
+          col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = 0;
+          _rzM4.makeScale(0, 0, 0); wakeMesh.setMatrixAt(i, _rzM4);
+          continue;
+        }
         wakeAge[i] += dt;
+        if (wakeAge[i] >= WAKE_LIFE) {
+          col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = 0;
+          _rzM4.makeScale(0, 0, 0); wakeMesh.setMatrixAt(i, _rzM4);
+          continue;
+        }
+        live++;
         const t = Math.min(1, wakeAge[i] / WAKE_LIFE), k = wakeK[i];
         const w = 6 + 18 * t;
-        _rzQ.setFromAxisAngle(_rzYaw, 0);
+        _rzQ.setFromAxisAngle(_rzYaw, wakeYaw[i]);
         _rzS.set(w, 1, 10 + 10 * t);
         _rzM4.compose(_rzV.set(wakePos[i * 3], WAKE_Y, wakePos[i * 3 + 2]), _rzQ, _rzS);
         wakeMesh.setMatrixAt(i, _rzM4);
         const b = k * 0.35 * (1 - t);
         col[i * 3] = b; col[i * 3 + 1] = b; col[i * 3 + 2] = b;
-        if (wakeAge[i] >= WAKE_LIFE) wakeAlive--;
       }
-      wakeMesh.visible = wakeAlive > 0;
-      if (!wakeAlive) return;
-      wakeMesh.instanceMatrix.needsUpdate = true;
-      wakeMesh.instanceColor.needsUpdate = true;
+      wakeAlive = live;
+      wakeMesh.visible = live > 0;
+      if (live > 0 || wakeWasLive) {
+        wakeMesh.instanceMatrix.needsUpdate = true;
+        wakeMesh.instanceColor.needsUpdate = true;
+      }
+      wakeWasLive = live > 0;
     },
-    reset() { for (let i = 0; i < WAKE_N; i++) wakeAge[i] = WAKE_LIFE; wakeAlive = 0; wakeLastValid = false; wakeAcc = 0; wakeMesh.visible = false; },
+    reset() { for (let i = 0; i < WAKE_N; i++) wakeAge[i] = WAKE_LIFE; wakeAlive = 0; wakeWasLive = false; wakeLastValid = false; wakeAcc = 0; wakeMesh.visible = false; },
     get stats() { return { alive: wakeAlive }; }
   };
 
@@ -1049,6 +1078,7 @@ export function createVFX(THREE, env) {
     // mid-way, which drew contour bands across the cloud tops at every slice boundary.
     return Math.min(1, Math.max(0, 0.5 + (m - 0.5) / Math.sqrt(1 - 2 * w + 2 * w * w)));
   }
+  const isGL2 = !!(renderer && renderer.capabilities && renderer.capabilities.isWebGL2);
   const DECK_GLSL = `
     uniform sampler2D uNoise; uniform float uThr; uniform vec3 uWind;
     uniform vec2 uDeckY;                                   // base, thickness (m)
@@ -1057,7 +1087,7 @@ export function createVFX(THREE, env) {
     // Explicit mip level (set per ray step from distance): implicit derivatives are
     // meaningless inside a dithered raymarch loop and picked streaky, blurry mips.
     float gLod = 0.0;
-    #define NOISE(uv) textureLod(uNoise, (uv), gLod)
+    #define NOISE(uv) ${isGL2 ? 'textureLod(uNoise, (uv), gLod)' : 'texture2D(uNoise, (uv))'}
     float ssf(float a, float b, float x) { float t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
     vec2 sliceOff(float q) { return vec2(fract(q * 0.618034) * 7.13, fract(q * 0.381966) * 5.71); }
     vec4 slice3(vec2 uv, float z) {                        // pseudo-3-D: two hashed 2-D slices blended by depth
@@ -1128,10 +1158,10 @@ export function createVFX(THREE, env) {
         }
         if (t1 <= t0) discard;
         float len = min(t1 - t0, 8000.0);
-        const int STEPS = 18;
+        const int STEPS = 12;
         // Geometric steps: fine where the ray enters the cloud skin, growing
-        // 18 % per step to cover the whole span cleanly at lower fragment cost.
-        const float GROW = 1.18;
+        // 24 % per step to cover the whole span cleanly at lower fragment cost.
+        const float GROW = 1.24;
         float stepL = len * (GROW - 1.0) / (pow(GROW, float(STEPS)) - 1.0);
         // Interleaved gradient noise ray-offset dither (no row-correlated streaks), rotated per frame.
         vec2 fc = gl_FragCoord.xy + vec2(5.588238, 5.588238) * uFrame;
@@ -1151,12 +1181,15 @@ export function createVFX(THREE, env) {
           float d = deckDensity(p) * near;
           if (d > 0.01) {
             if (tHit < 0.0) tHit = t;
-            // Single jittered light march tap on coarse mip for smooth self-shadowing.
-            float lodV = gLod;
-            gLod = lodV + 2.5;
-            float od = deckDensity(p + sunL * (180.0 + 120.0 * jit)) * 420.0;
-            gLod = lodV;
-            float Tl = exp(-od * 0.0055);                                  // Beer-Lambert toward the sun
+            // Single jittered light march tap on coarse mip for smooth self-shadowing (skip when nearly opaque).
+            float Tl = 0.35;
+            if (T > 0.08) {
+              float lodV = gLod;
+              gLod = lodV + 2.5;
+              float od = deckDensity(p + sunL * (180.0 + 120.0 * jit)) * 420.0;
+              gLod = lodV;
+              Tl = exp(-od * 0.0055);                                  // Beer-Lambert toward the sun
+            }
             float h = clamp((p.y - y0) / (y1 - y0), 0.0, 1.0);
             vec3 amb = mix(uBelly * 0.75, uTop * 0.9, smoothstep(0.0, 0.85, h));
             vec3 S = amb * 0.62 + uSunCol * Tl * (0.38 + phase) * 0.9 + vec3(0.75, 0.8, 1.0) * uFlash * 0.6;
@@ -1183,9 +1216,7 @@ export function createVFX(THREE, env) {
         // tops and alias into horizontal bands: fade them into the haze instead.
         if (ro.y > y1) alpha *= smoothstep(0.012, 0.05, -rd.y);
         gl_FragColor = vec4(col, alpha);
-        #ifdef USE_LOGDEPTHBUF
-          gl_FragDepth = log2(1.0 + max(dist * dot(rd, uCamFwd), 1.0)) * logDepthBufFC * 0.5;
-        #endif
+        ${isGL2 ? '#ifdef USE_LOGDEPTHBUF\n          gl_FragDepth = log2(1.0 + max(dist * dot(rd, uCamFwd), 1.0)) * logDepthBufFC * 0.5;\n        #endif' : ''}
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,

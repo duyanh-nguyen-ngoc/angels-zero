@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.25', title: 'WARDEN FLIGHT ORDERS', bullets: [
+    'Press G to cycle your wingmen through FORM, COVER and FOCUS. COVER hunts the bandit locking you from behind; FOCUS sends both WARDENs after your designated target.',
+    'A badly damaged WARDEN-2 can now limp home on smoke with bandits on her tail. Clear the pursuers to earn WINGMAN SAVED +1500, or lose the wingman if she goes down first.',
+    'The wing order badge and a limping roster entry keep you informed, and new debug hooks make both states reproducible.'
+  ] },
   { version: 'v1.1.24', title: 'RELIABLE SCORE', bullets: [
     'The soundtrack now unlocks on the first click without a refresh: a pending scenario survives the manifest fetch and a retrying gesture listener keeps trying until a deck really reports playing.',
     'Every mission and state transition force-resolves its exact track — catapult hold, each mission score, golden-hour RTB and the debrief — and the Now Playing widget repaints from the real playing event.',

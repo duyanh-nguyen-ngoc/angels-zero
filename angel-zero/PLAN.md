@@ -1667,6 +1667,11 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   - One-time key audit checks the 12 `BGM_KEYS` against the manifest, the resolver and `MISSIONS`; unknown keys log and fall back to `03_air_superiority`. `setAuto(true)` is re-applied at mission start and on returning to STANDBY (`?bgmtrack=` keeps MANUAL), and `lastMusicKey` force-switches on every app/flight/cat/autoland/RTB/phase/mission transition.
   - Deck state is committed only on the `playing` event, so the `#bgmWidget` title always equals `audio.bgm.title`. Headless checks confirm a fresh load + first gesture starts `01_hangar` un-paused, each mission's exact scenario (including catapult→`06_strike`/`08_crimson_duel`, `11_rtb` and `12_debrief`), `bgm keys ok=12`, zero JS errors and ~5–8 ms p95.
 
+- [x] **WARDEN three-state orders + wounded wingman save** *(build `s95c`, v1.1.25, `src/combat.js`, `src/hud.js`, `src/telemetry.js`, `index.html`)*
+  - `G` now cycles `C.wingOrder` through FORM / COVER / FOCUS with a 2 s order badge and `onWing` + `ON_WINGMAN_ENGAGE` feedback; `1`/`2`/`3` remain weapon keys. COVER scores rear-hemisphere lockers at 0.35× range, FOCUS shares `C.designated` with a 400 m bracket for WARDEN-3 and drops to COVER on `NO DESIGNATION`. Targets are re-picked every 0.5 s into `w.tgt`.
+  - WARDEN-2 can enter LIMPING in AIR_SUPERIORITY / NAVAL_BATTLE (low HP or mid-stage): 220 kt low-G RTB to the carrier stern or RWY 36, grey pooled smoke ribbon, two assigned pursuers (revived from the bandit pool if needed) that steer toward her. Clearing them fires `WINGMAN SAVED +1500` as a STYLE entry, event banner, `WING_SAVED` telemetry and a thank-you call; losing her is a plain loss.
+  - `?wingorderat=s:n` / `?limpat=s` and `__az.setWingOrder` / `__az.triggerWoundedWingman` make both deterministic. Headless checks confirm G cycling, COVER/FOCUS target sharing, smoke + 2 pursuers, SAVE reward and no limp in ACE_DUEL / CANYON_RUN, with zero JS errors and unchanged frame cost.
+
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.
@@ -1746,7 +1751,7 @@ toggle, ejection, bridge fly-under. User-facing weapon labels unified to
 MSL / UGB (briefing, radio call, CCIP reload cue, stores list).
 
 ## Debug URL flags (require `?debug`)
-`ambient=0` (kill all living-world effects) · `hold=s,a,...` (hold keys) · `keyat=s:key,...` (real keydown/keyup) · `carrierfinalat=s` (carrier final, 450 m behind the stern) · `duelahead=s` (CRIMSON 800 m ahead) · `nointro` · `cockpit` · `freeze` · `warp=s` · `pose=bank,pitch` · `mouse=x,y`
+`wingorderat=s:n` (force wing order 0/1/2) · `limpat=s` (force wounded WARDEN-2) · `ambient=0` (kill all living-world effects) · `hold=s,a,...` (hold keys) · `keyat=s:key,...` (real keydown/keyup) · `carrierfinalat=s` (carrier final, 450 m behind the stern) · `duelahead=s` (CRIMSON 800 m ahead) · `nointro` · `cockpit` · `freeze` · `warp=s` · `pose=bank,pitch` · `mouse=x,y`
 · `ab` · `highg` · `alt=m` · `spd=m/s` · `at=x,y,z,hdg|airbase|canyon|bridgeA|
 bridgeB|volcano|wind|harbor` · `overview[=h]` · `tod=NAME&az=deg` ·
 `todto=NAME:t` · `rolls=n` · `nvg` / `nvgat=s` · `camat=x,y,z` ·

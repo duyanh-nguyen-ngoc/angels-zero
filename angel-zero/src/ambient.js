@@ -9,7 +9,7 @@
 // disposed — configure()/reset() only toggle flags and visibility, so switching
 // missions can never leak one theatre's props into another.
 
-import { GORGE_FLOOR_Y, GORGE_GATE_Z, GORGE_GATE_N, gorgeCentreX } from './maps.js?v=s93d';
+import { GORGE_FLOOR_Y, GORGE_GATE_Z, GORGE_GATE_N, gorgeCentreX } from './maps.js?v=s95c';
 
 const WIND_X = 6.0, WIND_Z = -2.5;
 const SKY_BLEND_S = 18, RTB_BLEND_S = 25;
@@ -167,8 +167,12 @@ export function createAmbient(THREE, env) {
     }
   }
   function updateFlak(dt, phase) {
-    flakAcc += FLAK_RATE * dt;
-    if (phase >= 1) while (flakAcc >= 1) { flakAcc -= 1; spawnFlak(); }
+    if (phase >= 1) {
+      flakAcc = Math.min(4, flakAcc + FLAK_RATE * dt);
+      while (flakAcc >= 1) { flakAcc -= 1; spawnFlak(); }
+    } else {
+      flakAcc = 0;
+    }
     let live = 0;
     for (let i = 0; i < FLAK_N; i++) {
       if (flakAge[i] >= 4) continue;
@@ -241,6 +245,7 @@ export function createAmbient(THREE, env) {
   }
   function updateSmoke(dt) {
     if (!smokeCols) { smokePoints.visible = false; return; }
+    let spawned = false, fireDirty = false;
     for (let c = 0; c < SMOKE_COL_N; c++) {
       if (!colClaim[c]) continue;
       colAge[c] += dt;
@@ -252,12 +257,14 @@ export function createAmbient(THREE, env) {
           smokePos[i * 3 + 1] = 8;
           smokePos[i * 3 + 2] = colZ[c] + Math.sin(a) * r;
           smokeAge[i] = 0; smokeSeed[i] = Math.random(); smokeFire[i] = 1;
+          spawned = true; fireDirty = true;
         } else {
           smokeAge[i] += dt;
           smokePos[i * 3 + 1] += 8 * dt;
           smokePos[i * 3] += WIND_X * dt * 0.32;
           smokePos[i * 3 + 2] += WIND_Z * dt * 0.32;
-          smokeFire[i] = smokeAge[i] < 1.5 ? 1 : 0;
+          const nf = smokeAge[i] < 1.5 ? 1 : 0;
+          if (nf !== smokeFire[i]) { smokeFire[i] = nf; fireDirty = true; }
         }
       }
     }
@@ -265,8 +272,8 @@ export function createAmbient(THREE, env) {
     smokeMat.uniforms.uScale.value = camScale;
     markRange(smokeGeo.attributes.position, SMOKE_N * 3);
     markRange(smokeGeo.attributes.aAge, SMOKE_N);
-    markRange(smokeGeo.attributes.aFire, SMOKE_N);
-    markRange(smokeGeo.attributes.aSeed, SMOKE_N);
+    if (fireDirty) markRange(smokeGeo.attributes.aFire, SMOKE_N);
+    if (spawned) markRange(smokeGeo.attributes.aSeed, SMOKE_N);
     smokeGeo.setDrawRange(0, SMOKE_N);
   }
 

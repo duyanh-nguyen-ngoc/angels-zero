@@ -2,7 +2,7 @@
 // once; flight-time recording is index writes only (no arrays, no THREE objects).
 
 export const TELE_MAX = 600, TELE_DT = 1.5, EV_MAX = 64;
-export const EV = { KILL: 1, ACE_KILL: 2, STRIKE_KILL: 3, CARRIER_TRAP: 4, NEAR_MISS: 5 };
+export const EV = { KILL: 1, ACE_KILL: 2, STRIKE_KILL: 3, CARRIER_TRAP: 4, NEAR_MISS: 5, WING_SAVED: 6 };
 
 export function createTelemetry() {
   const samples = new Float32Array(TELE_MAX * 4);   // x, z, alt, t

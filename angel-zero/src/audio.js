@@ -9,7 +9,7 @@
 // to the procedural layers below. A master "hearing tunnel" low-pass sweeps
 // 12 kHz -> 550 Hz as the pilot approaches G-LOC.
 
-import { MISSIONS } from './missions.js?v=s93d';
+import { MISSIONS } from './missions.js?v=s95c';
 
 export function createAudio() {
   let ctx = null, master = null, cockpitLP = null, ready = false;
@@ -38,7 +38,7 @@ export function createAudio() {
   let manifestReady = false, manifestRetries = 0, pendingScn = null, pendingForce = false;
   let unlocked = false, playConfirmed = false, retryT = 0, bgmRetries = 0;
   let bgmPausedByUser = false, gestureArmed = false;
-  let cScn = '', cIdx = 0, cIdle = 0, cSeq = 0;          // pending crossfade commit (applied on 'playing')
+  let cScn = '', cIdx = 0, cIdle = 0, cSeq = 0, loading = false; // pending crossfade commit (applied on 'playing')
   const BGM_RETRY_S = 1.5, BGM_RETRY_MAX = 6;
   const GESTURES = ['pointerdown', 'keydown', 'click', 'touchend'];
   const BGM_KEYS = ['01_hangar', '02_catapult', '03_air_superiority', '04_storm', '05_night',
@@ -1181,8 +1181,10 @@ export function createAudio() {
   const onPlayOK = () => { retryT = 0; bgmRetries = 0; };
   const onPlayFail = e => {
     const name = e && e.name ? e.name : 'Error';
+    if (name === 'AbortError') return;
+    loading = false;
     console.log('[ANGELS_ZERO] bgm play blocked ' + name);
-    if (name === 'NotAllowedError') { setPending(pendingScn || curScn); armUnlock(); }
+    if (name === 'NotAllowedError') { setPending(pendingScn || cScn || curScn); armUnlock(); }
     else if (bgmRetries < BGM_RETRY_MAX) { bgmRetries++; retryT = BGM_RETRY_S; }
   };
   function playDeck(deck) {
@@ -1190,6 +1192,7 @@ export function createAudio() {
     deck.el.play().then(onPlayOK).catch(onPlayFail);
   }
   function onDeckPlaying(e) {
+    loading = false;
     let played = -1;
     for (let i = 0; i < decks.length; i++) if (decks[i].el === e.target) { played = i; break; }
     // Only the deck we intended to start commits the logical scenario, so the
@@ -1201,7 +1204,7 @@ export function createAudio() {
     emitChange();                                  // the widget repaints here, not before play resolves
   }
   // Equal-power crossfade between the two decks. An explicit idx pins a track.
-  function crossfadeTo(scn, idx, force = false) {
+  function crossfadeTo(scn, idx, force = false, userAction = false) {
     if (!BGM_OK || !decks.length) return;
     if (!manifestReady || (ctx && ctx.state === 'suspended')) {
       setPending(scn); pendingForce = pendingForce || force; armUnlock(); return;
@@ -1210,8 +1213,9 @@ export function createAudio() {
     if (!list || !list.length) { setPending(scn); pendingForce = pendingForce || force; armUnlock(); return; }
     const i = Number.isInteger(idx) && idx >= 0 && idx < list.length ? idx : nextIdx(scn);
     const cur = decks[active];
-    // A paused / never-started deck always falls through so a retry can restart it.
-    if (scn === curScn && !force && !pendingScn && cur.el.src && !cur.el.paused && cur.el.currentTime > 0) return;
+    // Never abort an already in-flight load for the same scenario unless triggered by user skip/select.
+    if (loading && scn === cScn && !userAction) return;
+    if (!force && !pendingScn && scn === curScn && cur.el.src && !cur.el.paused && cur.el.currentTime > 0) return;
     lastIdx[scn] = i;
     const idle = 1 - active, out = active, seq = ++switchSeq;
     const d = decks[idle], o = decks[out];
@@ -1223,6 +1227,7 @@ export function createAudio() {
     o.g.gain.cancelScheduledValues(now); o.g.gain.setValueAtTime(o.g.gain.value, now);
     o.g.gain.setValueCurveAtTime(cosCurve, now, XFADE);
     cScn = scn; cIdx = i; cIdle = idle; cSeq = seq;
+    loading = true; dwell = 0; setPending(null); pendingForce = false;
     playDeck(d);
     setTimeout(() => {
       if (seq !== switchSeq || active !== idle) return;
@@ -1253,10 +1258,10 @@ export function createAudio() {
   function advance() {
     if (advancing || !BGM_OK) return;
     advancing = true;
-    if (auto) crossfadeTo(curScn, nextIdx(curScn), true);
+    if (auto) crossfadeTo(curScn, nextIdx(curScn), true, true);
     else {
       const nx = manualNext();
-      if (nx) { manualId = nx.id; crossfadeTo(nx.scn, nx.idx < 0 ? 0 : nx.idx, true); }
+      if (nx) { manualId = nx.id; crossfadeTo(nx.scn, nx.idx < 0 ? 0 : nx.idx, true, true); }
     }
     clearTimeout(advTimer);
     advTimer = setTimeout(() => { advancing = false; }, (XFADE + 0.1) * 1000);
@@ -1266,7 +1271,7 @@ export function createAudio() {
     if (!t) return;
     auto = false; manualId = id;
     const own = tracksOf(t.scn), idx = own ? own.findIndex(e => e.file === t.file) : 0;
-    crossfadeTo(t.scn, idx < 0 ? 0 : idx, true);          // widget repaints on 'playing'
+    crossfadeTo(t.scn, idx < 0 ? 0 : idx, true, true);     // widget repaints on 'playing'
   }
   function skip(dir) {
     if (!auto) {
@@ -1283,7 +1288,7 @@ export function createAudio() {
       if (!b || b.length < 2) target = nextIdx(curScn);
       else { const p = ((bagPos[curScn] || 0) - 2 + b.length * 2) % b.length; target = b[p]; bagPos[curScn] = p + 1; }
     }
-    crossfadeTo(curScn, target, true);
+    crossfadeTo(curScn, target, true, true);
   }
   function setAuto(on) {
     auto = !!on;
@@ -1419,7 +1424,7 @@ export function createAudio() {
       }
       const scn = resolveScenario(bgmCtx);
       const wait = (scn === '12_debrief' || scn === '01_hangar' || scn === '11_rtb') ? 0 : MIN_DWELL;
-      if (auto && (scn !== curScn || pendingScn || pendScn) && dwell >= wait) {
+      if (auto && (scn !== curScn || pendingScn || pendScn) && !(loading && scn === cScn && !pendingForce && !pendingScn) && dwell >= wait) {
         switchTo(scn, pendingForce);
         pendingForce = false;
       }
@@ -1526,7 +1531,7 @@ export function createAudio() {
     setTimeout(() => { if (rxState === 'FADE') { rxState = 'IDLE'; rxCur = null; } }, FADE_S * 1000);
   }
   function txClose() { txTail(); }
-  // Lazy clip cache: fetch + decode at most four at a time; never blocks the first sortie.
+  // Lazy clip cache: single throttled background worker prevents fetch/decode hitches at launch.
   function preloadRadio(lines) {
     if (!ready || !ctx || !Array.isArray(lines)) return Promise.resolve(0);
     let next = 0;
@@ -1540,9 +1545,10 @@ export function createAudio() {
           const buf = await ctx.decodeAudioData(await res.arrayBuffer());
           if (buf) { radioBufs[line.id] = buf; radioState.loaded++; }
         } catch (e) { console.warn('[ANGELS_ZERO] radio decode failed', line.id, e && e.name, e && e.message); }
+        await new Promise(r => setTimeout(r, 25));
       }
     };
-    return Promise.all([worker(), worker(), worker(), worker()]).then(() => radioState.loaded);
+    return worker().then(() => radioState.loaded);
   }
   // One-shot source per clip; returns duration in seconds (0 when uncached / unavailable).
   function playRadio(id, ch) {

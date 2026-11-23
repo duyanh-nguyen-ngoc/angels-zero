@@ -6,7 +6,7 @@
 // clipped to the 3D combiner glass. Square tactical radar (bottom-left), stores
 // list + F-15C silhouette with per-pylon AIM-9 reload icons (bottom-right),
 // open-corner target brackets, edge pointers, minimal top-left telemetry.
-import { SPW } from './loadout.js?v=s93d';
+import { SPW } from './loadout.js?v=s95c';
 
 export function createHUD(THREE, A) {
   const canvas = A.canvas;
@@ -22,6 +22,7 @@ export function createHUD(THREE, A) {
   const AMBER = '#ffb838';
   const CYAN = '#38b6ff';
   const FONT = "'Rajdhani', 'Share Tech Mono', sans-serif";
+  const WING_ORDER_NAMES = ['FORM', 'COVER', 'FOCUS'];
   const LW = 1.35;
   const f = (px, bold = false) => `${bold ? '700' : '600'} ${px}px ${FONT}`;
 
@@ -1387,8 +1388,12 @@ export function createHUD(THREE, A) {
     }
     if (C.wingOrderT && now - C.wingOrderT < 1600) {
       const age = now - C.wingOrderT;
-      const label = C.wingOrder === 'ENGAGE' ? '[ WINGMEN // ENGAGE AT WILL ]' : '[ WINGMEN // REFORM ECHELON ]';
+      const label = '[ WINGMEN // ' + (WING_ORDER_NAMES[C.wingOrder] || 'FORM') + ' ]';
       drawBanner(ctx, cx, upperY + 72, label, '#5fe8ff', 340, 1 - age / 1600);
+    }
+    if (C.wingSavedBannerT && now - C.wingSavedBannerT < 3000) {
+      const age = now - C.wingSavedBannerT;
+      drawBanner(ctx, cx, upperY + 108, 'WINGMAN SAVED +1500', '#5fe8ff', 360, 1 - age / 3000);
     }
     if (C.aceFlightT && now - C.aceFlightT < 3000) {
       const age = now - C.aceFlightT;
@@ -1591,24 +1596,55 @@ export function createHUD(THREE, A) {
   }
 
   let lastT = performance.now();
+  let hudOrderName = '', hudOrderTag = '';
   function drawWingmen(ctx) {
     const ws = A.getWingmen ? A.getWingmen() : null;
-    if (!ws || !ws.length) return;
-    for (const w of ws) {
-      if (!w || !w.alive) continue;
-      _wv.copy(w.pos).project(cam);
-      if (_wv.z > 1 || _wv.z < -1 || Math.abs(_wv.x) > 1 || Math.abs(_wv.y) > 1) continue;
-      const x = (_wv.x * 0.5 + 0.5) * HW, y = (-_wv.y * 0.5 + 0.5) * HH;
-      const range = w.pos.distanceTo(S.position);
+    if (ws && ws.length) {
+      const nm = WING_ORDER_NAMES[C.wingOrder] || 'FORM';
+      if (nm !== hudOrderName) { hudOrderName = nm; hudOrderTag = 'ORD: ' + nm; }
+      for (const w of ws) {
+        if (!w || !w.alive) continue;
+        const limp = !!w.limping, col = limp ? AMBER : '#5fe8ff';
+        _wv.copy(w.pos).project(cam);
+        if (_wv.z > 1 || _wv.z < -1 || Math.abs(_wv.x) > 1 || Math.abs(_wv.y) > 1) continue;
+        const x = (_wv.x * 0.5 + 0.5) * HW, y = (-_wv.y * 0.5 + 0.5) * HH;
+        const range = w.pos.distanceTo(S.position);
+        ctx.save();
+        glow(ctx, col, 4); ctx.strokeStyle = col; ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(x, y - 7); ctx.lineTo(x + 7, y); ctx.lineTo(x, y + 7); ctx.lineTo(x - 7, y); ctx.closePath();
+        ctx.stroke();
+        ctx.font = f(11, true); ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        const label = `[ ${w.id} ]` + (range > 1852 ? `  ${(range / 1852).toFixed(1)}NM` : '')
+          + (limp ? `  LIMPING x${(C.limp && C.limp.n) || 0}` : `  ${hudOrderTag}`);
+        labelText(ctx, label, x, y + 12, col, 3);
+        ctx.restore();
+      }
+      // Persistent order tag beside the flight roster.
       ctx.save();
-      glow(ctx, '#5fe8ff', 4); ctx.strokeStyle = '#5fe8ff'; ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      ctx.moveTo(x, y - 7); ctx.lineTo(x + 7, y); ctx.lineTo(x, y + 7); ctx.lineTo(x - 7, y); ctx.closePath();
-      ctx.stroke();
-      ctx.font = f(11, true); ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-      const label = `[ ${w.id} ]` + (range > 1852 ? `  ${(range / 1852).toFixed(1)}NM` : '');
-      labelText(ctx, label, x, y + 12, '#5fe8ff', 3);
+      ctx.font = f(11, true); ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+      labelText(ctx, hudOrderTag, HW - 24, 128, G, 3);
+      if (C.orderBadgeT > 0) {
+        ctx.globalAlpha = Math.min(1, C.orderBadgeT / 0.4);
+        labelText(ctx, hudOrderTag, HW - 24, 146, G, 3);
+      }
       ctx.restore();
+    }
+    // Pulsing chevrons mark the bandits chasing WARDEN-2.
+    if (C.limp && C.limp.st === 'LIMPING') {
+      const foes = A.getEnemies ? A.getEnemies() : null;
+      if (foes) for (let i = 0; i < foes.length; i++) {
+        const e = foes[i];
+        if (!e || !e.alive || !e.wingTarget) continue;
+        _wv.copy(e.pos).project(cam);
+        if (_wv.z > 1 || _wv.z < -1 || Math.abs(_wv.x) > 1 || Math.abs(_wv.y) > 1) continue;
+        const x = (_wv.x * 0.5 + 0.5) * HW, y = (-_wv.y * 0.5 + 0.5) * HH;
+        ctx.save();
+        ctx.globalAlpha = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(performance.now() * 0.008));
+        ctx.strokeStyle = AMBER; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(x - 8, y - 6); ctx.lineTo(x, y + 8); ctx.lineTo(x + 8, y - 6); ctx.stroke();
+        ctx.restore();
+      }
     }
   }
   function drawObjective(ctx) {
@@ -1730,7 +1766,7 @@ export function createHUD(THREE, A) {
       if ((100 - C.health > 45 || winchester) && C.ally) { txt = P_RTB; prio = 3; }
     }
     if (!txt && C.lockState === 'LOCK') { txt = P_MCAM; prio = 4; }
-    if (!txt && C.wingOrder === 'FORM') {
+    if (!txt && C.wingOrder === 0) {
       const foes = A.getEnemies ? A.getEnemies() : null;
       if (foes) for (let i = 0; i < foes.length; i++) {
         const e = foes[i];

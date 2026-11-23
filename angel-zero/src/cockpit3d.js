@@ -31,7 +31,7 @@ export function createCockpit3D(THREE, env) {
   const rig = new THREE.Group();
   rig.visible = false;
   scene.add(rig);
-  const add = (mesh, parent = rig, cast = true) => { mesh.castShadow = cast; mesh.receiveShadow = true; parent.add(mesh); return mesh; };
+  const add = (mesh, parent = rig) => { mesh.castShadow = false; mesh.receiveShadow = false; parent.add(mesh); return mesh; };
 
   function rng(seed) {
     let a = seed | 0;
@@ -110,9 +110,16 @@ export function createCockpit3D(THREE, env) {
     return { map: tex(col.c, true), normalMap: tex(nor.c, false), roughnessMap: tex(rou.c, false) };
   })();
 
+  const paintTexCache = new Map();
   function paint(repeatX, repeatY, opts = {}) {
-    const t = {};
-    for (const k of ['map', 'normalMap', 'roughnessMap']) { t[k] = crinkle[k].clone(); t[k].repeat.set(repeatX, repeatY); t[k].needsUpdate = true; }
+    const rx = repeatX >= 4 ? 8 : 1.4, ry = repeatX >= 4 ? 1 : 1;
+    const key = rx + ',' + ry;
+    let t = paintTexCache.get(key);
+    if (!t) {
+      t = {};
+      for (const k of ['map', 'normalMap', 'roughnessMap']) { t[k] = crinkle[k].clone(); t[k].repeat.set(rx, ry); t[k].needsUpdate = true; }
+      paintTexCache.set(key, t);
+    }
     return new THREE.MeshStandardMaterial({
       color: opts.color ?? 0xffffff, map: t.map, normalMap: t.normalMap, roughnessMap: t.roughnessMap,
       normalScale: new THREE.Vector2(opts.bump ?? 0.9, opts.bump ?? 0.9), roughness: 1, metalness: opts.metalness ?? 0.35,
@@ -206,7 +213,7 @@ export function createCockpit3D(THREE, env) {
       washers.setMatrixAt(i, new THREE.Matrix4().compose(inward(p, 0.034), q, one));
       bolts.setMatrixAt(i, new THREE.Matrix4().compose(pos, q, one));
     }
-    for (const im of [bolts, washers]) { im.castShadow = im.receiveShadow = true; rig.add(im); }
+    for (const im of [bolts, washers]) { im.castShadow = im.receiveShadow = false; rig.add(im); }
   }
   for (const t of [0.42, 0.58]) {                                    // twin yellow/black canopy lock hooks
     const p = archCurve.getPointAt(t), pos = inward(p, 0.05);
@@ -736,17 +743,10 @@ export function createCockpit3D(THREE, env) {
   }
 
   /* =================================================================
-     8. SUN SHADOWS
+     8. SUN SHADOWS (disabled for GPU frame budget)
      ================================================================= */
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  sunLight.shadow.mapSize.set(1024, 1024);          // 2.4 m frustum -> ~2.3 mm texels
-  const sc = sunLight.shadow.camera;
-  sc.left = -1.2; sc.right = 1.2; sc.top = 1.2; sc.bottom = -1.2; sc.near = 0.5; sc.far = 12;
-  sc.updateProjectionMatrix();
-  sunLight.shadow.bias = -0.0003;
-  sunLight.shadow.normalBias = 0.012;
-  const sunHome = sunLight.position.clone();
+  renderer.shadowMap.enabled = false;
+  sunLight.castShadow = false;
 
   /* =================================================================
      9. LIVE INSTRUMENTS (atlas repaint: dials 15 Hz, CRTs 30 Hz, ADI ball
@@ -1168,8 +1168,7 @@ export function createCockpit3D(THREE, env) {
   const _lean = new THREE.Vector3();
   function setFreeLook(v) { freeLook = v; }               // { yaw, pitch, lean } shared by reference
   function setActive(on) {
-    active = on; rig.visible = on; sunLight.castShadow = on;
-    if (!on) { sunLight.position.copy(sunHome); sunLight.target.position.set(0, 0, 0); sunLight.target.updateMatrixWorld(); }
+    active = on; rig.visible = on; sunLight.castShadow = false;
   }
   function update(dt, now, eyeWorld, jetQuat) {
     if (!active) return;
@@ -1219,8 +1218,6 @@ export function createCockpit3D(THREE, env) {
     _q.setFromEuler(_e);
     camera.position.copy(head.off).add(_lean).applyQuaternion(jetQuat).add(eyeWorld);
     camera.quaternion.copy(jetQuat).multiply(_q);
-    sunLight.position.copy(eyeWorld).addScaledVector(sunDir, 6);
-    sunLight.target.position.copy(eyeWorld); sunLight.target.updateMatrixWorld();
 
     updateEngines(dt);
     updateHOTAS(dt);
@@ -1234,6 +1231,49 @@ export function createCockpit3D(THREE, env) {
       }
     }
     paintUFC(now); paintGauges(frame); paintDisplays(frame, now); paintCaution(now); updateLamps(now);
+  }
+
+  // Merge static cockpit meshes by material + renderOrder, leaving animated HOTAS/ADI/gear subtrees intact.
+  {
+    const dynamicRoots = new Set([adiOuter, gearHandle, gimbal, ...throttles.map(t => t.pivot)]);
+    rig.updateMatrixWorld(true);
+    const invRig = rig.matrixWorld.clone().invert(), m4 = new THREE.Matrix4();
+    const groups = new Map();
+    const isDynamic = o => {
+      for (let p = o; p && p !== rig; p = p.parent) if (dynamicRoots.has(p)) return true;
+      return false;
+    };
+    rig.traverse(o => {
+      if (!o.isMesh || o.isInstancedMesh || Array.isArray(o.material) || isDynamic(o)) return;
+      if (!o.geometry || !o.geometry.attributes || !o.geometry.attributes.position) return;
+      let byOrder = groups.get(o.material);
+      if (!byOrder) { byOrder = new Map(); groups.set(o.material, byOrder); }
+      let list = byOrder.get(o.renderOrder);
+      if (!list) { list = []; byOrder.set(o.renderOrder, list); }
+      list.push(o);
+    });
+    for (const [mat, byOrder] of groups) {
+      for (const [order, list] of byOrder) {
+        if (list.length < 2) continue;
+        const geos = [];
+        for (const o of list) {
+          const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+          for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv') g.deleteAttribute(k);
+          if (!g.attributes.normal) g.computeVertexNormals();
+          if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+          g.applyMatrix4(m4.multiplyMatrices(invRig, o.matrixWorld));
+          g.clearGroups();
+          geos.push(g);
+        }
+        const merged = mergeGeometries(geos, false);
+        for (const g of geos) g.dispose();
+        if (!merged) continue;
+        for (const o of list) o.parent && o.parent.remove(o);
+        const mm = new THREE.Mesh(merged, mat);
+        mm.castShadow = false; mm.receiveShadow = false; mm.renderOrder = order;
+        rig.add(mm);
+      }
+    }
   }
 
   const _w = new THREE.Vector3();

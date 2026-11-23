@@ -18,12 +18,13 @@
 // heightAt() interpolates the same two triangles per quad that the GPU draws,
 // so crashes, missiles, bombs and props agree exactly with what is on screen.
 
-export const WORLD = { SIZE: 20000, CX: 0, CZ: -2500, SEG: 600 };     // 33 m grid: sheer cliffs stay sheer
+export const WORLD = { SIZE: 20000, CX: 0, CZ: -2500, SEG: 360 };     // 55 m grid: crisp cliffs at 3x fewer vertices
 const FT = 0.3048;
 export const RWY = { x: 900, z0: -1400, z1: 1600, width: 50, elev: 10 };       // runway 18/36, 3,000 m
 
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { gorgeCentreX, gorgeDist, GORGE_FLOOR_Y, GORGE_RIM_Y, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_CRATER_Z,
-  GORGE_BBOX, GORGE_HALF_W, GORGE_RAMP_W, SEA_FLOOR_Y, RUNWAY_BBOX } from './maps.js?v=s93d';
+  GORGE_BBOX, GORGE_HALF_W, GORGE_RAMP_W, SEA_FLOOR_Y, RUNWAY_BBOX } from './maps.js?v=s95c';
 
 export function createWorld(THREE, env) {
   const { scene, createNoise2D, fbm } = env;
@@ -247,7 +248,11 @@ export function createWorld(THREE, env) {
     pos.setY(i, grid[gj * (N + 1) + gi]);
   }
   geo.computeVertexNormals();
-  const nrm = geo.attributes.normal, colors = new Float32Array(pos.count * 3), c = new THREE.Color();
+  const gridCache = Object.create(null);
+  gridCache.archipelago = { grid: new Float32Array(grid), normals: new Float32Array(geo.attributes.normal.array) };
+  let activeTerrainMode = 'archipelago';
+  const OCEAN_HEIGHT = () => SEA_FLOOR_Y;
+  const nrm = geo.attributes.normal, colors = new Float32Array(pos.count * 3), c = new THREE.Color(), _scrub = new THREE.Color();
   for (let i = 0; i < pos.count; i++) {
     const h = pos.getY(i), slope = 1 - nrm.getY(i);
     const wx = pos.getX(i) + WORLD.CX, wz = pos.getZ(i) + WORLD.CZ;
@@ -256,8 +261,8 @@ export function createWorld(THREE, env) {
     else {
       // Waterline: wet charcoal basalt; gentle shores keep a narrow strip of grey sand.
       c.copy(COL.basalt).lerp(COL.sand, (1 - ss(slope, 0.08, 0.2)) * ss(h, 0.8, 3) * (1 - ss(h, 6, 9)));
-      const scrub = COL.scrub.clone().lerp(COL.scrubDark, v);
-      c.lerp(scrub, ss(h, 5, 12) * (1 - ss(slope, 0.18, 0.3)));               // muted scrub on gentle lowland
+      _scrub.copy(COL.scrub).lerp(COL.scrubDark, v);
+      c.lerp(_scrub, ss(h, 5, 12) * (1 - ss(slope, 0.18, 0.3)));               // muted scrub on gentle lowland
       c.lerp(COL.ridge, ss(h, 90, 220));                                       // olive-slate uplands / ridges
       c.lerp(COL.cliff, ss(slope, 0.3, 0.5) * ss(h, 2, 10));                   // sheer slate-grey cliff faces
       c.lerp(COL.basalt, ss(slope, 0.3, 0.5) * (1 - ss(h, 25, 70)));           // dark wet basalt at the cliff foot
@@ -340,6 +345,7 @@ export function createWorld(THREE, env) {
       .replace('#include <map_fragment>', `#include <map_fragment>
         // Land bands: shore < 14 m, raw rock where normal.y < 0.78, pale stone > 340 m,
         // patchwork farmland on 14-310 m gentle ground (outside the airfield / town).
+        float camD = length(vWPos - cameraPosition);
         if (vWPos.y > 0.0) {
           float ny = clamp(vWNrm.y, 0.0, 1.0);
           float cliffK = 1.0 - smoothstep(0.72, 0.82, ny);
@@ -347,22 +353,26 @@ export function createWorld(THREE, env) {
             * (1.0 - rectMask(vWPos.xz, uAfb, 160.0)) * (1.0 - rectMask(vWPos.xz, uTown, 140.0));
           vec3 land = diffuseColor.rgb;
           if (farmK > 0.001) {
-            vec3 fe;
-            vec3 fc = farmField(vWPos.xz, fe);
-            float camD = length(vWPos - cameraPosition);
-            // Far away the per-plot colours average out (no sub-pixel colour sparkle).
-            fc = mix(fc, (uPal[0] + uPal[1] + uPal[2] + uPal[3] + uPal[4]) * 0.44, smoothstep(7000.0, 16000.0, camD));
-            // Plow furrows: 7 m stripes along the plot axis, faded by screen-space frequency.
-            float ff = fwidth(fe.z) / 7.0;
-            fc *= 1.0 + 0.08 * sin(fe.z * 0.8975979) * (1.0 - smoothstep(0.12, 0.45, ff));
-            // Hedgerows (6 m) and roads (5 m), anti-aliased; thinner than a pixel -> fractional coverage.
-            float fwH = max(fwidth(fe.x), 0.01), fwR = max(fwidth(fe.y), 0.01);
-            float hedge = clamp((3.0 - fe.x) / fwH + 0.5, 0.0, 1.0);
-            hedge = mix(hedge, min(1.0, 6.0 / fwH) * 0.5, smoothstep(1.5, 6.0, fwH));
-            float road = clamp((2.5 - fe.y) / fwR + 0.5, 0.0, 1.0);
-            road = mix(road, min(1.0, 5.0 / fwR) * 0.5, smoothstep(1.5, 6.0, fwR));
-            fc = mix(fc, uHedge, hedge * 0.9);
-            fc = mix(fc, uRoad, road * 0.85);
+            vec3 fc;
+            if (camD >= 16000.0) {
+              fc = (uPal[0] + uPal[1] + uPal[2] + uPal[3] + uPal[4]) * 0.44;
+            } else {
+              vec3 fe;
+              fc = farmField(vWPos.xz, fe);
+              // Far away the per-plot colours average out (no sub-pixel colour sparkle).
+              fc = mix(fc, (uPal[0] + uPal[1] + uPal[2] + uPal[3] + uPal[4]) * 0.44, smoothstep(7000.0, 16000.0, camD));
+              // Plow furrows: 7 m stripes along the plot axis, faded by screen-space frequency.
+              float ff = fwidth(fe.z) / 7.0;
+              fc *= 1.0 + 0.08 * sin(fe.z * 0.8975979) * (1.0 - smoothstep(0.12, 0.45, ff));
+              // Hedgerows (6 m) and roads (5 m), anti-aliased; thinner than a pixel -> fractional coverage.
+              float fwH = max(fwidth(fe.x), 0.01), fwR = max(fwidth(fe.y), 0.01);
+              float hedge = clamp((3.0 - fe.x) / fwH + 0.5, 0.0, 1.0);
+              hedge = mix(hedge, min(1.0, 6.0 / fwH) * 0.5, smoothstep(1.5, 6.0, fwH));
+              float road = clamp((2.5 - fe.y) / fwR + 0.5, 0.0, 1.0);
+              road = mix(road, min(1.0, 5.0 / fwR) * 0.5, smoothstep(1.5, 6.0, fwR));
+              fc = mix(fc, uHedge, hedge * 0.9);
+              fc = mix(fc, uRoad, road * 0.85);
+            }
             land = mix(land, fc, farmK);
           }
           vec3 rock = mix(uRockA, uRockB, 0.5 + 0.5 * sin(vWPos.y * 0.21 + vWPos.x * 0.004 + vWPos.z * 0.003));
@@ -371,10 +381,13 @@ export function createWorld(THREE, env) {
           land = mix(land, uShore, 1.0 - smoothstep(10.0, 16.0, vWPos.y));
           diffuseColor.rgb = land;
         }
-        vec3 tw = pow(abs(vWNrm), vec3(4.0)); tw /= (tw.x + tw.y + tw.z);
-        float d1 = texture2D(uDetail, vWPos.zy * 0.012).r * tw.x + texture2D(uDetail, vWPos.xz * 0.012).r * tw.y + texture2D(uDetail, vWPos.xy * 0.012).r * tw.z;
-        float d2 = texture2D(uDetail, vWPos.zy * 0.0021).r * tw.x + texture2D(uDetail, vWPos.xz * 0.0021).r * tw.y + texture2D(uDetail, vWPos.xy * 0.0021).r * tw.z;
-        float det = d1 * 0.6 + d2 * 0.4;
+        float det = 0.5;
+        if (camD < 12000.0) {
+          vec3 tw = pow(abs(vWNrm), vec3(4.0)); tw /= (tw.x + tw.y + tw.z);
+          float d1 = texture2D(uDetail, vWPos.zy * 0.012).r * tw.x + texture2D(uDetail, vWPos.xz * 0.012).r * tw.y + texture2D(uDetail, vWPos.xy * 0.012).r * tw.z;
+          float d2 = texture2D(uDetail, vWPos.zy * 0.0021).r * tw.x + texture2D(uDetail, vWPos.xz * 0.0021).r * tw.y + texture2D(uDetail, vWPos.xy * 0.0021).r * tw.z;
+          det = d1 * 0.6 + d2 * 0.4;
+        }
         float steep = smoothstep(0.32, 0.6, 1.0 - clamp(vWNrm.y, 0.0, 1.0));
         float strata = 0.82 + 0.18 * sin(vWPos.y * 0.62 + det * 7.0);
         diffuseColor.rgb *= (0.74 + 0.52 * det) * mix(1.0, strata, steep);`);
@@ -727,15 +740,18 @@ export function createWorld(THREE, env) {
   {
     const towerG = new THREE.CylinderGeometry(1.8, 2.8, 88, 12), nacG = new THREE.BoxGeometry(4, 4, 11), hubG = new THREE.SphereGeometry(2.2, 10, 8);
     const bladeG = new THREE.BoxGeometry(2.4, 42, 0.5); bladeG.translate(0, 21, 0);
+    const normTurb = g => { const ng = g.index ? g.toNonIndexed() : g.clone(); for (const a of Object.keys(ng.attributes)) if (a !== 'position' && a !== 'normal' && a !== 'uv') ng.deleteAttribute(a); if (!ng.attributes.normal) ng.computeVertexNormals(); return ng; };
+    const rotorParts = [normTurb(hubG)];
+    for (let b = 0; b < 3; b++) rotorParts.push(normTurb(bladeG).rotateZ(b * Math.PI * 2 / 3));
+    const rotorG = mergeGeometries(rotorParts, false);
+    for (const rp of rotorParts) rp.dispose();
     const n = 9;
     for (let k = 0; k < n; k++) {
       const f = (k + 0.5) / n, x = REEF.a[0] + (REEF.b[0] - REEF.a[0]) * f, z = REEF.a[1] + (REEF.b[1] - REEF.a[1]) * f;
       mesh(new THREE.CylinderGeometry(4, 4.5, 14, 12), mat.yellow, x, 0, z);
       mesh(towerG, mat.turbine, x, 44, z);
       const nac = mesh(nacG, mat.turbine, x, 90, z - 2);
-      const rotor = new THREE.Group(); rotor.position.set(x, 90, z - 8.6); props.add(rotor);
-      rotor.add(new THREE.Mesh(hubG, mat.turbine));
-      for (let b = 0; b < 3; b++) { const bl = new THREE.Mesh(bladeG, mat.turbine); bl.rotation.z = b * Math.PI * 2 / 3; rotor.add(bl); }
+      const rotor = new THREE.Mesh(rotorG, mat.turbine); rotor.position.set(x, 90, z - 8.6); props.add(rotor);
       rotor.rotation.z = k * 0.7;
       rotors.push({ g: rotor, w: 0.55 + (k % 3) * 0.06 });
       addBox(x, 45, z, 3, 46, 3);
@@ -942,9 +958,11 @@ export function createWorld(THREE, env) {
       }
     }
     const groveTrees = list.length;
-    // Tree lines on hedgerows of gentle farmland (some edges planted, most open).
-    for (let g = 0; g < 400000 && list.length < MAX; g++) {
+    // Tree lines on hedgerows of gentle farmland (cheap height bounds reject water/peaks before Voronoi edge()).
+    for (let g = 0; g < 80000 && list.length < MAX; g++) {
       const x = WORLD.CX + (rnd() - 0.5) * WORLD.SIZE * 0.92, z = WORLD.CZ + (rnd() - 0.5) * WORLD.SIZE * 0.92;
+      const h0 = heightAt(x, z);
+      if (h0 < 16 || h0 > 280) continue;
       const e = FARM.edge(x, z);
       if (e.hedge > 5 || e.road < 10 || e.plot > 0.5) continue;
       const y = ok(x, z);
@@ -997,7 +1015,8 @@ export function createWorld(THREE, env) {
       im.setColorAt(k, tc.copy(PAL[Math.floor(rnd() * 4)]).multiplyScalar(0.9 + rnd() * 0.2));
     });
     im.instanceMatrix.needsUpdate = true; im.instanceColor.needsUpdate = true;
-    im.frustumCulled = false; im.matrixAutoUpdate = false; im.updateMatrix();
+    im.computeBoundingSphere();
+    im.frustumCulled = true; im.matrixAutoUpdate = false; im.updateMatrix();
     im.castShadow = false; im.receiveShadow = false;
     im.name = 'forest';
     scene.add(im);
@@ -1131,7 +1150,7 @@ export function createWorld(THREE, env) {
     activeMap = def || null;
     const mode = def ? def.heightFn : 'archipelago';
     const amp = def && def.canyonAmp ? def.canyonAmp : 1;
-    const fn = mode === 'ocean' ? (x, z) => SEA_FLOOR_Y
+    const fn = mode === 'ocean' ? OCEAN_HEIGHT
       : mode === 'sea' ? (x, z) => -150 - 12 * (fbm(nSea, x * 0.0004, z * 0.0004, 2) * 0.5 + 0.5)
       : mode === 'strait' ? (x, z) => {
         let h = -150;
@@ -1140,16 +1159,29 @@ export function createWorld(THREE, env) {
       }
       : mode === 'gorge' ? gorgeHeight
         : analyticHeight;
-    activeHeightFn = mode === 'gorge' ? gorgeHeight : null;
-    for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) grid[j * (N + 1) + i] = fn(X0 + i * STEP, Z0 + j * STEP);
-    for (let i = 0; i < pos.count; i++) {
-      const gi = Math.round((pos.getX(i) + WORLD.SIZE / 2) / STEP), gj = Math.round((pos.getZ(i) + WORLD.SIZE / 2) / STEP);
-      pos.setY(i, grid[gj * (N + 1) + gi]);
+    activeHeightFn = mode === 'ocean' ? OCEAN_HEIGHT : mode === 'gorge' ? gorgeHeight : null;
+    if (mode !== 'ocean' && mode !== activeTerrainMode) {
+      const cached = gridCache[mode];
+      if (cached) {
+        grid.set(cached.grid);
+        for (let i = 0; i < pos.count; i++) {
+          const gi = Math.round((pos.getX(i) + WORLD.SIZE / 2) / STEP), gj = Math.round((pos.getZ(i) + WORLD.SIZE / 2) / STEP);
+          pos.setY(i, grid[gj * (N + 1) + gi]);
+        }
+        geo.attributes.normal.array.set(cached.normals);
+      } else {
+        for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) grid[j * (N + 1) + i] = fn(X0 + i * STEP, Z0 + j * STEP);
+        for (let i = 0; i < pos.count; i++) {
+          const gi = Math.round((pos.getX(i) + WORLD.SIZE / 2) / STEP), gj = Math.round((pos.getZ(i) + WORLD.SIZE / 2) / STEP);
+          pos.setY(i, grid[gj * (N + 1) + gi]);
+        }
+        geo.computeVertexNormals();
+        gridCache[mode] = { grid: new Float32Array(grid), normals: new Float32Array(geo.attributes.normal.array) };
+      }
+      geo.attributes.position.needsUpdate = true;
+      geo.attributes.normal.needsUpdate = true;
+      activeTerrainMode = mode;
     }
-    geo.computeVertexNormals();
-    geo.attributes.position.needsUpdate = true;
-    geo.attributes.normal.needsUpdate = true;
-    geo.attributes.color.needsUpdate = true;
     boxes.length = 0; cyls.length = 0;
     if (mode === 'archipelago') { for (const b of baseBoxes) boxes.push(b); for (const q of baseCyls) cyls.push(q); }
     else if (mode === 'gorge' && def.bbox) {                  // AFB / island obstacles outside the trench stay solid
@@ -1166,6 +1198,59 @@ export function createWorld(THREE, env) {
     return def;
   }
 
+  // Merge static worldProps meshes by (visibility bucket, material) to cut draw calls while preserving map toggling.
+  {
+    props.updateMatrixWorld(true);
+    const dynamic = new Set([...beams, ...radars.map(r => r.g), ...rotors.map(r => r.g), ...flames.map(f => f.s)]);
+    const anchors = {
+      runway: new THREE.Vector3(RWY.x, E, rwyMidZ),
+      baseBldg: new THREE.Vector3(RWY.x, E, 0),
+      islandsIn: new THREE.Vector3((GORGE_BBOX.x[0] + GORGE_BBOX.x[1]) * 0.5, 0, (GORGE_BBOX.z[0] + GORGE_BBOX.z[1]) * 0.5),
+      islandsOut: new THREE.Vector3(RWY.x + 2000, 0, 0)
+    };
+    const inGorge = (x, z) => x > GORGE_BBOX.x[0] - 600 && x < GORGE_BBOX.x[1] + 600 && z < GORGE_BBOX.z[0] + 600 && z > GORGE_BBOX.z[1] - 600;
+    const groups = new Map(), m4 = new THREE.Matrix4();
+    for (const o of props.children) {
+      if (!o.isMesh || o.isInstancedMesh || dynamic.has(o) || Array.isArray(o.material)) continue;
+      if (!o.geometry || !o.geometry.attributes || !o.geometry.attributes.position) continue;
+      const bucket = (o.geometry.type === 'PlaneGeometry' && Math.abs(o.position.x - RWY.x) < 500 && o.position.y < 40) ? 'runway'
+        : (Math.abs(o.position.x - RWY.x) < 600 && o.position.z > RWY.z0 - 600 && o.position.z < RWY.z1 + 600) ? 'baseBldg'
+          : inGorge(o.position.x, o.position.z) ? 'islandsIn' : 'islandsOut';
+      let byMat = groups.get(bucket);
+      if (!byMat) { byMat = new Map(); groups.set(bucket, byMat); }
+      let list = byMat.get(o.material);
+      if (!list) { list = []; byMat.set(o.material, list); }
+      list.push(o);
+    }
+    for (const [bucket, byMat] of groups) {
+      const anc = anchors[bucket];
+      for (const [mat, list] of byMat) {
+        if (list.length < 2) continue;
+        const geos = [];
+        for (const o of list) {
+          const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+          for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv') g.deleteAttribute(k);
+          if (!g.attributes.normal) g.computeVertexNormals();
+          if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+          o.updateMatrix();
+          g.applyMatrix4(m4.copy(o.matrix));
+          g.translate(-anc.x, -anc.y, -anc.z);
+          g.clearGroups();
+          geos.push(g);
+        }
+        const merged = mergeGeometries(geos, false);
+        for (const g of geos) g.dispose();
+        if (!merged) continue;
+        merged.computeBoundingSphere();
+        for (const o of list) props.remove(o);
+        const mm = new THREE.Mesh(merged, mat);
+        mm.position.copy(anc);
+        mm.userData.propBucket = bucket;
+        props.add(mm);
+      }
+    }
+  }
+
   // Registry of switchable map props, built once at boot. InstancedMeshes are
   // only ever toggled via .visible; count / geometry are never touched.
   // `lights` holds the one Points object carrying every runway edge / threshold /
@@ -1174,8 +1259,8 @@ export function createWorld(THREE, env) {
   for (const o of props.children) {
     if (radars.some(r => r.g === o)) envProps.radar.push(o);
     else if (o === trees.mesh || o.name === 'forest') envProps.foliage.push(o);
-    else if (o.geometry && o.geometry.type === 'PlaneGeometry' && Math.abs(o.position.x - RWY.x) < 500 && o.position.y < 40) envProps.runway.push(o);
-    else if (Math.abs(o.position.x - RWY.x) < 600 && o.position.z > RWY.z0 - 600 && o.position.z < RWY.z1 + 600) envProps.baseBldg.push(o);
+    else if (o.userData.propBucket === 'runway' || (o.geometry && o.geometry.type === 'PlaneGeometry' && Math.abs(o.position.x - RWY.x) < 500 && o.position.y < 40)) envProps.runway.push(o);
+    else if (o.userData.propBucket === 'baseBldg' || (Math.abs(o.position.x - RWY.x) < 600 && o.position.z > RWY.z0 - 600 && o.position.z < RWY.z1 + 600)) envProps.baseBldg.push(o);
     else envProps.islands.push(o);
   }
 

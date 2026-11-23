@@ -254,7 +254,7 @@ export function createBlastFX(THREE, env) {
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); mesh.frustumCulled = false; mesh.visible = false; scene.add(mesh);
     const it = Array.from({ length: DEB_N }, () => ({ on: false, t: 0, life: 3.5, p: new THREE.Vector3(), v: new THREE.Vector3(),
       q: new THREE.Quaternion(), w: new THREE.Vector3(), s: 1, emit: 0 }));
-    return { mesh, it, next: 0, live: 0 };
+    return { mesh, it, next: 0, live: 0, wasLive: false, anyOn: false };
   })();
 
   /* ------------------------------------------------------------ colour ramps */
@@ -308,6 +308,7 @@ export function createBlastFX(THREE, env) {
     }
   }
   function chunks(x, y, z, n, vel, k, normal = null) {
+    debris.anyOn = true;
     for (let i = 0; i < n; i++) {
       const d = debris.it[debris.next]; debris.next = (debris.next + 1) % DEB_N;
       rndDir(_v, normal ? 0 : 0.35);
@@ -512,6 +513,7 @@ export function createBlastFX(THREE, env) {
     foam.wasLive = live > 0;
   }
   function stepDebris(dt) {
+    if (!debris.anyOn && !debris.wasLive) return;
     let live = 0;
     for (let i = 0; i < DEB_N; i++) {
       const d = debris.it[i];
@@ -542,7 +544,7 @@ export function createBlastFX(THREE, env) {
         o.a = 0.7 * (1 - d.t / 3.5);
       }
     }
-    debris.live = live; debris.mesh.visible = live > 0;
+    debris.live = live; debris.anyOn = live > 0; debris.mesh.visible = live > 0;
     if (live > 0 || debris.wasLive) debris.mesh.instanceMatrix.needsUpdate = true;
     debris.wasLive = live > 0;
   }
@@ -566,6 +568,7 @@ export function createBlastFX(THREE, env) {
     for (const s of sparks.it) s.on = false;
     for (const f of foam.it) f.on = false;
     for (const d of debris.it) d.on = false;
+    debris.anyOn = false; debris.live = 0;
   }
   // Warm-up: make every pool visible once so its program compiles with the rest.
   function warm(on) { for (const m of [hang.mesh, trail.mesh, spray.mesh, fireP.mesh, add.mesh, sparks.mesh, foam.mesh, debris.mesh]) m.visible = !!on; }

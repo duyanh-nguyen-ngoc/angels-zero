@@ -75,7 +75,6 @@
       linear-gradient(165deg, rgba(4,16,24,.76), rgba(2,10,16,.84));
     border:1px solid rgba(82,255,156,.45);
     box-shadow:0 0 0 1px rgba(82,255,156,.12) inset, 0 24px 64px rgba(0,0,0,.72);
-    backdrop-filter:blur(8px);
     clip-path:polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));
   }
   #menu .panel::before, #menu .panel::after {
@@ -202,7 +201,7 @@
   #debrief[hidden] { display:none; }
   #debrief .panel { position:relative; width:min(720px, 100%); max-height:calc(100vh - 32px); overflow-y:auto; overflow-x:hidden; box-sizing:border-box; padding:20px 24px 18px; color:#d2ffea;
     background:repeating-linear-gradient(0deg, rgba(82,255,156,.025) 0 1px, transparent 1px 3px), linear-gradient(165deg, rgba(4,16,24,.86), rgba(2,10,16,.92));
-    border:1px solid rgba(82,255,156,.45); box-shadow:0 0 0 1px rgba(82,255,156,.12) inset, 0 24px 64px rgba(0,0,0,.72); backdrop-filter:blur(8px);
+    border:1px solid rgba(82,255,156,.45); box-shadow:0 0 0 1px rgba(82,255,156,.12) inset, 0 24px 64px rgba(0,0,0,.72);
     clip-path:polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px)); }
   #debrief .eyebrow { font-size:12px; font-weight:600; letter-spacing:3.5px; color:#52ff9c; }
   #debrief .db-head { display:flex; align-items:center; justify-content:space-between; gap:16px; border-bottom:1px solid rgba(82,255,156,.28); padding-bottom:10px; margin:4px 0 12px; }
@@ -312,7 +311,7 @@
 
   /* Translucent glass pill for the top-right HUD controls button. */
   #hBadge { position:fixed; z-index:30; top:14px; right:18px; padding:5px 14px; border-radius:999px; cursor:pointer; display:none;
-    background:linear-gradient(180deg, rgba(200,255,228,.10), rgba(120,255,190,.03)); backdrop-filter:blur(5px) saturate(1.2);
+    background:linear-gradient(180deg, rgba(16,44,32,.72), rgba(6,24,18,.68));
     border:1px solid rgba(110,255,175,.28); box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 2px 10px rgba(0,0,0,.18);
     color:#c8ffe3; font:600 12px 'Rajdhani','Share Tech Mono',monospace; letter-spacing:2px; text-shadow:0 0 6px rgba(60,255,150,.35);
     transition:background .15s, border-color .15s; }
@@ -341,7 +340,7 @@
 
   /* Centered, high-contrast patch-notes modal (above menu + HUD layers). */
   #patchOverlay { position:fixed; inset:0; z-index:100; display:none; align-items:center; justify-content:center; padding:20px; box-sizing:border-box;
-    background:rgba(8,12,16,.94); backdrop-filter:blur(6px); pointer-events:auto; }
+    background:rgba(8,12,16,.96); pointer-events:auto; }
   #patchOverlay.open { display:flex; }
   #patchPanel { position:relative; display:flex; flex-direction:column; width:100%; max-width:680px; max-height:75vh; box-sizing:border-box;
     background:rgba(8,16,22,.97); border:1px solid rgba(82,255,156,.6);
@@ -428,7 +427,7 @@
 
   /* --- [ CONTROLS & AUDIO ] modal --- */
   #ctrlOverlay { position:fixed; inset:0; z-index:101; display:none; align-items:center; justify-content:center;
-    padding:20px; box-sizing:border-box; background:rgba(4,8,12,0.82); backdrop-filter:blur(6px); pointer-events:auto;
+    padding:20px; box-sizing:border-box; background:rgba(4,8,12,0.9); pointer-events:auto;
     font-family:'Rajdhani','Share Tech Mono',monospace; color:#F2F5F8;
     text-shadow:0 1px 4px rgba(0,0,0,0.85); letter-spacing:0.06em; text-transform:uppercase; }
   #ctrlOverlay.open { display:flex; }
@@ -719,36 +718,37 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s93d';
-import { createAmbient } from './src/ambient.js?v=s93d';
-import { createBlastFX } from './src/blastfx.js?v=s93d';
-import { createHUD } from './src/hud.js?v=s93d';
-import { createCockpit3D } from './src/cockpit3d.js?v=s93d';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s93d';
-import { createEjection } from './src/eject.js?v=s93d';
-import { createAudio } from './src/audio.js?v=s93d';
-import { createRadio } from './src/radio.js?v=s93d';
-import { createProfile, LIVERIES, liveryById } from './src/profile.js?v=s93d';
-import { createLivery } from './src/livery.js?v=s93d';
-import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s93d';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s93d';
-import { createCanopyFX } from './src/canopy.js?v=s93d';
-import { createNVG } from './src/nvg.js?v=s93d';
-import { createWorld, WORLD } from './src/world.js?v=s93d';
-import { createSurfaces } from './src/surfaces.js?v=s93d';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s93d';
-import { createFreeLook } from './src/freelook.js?v=s93d';
-import { createCanopyGlass } from './src/canopyglass.js?v=s93d';
-import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s93d';
-import { SPW, SQUADRON, MODES, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode } from './src/loadout.js?v=s93d';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s93d';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s93d';
-import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s93d';
-import { createRadioQueue } from './src/radioQueue.js?v=s93d';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s93d';
+import { createVFX } from './src/vfx.js?v=s95c';
+import { createAmbient } from './src/ambient.js?v=s95c';
+import { createBlastFX } from './src/blastfx.js?v=s95c';
+import { createHUD } from './src/hud.js?v=s95c';
+import { createCockpit3D } from './src/cockpit3d.js?v=s95c';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s95c';
+import { createEjection } from './src/eject.js?v=s95c';
+import { createAudio } from './src/audio.js?v=s95c';
+import { createRadio } from './src/radio.js?v=s95c';
+import { createProfile, LIVERIES, liveryById } from './src/profile.js?v=s95c';
+import { createLivery } from './src/livery.js?v=s95c';
+import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s95c';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s95c';
+import { createCanopyFX } from './src/canopy.js?v=s95c';
+import { createNVG } from './src/nvg.js?v=s95c';
+import { createWorld, WORLD } from './src/world.js?v=s95c';
+import { createSurfaces } from './src/surfaces.js?v=s95c';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s95c';
+import { createFreeLook } from './src/freelook.js?v=s95c';
+import { createCanopyGlass } from './src/canopyglass.js?v=s95c';
+import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s95c';
+import { SPW, SQUADRON, MODES, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode } from './src/loadout.js?v=s95c';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s95c';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s95c';
+import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s95c';
+import { createRadioQueue } from './src/radioQueue.js?v=s95c';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s95c';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
-  GORGE_HALF_W, RUNWAY_BBOX } from './src/maps.js?v=s93d';
+  GORGE_HALF_W, RUNWAY_BBOX } from './src/maps.js?v=s95c';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -785,6 +785,7 @@ renderer.setSize(innerWidth, innerHeight, false);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
+renderer.localClippingEnabled = true;
 renderer.info.autoReset = false;
 const PERF_DEBUG = { calls: 0, triangles: 0, frameMs: 0 };
 window.__perfDebug = PERF_DEBUG;
@@ -974,17 +975,21 @@ const ocean = new THREE.Mesh(new THREE.PlaneGeometry(OCEAN_SPAN, OCEAN_SPAN, 1, 
       vec2 g = vec2(0.0);
       wave(p, normalize(vec2(0.83, 0.56)), 210.0, 0.050 * sw * (1.0 - smoothstep(9000.0, 26000.0, dist)), tw, g);
       wave(p, normalize(vec2(0.38, 0.92)), 118.0, 0.042 * sw * (1.0 - smoothstep(4000.0, 12000.0, dist)), tw, g);
-      wave(p, normalize(vec2(-0.62, 0.78)), 61.0, 0.034 * sw * (1.0 - smoothstep(1500.0, 5000.0, dist)), tw, g);
-      wave(p, normalize(vec2(0.95, -0.30)), 29.0, 0.026 * sw * (1.0 - smoothstep(600.0, 2200.0, dist)), tw, g);
-      // Detail octaves fade with distance (no shimmer / moire far out); a 3.2 km
-      // octave adds the large swell patterns read from 8,000 ft.
+      if (dist < 5000.0) wave(p, normalize(vec2(-0.62, 0.78)), 61.0, 0.034 * sw * (1.0 - smoothstep(1500.0, 5000.0, dist)), tw, g);
+      if (dist < 2200.0) wave(p, normalize(vec2(0.95, -0.30)), 29.0, 0.026 * sw * (1.0 - smoothstep(600.0, 2200.0, dist)), tw, g);
+      // Detail octaves fade with distance (no shimmer / moire far out); skip distant texture reads.
       float nearK = 1.0 - smoothstep(350.0, 4000.0, dist);
       float midK = 1.0 - smoothstep(2500.0, 22000.0, dist);
       vec3 nB = texture2D(uN1, p * 0.00031 + vec2(tw * 0.0011, -tw * 0.0008)).rgb * 2.0 - 1.0;
-      vec3 n1 = texture2D(uN1, p * 0.0016 + uScroll + vec2(tw * 0.006, tw * 0.008)).rgb * 2.0 - 1.0;
-      vec3 n2 = texture2D(uN2, p * 0.0043 - uScroll * 0.65 + vec2(-tw * 0.011, tw * 0.007)).rgb * 2.0 - 1.0;
-      vec3 n3 = texture2D(uN2, p * 0.021 + vec2(tw * 0.03, -tw * 0.021)).rgb * 2.0 - 1.0;
-      vec3 n4 = texture2D(uN1, p * 0.067 + vec2(-tw * 0.05, -tw * 0.04)).rgb * 2.0 - 1.0;   // micro ripples (100 ft skim)
+      vec3 n1 = vec3(0.0); vec3 n2 = vec3(0.0); vec3 n3 = vec3(0.0); vec3 n4 = vec3(0.0);
+      if (midK > 0.001) {
+        n1 = texture2D(uN1, p * 0.0016 + uScroll + vec2(tw * 0.006, tw * 0.008)).rgb * 2.0 - 1.0;
+        n2 = texture2D(uN2, p * 0.0043 - uScroll * 0.65 + vec2(-tw * 0.011, tw * 0.007)).rgb * 2.0 - 1.0;
+      }
+      if (nearK > 0.001) {
+        n3 = texture2D(uN2, p * 0.021 + vec2(tw * 0.03, -tw * 0.021)).rgb * 2.0 - 1.0;
+        n4 = texture2D(uN1, p * 0.067 + vec2(-tw * 0.05, -tw * 0.04)).rgb * 2.0 - 1.0;   // micro ripples (100 ft skim)
+      }
       float rough = 1.0 + 1.5 * uChop;
       vec2 slope = g + nB.xy * 0.2 + (n1.xy + n2.xy) * 0.21 * midK * rough
                  + n3.xy * 0.11 * (1.0 + uChop) * nearK + n4.xy * 0.055 * nearK;
@@ -1070,6 +1075,8 @@ const COCKPIT_CLIP_LOCAL = [
 ];
 const cockpitClip = COCKPIT_CLIP_LOCAL.map(p => p.clone());
 function updateCockpitClip() { cockpitClip.forEach((p, i) => p.copy(COCKPIT_CLIP_LOCAL[i]).applyMatrix4(jet.matrixWorld)); }
+function disableCockpitClip() { for (let i = 0; i < cockpitClip.length; i++) { cockpitClip[i].normal.set(0, 1, 0); cockpitClip[i].constant = 1e9; } }
+disableCockpitClip();
 
 // Placeholder cockpit meshes that must never render (2D overlay replaces them).
 const PLACEHOLDER_NAME = /HUD_Glass|MFD_|Cockpit_Tub|Dashboard/i;
@@ -1129,12 +1136,16 @@ const wingmen = [
   { id: 'WDN-3', call: 'WARDEN-3', off: new THREE.Vector3(55, -8, 45) }
 ];
 for (const w of wingmen) {
+  w.homeOff = w.off.clone();                              // FORM echelon slot, restored on reform
   w.pos = new THREE.Vector3(); w.vel = new THREE.Vector3(); w.quat = new THREE.Quaternion();
   w.alive = true; w.friendly = true; w.cd = 7 + 4 * Math.random();
+  w.tgt = null; w.pickT = 0; w.hp = 100; w.hpMax = 100;
+  w.limping = false; w.limpDest = new THREE.Vector3();
   w.cat = { ph: 'NONE', t: 0, delay: 0, track: CAT_BOW[0], fired: false, blend: 4 };
   w.catPos = new THREE.Vector3(); w.catVel = new THREE.Vector3(); w.catQ = new THREE.Quaternion();
 }
 const _ws = new THREE.Vector3();                   // wingman formation scratch
+const _limpDir = new THREE.Vector3(), _limpStep = new THREE.Vector3(), _limpQ = new THREE.Quaternion(), FWD0 = new THREE.Vector3(0, 0, -1);  // limp-home steering
 // Reused contrail emitter descriptors (lead, WARDEN-2/3, CRIMSON-1/2): filled in place each frame.
 const contrailEm = Array.from({ length: 5 }, () => ({ pos: new THREE.Vector3(), quat: new THREE.Quaternion(), on: false }));
 let cloudWet = 0;
@@ -1343,33 +1354,30 @@ function setView(fp) {
   camera.fov = fp ? COCKPIT_FOV : CHASE_FOV;
   camera.updateProjectionMatrix();
   for (const m of cockpitHidden) m.visible = !fp;
-  renderer.localClippingEnabled = fp;
+  if (fp) updateCockpitClip(); else disableCockpitClip();
   cockpit.setActive(fp);
   if (!fp) { camera.position.copy(CAM_OFFSET).applyQuaternion(state.quaternion).add(state.position); camVelocity.set(0, 0, 0); prevPlanePos.copy(state.position); }
 }
 
 /* ---- GPU warm-up: zero-freeze view / NVG toggles ----------------------------
    Every program variant the sortie can need is built before flight: chase vs
-   cockpit (cockpit enables the sun shadow map + airframe clipping planes, the 3D
-   cockpit and the canopy glass) x screen vs the NVG half-float target (render
-   targets use their own tone-mapping variants). Step 1 hands all four states to
-   renderer.compileAsync (KHR_parallel_shader_compile: links in the background while
-   the briefing is up); step 2 renders each state once synchronously so anything
-   compile() cannot predict (shadow depth programs, clip variants, texture / render
-   target allocation, gauge atlas upload) is also resident. */
+   cockpit x screen vs the NVG half-float target. Step 1 hands all unique states
+   to renderer.compileAsync; step 2 renders each state once without gl.finish(). */
 const gpuWarm = { done: false, pending: null, ms: 0, programs: 0 };
-let carrierLoadPromise = Promise.resolve();       // kicked off at boot; resolves only after the GLB is mounted
-// Walk the states the way a pilot toggles them (both orders), so variants that
-// depend on toggle history are also built.
-const WARM_STATES = [[false, false], [true, false], [true, true], [true, false], [false, true], [true, true], [false, true], [false, false]];
+let carrierLoadPromise = Promise.resolve();       // started after shader warmup so it never contends with compile
+const WARM_STATES = [[false, false], [true, false], [true, true]];
 const _warmEye = new THREE.Vector3();
+let dialsWarmed = false;
 function applyWarmState(fp, nv) {
   setView(fp); setNVG(nv, true);                       // the real toggles: identical side effects to flight
   updateCameraAndVisuals(1 / 60, simTime);
-  // Cockpit: 9 updates so the 2-dials-per-frame scheduler paints (and caches) all 16 dial faces now.
-  if (fp) for (let i = 0; i < 9; i++) cockpit.update(1 / 60, simTime, _warmEye.copy(EYE).applyQuaternion(state.quaternion).add(state.position), state.quaternion);
+  // Cockpit: 9 updates once so the 2-dials-per-frame scheduler paints (and caches) all 16 dial faces now.
+  if (fp && !dialsWarmed) {
+    dialsWarmed = true;
+    for (let i = 0; i < 9; i++) cockpit.update(1 / 60, simTime, _warmEye.copy(EYE).applyQuaternion(state.quaternion).add(state.position), state.quaternion);
+  }
   weather.rainMesh.visible = true;                     // rain streak program even in dry weather
-  combatSys.warmVisuals(true);                         // HDR muzzle flash + tracer bolt programs
+  combatSys.warmVisuals(true);                         // HDR muzzle flash + tracer bolt + fleet programs
   blast.warm(true);                                    // detonation pools (fire / smoke / sparks / debris / foam)
 }
 function warmupGPUAsync() {
@@ -1381,6 +1389,8 @@ function warmupGPUAsync() {
     jobs.push(renderer.compileAsync(scene, camera).catch(() => {}));
   }
   renderer.setRenderTarget(null);
+  weather.rainMesh.visible = false;
+  blast.warm(false);
   combatSys.warmVisuals(false);
   setView(fp0); setNVG(nv0, true);
   gpuWarm.pending = Promise.all(jobs).then(() => { gpuWarm.asyncMs = Math.round(performance.now() - t0); });
@@ -1390,7 +1400,8 @@ function warmupGPUSync() {
   if (gpuWarm.done) return;
   const fp0 = firstPerson, nv0 = nvg.active, t0 = performance.now();
   for (const [fp, nv] of WARM_STATES) { applyWarmState(fp, nv); nvg.render(scene, camera, simTime, fp); }
-  renderer.getContext().finish();
+  weather.rainMesh.visible = false;
+  blast.warm(false);
   combatSys.warmVisuals(false);
   setView(fp0); setNVG(nv0, true);
   updateCameraAndVisuals(1 / 60, simTime);
@@ -1549,7 +1560,9 @@ function applyMapProps(mapDef) {
 }
 // Mission scene setup: pooled actors return to their pools, the terrain is rebuilt
 // in place (same geometry/material) and collision sets are reset.
+let launchGen = 0;
 function loadMissionScene(m) {
+  launchGen++;
   if (!(DEBUG && Q.has('bgmtrack'))) audio.setAuto(true);
   combatSys.resetMission();
   world.rebuild(MAPS[m.mapTag] || MAPS.ARCHIPELAGO);
@@ -1557,6 +1570,13 @@ function loadMissionScene(m) {
   vfx.clearTrails();
   ambient.reset();
   tele.reset();
+  const solo = missionConfigWingSolo(m);
+  for (const w of wingmen) {
+    w.alive = !solo; w.limping = false; w.hp = w.hpMax = 100; w.tgt = null; w.pickT = 0;
+    if (w.homeOff) w.off.copy(w.homeOff);
+    if (w.mesh) w.mesh.visible = !solo && modelReady && flightMode === 'FLY';
+  }
+  if (limpTrail) { limpTrail.clear(); limpTrail.mesh.visible = false; }
   combatSys.configureMission(m, MAPS[m.mapTag] || MAPS.ARCHIPELAGO);
   ambient.configure(m.id);
   combat.missionPhase = 1; combat.rtb = null; combat.done = false;
@@ -1564,11 +1584,10 @@ function loadMissionScene(m) {
   autoland.on = false; autoland.ph = ''; autoland.prevLz = Infinity; combat.allyHold = false;
   cat.ph = 'NONE'; cat.t = 0; cat.arm = 0; cat.grace = 0; cat.forceAB = false;
   for (const w of wingmen) { w.cat.ph = 'NONE'; w.cat.t = 0; w.cat.delay = 0; }
-  const solo = combat.mcfg.wingmen === 'NONE';
-  for (const w of wingmen) {
-    w.alive = !solo;
-    if (w.mesh) w.mesh.visible = !solo && modelReady && flightMode === 'FLY';
-  }
+}
+function missionConfigWingSolo(m) {
+  if (!m) return false;
+  return m.wingmen === 'NONE' || m.id === 'ACE_DUEL';
 }
 /* --------------------------------------------------------------------------
    CARRIER_AUTOLAND. Everything is solved in the carrier ROOT frame (bow = local
@@ -1784,11 +1803,16 @@ function carrierDiag(tag) {
 }
 // Single launch entry for every path that needs the flight deck.
 async function enterCarrierLaunch(m) {
+  const gen = launchGen;
   cat.ph = 'WAIT';
   const hintEl = document.getElementById('menuHint');
   const oldHint = hintEl ? hintEl.textContent : '';
   if (hintEl) hintEl.textContent = 'DECK PREP';
   await carrierReady;
+  if (gen !== launchGen || appMode !== 'PLAY') {
+    if (hintEl) hintEl.textContent = oldHint;
+    return;
+  }
   const def = MAPS[m.mapTag] && MAPS[m.mapTag].carrier;
   if (def) combatSys.placeCarrier(def);
   combatSys.stepAlly(0);
@@ -1856,8 +1880,8 @@ function updateWingCat(dt, a) {
       vfx.catSteam.stroke(w.catPos, _catFwd, v / CAT_VEND, dt);
       if (wc.t >= CAT_T) {
         wc.ph = 'AIRBORNE'; wc.blend = 0;
-        if (combat.mcfg.wingmen === 'FLIGHT' && combat.stage >= 0 && combat.missionTitle === 'NAVAL BATTLE' && combat.wingOrder !== 'ENGAGE') {
-          combatSys.setWingOrder('ENGAGE');
+        if (combat.mcfg.wingmen === 'FLIGHT' && combat.stage >= 0 && combat.missionTitle === 'NAVAL BATTLE' && combat.wingOrder === 0) {
+          combatSys.setWingOrder(1);
         }
         w.pos.copy(w.catPos); w.vel.copy(w.catVel); w.quat.copy(w.catQ);
       }
@@ -1929,7 +1953,7 @@ async function startSortie() {
       catTrackWorld(w.cat.track, w.pos); catTrackQuat(w.cat.track, w.quat);
       w.vel.copy(a.vel); w.mesh && w.mesh.position.copy(w.pos);
     }
-    combat.wingOrder = 'FORM';                           // silent reset: keep the AWACS arming call on the CRT
+    combat.wingOrder = 0;                                // silent reset: keep the AWACS arming call on the CRT
     if (DEBUG) {
       const deckWorldY = catDeckY(CAT_BOW[0]) + combatSys.allyRoot.position.y;
       const jetMinY = state.position.y - JET_GEAR_DY;
@@ -2000,7 +2024,7 @@ async function startSortie() {
       w.pos.copy(w.off).applyQuaternion(state.quaternion).add(state.position);
       w.quat.copy(state.quaternion); w.vel.copy(state.velocity);
     }
-    combatSys.setWingOrder('FORM');
+    combatSys.setWingOrder(0);
     combatSys.say('FURBALL // WEAPONS FREE — ENDLESS BANDITS', 3, '#ffbf3f');
   }
 }
@@ -2184,8 +2208,8 @@ function showDebrief(outcome, st, res) {
   if (!cleared && res.rank === 'B' && profile.rankFor(st.score, true) !== 'B') flags.push('RANK CAPPED AT B — SORTIE NOT CLEARED');
   document.getElementById('dbFlags').innerHTML = flags.map(f => `<span>${f}</span>`).join('');
   const ri = st.rankInfo || computeRank(st, outcome);
-  const evCount = [0, 0, 0, 0, 0, 0];
-  for (let i = 0; i < tele.ne; i++) { const t = tele.events[i * 4 + 3]; if (t >= 1 && t <= 5) evCount[t]++; }
+  const evCount = [0, 0, 0, 0, 0, 0, 0];
+  for (let i = 0; i < tele.ne; i++) { const t = tele.events[i * 4 + 3]; if (t >= 1 && t <= 6) evCount[t]++; }
   const cells = [
     ['SCORE', String(st.score).padStart(6, '0')],
     ['KILLS AIR / ACE / STRIKE', `${evCount[EV.KILL]} / ${evCount[EV.ACE_KILL]} / ${evCount[EV.STRIKE_KILL]}`],
@@ -2193,6 +2217,7 @@ function showDebrief(outcome, st, res) {
     ['GUN ACC %', Math.round(ri.gunAcc * 100) + '%'],
     ['MSL x/y', `${combat.mslHitsP || 0}/${combat.mslFiredP || 0}`],
     ['TRAPS / NEAR MISS', `${ri.traps} / ${evCount[EV.NEAR_MISS]}`],
+    ['WINGMEN SAVED', evCount[EV.WING_SAVED]],
     ['CLEAR TIME', fmtClock(st.time)],
     ['GUNS KILLS', st.gunsKills],
     ['WINGS SEVERED', st.wingsSevered],
@@ -3335,6 +3360,25 @@ function updateCameraAndVisuals(dt, now) {
       w.mesh.visible = modelReady && flightMode === 'FLY' && w.alive;
       continue;
     }
+    if (w.limping) {
+      // Wounded WARDEN-2 limps home at 220 kt, holds >= 1500 m and ignores formation.
+      _limpDir.copy(w.limpDest).sub(w.pos);
+      const dist = _limpDir.length();
+      if (dist > 1) _limpDir.divideScalar(dist); else _limpDir.set(0, 0, -1).applyQuaternion(w.quat);
+      _limpStep.copy(_limpDir).multiplyScalar(Math.min(dist, 113 * dt));
+      w.pos.add(_limpStep);
+      if (w.pos.y < 1500) w.pos.y = Math.min(1500, w.pos.y + 60 * dt);   // gentle climb
+      w.vel.copy(_limpDir).multiplyScalar(113);
+      _ws.copy(_limpDir);
+      _ws.y = 0;
+      if (_ws.lengthSq() > 1e-4) {
+        _ws.normalize();
+        w.quat.slerp(_limpQ.setFromUnitVectors(FWD0, _ws), 1 - Math.exp(-dt * 0.5));  // ~2 G turn
+      }
+      w.mesh.position.copy(w.pos); w.mesh.quaternion.copy(w.quat);
+      w.mesh.visible = modelReady && flightMode === 'FLY' && w.alive;
+      continue;
+    }
     _ws.copy(w.off).applyQuaternion(q).add(state.position);
     if (!w.pos.lengthSq()) w.pos.copy(_ws);
     const blendK = w.cat && w.cat.blend < 4 ? 0.9 : 2.2;
@@ -3361,8 +3405,6 @@ function updateCameraAndVisuals(dt, now) {
   skimK += (skimTgt - skimK) * Math.min(1, dt * (skimTgt > skimK ? 4 : 12));
   if (skimK < 0.02) skimK = 0;
   audio.setSpray(skimK, skimKt);
-  vfx.spray.update(dt);
-  vfx.wake.update(dt);
   if (skimK > 0 && state.speed > 1) {
     _skB.copy(state.velocity).setY(0).normalize();
     vfx.spray.emit(state.position.x, state.position.z, _skB.x, _skB.z, state.speed, skimK, dt);
@@ -3391,14 +3433,14 @@ function updateCameraAndVisuals(dt, now) {
       updateCockpitClip();
       cockpit.update(dt, now, _cv.eye.copy(EYE).applyQuaternion(q).add(state.position), q);
     } else {
-      // Title screen: slow cinematic orbit around the jet circling the archipelago.
+      // Title screen: slow cinematic orbit around the jet circling the archipelago (zero per-frame allocs).
       const ca = menuT * 0.11;
       camera.up.set(0, 1, 0);
-      camera.position.copy(state.position).add(new THREE.Vector3(Math.sin(ca) * 30, 6 + 4 * Math.sin(menuT * 0.27), Math.cos(ca) * 30));
+      camera.position.copy(state.position).add(_mcOff.set(Math.sin(ca) * 30, 6 + 4 * Math.sin(menuT * 0.27), Math.cos(ca) * 30));
       // On wide layouts aim left of the jet so it sits in the right-hand third, beside the briefing panel.
-      const toJet = state.position.clone().sub(camera.position).normalize();
-      const right = new THREE.Vector3().crossVectors(toJet, AX_Y).normalize();
-      camera.lookAt(state.position.clone().addScaledVector(right, innerWidth >= 1150 ? -13 : 0).add(new THREE.Vector3(0, -2, 0)));
+      _mcTo.copy(state.position).sub(camera.position).normalize();
+      _mcR.crossVectors(_mcTo, AX_Y).normalize();
+      camera.lookAt(_mcLook.copy(state.position).addScaledVector(_mcR, innerWidth >= 1150 ? -13 : 0).add(_mcBias));
     }
   } else if (flightMode === 'EJECT') {
     // camera owned by the ejection sequence
@@ -3512,6 +3554,7 @@ function updateCameraAndVisuals(dt, now) {
     } else machShake = null;
   }
   camera.updateMatrixWorld();
+  combatSys.cullFleet();
   if (blast && !fxHold) blast.update(dt);
   oceanUniforms.uCam.value.copy(camera.position);
   followOcean();
@@ -3880,6 +3923,9 @@ function onSfx(type, pos, scale = 1) {
 }
 const vfx = createVFX(THREE, { scene, camera, jet, renderer, terrainHeight, sunDir: SUN_DIR, canyonX: world.canyonX, runway: world.runway,
   force: DEBUG && Q.has('force') ? Q.get('force').split(',') : [] });
+// One pooled smoke ribbon for the wounded-wingman limp trail (driven by combat).
+const limpTrail = vfx.makeRibbon({ w0: 1.5, w1: 7, life: 4, alpha: 0.6, step: 6, far: [900, 9000] });
+limpTrail.mat.uniforms.uCol.value.set(0x9aa0a6); limpTrail.mesh.visible = false;
 const SUN_AZIMUTH = (Math.atan2(SUN_DIR.x, -SUN_DIR.z) * 180 / Math.PI + 360) % 360;
 const canopyFx = createCanopyFX();
 // AN/AVS-9 night vision (N): light intensification + green-phosphor tube composite.
@@ -3909,7 +3955,7 @@ const combatSys = createCombat(THREE, { scene, camera, renderer, state, combat, 
   terrainCenter: { x: TERRAIN_CENTER.x, z: TERRAIN_CENTER.y }, bridges: world.bridges, canyonX: world.canyonX,
   sectorAt: world.sectorAt, isTerrainOccluded: world.isTerrainOccluded, fleetLane: world.fleetLane, canyonCenter: world.canyonCenter,
   isReady: () => modelReady && flightMode === 'FLY', onPlayerDown: reason => triggerEject(reason), onSfx, onFlyby, onWing,
-  onSlowMo: triggerSlowMo, getWingmen: () => wingmen, addBox: world.addBox,
+  onSlowMo: triggerSlowMo, getWingmen: () => wingmen, addBox: world.addBox, limpTrail,
   aaTracer: (pos, dir, life, red) => vfx.aaTracer.add(pos, dir, life, red),
   samPuff: p => vfx.catSteam.stroke(p, _samPuffFwd, 0.6, 0.06),
   samFx: (list, camPos, now) => vfx.samFx.update(list, camPos, now),
@@ -4242,25 +4288,60 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
   });
   for (const o of removed) o.parent.remove(o);
   if (DEBUG) console.log('[ANGELS_ZERO] removed cockpit placeholders:', removed.map(o => o.name).join(', '));
-  for (const w of wingmen) {
-    w.mesh = model.clone(true);                     // shared geometry and materials
-    w.mesh.traverse(o => {
-      if (!o.isMesh) return;
-      const mats = Array.isArray(o.material) ? o.material : [o.material];
-      const matName = mats.map(m => m && m.name || '').join(' ');
-      if (o.name === 'Canopy_Glass' || INTERIOR_MAT.test(matName) || PLACEHOLDER_NAME.test(o.name)) o.visible = false;
+  function buildMergedWingman(srcModel) {
+    srcModel.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(srcModel.matrixWorld).invert(), m4 = new THREE.Matrix4();
+    const byMat = new Map(), root = new THREE.Group();
+    srcModel.traverse(o => {
+      if (!o.isMesh || Array.isArray(o.material)) return;
+      const matName = (o.material && o.material.name) || '';
+      if (o.name === 'Canopy_Glass' || INTERIOR_MAT.test(matName) || PLACEHOLDER_NAME.test(o.name)) return;
+      if (!o.geometry || !o.geometry.attributes || !o.geometry.attributes.position) return;
+      let list = byMat.get(o.material);
+      if (!list) { list = []; byMat.set(o.material, list); }
+      list.push(o);
     });
+    for (const [mat, list] of byMat) {
+      const geos = [];
+      for (const o of list) {
+        const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+        for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv') g.deleteAttribute(k);
+        if (!g.attributes.normal) g.computeVertexNormals();
+        if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+        g.applyMatrix4(m4.multiplyMatrices(inv, o.matrixWorld));
+        g.clearGroups();
+        geos.push(g);
+      }
+      const merged = mergeGeometries(geos, false);
+      for (const g of geos) g.dispose();
+      if (!merged) continue;
+      merged.computeBoundingSphere();
+      const mm = new THREE.Mesh(merged, mat);
+      root.add(mm);
+    }
+    return root;
+  }
+  const wingTemplate = buildMergedWingman(model);
+  for (let i = 0; i < wingmen.length; i++) {
+    const w = wingmen[i];
+    w.mesh = i === 0 ? wingTemplate : wingTemplate.clone(true);
     w.mesh.visible = false;
     scene.add(w.mesh);
   }
 
-  // Wingtip vortex emitters at the real outboard wing vertices.
+  // Wingtip vortex emitters at the real outboard wing vertices + hide strictly under-floor belly meshes in cockpit.
   let tip = null;
   model.updateMatrixWorld(true);
-  const v = new THREE.Vector3();
+  const v = new THREE.Vector3(), invJet = new THREE.Matrix4().copy(model.matrixWorld).invert(), mBox = new THREE.Box3(), vBox = new THREE.Box3(), bm4 = new THREE.Matrix4();
+  const isPylonDesc = o => { for (let p = o; p && p !== model; p = p.parent) if (/^Pylon_/i.test(p.name || '')) return true; return false; };
   model.traverse(o => {
     if (!o.isMesh) return;
-    const p = o.geometry.attributes.position;
+    const g = o.geometry, p = g.attributes.position;
+    if (!g.boundingBox) g.computeBoundingBox();
+    if (!isPylonDesc(o) && !cockpitHidden.includes(o)) {
+      vBox.copy(g.boundingBox).applyMatrix4(bm4.multiplyMatrices(invJet, o.matrixWorld));
+      if (vBox.max.y < -0.95) cockpitHidden.push(o);
+    }
     for (let i = 0; i < p.count; i++) {
       v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld);
       if (Math.abs(v.y) < 1.2 && (!tip || v.x > tip.x)) tip = v.clone();
@@ -4290,8 +4371,6 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
   }
   jet.add(model);
   combatSys.init(model, nozzleLocal);
-  // The ally exists only now: start the real CVN mount (boot kick-off above early-returned).
-  carrierLoadPromise = Promise.resolve(gpuWarm.pending).then(() => combatSys.loadCarrier(combatSys.CARRIER_GLB)).then(() => carrierReady);
   applyCarrierDebugPose();
   model.updateMatrixWorld(true);
   surfaces = createSurfaces(THREE, model);              // Ctrl_* hinges + Nozzle_L/R (after the fleet clone)
@@ -4316,17 +4395,20 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
   modelReady = true;
   setView(appMode === 'PLAY' ? firstPerson : menuPreviewCockpit);
   statusEl.remove();
-  if (appMode === 'PLAY') warmupGPUSync();             // briefing skipped (?nointro): warm up right now
-  else {
-    // Briefing up: compile in the background, then finish synchronously before LAUNCH unlocks.
+  if (appMode === 'PLAY') {
+    warmupGPUSync();             // briefing skipped (?nointro): warm up right now
+    carrierLoadPromise = combatSys.loadCarrier(combatSys.CARRIER_GLB).then(() => carrierReady);
+  } else {
+    // Briefing up: compile in the background, then finish before LAUNCH unlocks.
     const hint = document.getElementById('menuHint');
     hint.textContent = 'PREPARING COCKPIT SYSTEMS…';
     // (timers, not rAF: a background tab must still unlock; capped at 12 s)
     const finish = () => {
       if (!launchBtn.disabled) return;
-      if (appMode === 'MENU') { warmupGPUSync(); setView(menuPreviewCockpit); }
+      if (appMode === 'MENU') { setView(menuPreviewCockpit); warmupGPUSync(); }
       launchBtn.disabled = false;
       if (appMode === 'MENU') hint.textContent = 'CLICK LAUNCH OR PRESS ENTER';
+      carrierLoadPromise = combatSys.loadCarrier(combatSys.CARRIER_GLB).then(() => carrierReady);
     };
     Promise.resolve(warmupGPUAsync()).then(() => setTimeout(finish, 0));
     setTimeout(finish, 12000);
@@ -4423,6 +4505,8 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
     const catLaunchAt = Q.has('catlaunchat') ? Number(Q.get('catlaunchat')) : -1;
     const restartAt = Q.has('restartat') ? Number(Q.get('restartat')) : -1;
     const stageAt = Q.has('stageat') ? Number(Q.get('stageat')) : -1;
+    const wingOrderAt = Q.has('wingorderat') ? Q.get('wingorderat').split(':').map(Number) : null;
+    const limpAt = Q.has('limpat') ? Number(Q.get('limpat')) : -1;
     const fortKillAt = Q.has('fortkillat') ? Number(Q.get('fortkillat')) : -1;
     const ceilAt = Q.has('ceilat') ? Number(Q.get('ceilat')) : -1;
     const climbAt = Q.has('climbat') ? Number(Q.get('climbat')) : -1;
@@ -4459,6 +4543,14 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
         triggerSlowMo(); console.log('[ANGELS_ZERO] slowmo @', t1.toFixed(2), 'timeScale', timeScale);
       }
       updateMissileCamState(h);
+      if (wingOrderAt && t1 >= wingOrderAt[0] && t0 < wingOrderAt[0]) {
+        const o = combatSys.setWingOrder(wingOrderAt[1]);
+        console.log('[ANGELS_ZERO] wing order=' + o + ' @ ' + t1.toFixed(2));
+      }
+      if (limpAt >= t0 && limpAt < t1) {
+        const ok = combatSys.triggerWoundedWingman(true);
+        console.log('[ANGELS_ZERO] limp st=' + combat.limp.st + ' pursuers=' + combat.limp.n + ' forced=' + ok);
+      }
       if (strikeKillAt >= t0 && strikeKillAt < t1) { combatSys.killStrikes(); console.log('[ANGELS_ZERO] strike kill @', t1.toFixed(2), JSON.stringify(combatSys.stats().strike), 'score', combat.score); }
       if (nearAt >= t0 && nearAt < t1) { tele.event(EV.NEAR_MISS, state.position.x, state.position.z, simTime); console.log('[ANGELS_ZERO] near miss @', t1.toFixed(2)); }
       if (radioAt && Number(radioAt[0]) >= t0 && Number(radioAt[0]) < t1) {
@@ -4683,7 +4775,8 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
         lit: navLights.filter(n => n.sp.visible).length }), 'look', JSON.stringify(freeLook.stats), 'canopy', JSON.stringify({ glass: canopyGlass.stats, rainCulled: weather.rainCulled,
         nearestRain: +weather.nearestVisible().toFixed(2), audio: audio.canopyRain }), 'fleet', JSON.stringify(combatSys.fleetStats()),
         'mcam', JSON.stringify({ active: mcam.active, k: +mcam.k.toFixed(2) }), 'slowmo', +timeScale.toFixed(2),
-        'ambient', JSON.stringify(ambient.stats()));
+        'ambient', JSON.stringify(ambient.stats()),
+        'wingOrder', combatSys.stats().style.wingOrderName, 'limp', JSON.stringify(combatSys.stats().style.limp));
   }
   if (DEBUG && Q.has('pause')) pauseSim();
   if (DEBUG && Q.has('fxhold')) fxHold = true;
@@ -4705,20 +4798,24 @@ const RWY_X = () => world.runway.x;
 const DEBUG_OVERVIEW = DEBUG && Q.has('overview') ? (Number(Q.get('overview')) || 22000) : 0;
 const DEBUG_BANDCAM = DEBUG && Q.has('bandcam') ? Q.get('bandcam').split(',').map(Number) : null;
 const DEBUG_CAM = DEBUG && Q.has('camat') ? new THREE.Vector3(...Q.get('camat').split(',').map(Number)) : null;   // ?camat=x,y,z (jet frame)            // headless test hook: hold the trigger
-// Title-screen flight path: a banked orbit over the island chain.
+// Title-screen flight path: a banked orbit over the island chain (preallocated scratch).
 let menuT = 0;
+const _moFwd = new THREE.Vector3(), _moTo = new THREE.Vector3(), _moCross = new THREE.Vector3(), _moZero = new THREE.Vector3();
+const _moM = new THREE.Matrix4(), _moQ = new THREE.Quaternion();
+const _mcOff = new THREE.Vector3(), _mcTo = new THREE.Vector3(), _mcR = new THREE.Vector3(), _mcLook = new THREE.Vector3(), _mcBias = new THREE.Vector3(0, -2, 0);
 function menuOrbit(dt) {
   menuT += dt;
   const R = 2600, w = 0.05, v = R * w, ang = menuT * w;
   const cx = TERRAIN_CENTER.x, cz = TERRAIN_CENTER.y;
   // 6,000 ft keeps the orbit (and the camera around it) clear of the island peaks.
   state.position.set(cx + Math.cos(ang) * R, 1830 + 60 * Math.sin(menuT * 0.2), cz + Math.sin(ang) * R);
-  const fwd = new THREE.Vector3(-Math.sin(ang), 0, Math.cos(ang));
+  _moFwd.set(-Math.sin(ang), 0, Math.cos(ang));
   const bank = Math.atan(v * w / GRAVITY);
-  const m = new THREE.Matrix4().lookAt(new THREE.Vector3(), fwd, AX_Y);
-  const turnLeft = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(cx - state.position.x, 0, cz - state.position.z)).y > 0;
-  state.quaternion.setFromRotationMatrix(m).multiply(new THREE.Quaternion().setFromAxisAngle(AX_Z, turnLeft ? bank : -bank));
-  state.velocity.copy(fwd).multiplyScalar(v);
+  _moM.lookAt(_moZero, _moFwd, AX_Y);
+  _moTo.set(cx - state.position.x, 0, cz - state.position.z);
+  const turnLeft = _moCross.crossVectors(_moFwd, _moTo).y > 0;
+  state.quaternion.setFromRotationMatrix(_moM).multiply(_moQ.setFromAxisAngle(AX_Z, turnLeft ? bank : -bank));
+  state.velocity.copy(_moFwd).multiplyScalar(v);
   state.speed = v; state.throttle = 0.72; state.afterburner = 0; state.gLoad = 1 / Math.cos(bank);
 }
 
@@ -4818,6 +4915,7 @@ if (DEBUG) {
     ilsVisible, inCutscene, get missionT() { return missionT; }, applyMapProps,
     getCarrierBox() { const a = combat.ally; if (!a || !a.root) return null; const b = new THREE.Box3().setFromObject(a.root); return { min: b.min.toArray(), max: b.max.toArray() }; },
     get carrier() { return carrier; }, get jetGearDY() { return JET_GEAR_DY; },
+    setWingOrder: n => combatSys.setWingOrder(n), triggerWoundedWingman: () => combatSys.triggerWoundedWingman(true), get limpTrail() { return limpTrail; },
     radioEvent, get radioEvents() { return Object.keys(RADIO_BY_EVENT); }, get radioQueue() { return rq; }, radioPlay, clearBox };
 }
 /* ============================================================================

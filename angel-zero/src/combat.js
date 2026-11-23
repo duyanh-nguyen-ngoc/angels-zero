@@ -8,11 +8,11 @@
 // burning wrecks that splash, scoring, waves, lock-on and threat warnings.
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { DIFFICULTY_PRESETS } from './difficulty.js?v=s93d';
-import { SPW } from './loadout.js?v=s93d';
-import { missionConfig } from './missions.js?v=s93d';
+import { DIFFICULTY_PRESETS } from './difficulty.js?v=s95c';
+import { SPW } from './loadout.js?v=s95c';
+import { missionConfig } from './missions.js?v=s95c';
 import { gorgeCentreX, gorgeSlope, gorgeHeading, gorgeDist, GORGE_GATE_Z, GORGE_GATE_N, GORGE_FLOOR_Y, GORGE_RIM_Y,
-  GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_FORT, CEIL_M } from './maps.js?v=s93d';
+  GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_FORT, CEIL_M } from './maps.js?v=s95c';
 
 const NM = 1852, FT = 0.3048, G0 = 9.81;
 // Allied CVN model: same 360 m deck as the procedural ship, re-anchored to the GLB.
@@ -74,6 +74,11 @@ export function createCombat(THREE, env) {
   const FLR_MAX = 4, FLR_RECHARGE = 8, FLR_PER_SALVO = 6, FLR_DECOY_RANGE = 1.2 * NM;
   const LOCK_RANGE = 3.5 * NM, PURSUE_RANGE = 4.0 * NM;
   const LOCK_DECAY = 0.8;   // seeker half-angle / lock time: DIFF.seekerHalf / DIFF.lockTime
+  // WARDEN orders + wounded-wingman save. All scalars / preallocated state.
+  const WING_ORDERS = ['FORM', 'COVER', 'FOCUS'];
+  const ORDER_TEXT = ['WARDEN, FORM ON ME', 'WARDEN, COVER MY SIX', 'WARDEN, FOCUS MY TARGET'];
+  const COVER_R = 2500, COVER_REAR_COS = Math.cos(110 * Math.PI / 180), ORDER_BADGE_S = 2.0;
+  const LIMP_HP_FRAC = 0.35, LIMP_SPD = 113, LIMP_PURSUERS = 2, LIMP_SAVE_PTS = 1500, LIMP_MIN_T = 60;
   // Bandit seekers: within 3.2 NM, player inside a 22 deg cone off the bandit's nose
   // while the bandit sits in the player's rear hemisphere; ~2.2 s to a full lock.
   const B_LOCK_RANGE = 3.2 * NM, B_CONE = 22 * D2R, B_LOCK_TIME = 2.2, B_SOFT = 0.45;
@@ -99,7 +104,9 @@ export function createCombat(THREE, env) {
     bulletSpeed: BULLET_SPEED, score: C.score || 0, comms: [], events: [], wave: 0, gunFiring: false, hitMarker: 0 });
   // Stores: weapon select (>MSL / >BOMB), bombs, CCIP solution, flares.
   Object.assign(C, { weapon: 'MSL', bombs: 0, bombMax: 0, bombReload: 0, ccip: null, ccipTof: 0, flares: FLR_MAX, flareMax: FLR_MAX, chaff: 0, chaffMax: 0, notchT: 0,
-    wingOrder: 'FORM', wingOrderT: 0, gunRounds: 0, gunHitsP: 0, mslFiredP: 0, mslHitsP: 0, maxDmg: 0, traps: 0 });
+    wingOrder: 0, wingOrderT: 0, orderBadgeT: 0, gunRounds: 0, gunHitsP: 0, mslFiredP: 0, mslHitsP: 0, maxDmg: 0, traps: 0 });
+  Object.assign(C, { limp: { st: 'IDLE', w: null, pursuers: new Int16Array(LIMP_PURSUERS).fill(-1), n: 0, used: false, graceT: 0 },
+    wingSavedBannerT: 0, wingNoDesignationT: 0 });
   Object.assign(C, { mcfg: missionConfig({}), stage: 0, stageT: 0,
     ceil: { st: 'CLEAR', phase: 'CLEAR', armed: false, t: 0, warnT: 0, salvoT: 0, rail: 0, railT: 0, fired: 0, lastSam: 0, live: true, belowT: 0 },
     climb: { on: false, t: 0, sams: 0, salvoT: 0, rail: 0, railT: 0 }, gateIdx: 0, weaponsLock: { msl: false, spw: false },
@@ -978,7 +985,10 @@ export function createCombat(THREE, env) {
 
   function updateEnemy(e, dt, playerActive) {
     e.prev.copy(e.pos);
-    const toP = _t.copy(S.position).sub(e.pos);
+    // Limp-home pursuers fly to the wounded wingman instead of the player.
+    const tp = (e.wingTarget && e.wingTarget.alive) ? e.wingTarget.pos : S.position;
+    const tv = (e.wingTarget && e.wingTarget.alive && e.wingTarget.vel) ? e.wingTarget.vel : S.velocity;
+    const toP = _t.copy(tp).sub(e.pos);
     const dist = toP.length();
     if (playerActive) ai.minSep = Math.min(ai.minSep, dist);
     e.flareCD = Math.max(0, e.flareCD - dt);
@@ -1096,11 +1106,11 @@ export function createCombat(THREE, env) {
       if (e.duel) {
         // Gun-solution lead pursuit: aim where 20 mm rounds meet the player.
         const tof = clamp(dist / (980 + e.speed * 0.5), 0, 1.6);
-        _eLead.copy(S.position).addScaledVector(S.velocity, tof);
+        _eLead.copy(tp).addScaledVector(tv, tof);
         desired.copy(_eLead).sub(e.pos);
         maxG = dist < 2000 ? 9 : 7; useAB = dist > 700 || e.speed < e.cruise;
       } else {
-        const lead = _s.copy(S.position).addScaledVector(S.velocity, clamp(dist / 900, 0, 2.5));
+        const lead = _s.copy(tp).addScaledVector(tv, clamp(dist / 900, 0, 2.5));
         desired.copy(lead).sub(e.pos);
         maxG = 7; useAB = dist > 1500 || desired.y > 0.25 * desired.length();
       }
@@ -1462,6 +1472,17 @@ export function createCombat(THREE, env) {
   function destroyEnemy(e, byMissile, how) {
     if (!e.alive) return;
     e.alive = false;
+    // A limping WARDEN-2 is saved once every assigned pursuer is destroyed.
+    if (C.limp && C.limp.st === 'LIMPING') {
+      const idx = enemies.indexOf(e);
+      for (let i = 0; i < C.limp.n; i++) if (C.limp.pursuers[i] === idx) { C.limp.pursuers[i] = -1; break; }
+      let live = false;
+      for (let i = 0; i < C.limp.n; i++) {
+        const pi = C.limp.pursuers[i];
+        if (pi >= 0 && enemies[pi] && enemies[pi].alive) { live = true; break; }
+      }
+      if (!live && C.limp.w && C.limp.w.hp > 0) saveWingman();
+    }
     // One slow-mo pulse per kill: close gun kill or any ace. A new kill restarts it.
     const close = !byMissile && !how && e.pos.distanceTo(S.position) < 450;
     const aceK = e.aceFlight || /^CRIMSON-/.test(e.label || '') || e.ace;
@@ -1526,6 +1547,7 @@ export function createCombat(THREE, env) {
     KILL:          { text: 'TARGET DESTROYED', pts: 0, mult: 0.5, color: '#58ff9a' },
     ACE_KILL:      { text: 'ACE KILL',      pts: 5000, mult: 1.0, color: '#ff3b5c' },
     WING_RIP:      { text: 'WING RIP',      pts: 300, mult: 0.5,  color: '#ffd45a' },
+    WING_SAVED:    { text: 'WINGMAN SAVED', pts: LIMP_SAVE_PTS, mult: 0, color: '#5fe8ff' },
     GUNS_KILL:     { text: 'GUNS KILL',     pts: 400, mult: 0.5,  color: '#58ff9a' },
     SWEEP:         { text: '4AAM SWEEP',    pts: 500, mult: 0.75, color: '#ffd45a' },
     CLOSE_CALL:    { text: 'CLOSE CALL',    pts: 250, mult: 0.5,  color: '#58ff9a' },
@@ -1816,16 +1838,46 @@ export function createCombat(THREE, env) {
   const _wfFull = new THREE.Matrix4(), _wfNone = new THREE.Matrix4(), _wfM = new THREE.Matrix4();
   const _wfNz = new THREE.Vector3(), _wfP = new THREE.Vector3(), _wfPo = new THREE.Vector3(), _wfPc = new THREE.Vector3();
   const _wfS1 = new THREE.Vector3(), _wfS2 = new THREE.Vector3();
+  const _flFrustum = new THREE.Frustum(), _flProj = new THREE.Matrix4(), _flSphere = new THREE.Sphere();
+  let fleetActiveCount = 0;
+  function cullFleet() {
+    if (!fleet.length) return;
+    if (!fleetActiveCount) {
+      for (const f of fleet) f.inst.visible = false;
+      if (glowMesh) glowMesh.visible = false;
+      if (flameOuter) flameOuter.visible = false;
+      if (flameCore) flameCore.visible = false;
+      return;
+    }
+    let anyVisible = !camera;
+    if (camera) {
+      _flProj.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+      _flFrustum.setFromProjectionMatrix(_flProj);
+      for (let i = 0; i < fleetActiveCount; i++) {
+        const e = enemies[i];
+        if (!e || (!e.alive && !e.wreck)) continue;
+        _flSphere.set(e.pos, 28);
+        if (_flFrustum.intersectsSphere(_flSphere) || e.pos.distanceToSquared(camera.position) < 900) { anyVisible = true; break; }
+      }
+    }
+    for (const f of fleet) f.inst.visible = anyVisible;
+    if (glowMesh) glowMesh.visible = anyVisible;
+    if (flameOuter) flameOuter.visible = anyVisible;
+    if (flameCore) flameCore.visible = anyVisible;
+  }
   function writeFleet() {
     if (!fleet.length) return;
-    enemies.forEach((e, i) => {
+    let maxIdx = -1;
+    for (let i = 0; i < enemies.length; i++) {
+      const e = enemies[i];
       const vis = e.alive || !!e.wreck, sk = e.scale || 1;                 // strike bombers: 1.35x airframe
+      if (vis) maxIdx = i;
       _wfFull.compose(e.pos, e.quat, vis ? _wfScale.set(sk, sk, sk) : _wfZero);
       _wfNone.compose(e.pos, e.quat, _wfZero);
       for (const f of fleet) f.inst.setMatrixAt(i, (f.part === 'L' && e.wingOffL) || (f.part === 'R' && e.wingOffR) ? _wfNone : _wfFull);
       const ab = e.alive ? e.ab : 0, on = ab > 0.05;
-      nozzles.forEach((nz0, k) => {
-        _wfNz.copy(nz0);
+      for (let k = 0; k < nozzles.length; k++) {
+        _wfNz.copy(nozzles[k]);
         if (sk !== 1) _wfNz.multiplyScalar(sk);
         _wfP.set(_wfNz.x, _wfNz.y, _wfNz.z + 1.9).applyQuaternion(e.quat).add(e.pos);
         glowMesh.setMatrixAt(i * 2 + k, _wfM.compose(_wfP, e.quat, e.alive ? _wfOne : _wfZero));
@@ -1836,11 +1888,21 @@ export function createCombat(THREE, env) {
         _wfPc.set(_wfNz.x, _wfNz.y, _wfNz.z + 1.0 + 1.3 * lc).applyQuaternion(e.quat).add(e.pos);
         flameOuter.setMatrixAt(i * 2 + k, _wfM.compose(_wfPo, e.quat, on ? _wfS1.set(0.8 + 0.3 * ab, 0.8 + 0.3 * ab, lo) : _wfZero));
         flameCore.setMatrixAt(i * 2 + k, _wfM.compose(_wfPc, e.quat, on ? _wfS2.set(1, 1, lc) : _wfZero));
-      });
-    });
-    for (const f of fleet) f.inst.instanceMatrix.needsUpdate = true;
-    glowMesh.instanceMatrix.needsUpdate = true;
-    flameOuter.instanceMatrix.needsUpdate = true; flameCore.instanceMatrix.needsUpdate = true;
+      }
+    }
+    fleetActiveCount = maxIdx + 1;
+    for (const f of fleet) {
+      f.inst.count = fleetActiveCount;
+      if (fleetActiveCount > 0) f.inst.instanceMatrix.needsUpdate = true;
+    }
+    glowMesh.count = fleetActiveCount * 2;
+    flameOuter.count = fleetActiveCount * 2;
+    flameCore.count = fleetActiveCount * 2;
+    if (fleetActiveCount > 0) {
+      glowMesh.instanceMatrix.needsUpdate = true;
+      flameOuter.instanceMatrix.needsUpdate = true; flameCore.instanceMatrix.needsUpdate = true;
+    }
+    cullFleet();
   }
 
   /* =========================================================== lock-on */
@@ -2542,58 +2604,223 @@ export function createCombat(THREE, env) {
   }
 
   /* ======================================================= missile flight */
-  // WARDEN flight: G toggles formation / engage. Friendly shots never touch the
+  // WARDEN flight: G cycles FORM -> COVER -> FOCUS. Friendly shots never touch the
   // hostile director budget, and wingman kills award no player score.
-  function setWingOrder(order) {
-    C.wingOrder = order || (C.wingOrder === 'ENGAGE' ? 'FORM' : 'ENGAGE');
-    C.wingOrderT = performance.now();
-    if (C.wingOrder === 'ENGAGE' && env.onRadio) env.onRadio('ON_WINGMAN_ENGAGE');
-    else if (env.onWing) env.onWing('Reforming echelon, Lead.', 'WARDEN');
-    return C.wingOrder;
+  function setWingOrder(next) {
+    const i = Number.isInteger(next) && next >= 0 && next < WING_ORDERS.length
+      ? next : (C.wingOrder + 1) % WING_ORDERS.length;
+    C.wingOrder = i; C.wingOrderT = performance.now(); C.orderBadgeT = ORDER_BADGE_S;
+    const ws = env.getWingmen ? env.getWingmen() : null;
+    if (ws) for (let k = 0; k < ws.length; k++) if (ws[k]) {
+      ws[k].tgt = null; ws[k].pickT = 0;
+      if (i === 0 && ws[k].homeOff) ws[k].off.copy(ws[k].homeOff);
+    }
+    if (env.onWing) env.onWing(ORDER_TEXT[i], 'WARDEN-2', '#00ff66');
+    if (i !== 0 && env.onRadio) env.onRadio('ON_WINGMAN_ENGAGE');
+    if (env.debug) console.log('[ANGELS_ZERO] wing order=' + WING_ORDERS[i]);
+    return WING_ORDERS[i];
+  }
+  // Pick a target every 0.5 s per wingman. COVER scores rear-hemisphere lockers
+  // at 0.35x range; FOCUS shares C.designated with a 400 m bracket for WARDEN-3.
+  function pickWingTarget(w, wi, dt) {
+    w.pickT -= dt;
+    if (w.pickT > 0) return w.tgt;
+    w.pickT = 0.5;
+    if (C.wingOrder === 0) { w.tgt = null; if (w.homeOff) w.off.copy(w.homeOff); return null; }
+    if (C.wingOrder === 2) {
+      const d = C.designated;
+      if (!d || !d.alive) {
+        if (performance.now() - C.wingNoDesignationT > 3000) {
+          C.wingNoDesignationT = performance.now();
+          if (env.onWing) env.onWing('NO DESIGNATION — COVERING', 'WARDEN-2', '#ffb838');
+        }
+        setWingOrder(1);                                  // drop to COVER, no target this tick
+        return null;
+      }
+      w.tgt = d; return d;
+    }
+    let best = null, bestScore = Infinity;
+    _wmFwd.set(0, 0, -1).applyQuaternion(S.quaternion);
+    for (const e of enemies) {
+      if (!e.alive || e.wingTarget) continue;
+      const d = e.pos.distanceTo(S.position);
+      if (d > 3 * NM) continue;
+      _wmRel.copy(e.pos).sub(S.position).normalize();
+      const threat = e.bLock > 0 || (d < COVER_R && _wmFwd.dot(_wmRel) < COVER_REAR_COS);
+      const score = d * (threat ? 0.35 : 1);
+      if (score < bestScore) { bestScore = score; best = e; }
+    }
+    if (!best && C.mcfg.stages) {                        // no bandits: finish damaged escorts only
+      for (const t of stagedShips) {
+        if (!t.alive || t.kind === 'CV_FLAG' || t.hp > 2) continue;
+        const d = t.pos.distanceTo(S.position);
+        if (d > 1500 || d >= bestScore) continue;
+        bestScore = d; best = t;
+      }
+    }
+    if (!best) { w.tgt = null; if (w.homeOff) w.off.copy(w.homeOff); }
+    else w.tgt = best;
+    return best;
+  }
+  function wingSlot(w, wi, best) {
+    _wmTarget.copy(best.pos);
+    if (C.wingOrder === 2 && wi === 1) _wmTarget.x += 400;   // WARDEN-3 bracket
+    else if (C.wingOrder === 1) _wmTarget.addScaledVector(best.fwd || _wmFwd.set(0, 0, -1), -600);
+    _wmRel.copy(_wmTarget).sub(S.position);
+    if (_wmRel.length() > 1500) _wmTarget.copy(S.position).add(_wmRel.setLength(1500));
+    w.off.copy(_wmTarget).sub(S.position).applyQuaternion(_wmInv.copy(S.quaternion).invert());
+  }
+  // --- wounded wingman (LIMPING) ------------------------------------------------
+  function limpDestination(out) {
+    const a = C.ally;
+    if (a && a.root && a.root.visible && C.carrierVisible) {
+      out.copy(a.root.position);
+      _wmRel.set(0, 0, (a.len || 360) * 0.5).applyQuaternion(a.root.quaternion);
+      out.add(_wmRel); out.y = 1500;
+    } else {
+      const rw = env.runway || {};
+      out.set(rw.x || 900, 1500, ((rw.z0 || -1800) + (rw.z1 || 2000)) * 0.5);
+    }
+    return out;
+  }
+  function assignLimpPursuers(w) {
+    const L = C.limp;
+    L.n = 0;
+    let i0 = -1, i1 = -1, d0 = Infinity, d1 = Infinity;
+    for (let i = 0; i < enemies.length; i++) {
+      const e = enemies[i];
+      if (!e.alive || e.ace || e.aceFlight || e.bomber || e.wingTarget) continue;
+      const d = e.pos.distanceToSquared(w.pos);
+      if (d < d0) { d1 = d0; i1 = i0; d0 = d; i0 = i; }
+      else if (d < d1) { d1 = d; i1 = i; }
+    }
+    for (let k = 0; k < 2; k++) {
+      const idx = k ? i1 : i0;
+      if (idx < 0) continue;
+      const e = enemies[idx];
+      e.wingTarget = w; e.tac = e.mode = 'ENGAGE'; e.mslCD = 999; e.bLock = 0;
+      L.pursuers[L.n++] = idx;
+    }
+    for (let k = L.n; k < LIMP_PURSUERS; k++) {
+      let idx = -1;
+      for (let i = 0; i < enemies.length; i++) if (!enemies[i].alive && !enemies[i].aceFlight && !enemies[i].bomber) { idx = i; break; }
+      if (idx < 0) break;
+      const e = enemies[idx];
+      resetAI(e); clearAce(e);
+      _wmRel.set(0, 0, -1).applyQuaternion(w.quat);
+      e.pos.copy(w.pos).addScaledVector(_wmRel, -3000); e.pos.y = Math.max(900, w.pos.y);
+      e.prev.copy(e.pos); e.fwd.copy(w.pos).sub(e.pos).normalize();
+      e.vel.copy(e.fwd).multiplyScalar(e.speed);
+      e.alive = true; e.wreck = null; e.tac = e.mode = 'ENGAGE';
+      e.mslCD = 999; e.bLock = 0; e.hp = e.hpMax = 100; e.wingTarget = w;
+      L.pursuers[L.n++] = idx;
+    }
+    writeFleet();
+  }
+  function triggerWoundedWingman(force = false) {
+    const L = C.limp;
+    if (C.missionId !== 'AIR_SUPERIORITY' && C.missionId !== 'NAVAL_BATTLE') return false;
+    if (L.st !== 'IDLE' || L.used) return false;
+    const ws = env.getWingmen ? env.getWingmen() : null;
+    const w = ws && ws[0];
+    if (!w || !w.alive) return false;
+    if (w.hp === undefined) { w.hp = 100; w.hpMax = 100; }
+    L.st = 'LIMPING'; L.used = true; L.w = w; L.graceT = 1; L.force = !!force;
+    w.hp = Math.max(1, w.hp);
+    w.limping = true; w.tgt = null; w.cd = 999;
+    if (!w.limpDest) w.limpDest = new THREE.Vector3();
+    limpDestination(w.limpDest);
+    assignLimpPursuers(w);
+    if (env.onWing) env.onWing("WARDEN-2: I'M HIT — BINGO, LIMPING HOME!", 'WARDEN-2', 'warn');
+    if (env.debug) console.log('[ANGELS_ZERO] limp st=LIMPING pursuers=' + L.n + ' w2hp=' + Math.round(w.hp));
+    return true;
+  }
+  function saveWingman() {
+    const L = C.limp, w = L.w;
+    L.st = 'SAVED';
+    if (w) { w.limping = false; if (env.limpTrail) env.limpTrail.mesh.visible = false; }
+    C.wingSavedBannerT = performance.now();
+    awardStyle('WING_SAVED', w ? w.call : '');
+    pushEvent('WINGMAN SAVED', 'WINGMAN SAVED +1500', LIMP_SAVE_PTS, '#5fe8ff');
+    if (env.onTele && w) env.onTele('WING_SAVED', w.pos);
+    if (env.onWing) env.onWing('WARDEN-2: THANKS ONE, OWE YOU A BEER', 'WARDEN-2', '#00ff66');
+    if (env.debug) console.log('[ANGELS_ZERO] limp SAVED pts=1500');
+  }
+  function loseWingman() {
+    const L = C.limp;
+    L.st = 'LOST';
+    if (L.w) { L.w.limping = false; L.w.alive = false; }
+    if (env.limpTrail) env.limpTrail.mesh.visible = false;
+    if (env.onWing) env.onWing('WARDEN-2 DOWN — NO JOY', 'WARDEN-2', 'warn');
+    if (env.debug) console.log('[ANGELS_ZERO] limp st=LOST');
+  }
+  function resetLimp() {
+    const L = C.limp;
+    for (let i = 0; i < L.n; i++) {
+      const idx = L.pursuers[i];
+      if (idx >= 0 && enemies[idx]) enemies[idx].wingTarget = null;
+    }
+    if (L.w) { L.w.limping = false; if (L.w.hpMax) L.w.hp = L.w.hpMax; }
+    if (env.limpTrail) { env.limpTrail.clear(); env.limpTrail.mesh.visible = false; }
+    L.st = 'IDLE'; L.w = null; L.n = 0; L.used = false; L.graceT = 0;
+    L.pursuers.fill(-1);
+  }
+  function updateLimp(dt, ws) {
+    const L = C.limp;
+    if (L.st === 'IDLE') {
+      const w = ws[0];
+      if (!L.used && w && w.alive && (C.missionId === 'AIR_SUPERIORITY' || C.missionId === 'NAVAL_BATTLE')) {
+        const mt = env.getMissionT ? env.getMissionT() : 0;
+        const hpFrac = w.hp === undefined ? 1 : w.hp / (w.hpMax || 100);
+        const stages = C.mcfg.stages;
+        const midStage = !!(stages && stages.length > 1 && C.stage === Math.floor(stages.length / 2) &&
+          C.stageT && performance.now() / 1000 - C.stageT > 5);
+        if (mt > LIMP_MIN_T && (hpFrac < LIMP_HP_FRAC || midStage)) triggerWoundedWingman();
+      }
+      return;
+    }
+    if (L.st !== 'LIMPING') return;
+    const w = L.w;
+    if (!w || !w.alive || w.hp <= 0) { loseWingman(); return; }
+    L.graceT -= dt;
+    if (L.graceT > 0) w.hp = Math.max(1, w.hp);
+    if (env.limpTrail) {
+      const t = performance.now() / 1000;
+      _wmTarget.copy(w.pos); _wmTarget.y -= 2;
+      env.limpTrail.emit(_wmTarget, 1, t);
+      env.limpTrail.update(camera.position, t);
+      env.limpTrail.mesh.visible = true;
+    }
+    let any = false;
+    for (let i = 0; i < L.n; i++) {
+      const idx = L.pursuers[i];
+      if (idx >= 0 && enemies[idx] && enemies[idx].alive) { any = true; break; }
+    }
+    if (!any && L.n > 0) saveWingman();
   }
   function updateWingmen(dt) {
     if (C.mcfg.wingmen === 'NONE') return;
     const ws = env.getWingmen ? env.getWingmen() : null;
     if (!ws || !ws.length) return;
-    for (const w of ws) {
+    updateLimp(dt, ws);
+    for (let wi = 0; wi < ws.length; wi++) {
+      const w = ws[wi];
       if (!w || !w.alive) continue;
-      if (w.cat && w.cat.ph !== 'AIRBORNE') continue;    // no combat AI until the wingman clears the bow
+      if (w.cat && w.cat.ph !== 'AIRBORNE' && w.cat.ph !== 'NONE') continue;
+      if (w.limping) continue;                            // limping wingman ignores orders
       w.cd -= dt;
-      if (C.wingOrder !== 'ENGAGE' || !env.isReady()) continue;
-      let best = null, bestD = Infinity;
-      _wmFwd.set(0, 0, -1).applyQuaternion(w.quat);
-      for (const e of enemies) {
-        if (!e.alive) continue;
-        const d = e.pos.distanceTo(w.pos);
-        if (d > 3 * NM || d >= bestD) continue;
-        _wmRel.copy(e.pos).sub(w.pos).normalize();
-        if (Math.acos(clamp(_wmFwd.dot(_wmRel), -1, 1)) > 35 * D2R) continue;
-        best = e; bestD = d;
-      }
-      if (!best && C.mcfg.stages) {                        // no bandits: finish damaged escorts only
-        for (const t of stagedShips) {
-          if (!t.alive || t.kind === 'CV_FLAG' || t.hp > 2) continue;
-          const d = t.pos.distanceTo(w.pos);
-          if (d > 3 * NM || d >= bestD) continue;
-          _wmRel.copy(t.pos).sub(w.pos).normalize();
-          if (Math.acos(clamp(_wmFwd.dot(_wmRel), -1, 1)) > 35 * D2R) continue;
-          best = t; bestD = d;
-        }
-      }
+      if (!env.isReady()) continue;
+      const best = pickWingTarget(w, wi, dt);
       if (!best) continue;
-      // Formation slot: 600 m behind the bandit, clamped to 1,500 m from the player.
-      _wmTarget.copy(best.pos).addScaledVector(best.fwd, -600);
-      _wmRel.copy(_wmTarget).sub(S.position);
-      if (_wmRel.length() > 1500) _wmTarget.copy(S.position).add(_wmRel.setLength(1500));
-      w.off.copy(_wmTarget).sub(S.position).applyQuaternion(_wmInv.copy(S.quaternion).invert());
-      if (w.cd > 0) continue;
+      wingSlot(w, wi, best);
+      if (w.cd > 0 || C.wingOrder === 0) continue;
       let inFlight = 0;
       for (const m of missiles) if (m.active && m.wingman === w.id) inFlight++;
       if (inFlight) continue;
       const m = launch(w.pos, w.quat, w.vel, best, false, MSL_FULL, null);
       if (!m) continue;
       m.friendly = true; m.wingman = w.id; w.cd = 7 + 4 * rand();
-      if (env.onRadio) env.onRadio('ON_WINGMAN_ENGAGE');      // voice: deduped by the radio cooldown
+      if (env.onRadio) env.onRadio('ON_WINGMAN_ENGAGE');
     }
   }
   const _mFwd = new THREE.Vector3(), _mL2 = new THREE.Vector3(), _mLos = new THREE.Vector3();
@@ -2811,7 +3038,7 @@ export function createCombat(THREE, env) {
     c.traverse(q => {
       if (!q.isMesh) return;
       q.material = Array.isArray(q.material) ? q.material.map(m => freeMats.get(m) || m) : (freeMats.get(q.material) || q.material);
-      q.castShadow = true;
+      q.castShadow = false;
     });
     node.getWorldScale(c.scale);
     return c;
@@ -3578,19 +3805,31 @@ export function createCombat(THREE, env) {
   const _allyScratch = new THREE.Vector3(), _lpLocal = new THREE.Vector3(), _allyInvQ = new THREE.Quaternion();
   const _allyBox = new THREE.Box3(), _allySize = new THREE.Vector3(), _allyCenter = new THREE.Vector3();
   const _ray = new THREE.Raycaster(), _rayDown = new THREE.Vector3(0, -1, 0), _rayOrigin = new THREE.Vector3();
-  const deckLights = [];
+  const _fbBox = new THREE.Box3();
+  function fastBounds(obj, out) {
+    out.makeEmpty();
+    obj.traverse(o => {
+      if (!o.isMesh || !o.geometry || !o.geometry.boundingBox) return;
+      _fbBox.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld);
+      out.union(_fbBox);
+    });
+    return out;
+  }
   const _deckLightGeo = new THREE.SphereGeometry(0.65, 6, 4);
   const _deckLightMat = new THREE.MeshBasicMaterial({ color: 0xfff0b0, toneMapped: false, fog: false });
+  const deckLightMesh = new THREE.InstancedMesh(_deckLightGeo, _deckLightMat, 32);
+  deckLightMesh.renderOrder = 6; deckLightMesh.frustumCulled = false;
+  const _dlM = new THREE.Matrix4(), _dlP = new THREE.Vector3(), _dlQ = new THREE.Quaternion(), _dlS = new THREE.Vector3(1, 1, 1);
   function placeAllyLights(g, scale, localDeckY) {
-    const n = Math.floor((CARRIER_LEN - 20) / 30);
-    while (deckLights.length < n * 2) {
-      const m = new THREE.Mesh(_deckLightGeo, _deckLightMat); m.renderOrder = 6; deckLights.push(m); g.add(m);
-    }
-    for (let i = 0; i < deckLights.length; i++) {
+    const n = Math.min(16, Math.floor((CARRIER_LEN - 20) / 30));
+    for (let i = 0; i < n * 2; i++) {
       const sp = i % 2 ? 1 : -1, zi = (Math.floor(i / 2) - (n - 1) / 2) * 30;
-      deckLights[i].visible = Math.floor(i / 2) < n;
-      deckLights[i].position.set(sp * (DECK_HALF_W - 1) / scale, localDeckY + 0.3 / scale, zi / scale);
+      _dlP.set(sp * (DECK_HALF_W - 1) / scale, localDeckY + 0.3 / scale, zi / scale);
+      deckLightMesh.setMatrixAt(i, _dlM.compose(_dlP, _dlQ, _dlS));
     }
+    deckLightMesh.count = n * 2;
+    deckLightMesh.instanceMatrix.needsUpdate = true;
+    g.add(deckLightMesh);
   }
   function buildAlliedCarrier() {
     const t = buildCarrier();
@@ -3670,49 +3909,63 @@ export function createCombat(THREE, env) {
       glb.position.set(0, 0, 0);
       root.add(glb); scene.add(root);
       console.assert(glb.parent === root && root === a.root, 'carrier GLB must be mounted under allyRoot');
-      // One-time culling / visible mesh pass; stepAlly owns runtime visibility.
-      glb.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.visible = true; } });
+      // One-time bounding/culling setup; stepAlly owns runtime visibility.
+      glb.traverse(o => {
+        if (!o.isMesh) return;
+        if (o.geometry) {
+          if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+          if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
+        }
+        o.frustumCulled = true; o.visible = true;
+      });
       glb.scale.setScalar(CARRIER_SCALE);
       glb.updateMatrixWorld(true);
       // Align the hull's long axis to local Z (bow toward -Z) regardless of source axes.
-      const hull = new THREE.Box3().setFromObject(glb);
+      const hull = fastBounds(glb, new THREE.Box3());
       let size = hull.getSize(_allySize);
       if (size.x > size.z) { glb.rotation.y += Math.PI / 2; glb.updateMatrixWorld(true); }
-      hull.setFromObject(glb); hull.getSize(_allySize);
+      fastBounds(glb, hull); hull.getSize(_allySize);
       // The island sits near the stern: put it toward +Z so the bow faces -Z.
       let islZ = 0, islN = 0;
       glb.updateMatrixWorld(true);
       glb.traverse(o => {
         if (!o.isMesh || !o.geometry || !o.geometry.attributes.position) return;
-        const pos = o.geometry.attributes.position;
-        for (let i = 0; i < pos.count; i++) {
+        const pos = o.geometry.attributes.position, step = Math.max(1, pos.count >> 10);
+        for (let i = 0; i < pos.count; i += step) {
           _allyScratch.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
           if (_allyScratch.y > hull.max.y - 40) { islZ += _allyScratch.z; islN++; }
         }
       });
       if (islN && islZ / islN < 0) { glb.rotation.y += Math.PI; glb.updateMatrixWorld(true); }
-      hull.setFromObject(glb); hull.getCenter(_allyCenter);
+      fastBounds(glb, hull); hull.getCenter(_allyCenter);
       glb.position.x -= _allyCenter.x; glb.position.z -= _allyCenter.z;
       glb.updateMatrixWorld(true);
       // Scale verification in root-local metres.
-      hull.setFromObject(glb); hull.getSize(_allySize);
+      fastBounds(glb, hull); hull.getSize(_allySize);
       const len = Math.max(_allySize.x, _allySize.z);
       if (len < 340 || len > 380) { glb.scale.multiplyScalar(CARRIER_LEN_M / len); glb.updateMatrixWorld(true); }
       // Root at sea level; the GLB keeps its natural draft as a local offset.
       root.position.copy(oldPos); root.position.y = 0;
       root.rotation.y = oldRotY;
       root.updateMatrixWorld(true);
-      const rayAt = (x, z, label) => {
+      const rayAt = (x, z, label, quiet = false) => {
         _rayOrigin.set(x, 400, z); root.localToWorld(_rayOrigin);
         _ray.set(_rayOrigin, _rayDown);
-        const hs = _ray.intersectObject(glb, true);
+        const cands = [];
+        glb.traverse(o => {
+          if (!o.isMesh || !o.geometry || !o.geometry.boundingBox) return;
+          _fbBox.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld);
+          if (_rayOrigin.x >= _fbBox.min.x - 1 && _rayOrigin.x <= _fbBox.max.x + 1 &&
+              _rayOrigin.z >= _fbBox.min.z - 1 && _rayOrigin.z <= _fbBox.max.z + 1) cands.push(o);
+        });
+        const hs = cands.length ? _ray.intersectObjects(cands, false) : [];
         let y = -Infinity;
         for (const h of hs) {
           if (h.point.y > 400) continue;
           _allyScratch.copy(h.point); root.worldToLocal(_allyScratch);
           if (_allyScratch.y > y) y = _allyScratch.y;
         }
-        if (!Number.isFinite(y)) { console.log('[ANGELS_ZERO] deckRayMiss=' + label); return NaN; }
+        if (!Number.isFinite(y)) { if (!quiet) console.log('[ANGELS_ZERO] deckRayMiss=' + label); return NaN; }
         return y;
       };
       const centre = [rayAt(0, -120, 'centre0'), rayAt(0, -60, 'centre1'), rayAt(0, 0, 'centre2'),
@@ -3726,14 +3979,15 @@ export function createCombat(THREE, env) {
         ['waist0', CAT_WAIST[0].x, CAT_WAIST[0].z], ['jbd', CAT_BOW[0].x, CAT_BOW[0].z + CAT_JBD_DZ],
         ['trap', CAT_TRAP_X, CARRIER_LEN / 2 - 78]];
       for (const tr of tracks) {
-        const y = rayAt(tr[1], tr[2], tr[0]);
-        deckYLocal[tr[0]] = Number.isFinite(y) ? y : CARRIER_TRAP_DY;   // never 0
+        let y = tr[0] === 'waist0' ? rayAt(tr[1], tr[2], tr[0], true) : rayAt(tr[1], tr[2], tr[0]);
+        if (!Number.isFinite(y) && tr[0] === 'waist0') y = rayAt(-14, tr[2], 'waist0');
+        deckYLocal[tr[0]] = Number.isFinite(y) ? y : CARRIER_DECK_ASL;
       }
       a.deckYLocal = deckYLocal;
       a.deckY = CARRIER_DECK_ASL;
       a.deckLocalY = medianY / (glb.scale.y || 1);
       a.deckWorldY = CARRIER_DECK_ASL;
-      hull.setFromObject(glb);
+      fastBounds(glb, hull);
       if (hull.min.y > 0.5 || a.deckY < CARRIER_MIN_FREEBOARD) {
         console.log('[ANGELS_ZERO] carrier waterline FAIL', +hull.min.y.toFixed(2), +a.deckY.toFixed(2));
       }
@@ -3742,8 +3996,8 @@ export function createCombat(THREE, env) {
       glb.updateMatrixWorld(true);
       glb.traverse(o => {
         if (!o.isMesh || !o.geometry || !o.geometry.attributes.position) return;
-        const pos = o.geometry.attributes.position;
-        for (let i = 0; i < pos.count; i++) {
+        const pos = o.geometry.attributes.position, step = Math.max(1, pos.count >> 11);
+        for (let i = 0; i < pos.count; i += step) {
           _allyScratch.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
           if (_allyScratch.x > 15) {
             ix0 = Math.min(ix0, _allyScratch.x); ix1 = Math.max(ix1, _allyScratch.x);
@@ -4554,6 +4808,7 @@ export function createCombat(THREE, env) {
     updateSafe(playerActive);
     C.hitFlash = Math.max(0, C.hitFlash - dt);
     C.missileWarning = Math.max(0, C.missileWarning - dt);
+    C.orderBadgeT = Math.max(0, (C.orderBadgeT || 0) - dt);
     mslCooldown = Math.max(0, mslCooldown - dt);
     if (C.reload > 0) { C.reload -= dt; if (C.reload <= 0) C.ammo = GUN_MAX; }
     if (C.missileReload > 0) { C.missileReload -= dt; if (C.missileReload <= 0) { C.missiles = MSL_MAX; rearm('msl'); } }
@@ -4678,7 +4933,8 @@ export function createCombat(THREE, env) {
     setMissionPhase(p) { setMissionPhase(p); return C.missionPhase; },
     forceStage(n) { C.stage = clamp(n | 0, 0, (C.mcfg.stages ? C.mcfg.stages.length : 1) - 1); spawnStage(C.stage); return C.stage; },
     configureMission(m, mapDef) {
-      C.missionTitle = m.title; C.rtbType = m.rtbType; C.missionBgm = m.bgmScenario;
+      C.missionTitle = m.title; C.missionId = m.id; C.rtbType = m.rtbType; C.missionBgm = m.bgmScenario;
+      C.wingOrder = 0; C.orderBadgeT = 0; resetLimp();
       C.mcfg = missionConfig(m);
       C.stage = 0; C.stageT = 0; C.gateIdx = 0;
       C.samSitesOn = C.mcfg.gatesPath === 'CANYON';
@@ -4712,9 +4968,6 @@ export function createCombat(THREE, env) {
       MP[2].label = stages && stages[1] ? stages[1].label : (m.rtbType === 'CARRIER' ? 'NAVAL STRIKE' : 'SECTOR STRIKE');
       MP[3].label = stages && stages[2] ? stages[2].label : (m.id === 'ACE_DUEL' ? 'CRIMSON DUEL' : 'ACE INTERCEPT');
       MP[4].label = m.rtbType === 'CARRIER' ? 'CARRIER RTB' : 'AFB RTB';
-      MP[2].label = m.rtbType === 'CARRIER' ? 'NAVAL STRIKE' : 'SECTOR STRIKE';
-      MP[3].label = m.id === 'ACE_DUEL' ? 'CRIMSON DUEL' : 'ACE INTERCEPT';
-      MP[4].label = m.rtbType === 'CARRIER' ? 'CARRIER RTB' : 'AFB RTB';
       // The carrier is loaded once and cached; a mission switch only toggles it.
       C.missionCarrier = mapDef && mapDef.carrier ? mapDef.carrier : null;
       if (C.ally && C.missionCarrier) placeCarrier(C.missionCarrier);
@@ -4738,9 +4991,9 @@ export function createCombat(THREE, env) {
       if (env.onMissionComplete) env.onMissionComplete();
     },
     get difficulty() { return C.difficulty; },
-    fireSelected, pickleUp, dropBomb, setWeapon, toggleWeapon, dispenseFlares, dispenseChaff, fireAAM4, activateECM, setWingOrder, spawnAceFlight,
+    fireSelected, pickleUp, dropBomb, setWeapon, toggleWeapon, dispenseFlares, dispenseChaff, fireAAM4, activateECM, setWingOrder, triggerWoundedWingman, spawnAceFlight,
     repairEngines() { resetEngines(); return C.engState; },
-    get surface() { return surface; }, awardStyle, loadCarrier, placeCarrier, allyCollision, updateJbd, mountJbd, onCarrierMounted, CARRIER_GLB, RETURN_Z,
+    get surface() { return surface; }, awardStyle, loadCarrier, placeCarrier, allyCollision, updateJbd, mountJbd, onCarrierMounted, CARRIER_GLB, RETURN_Z, cullFleet,
     // Single visibility writer for the carrier root (and the one shared for heading).
     stepAlly(dt) {
       updateAlly(dt);
@@ -4764,6 +5017,14 @@ export function createCombat(THREE, env) {
     warmVisuals(on) {
       muzzle.visible = muzzleStreak.visible = !!on;
       for (const t of [playerTracers, enemyTracers, baseTracers]) t.mesh.count = on ? Math.max(1, t.list.length) : t.list.length;
+      if (on) {
+        for (const f of fleet) { f.inst.visible = true; f.inst.count = Math.max(1, f.inst.count); }
+        if (glowMesh) { glowMesh.visible = true; glowMesh.count = Math.max(2, glowMesh.count); }
+        if (flameOuter) { flameOuter.visible = true; flameOuter.count = Math.max(2, flameOuter.count); }
+        if (flameCore) { flameCore.visible = true; flameCore.count = Math.max(2, flameCore.count); }
+      } else {
+        writeFleet();
+      }
     },
     // Engine emergency: F routes here while a fire / relight is pending.
     engineEmergency, fireKey, relightOdds,
@@ -4894,7 +5155,9 @@ export function createCombat(THREE, env) {
           feed: C.styleFeed.map(s => s.text).join('|'), score: C.score, flr: C.flares,
           chf: C.chaff, chfMax: C.chaffMax, chaffClouds: chaff.length,
           notch: C.notchT > 0 ? +(performance.now() - C.notchT).toFixed(0) : null,
-          wingOrder: C.wingOrder, wingOrderAge: C.wingOrderT ? +(performance.now() - C.wingOrderT).toFixed(0) : null,
+          wingOrder: C.wingOrder, wingOrderName: WING_ORDERS[C.wingOrder],
+          wingOrderAge: C.wingOrderT ? +(performance.now() - C.wingOrderT).toFixed(0) : null,
+          limp: { st: C.limp.st, n: C.limp.n, w2hp: C.limp.w && C.limp.w.hp !== undefined ? Math.round(C.limp.w.hp) : null },
           aceFlight: { done: aceFlightDone, alive: enemies.filter(e => e.aceFlight && e.alive).length,
             labels: enemies.filter(e => e.aceFlight && e.alive).map(e => e.label).join(',') } },
         phase: { phase: C.phase, wave: C.wave, ace: C.ace, aceDowns: C.aceDowns,

@@ -7,7 +7,7 @@
 // `vertexColors` is enabled permanently at init so switching schemes never
 // recompiles a shader; its only new program is the one-time dice decal material.
 // Model axes: nose -Z, up +Y, right +X, metres.
-import { SQUADRON } from './loadout.js?v=s93d';
+import { SQUADRON } from './loadout.js?v=s95c';
 
 export function createLivery(THREE, model, LIVERIES, wingMeshes = []) {
   const liveryById = id => LIVERIES.find(l => l.id === id) || LIVERIES[0];
@@ -29,30 +29,38 @@ export function createLivery(THREE, model, LIVERIES, wingMeshes = []) {
   };
 
   model.updateMatrixWorld(true);
-  const inv = model.matrixWorld.clone().invert();
-  const meshes = [], bodyMats = new Set(), gapMats = new Set();
+  const inv = new THREE.Matrix4().copy(model.matrixWorld).invert();
+  const meshes = [], bodyMats = new Set(), gapMats = new Set(), seenGeo = new Set();
   const v = new THREE.Vector3(), m4 = new THREE.Matrix4();
-  model.traverse(o => {
-    if (!o.isMesh) return;
-    const mat = o.material;
-    if (Array.isArray(mat)) return;
-    if (GAP.test(mat.name)) { gapMats.add(mat); return; }
-    if (!PAINT.test(mat.name)) return;
-    const g = o.geometry, p = g.attributes.position;
-    if (!g.userData.trimMask) {
-      m4.multiplyMatrices(inv, o.matrixWorld);
-      const mask = new Float32Array(p.count), modelPos = new Float32Array(p.count * 3), accent = new Uint8Array(p.count);
-      for (let i = 0; i < p.count; i++) {
-        v.fromBufferAttribute(p, i).applyMatrix4(m4);
-        mask[i] = trimMask(v.x, v.y, v.z);
-        accent[i] = accentMask(v.x, v.y, v.z);
-        modelPos[i * 3] = v.x; modelPos[i * 3 + 1] = v.y; modelPos[i * 3 + 2] = v.z;
+  const roots = [model];
+  if (wingMeshes && wingMeshes.length) roots.push(wingMeshes[0]);
+  for (const root of roots) {
+    root.updateMatrixWorld(true);
+    const rootInv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+    root.traverse(o => {
+      if (!o.isMesh) return;
+      const mat = o.material;
+      if (Array.isArray(mat)) return;
+      if (GAP.test(mat.name)) { gapMats.add(mat); return; }
+      if (!PAINT.test(mat.name)) return;
+      const g = o.geometry, p = g.attributes.position;
+      if (!p || seenGeo.has(g)) return;
+      seenGeo.add(g);
+      if (!g.userData.trimMask) {
+        m4.multiplyMatrices(rootInv, o.matrixWorld);
+        const mask = new Float32Array(p.count), modelPos = new Float32Array(p.count * 3), accent = new Uint8Array(p.count);
+        for (let i = 0; i < p.count; i++) {
+          v.fromBufferAttribute(p, i).applyMatrix4(m4);
+          mask[i] = trimMask(v.x, v.y, v.z);
+          accent[i] = accentMask(v.x, v.y, v.z);
+          modelPos[i * 3] = v.x; modelPos[i * 3 + 1] = v.y; modelPos[i * 3 + 2] = v.z;
+        }
+        g.userData.trimMask = mask; g.userData.modelPos = modelPos; g.userData.accentMask = accent;
+        g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(p.count * 3), 3));
       }
-      g.userData.trimMask = mask; g.userData.modelPos = modelPos; g.userData.accentMask = accent;
-      g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(p.count * 3), 3));
-    }
-    meshes.push(o); bodyMats.add(mat);
-  });
+      meshes.push(o); bodyMats.add(mat);
+    });
+  }
 
   const PAINT_GAIN = 0.66;
   function lumRef(tex) {
@@ -118,9 +126,15 @@ export function createLivery(THREE, model, LIVERIES, wingMeshes = []) {
     d.rotation.y = side < 0 ? -Math.PI / 2 : Math.PI / 2;
     d.renderOrder = 3;
     parent.add(d); decals.push(d);
-    for (const wm of wingMeshes) {                            // wingmen were cloned before the decals existed
+    parent.updateMatrixWorld(true);
+    d.updateMatrixWorld();
+    const modelMat = m4.multiplyMatrices(inv, d.matrixWorld);
+    for (const wm of wingMeshes) {                            // wingmen were cloned/merged before the decals existed
       const wr = wm && wm.getObjectByName(name), wp = wr ? wr.parent : wm;
-      if (wp) wp.add(d.clone());                               // clone shares geometry and material, never clones either
+      if (!wp) continue;
+      const dc2 = d.clone();
+      if (!wr) modelMat.decompose(dc2.position, dc2.quaternion, dc2.scale);
+      wp.add(dc2);                                            // clone shares geometry and material, never clones either
     }
   }
 

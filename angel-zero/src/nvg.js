@@ -27,9 +27,9 @@ export function createNVG(THREE, renderer, post) {
     const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 0 });
     composer = new post.EffectComposer(renderer, rt);
     renderPass = new post.RenderPass(new THREE.Scene(), new THREE.PerspectiveCamera());
-    bloom = new post.UnrealBloomPass(new THREE.Vector2(Math.floor(size.x * 0.35), Math.floor(size.y * 0.35)), 0.48, 0.32, 0.92);
+    bloom = new post.UnrealBloomPass(new THREE.Vector2(Math.max(1, Math.floor(size.x * 0.25)), Math.max(1, Math.floor(size.y * 0.25))), 0.48, 0.32, 0.92);
     composer.addPass(renderPass); composer.addPass(bloom); composer.addPass(new post.OutputPass());
-    bloom.setSize(Math.floor(size.x * 0.35), Math.floor(size.y * 0.35));    // composer.addPass set it full-res
+    bloom.setSize(Math.max(1, Math.floor(size.x * 0.25)), Math.max(1, Math.floor(size.y * 0.25)));    // composer.addPass set it full-res
   }
   const mk = (w, h) => new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, depthBuffer: true, samples: 0 });
   const sceneRT = mk(size.x, size.y);
@@ -127,7 +127,7 @@ export function createNVG(THREE, renderer, post) {
     compMat.uniforms.uAspect.value = size.x / size.y;
     if (composer) {
       composer.setSize(size.x, size.y);                                       // target pixel ratio is 1: drawing-buffer px
-      bloom.setSize(Math.floor(size.x * 0.35), Math.floor(size.y * 0.35));    // 0.35-res bloom chain
+      bloom.setSize(Math.max(1, Math.floor(size.x * 0.25)), Math.max(1, Math.floor(size.y * 0.25)));    // 0.25-res bloom chain
     }
   }
   // Renders the frame: through the HDR bloom composer in normal vision, through the tubes with NVG.
