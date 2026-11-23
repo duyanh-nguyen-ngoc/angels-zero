@@ -8,13 +8,13 @@
 // burning wrecks that splash, scoring, waves, lock-on and threat warnings.
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { DIFFICULTY_PRESETS } from './difficulty.js?v=s9ba';
-import { SPW } from './loadout.js?v=s9ba';
-import { missionConfig } from './missions.js?v=s9ba';
+import { DIFFICULTY_PRESETS } from './difficulty.js?v=s9bc';
+import { SPW } from './loadout.js?v=s9bc';
+import { missionConfig } from './missions.js?v=s9bc';
 import { gorgeCentreX, gorgeSlope, gorgeHeading, gorgeDist, GORGE_GATE_Z, GORGE_GATE_N, GORGE_FLOOR_Y, GORGE_RIM_Y,
   GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_FORT, GORGE_ARC_M, GORGE_SPAWN_Z, CEIL_M,
   GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_ZB, GORGE_SC_HALF_W, GORGE_SC_ARCH_Z, GORGE_SC_ARCH_Y0,
-  GORGE_SC_ARCH_W, GORGE_SC_SKIP, GORGE_SC_SAVE_M } from './maps.js?v=s9ba';
+  GORGE_SC_ARCH_W, GORGE_SC_SKIP, GORGE_SC_SAVE_M } from './maps.js?v=s9bc';
 
 const NM = 1852, FT = 0.3048, G0 = 9.81;
 // Allied CVN model: same 360 m deck as the procedural ship, re-anchored to the GLB.
@@ -139,6 +139,8 @@ export function createCombat(THREE, env) {
     ambushActive: false, buzzTower: 0, buzzJet: 0,
     droneInboundT: 0, droneClearedT: 0, scrambleT: 0, bwBannerT: 0, intrBannerT: 0,
     wingRoles: { w2: 'CAP', w3: 'STRIKE' },
+    inESM: false, esmOn: false, esmBaseOn: false, esmDisabled: false, iceSlow: false,
+    esmPos: new THREE.Vector3(), esmT: 0, esmTheta: 0, esmMsgT: 0, esmLogT: 0,
     bw: { eligible: false, landed: false, logged: false },
     intr: { st: 'IDLE', t: 0, ace: -1, used: false, farT: 0 },
     wingHold: false,
@@ -758,6 +760,7 @@ export function createCombat(THREE, env) {
     m.guidance = guidance || (quality === SAM_Q ? 'RADAR' : 'IR'); m.notchT = 0; m.chaffSalvo = -1;
     m.cloudLost = false; m.cloudT = 0; m.cloud = 0; m.reacquired = false;
     m.terrainLost = false; m.maskT = 0; m.sam = false; m.friendly = false;
+    m.esm = !enemy && !!C.inESM;                             // latched at launch
     m.mesh.position.copy(fromPos); m.mesh.quaternion.copy(fromQuat); m.mesh.visible = true; m.plume.visible = false;
     if (m.visual) { m.mesh.remove(m.visual); m.visual = null; }
     for (const p of m.parts) p.visible = !visual;
@@ -2569,7 +2572,7 @@ export function createCombat(THREE, env) {
     const inSeeker = C.jamming <= 0.5 && d < (qaam ? QAAM_RANGE : LOCK_RANGE) && off < (qaam ? QAAM_HALF : DIFF.seekerHalf) &&
       (qaam ? C.qaam > 0 && C.qaamReload <= 0 : C.missiles > 0 && C.missileReload <= 0);
     const lockT = (qaam ? QAAM_LOCK : DIFF.lockTime) * (t.kind === 'DRONE' ? 0.6 : 1);
-    C.lockProgress = clamp(C.lockProgress + (obscured ? -1.0 * dt : inSeeker ? dt / lockT : -LOCK_DECAY * dt), 0, 1);
+    C.lockProgress = clamp(C.lockProgress + (obscured ? -1.0 * dt : inSeeker ? dt / lockT * (C.inESM ? ESM_LOCK_K : 1) : -LOCK_DECAY * dt), 0, 1);
     const prev = C.lockState;
     if (obscured && !wasObscured) {
       say('CLOUD OBSCURED — ' + t.label, 1.4, '#ffbf3f');
@@ -2602,7 +2605,7 @@ export function createCombat(THREE, env) {
       const inCone = d < AAM4_RANGE && off < DIFF.aam4Half && C.aam4 > 0 && C.aam4Reload <= 0;
       const prev = C.multiState[i];
       const lockT = DIFF.aam4Lock * (e.kind === 'DRONE' ? 0.6 : 1);
-      let p = C.seekerArmed ? clamp(C.multiProg[i] + (obsc ? -1.0 * dt : inCone ? dt / lockT : -LOCK_DECAY * dt), 0, 1) : 0;
+      let p = C.seekerArmed ? clamp(C.multiProg[i] + (obsc ? -1.0 * dt : inCone ? dt / lockT * (C.inESM ? ESM_LOCK_K : 1) : -LOCK_DECAY * dt), 0, 1) : 0;
       C.multiProg[i] = p;
       const st = p >= 1 ? 'LOCK' : p > 0 ? 'ACQ' : 'NONE';
       C.multiState[i] = st;
@@ -2671,13 +2674,14 @@ export function createCombat(THREE, env) {
       for (const st of stores.msl) st.node.visible = false;
       return;
     }
-    if (C.qaamReload > 0) { C.qaamReload -= dt; if (C.qaamReload <= 0) { C.qaam = QAAM_MAX; say('QAAM RELOADED', 1.0); } }
+    const rk = C.inESM ? ESM_RELOAD_K : 1;
+    if (C.qaamReload > 0) { C.qaamReload -= dt * rk; if (C.qaamReload <= 0) { C.qaam = QAAM_MAX; say('QAAM RELOADED', 1.0); } }
     for (let i = ripple.length - 1; i >= 0; i--) {
       const r = ripple[i]; r.t -= dt;
       if (r.t <= 0) { ripple.splice(i, 1); launchAAM(r.target && r.target.alive ? r.target : null); }
     }
     if (aamRack > 0) { aamRack -= dt; if (aamRack <= 0) for (const st of stores.msl) st.aamHidden = false; }
-    if (C.aam4Reload > 0) { C.aam4Reload -= dt; if (C.aam4Reload <= 0) { C.aam4 = AAM4_MAX; say('4AAM RELOADED', 1.0); } }
+    if (C.aam4Reload > 0) { C.aam4Reload -= dt * rk; if (C.aam4Reload <= 0) { C.aam4 = AAM4_MAX; say('4AAM RELOADED', 1.0); } }
     for (const st of stores.msl) st.node.visible = !st.mslSpent && !st.aamHidden;
   }
 
@@ -3764,6 +3768,7 @@ export function createCombat(THREE, env) {
           m.lostTrack = true; m.cloudLost = true; m.life = Math.min(m.life, m.age + 1.5);
           C.missileWarning = 0; cloudClear = 1.2;
           C.cloudBreaks = (C.cloudBreaks || 0) + 1;
+          if (S.cloudIce > 0.65) C.iceSlow = true;
           say('CLOUD COVER // MISSILE LOST', 2.2, '#52ff9c');
           pushEvent('EVADED', 'CLOUD COVER // MISSILE LOST', 0, '#52ff9c');
           if (env.onSfx) env.onSfx('lockdrop', null, 1);
@@ -3819,7 +3824,7 @@ export function createCombat(THREE, env) {
               _mAcc.addScaledVector(m.jit, q.noise * 25 * G0);
             }
             _mAcc.y += G0;                                          // gravity compensation
-            const lim = m.vel.length() * q.turn;
+            const lim = m.vel.length() * q.turn * (m.esm ? ESM_TURN_K : 1);
             if (_mAcc.length() > lim) _mAcc.setLength(lim);
             m.vel.addScaledVector(_mAcc, dt);
             const fuse = (tgt && tgt.kind === 'DRONE') ? DRONE_HIT_R + 4 : m.enemy ? 22 : 18;
@@ -4750,6 +4755,44 @@ export function createCombat(THREE, env) {
   // Friendly CVN: same carrier geometry, but never a surface target / emitter.
   // Procedural ship is the default; the detailed GLB swaps in asynchronously later.
   const RETURN_Z = 8000, RETURN_CD = 25;
+  // Friendly ESM umbrella: carrier (NAVAL) or orbiting AWACS (AIR_SUPERIORITY).
+  const ESM_R = 4500, ESM_HYST = 150;
+  const ESM_LOCK_K = 1.6, ESM_TURN_K = 1.25, ESM_RELOAD_K = 1.3;
+  const AWACS_ORBIT_R = 9000, AWACS_ALT = 7500, AWACS_W = 0.012;
+  const AWACS_CENTER = [0, 0, -2000];
+  function updateESM(dt) {
+    if (!C.esmBaseOn || C.esmDisabled) { C.esmOn = false; C.inESM = false; return; }
+    let on = true;
+    if (C.missionId === 'NAVAL_BATTLE') {
+      const a = C.ally;
+      if (C.carrierVisible === false || !a || !a.root) on = false;
+      else C.esmPos.copy(a.root.position);
+    } else {
+      C.esmTheta += AWACS_W * dt;
+      C.esmPos.set(AWACS_CENTER[0] + Math.cos(C.esmTheta) * AWACS_ORBIT_R, AWACS_ALT,
+        AWACS_CENTER[2] + Math.sin(C.esmTheta) * AWACS_ORBIT_R);
+    }
+    C.esmOn = on;
+    if (!on) { C.inESM = false; return; }
+    const d = Math.hypot(S.position.x - C.esmPos.x, S.position.z - C.esmPos.z);
+    const inside = C.inESM ? d < ESM_R + ESM_HYST : d < ESM_R;
+    if (inside !== C.inESM) {
+      C.inESM = inside;
+      const now = performance.now();
+      if (inside && now - C.esmMsgT > 20000) {
+        C.esmMsgT = now;
+        say("OVERLORD: YOU'RE IN MY UMBRELLA, ANGEL — ESM LINK UP", 2.6, '#00c8ff');
+        if (env.onESM) env.onESM(true);
+      } else if (!inside) {
+        say('ESM LINK LOST', 1.4, '#ffb838');
+        if (env.onESM) env.onESM(false);
+      }
+    }
+    C.esmT = C.inESM ? C.esmT + dt : 0;
+    if (env.debug && C.inESM && Math.floor(C.esmT) !== Math.floor(C.esmT - dt)) {
+      console.log('[ANGELS_ZERO] esm in=1 d=' + Math.round(d) + ' lockK=' + ESM_LOCK_K);
+    }
+  }
   let lastReturn = -1e9, prevReturnZ = S.position.z;
   const _allyScratch = new THREE.Vector3(), _lpLocal = new THREE.Vector3(), _allyInvQ = new THREE.Quaternion();
   const _allyBox = new THREE.Box3(), _allySize = new THREE.Vector3(), _allyCenter = new THREE.Vector3();
@@ -5773,7 +5816,7 @@ export function createCombat(THREE, env) {
     C.orderBadgeT = Math.max(0, (C.orderBadgeT || 0) - dt);
     mslCooldown = Math.max(0, mslCooldown - dt);
     if (C.reload > 0) { C.reload -= dt; if (C.reload <= 0) C.ammo = GUN_MAX; }
-    if (C.missileReload > 0) { C.missileReload -= dt; if (C.missileReload <= 0) { C.missiles = MSL_MAX; rearm('msl'); } }
+    if (C.missileReload > 0) { C.missileReload -= dt * (C.inESM && !C.weaponsLock.msl ? ESM_RELOAD_K : 1); if (C.missileReload <= 0) { C.missiles = MSL_MAX; rearm('msl'); } }
     if (C.bombReload > 0) { C.bombReload -= dt; if (C.bombReload <= 0) { C.bombs = stores.bomb.length; rearm('bomb'); } }
     bombCooldown = Math.max(0, bombCooldown - dt);
     playerActiveNow = opts.playerActive;
@@ -5788,6 +5831,7 @@ export function createCombat(THREE, env) {
     C.playerInCloud = C.playerCloud > CLOUD_T;
     for (const e of enemies) e.cloud = e.alive ? cloudAt(e.pos) : 0;
     cloudClear = Math.max(0, cloudClear - dt);
+    updateESM(dt);
 
     if (ready) {
       if (C.mode !== 'FURBALL' && !stagedMission() && C.missionPhase === 3 && !aceFlightDone && C.phase !== 3 && waveAlive() <= WAVE_SIZE * 0.5) spawnAceFlight();
@@ -5929,6 +5973,8 @@ export function createCombat(THREE, env) {
     forceStage(n) { C.stage = clamp(n | 0, 0, (C.mcfg.stages ? C.mcfg.stages.length : 1) - 1); spawnStage(C.stage); return C.stage; },
     configureMission(m, mapDef) {
       C.missionTitle = m.title; C.missionId = m.id; C.rtbType = m.rtbType; C.missionBgm = m.bgmScenario;
+      C.esmBaseOn = !m.gunsOnly && m.id !== 'ACE_DUEL' && m.gatesPath !== 'CANYON' && (m.id === 'NAVAL_BATTLE' || m.id === 'AIR_SUPERIORITY');
+      C.inESM = false; C.esmOn = false; C.esmT = 0; C.esmTheta = 0; C.iceSlow = false;
       C.wingOrder = 0; C.orderBadgeT = 0; resetLimp();
       intrForce = false; intrDisabled = false;
       Object.assign(C.bw, { eligible: false, landed: false, logged: false });
@@ -6015,6 +6061,9 @@ export function createCombat(THREE, env) {
     awardBrokenWing, spawnRaiders, handoffRaiders,
     setIntrusionForce(on) { intrForce = !!on; return intrForce; }, setIntrusionDisabled(on) { intrDisabled = !!on; return intrDisabled; }, forceIntrusion() { return startIntrusion(); },
     get intrusion() { return C.intr; },
+    get esm() { return { on: !!C.esmOn, in: !!C.inESM, x: C.esmPos.x, z: C.esmPos.z, r: ESM_R }; },
+    get inESM() { return !!C.inESM; },
+    setESMDisabled(on) { C.esmDisabled = !!on; return C.esmDisabled; },
     get sc() { return C.sc; },
     spawnDroneSwarm(n = SWARM_MAX, anchor = 'PLAYER') { return spawnSwarm(n, anchor); },
     killDrone(i, how = 'GUN') { return killDrone(i, how); },
@@ -6229,7 +6278,8 @@ export function createCombat(THREE, env) {
           shots: C.mslLog.slice(-4).map(x => x.tag + ':' + x.result).join(' '), sams: missiles.filter(m => m.active && m.sam).length, provoked: fleetProvoked,
           fleet: taskForce.map(t => t.id + (t.alive ? ':' + Math.round(100 * t.hp / t.hpMax) : 'x')).join(' '), bombers: enemies.filter(e => e.bomber).map(e => e.label.slice(-1) + (e.alive ? (e.bombed ? 'B' : 'I') : 'x')).join('') },
         lock: { next: C.nextTarget?.label || null, tgt: C.designated?.label || null, state: C.lockState, prog: +C.lockProgress.toFixed(2), off: +((C.seekerOff || 0) / D2R).toFixed(1), nm: +((C.targetRange || 0) / NM).toFixed(2) },
-        cloud: { player: +(C.playerCloud || 0).toFixed(2), tgt: +((C.designated && C.designated.cloud) || 0).toFixed(2), obscured: !!C.targetObscured, breaks: C.cloudBreaks || 0,
+        esm: { on: !!C.esmOn, in: !!C.inESM, t: +C.esmT.toFixed(1) },
+        cloud: { player: +(C.playerCloud || 0).toFixed(2), tgt: +((C.designated && C.designated.cloud) || 0).toFixed(2), obscured: !!C.targetObscured, breaks: C.cloudBreaks || 0, ice: !!C.iceSlow,
           msl: missiles.filter(m => m.active).map(m => (m.q || MSL_FULL).tag + (m.cloudLost ? '/cloudLost' : m.lostTrack ? '/lost' : '') + (m.reacquired ? '/reacq' : '') + ' c' + (m.cloud || 0).toFixed(2)).join(' ') },
         bandit: { lock: +C.banditLock.toFixed(2), rwr: C.rwrTrack, incoming: C.incoming || 0, warn: +C.missileWarning.toFixed(2) },
         sun: { t: +(C.sunT || 0).toFixed(2), blinds: C.sunBlinds || 0, cd: +(C.sunCD || 0).toFixed(2) },

@@ -725,35 +725,35 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s9ba';
-import { createAmbient } from './src/ambient.js?v=s9ba';
-import { createBlastFX } from './src/blastfx.js?v=s9ba';
-import { createHUD } from './src/hud.js?v=s9ba';
-import { createCockpit3D } from './src/cockpit3d.js?v=s9ba';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9ba';
-import { createEjection } from './src/eject.js?v=s9ba';
-import { createAudio } from './src/audio.js?v=s9ba';
-import { createRadio } from './src/radio.js?v=s9ba';
-import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9ba';
-import { createLivery } from './src/livery.js?v=s9ba';
-import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s9ba';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9ba';
-import { createCanopyFX } from './src/canopy.js?v=s9ba';
-import { createNVG } from './src/nvg.js?v=s9ba';
-import { createWorld, WORLD } from './src/world.js?v=s9ba';
-import { createSurfaces } from './src/surfaces.js?v=s9ba';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9ba';
-import { createFreeLook } from './src/freelook.js?v=s9ba';
-import { createCanopyGlass } from './src/canopyglass.js?v=s9ba';
-import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9ba';
-import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9ba';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9bb';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9ba';
-import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9ba';
-import { createRadioQueue } from './src/radioQueue.js?v=s9ba';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9ba';
+import { createVFX } from './src/vfx.js?v=s9bc';
+import { createAmbient } from './src/ambient.js?v=s9bc';
+import { createBlastFX } from './src/blastfx.js?v=s9bc';
+import { createHUD } from './src/hud.js?v=s9bc';
+import { createCockpit3D } from './src/cockpit3d.js?v=s9bc';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9bc';
+import { createEjection } from './src/eject.js?v=s9bc';
+import { createAudio } from './src/audio.js?v=s9bc';
+import { createRadio } from './src/radio.js?v=s9bc';
+import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9bc';
+import { createLivery } from './src/livery.js?v=s9bc';
+import { createGear, GEAR_H, GEAR_PTS } from './src/gear.js?v=s9bc';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9bc';
+import { createCanopyFX } from './src/canopy.js?v=s9bc';
+import { createNVG } from './src/nvg.js?v=s9bc';
+import { createWorld, WORLD } from './src/world.js?v=s9bc';
+import { createSurfaces } from './src/surfaces.js?v=s9bc';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9bc';
+import { createFreeLook } from './src/freelook.js?v=s9bc';
+import { createCanopyGlass } from './src/canopyglass.js?v=s9bc';
+import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9bc';
+import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9bc';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9bc';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9bc';
+import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9bc';
+import { createRadioQueue } from './src/radioQueue.js?v=s9bc';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9bc';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
-  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9ba';
+  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9bc';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -1134,7 +1134,7 @@ const state = {
   position: SPAWN.clone(), velocity: new THREE.Vector3(0, 0, -200), quaternion: new THREE.Quaternion(),
   throttle: 0.65, afterburner: 0, pitchRate: 0, rollRate: 0, yawRate: 0,
   gLoad: 1, alpha: 0, speed: 200, mach: 0.6, heading: 0, pitch: 0, bank: 0, radalt: 1500,
-  gStrain: 0, negGStrain: 0,                        // pilot G physiology: 0 fresh .. 1 G-LOC / redout
+  gStrain: 0, negGStrain: 0, cloudIce: 0,          // pilot G physiology + airframe ice accretion (0..1)
   beta: 0, mass: 20400, cl: 0, cd: 0, stalled: false, fuel: 13455, fuelFlow: 0,   // internal fuel (lb) / total burn (pph)   // sideslip, mass, aero coefficients, low-speed stall (hysteresis)
   ctl: { pitch: 0, roll: 0, yaw: 0, airbrake: 0 },
   psm: false, spin: 0, alphaPk: 0, assist: 0,          // post-stall / ILS-assist state for the HUD
@@ -1162,6 +1162,11 @@ const _limpDir = new THREE.Vector3(), _limpStep = new THREE.Vector3(), _limpQ = 
 // Reused contrail emitter descriptors (lead, WARDEN-2/3, CRIMSON-1/2): filled in place each frame.
 const contrailEm = Array.from({ length: 5 }, () => ({ pos: new THREE.Vector3(), quat: new THREE.Quaternion(), on: false }));
 let cloudWet = 0;
+// Cloud icing risk/reward: ice builds in thick cloud, melts in clear air or burner.
+const ICE_CLOUD_T = 0.45, ICE_FROST_T = 0.35, ICE_WARN_T = 0.65;
+const ICE_BUILD_S = 6.0, ICE_MELT_S = 2.5, ICE_AB_MELT_K = 2.0;
+const ICE_CTRL_LOSS = 0.20, ICE_DRAG_K = 0.12;
+let iceCaution = false, iceCautionT = 0, iceCloudUntil = -1, iceForcedCloud = false;
 
 const mouse = { nx: 0, ny: 0 };
 const keys = { w: false, s: false, a: false, d: false, shift: false, fire: false, b: false,
@@ -1312,6 +1317,9 @@ function resetAircraft() {
   if (DEBUG && Q.has('at') && Q.has('alt')) state.position.y = Number(Q.get('alt')) || SPAWN.y;   // ?alt= is an explicit override of the named spot's altitude
   if (DEBUG && Q.has('contrailalt')) state.position.y = 4000;                                      // contrail test spawn above 12,500 ft
   combatSys.resetPlayer();
+  state.cloudIce = DEBUG && Q.has('ice') ? THREE.MathUtils.clamp(Number(Q.get('ice')) || 0, 0, 1) : 0;
+  iceCaution = false; iceForcedCloud = false;
+  iceCloudUntil = DEBUG && Q.has('icecloud') ? Number(Q.get('icecloud')) : -1;
   roll.left = 0;
   gearAutoLock = false; gearCheckT = 0; state.assist = 0;
   resetKB();
@@ -1608,6 +1616,10 @@ function loadMissionScene(m) {
   waveoff.ids.fill(-1); waveoff.pitchBias = 0; combat.ambushActive = false;
   BUZZ_CDV.fill(0);
   cat.ph = 'NONE'; cat.t = 0; cat.arm = 0; cat.grace = 0; cat.forceAB = false;
+  if (Q.get('esm') === '0') combatSys.setESMDisabled(true);
+  state.cloudIce = DEBUG && Q.has('ice') ? THREE.MathUtils.clamp(Number(Q.get('ice')) || 0, 0, 1) : 0;
+  iceCaution = false; iceForcedCloud = false;
+  iceCloudUntil = DEBUG && Q.has('icecloud') ? Number(Q.get('icecloud')) : -1;
   scramble.st = 'IDLE'; scramble.t = 0; scramble.ids.fill(-1); scramble.rolled = false;
   if (FORCE_INTRUSION) combatSys.setIntrusionForce(true);
   if (NO_INTRUSION) combatSys.setIntrusionDisabled(true);
@@ -2988,6 +3000,31 @@ function updatePhysics(dt) {
     combatSys.updateJbd(combat.ally, cat.ph === 'HOLD' || cat.ph === 'LAUNCH', dt);
   }
   if (cat.ph === 'HOLD' || cat.ph === 'LAUNCH') { catTick(dt); return; }
+  // Cloud ice: scalar state, no allocations. Clear air and afterburner melt it off.
+  if (flightMode === 'FLY' && !autoland.on && !state.onGround) {
+    const wet = iceForcedCloud ? 1 : (combat.playerCloud || 0);
+    if (wet > ICE_CLOUD_T) {
+      const k = (wet - ICE_CLOUD_T) / (1 - ICE_CLOUD_T) * 0.5 + 0.5;
+      state.cloudIce = Math.min(1, state.cloudIce + dt / ICE_BUILD_S * k * (state.afterburner > 0.5 ? 0.5 : 1));
+    } else {
+      state.cloudIce = Math.max(0, state.cloudIce - dt / ICE_MELT_S * (state.afterburner > 0.5 ? ICE_AB_MELT_K : 1));
+    }
+    const warn = state.cloudIce > (iceCaution ? ICE_WARN_T - 0.05 : ICE_WARN_T + 0.05);
+    if (warn !== iceCaution) {
+      iceCaution = warn;
+      if (warn) {
+        iceCautionT = performance.now();
+        combat.iceBannerT = iceCautionT;
+        audio.masterCaution();
+        if (performance.now() / 1000 - (window.__iceRadioT || -1e9) > 30) {
+          window.__iceRadioT = performance.now() / 1000;
+          rq.say({ id: 'ICE_WARN', text: "ANGEL, YOU'RE ICING UP — GET OUT OF THE SOUP OR LIGHT THE BURNERS", pri: 3, cat: 'MISSILE', ch: 'AWACS', duration: 4 }, { bypass: true });
+        }
+      }
+    }
+    combat.iceSlow = state.cloudIce > ICE_WARN_T;
+  }
+  const iceK = 1 - ICE_CTRL_LOSS * THREE.MathUtils.smoothstep(state.cloudIce, ICE_FROST_T, 1);
   // ---- PSM entry (air data from the last integrated velocity; one frame of lag is fine)
   const kts = Math.max(1, state.velocity.length()) * 1.94384;
   // WASD keyboard axes: ramped, blended with the mouse over KB_BLEND_OUT after release.
@@ -3191,20 +3228,20 @@ function updatePhysics(dt) {
   }
   // Pitch moment: control chases qCmd (inertia + q-scaled authority) with aero damping.
   const pitchGain = state.stalled ? 2.2 : (1.0 + 5.0 * authQ);             // stalled: heavy, critically damped
-  let qDot = (qCmd - state.pitchRate) * pitchGain * kyy * machStiff * hydK;
+  let qDot = (qCmd - state.pitchRate) * pitchGain * kyy * machStiff * hydK * iceK;
   // Hammerhead pivot: with the nose vertical, neutral stick lets gravity tip it through.
   if (pivot) {
     // Hammerhead pivot: keep rotating nose-down through the vertical (no FCS
     // recovery spring fighting it), so the nose ends up pointing back at the ground.
     qCmd -= 1.2 + 0.6 * (1 - kts / APEX_KT);
-    qDot = (qCmd - state.pitchRate) * pitchGain * kyy * machStiff * hydK;
+    qDot = (qCmd - state.pitchRate) * pitchGain * kyy * machStiff * hydK * iceK;
     qDot += -0.6 * (1 - kts / APEX_KT);
   }
   state.pitchRate = clamp(state.pitchRate + qDot * dt, psmActive ? -3.6 : -1.4, psmActive ? 3.6 : 1.4);
 
   // Roll: up to ~240 deg/s at high q, degrading with AoA; dihedral rolls away from sideslip.
   const pMax = 4.2 * (0.25 + 0.75 * auth) * (1 - 0.55 * sstep(alpha, 0.2, 0.45)) * hydK;
-  let pCmd = roll.left > 0 ? -roll.dir * ROLL_RATE : -rollIn * pMax * pilotK * (state.stalled ? 0.4 : 1);
+  let pCmd = (roll.left > 0 ? -roll.dir * ROLL_RATE : -rollIn * pMax * pilotK * (state.stalled ? 0.4 : 1)) * iceK;
   // Dihedral (roll due to sideslip): cut to 30 % for small / no rudder (|rudder| < 0.5,
   // i.e. taps) so flat nose nudges don't bank the wings; full with a held rudder.
   const smallYaw = Math.abs(rudderIn) < 0.5;
@@ -3292,7 +3329,7 @@ function updatePhysics(dt) {
   state.cd = CD; state.cl = CL;
   const thrust = (THRUST_DRY * state.throttle + THRUST_AB * state.afterburner) * (0.55 + 0.45 * rho / 1.225) * (1 + 0.12 * Math.min(mach, 1.6))
     * (outSide ? SINGLE_ENGINE_K : 1);                                 // one F100 down: 58 % max thrust
-  _aero.copy(_lift).add(_side).addScaledVector(_vdir, -qBar * WING_AREA * CD);
+  _aero.copy(_lift).add(_side).addScaledVector(_vdir, -qBar * WING_AREA * CD * (1 + ICE_DRAG_K * state.cloudIce));
   _force.copy(_aero).addScaledVector(_fwd, thrust);
   _force.y -= W;
   // Storm gust: +/-0.4 G along the lift axis.
@@ -3864,6 +3901,7 @@ function updateCameraAndVisuals(dt, now) {
   // 3D bubble canopy glass: glare / sheen lighting + water driven by rain, cloud and airspeed.
   canopyGlass.update({ dt, time: simTime, rain: flightMode === 'FLY' ? Math.max(weather.rainHere, cloudWet, ambient.rain) : 0,
     cloud: flightMode === 'FLY' ? Math.max(combat.playerCloud || 0, vfx.mist) : 0, kts: state.speed * 1.94384, rollRate: state.rollRate,
+    frost: THREE.MathUtils.smoothstep(state.cloudIce, ICE_FROST_T, 1),
     sunCol: sunLight.color, sunK: Math.min(1.3, sunLight.intensity / 3.4) * atmosphere.sunVisible, sky: atmosphere.sky.material.uniforms.uMid.value,
     gain: 0.15 + 0.85 * Math.min(1, hemiLight.intensity / 1.5), nvg: nvg.active, visible: firstPerson && flightMode === 'FLY' });
   updateNavLights(simTime);
@@ -4234,6 +4272,7 @@ const combatSys = createCombat(THREE, { scene, camera, renderer, state, combat, 
   sectorAt: world.sectorAt, isTerrainOccluded: world.isTerrainOccluded, fleetLane: world.fleetLane, canyonCenter: world.canyonCenter,
   isReady: () => modelReady && flightMode === 'FLY', onPlayerDown: reason => triggerEject(reason), onSfx, onFlyby, onWing,
   onSlowMo: triggerSlowMo, getWingmen: () => wingmen, addBox: world.addBox, limpTrail,
+    onESM(on) { if (on) rq.say('OVERLORD: YOU ARE IN MY UMBRELLA, ANGEL — ESM LINK UP', { pri: 2, bypass: true, ch: 'AWACS' }); },
     onIntrusion(phase) {
       if (phase === 'CUT') { audio.bgmCut(1.5); hud.setAlertState('NORMAL'); }
       else if (phase === 'SPAWN') {
@@ -4478,7 +4517,7 @@ const hud = createHUD(THREE, {
   getMissileCam: () => (mcam.active && mcam.m) ? { dist: mcam.m.target ? mcam.m.mesh.position.distanceTo(mcam.m.target.pos) : 0, k: mcam.k } : null,
   getStrikeTargets: () => combatSys.strikeTargets,
   getWeakTargets: () => combatSys.weakTargets,
-  getShortcut: () => combatSys.sc,
+  getShortcut: () => combatSys.sc, getESM: () => combatSys.esm,
   getPrimary: () => combatSys.primaryTargets(),
   getCat: () => cat, getCatArmT: () => CAT_ARM_T, getCatMounted: () => !!(combat.ally && combat.ally.glbMounted),
   ilsVisible: () => ilsVisible(), getMissionT: () => missionT, inCutscene: () => inCutscene(),
@@ -4800,6 +4839,7 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
     const catLaunchAt = Q.has('catlaunchat') ? Number(Q.get('catlaunchat')) : -1;
     const engOutAt = Q.has('engoutat') ? Q.get('engoutat').split(':') : null;
     const intrusionAt = Q.has('intrusionat') ? Number(Q.get('intrusionat')) : -1;
+    const awacsAt = Q.has('awacsat') ? Number(Q.get('awacsat')) : -1;
     let intrusionAtDone = false;
     const restartAt = Q.has('restartat') ? Number(Q.get('restartat')) : -1;
     const stageAt = Q.has('stageat') ? Number(Q.get('stageat')) : -1;
@@ -5014,6 +5054,12 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
         combatSys.fireKey(true); combatSys.fireKey(false);
         console.log('[ANGELS_ZERO] engoutat @', t1.toFixed(2), engOutAt[1] || 'L', JSON.stringify(combatSys.stats().eng));
       }
+      if (awacsAt >= t0 && awacsAt < t1) {
+        state.position.set(2000, 7500, -2000);
+        state.velocity.set(0, 0, -210); state.onGround = false;
+        prevPlanePos.copy(state.position);
+        console.log('[ANGELS_ZERO] awacsat @', t1.toFixed(2), 'inESM=', combatSys.inESM);
+      }
       if (intrusionAt >= t0 && intrusionAt < t1 && !intrusionAtDone) {
         intrusionAtDone = true;
         combatSys.setIntrusionForce(true);
@@ -5147,7 +5193,7 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
       'eject', JSON.stringify(eject.info));
     console.log('[ANGELS_ZERO] warp', Q.get('warp'), 's: app', appMode, 't0', sortie.t0.toFixed(2), 'sim', simTime.toFixed(2), 'missionT', missionT.toFixed(2), 'cat', cat.ph, 'catT', +cat.t.toFixed(2), 'wing', wingmen.map(w => w.cat.ph).join(','), 'speed', state.speed.toFixed(1), 'alt', state.position.y.toFixed(0),
       'G', state.gLoad.toFixed(2), 'hdg', state.heading.toFixed(0), 'mach', state.mach.toFixed(2), 'contrail pts', vfx.trailPoints, 'vapor', vfx.vaporLevel.toFixed(2), 'contrails', JSON.stringify(vfx.contrailStats),
-      'cone', vfx.coneOpacity.toFixed(2), 'spray', vfx.sprayCount, 'mist', vfx.mist.toFixed(2), 'dead', combat.dead,
+      'cone', vfx.coneOpacity.toFixed(2), 'spray', vfx.sprayCount, 'mist', vfx.mist.toFixed(2), 'ice', state.cloudIce.toFixed(2), 'iceK', (1 - ICE_CTRL_LOSS * THREE.MathUtils.smoothstep(state.cloudIce, ICE_FROST_T, 1)).toFixed(2), 'inESM', combatSys.inESM, 'dead', combat.dead,
       'bank', (state.bank * 180 / Math.PI).toFixed(0), 'pitch', (state.pitch * 180 / Math.PI).toFixed(0), 'highG', !!state.highG,
       'gear', state.gear.toFixed(2), 'assist', state.assist, 'returnT', +(combat.returnT || 0).toFixed(0),
       'maxG', hud.maxG !== undefined ? hud.maxG : '-', 'fov', camera.fov.toFixed(1), 'head', JSON.stringify(cockpit.head), 'hotas', JSON.stringify(cockpit.hotas),
@@ -5241,6 +5287,7 @@ function stepSim(dt) {
   rq.update(performance.now() / 1000);                    // priority radio queue: no overlap, 0.35 s gaps
   combatSys.stepAlly(dt);                                 // carrier moves before the jet rides its deck
   if (DEBUG && cat.diagAt && simTime >= cat.diagAt) { cat.diagAt = 0; carrierDiag('catEnter+1s'); }
+  iceForcedCloud = DEBUG && iceCloudUntil > simTime;
   if (cat.ph === 'WAIT') return;                          // deck prep: sim frozen until the GLB is mounted
   combat.allyHold = autoland.on || !!carrier.phase || cat.ph === 'HOLD' || cat.ph === 'LAUNCH';
   if (flightMode === 'FLY' && !autoland.on) autolandGateCheck();   // final approach gate -> CARRIER_AUTOLAND
@@ -5308,6 +5355,8 @@ if (DEBUG) {
     get autoland() { return autoland; }, autolandPrompt, engageAutoland, getMusicCtx, get debrief() { return !debriefEl.hidden; },
     get cat() { return cat; }, get skimK() { return skimK; }, catEnter, catTick, catFire, catSnapAll, carrierDiag, enterCarrierLaunch, carrierReady,
     get scramble() { return scramble; }, get bw() { return combat.bw; }, get intrusion() { return combat.intr; },
+    get inESM() { return combatSys.inESM; }, get esm() { return combatSys.esm; }, get cloudIce() { return state.cloudIce; },
+    setESMDisabled: on => combatSys.setESMDisabled(on),
     awardBrokenWing: k => combatSys.awardBrokenWing(k), forceIntrusion: () => combatSys.forceIntrusion(),
     ilsVisible, inCutscene, get missionT() { return missionT; }, applyMapProps,
     getCarrierBox() { const a = combat.ally; if (!a || !a.root) return null; const b = new THREE.Box3().setFromObject(a.root); return { min: b.min.toArray(), max: b.max.toArray() }; },

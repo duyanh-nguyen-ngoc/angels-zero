@@ -83,7 +83,7 @@ export function createCanopyGlass(THREE, env) {
     uSun: { value: sunDir }, uSunCol: { value: new THREE.Color(1, 0.95, 0.85) },
     uSky: { value: new THREE.Color(0.35, 0.5, 0.75) }, uHor: { value: fogColor },
     uGain: { value: 1 }, uGlare: { value: 1 }, uHud: { value: 1 },
-    uTime: { value: 0 }, uRain: { value: 0 }, uMoist: { value: 0 },
+    uTime: { value: 0 }, uRain: { value: 0 }, uMoist: { value: 0 }, uFrost: { value: 0 },
     uFlow: { value: new THREE.Vector2() }, uStretch: { value: 1 }
   };
   const mat = new THREE.ShaderMaterial({
@@ -104,7 +104,7 @@ export function createCanopyGlass(THREE, env) {
       #include <logdepthbuf_pars_fragment>
       uniform vec3 uSun; uniform vec3 uSunCol; uniform vec3 uSky; uniform vec3 uHor;
       uniform float uGain; uniform float uGlare; uniform float uHud;
-      uniform float uTime; uniform float uRain; uniform float uMoist; uniform vec2 uFlow; uniform float uStretch;
+      uniform float uTime; uniform float uRain; uniform float uMoist; uniform float uFrost; uniform vec2 uFlow; uniform float uStretch;
       varying vec3 vWPos; varying vec3 vWN; varying vec2 vUv; varying vec2 vMet;
       float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
       float ggx(float ndh, float a) { float a2 = a * a, d = ndh * ndh * (a2 - 1.0) + 1.0; return a2 / (3.14159265 * d * d); }
@@ -205,7 +205,18 @@ export function createCanopyGlass(THREE, env) {
           float film = wetK * 0.05;
           col += wetC * film; alpha += film * (1.0 - alpha);
         }
-        gl_FragColor = vec4(col + add, clamp(alpha, 0.0, 0.95));
+        // Ice: procedural crystals creep inward from the canopy edge. Hash based,
+        // no texture; the centre sightline stays clear until frost is severe.
+        if (uFrost > 0.01) {
+          float frEdge = smoothstep(0.35, 0.95, length((vUv - 0.5) * vec2(1.0, 1.2)) * 1.6);
+          float crystals = step(0.62, h21(floor(vMet * 55.0) + 2.9)) * 0.55
+            + step(0.86, h21(floor(vMet * 115.0) + 8.1)) * 0.45;
+          float fmask = clamp(frEdge * (0.5 + 0.6 * crystals) * uFrost, 0.0, 1.0);
+          vec3 fcol = vec3(0.68, 0.84, 1.0) * (0.62 + 0.42 * crystals);
+          col = mix(col, fcol, fmask * 0.9);
+          alpha = clamp(alpha + fmask * 0.5, 0.0, 0.97);
+        }
+        gl_FragColor = vec4(col + add, clamp(alpha, 0.0, 0.97));
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`
@@ -237,6 +248,7 @@ export function createCanopyGlass(THREE, env) {
     moist = target > moist ? moist + (target - moist) * Math.min(1, o.dt * 3) : Math.max(target, moist - o.dt / 2.5);
     U.uMoist.value = o.visible ? moist : 0;
     U.uRain.value = o.visible ? o.rain : 0;
+    U.uFrost.value = o.visible ? (o.frost || 0) : 0;
     // Slipstream slide speed over the glass (m/s): slow beads trickle back below
     // ~120 kt, a fast wash above ~200 kt (whips back at dogfight speeds).
     const k = o.kts;
@@ -255,6 +267,6 @@ export function createCanopyGlass(THREE, env) {
   return {
     glass, update,
     get moisture() { return moist; },
-    get stats() { return { rain: +U.uRain.value.toFixed(2), moist: +moist.toFixed(2), flow: +flow.y.toFixed(1), stretch: +U.uStretch.value.toFixed(2) }; }
+    get stats() { return { rain: +U.uRain.value.toFixed(2), moist: +moist.toFixed(2), frost: +U.uFrost.value.toFixed(2), flow: +flow.y.toFixed(1), stretch: +U.uStretch.value.toFixed(2) }; }
   };
 }

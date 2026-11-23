@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.33', title: 'ESM UMBRELLA & AIRFRAME ICING', bullets: [
+    'Fly into the carrier or AWACS ESM umbrella for faster lock-on, quicker missile reloading and sharper turns on shots launched inside the Zone. A cyan radar ring and ESM ACTIVE badge show the coverage.',
+    'Thick cloud now ices the airframe: controls get sluggish, drag rises and a white-blue frost creeps in from the canopy edges. Break into clear air or light the afterburner to melt it off before the ICING caution takes over.',
+    'Cloud cover still breaks inbound missile seekers, but a heavily iced jet can no longer rely on it for free.'
+  ] },
   { version: 'v1.1.32', title: 'CLEAN FLIGHT INPUTS', bullets: [
     'Multi-key flight combos no longer trigger browser shortcuts in flight: Ctrl, Alt, and Shift chords (including Ctrl+F/S/R/G/J/L/P, Slash, F3/F5, Alt release, and Ctrl+Wheel page zoom) are now intercepted cleanly while keeping F12 free.',
     'Weapon and combat keys now resolve by physical key code when Shift, Ctrl, or Alt are held, so switching weapons with Shift+1/2/3 under afterburner works reliably.',

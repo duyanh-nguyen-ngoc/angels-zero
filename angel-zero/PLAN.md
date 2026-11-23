@@ -1701,6 +1701,10 @@ Status legend: `[x]` implemented and verified · `[ ]` open — gaps listed.
   - Sticky `C.bw.eligible` from `syncEngineFlags()`; `?engoutat=s:L` forces it. A manual carrier trap or smooth runway touchdown awards BROKEN WING +2000, sets a permanent profile badge, and puts a ★ cell on the debrief.
   - `C.intr` CUT/DUEL/DONE state holds stage advance + RTB, plays `audio.bgmCut(1.5)` with radio static, spawns a single diving CRIMSON-1 with combo ≥ 4 (or `?intrusion=1`), forces `08_crimson_duel` through `musicCtx.intrusion`, holds the wingmen in FORM, and unlocks RTB on kill or long-range disengage. `?intrusionat=s` forces it deterministically.
 
+- [x] **Friendly ESM zones + cloud icing** *(build `s9bc`, v1.1.33, `src/combat.js`, `src/hud.js`, `src/canopyglass.js`, `src/cockpit3d.js`, `index.html`)*
+  - Carrier (NAVAL) and orbiting AWACS (AIR_SUPERIORITY) broadcast a 4.5 km friendly ESM umbrella with hysteresis. Inside: 1.6× lock build, 1.3× missile reload and 1.25× turn on missiles latched at launch. Cyan radar ring, ESM ACTIVE badge and VSD circle show coverage; ACE_DUEL / CANYON never get it.
+  - `state.cloudIce` builds in thick cloud (0.45 threshold), melts in clear air and twice as fast on burner. At high ice, pitch/roll authority fades 20 % and drag rises 12 %; `[ ICING ]` banner, master caution, radio call, canopy frost shader and a cached HUD frost vignette make the risk legible. `?esm=0`, `?awacsat=s`, `?icecloud=s`, `?ice=v` provide deterministic tests.
+
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.

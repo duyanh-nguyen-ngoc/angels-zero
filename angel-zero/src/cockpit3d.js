@@ -835,7 +835,8 @@ export function createCockpit3D(THREE, env) {
     const rld = spw === '4AAM' ? C.aam4Reload : spw === 'UGB' ? C.bombReload : C.qaamReload;
     const code = st => st === 'HEALTHY' ? 1 : st === 'ON_FIRE' ? 2 : st === 'EXTINGUISHED' ? 3 : st === 'SEIZED' ? 4 : st === 'RELIGHTING' ? 5 : 0;
     return [C.missiles || 0, ammo || 0, Math.round((rld || 0) * 10), C.flares || 0,
-      C.chaff === undefined ? -1 : C.chaff, Math.round(100 - (C.health ?? 100)), code(C.engL), code(C.engR)].join('');
+      C.chaff === undefined ? -1 : C.chaff, Math.round(100 - (C.health ?? 100)), code(C.engL), code(C.engR),
+      C.esmOn ? 1 : 0, C.inESM ? 1 : 0].join('');
   }
   function gaugeSignature(k, kts, altFt, vs, ffL, ffR, fuel, hydP) {
     switch (k) {
@@ -910,6 +911,15 @@ export function createCockpit3D(THREE, env) {
     x.strokeStyle = '#00ff66'; x.lineWidth = 2;
     x.beginPath(); x.moveTo(cx, cy); x.lineTo(cx + Math.sin(a) * R, cy - Math.cos(a) * R); x.stroke();
     const cs = Math.cos(hRad), sn = Math.sin(hRad);
+    // Friendly ESM umbrella on the tactical display.
+    if (C.esmOn && C.esmPos) {
+      const dx = C.esmPos.x - S.position.x, dz = C.esmPos.z - S.position.z;
+      _mrx = dx * cs + dz * sn; _mry = -dx * sn + dz * cs;
+      const px = cx + _mrx * scale, py = cy + _mry * scale;
+      x.strokeStyle = 'rgba(0,200,255,0.55)'; x.lineWidth = 1.5;
+      x.beginPath(); x.arc(px, py, 4500 * scale, 0, Math.PI * 2); x.stroke();
+      x.fillStyle = 'rgba(0,200,255,0.06)'; x.fill();
+    }
     const project = p => {
       const rx = p.x - S.position.x, rz = p.z - S.position.z;
       _mrx = rx * cs + rz * sn; _mry = -rx * sn + rz * cs;

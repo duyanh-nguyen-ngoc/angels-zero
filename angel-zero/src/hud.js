@@ -6,8 +6,8 @@
 // clipped to the 3D combiner glass. Square tactical radar (bottom-left), stores
 // list + F-15C silhouette with per-pylon AIM-9 reload icons (bottom-right),
 // open-corner target brackets, edge pointers, minimal top-left telemetry.
-import { SPW } from './loadout.js?v=s9ba';
-import { GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_FLOOR_Y } from './maps.js?v=s9ba';
+import { SPW } from './loadout.js?v=s9bc';
+import { GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_FLOOR_Y } from './maps.js?v=s9bc';
 
 export function createHUD(THREE, A) {
   const canvas = A.canvas;
@@ -121,6 +121,14 @@ export function createHUD(THREE, A) {
   }
   // Drone marker scratch: reused projection object, zero per-frame allocations.
   const _drScr = new THREE.Vector3(), _drPr = { x: 0, y: 0, ok: false }, _drCentroid = new THREE.Vector3();
+  // Frost vignette gradient, rasterised once; only globalAlpha changes per frame.
+  const frostCv = document.createElement('canvas'); frostCv.width = frostCv.height = 256;
+  {
+    const fc = frostCv.getContext('2d');
+    const fg = fc.createRadialGradient(128, 128, 86, 128, 128, 128);
+    fg.addColorStop(0, 'rgba(190,225,255,0)'); fg.addColorStop(0.7, 'rgba(190,225,255,0.35)'); fg.addColorStop(1, 'rgba(210,235,255,0.95)');
+    fc.fillStyle = fg; fc.fillRect(0, 0, 256, 256);
+  }
   function droneScreen(v) {
     _drScr.copy(v).project(cam);
     _drPr.x = (_drScr.x * 0.5 + 0.5) * HW; _drPr.y = (-_drScr.y * 0.5 + 0.5) * HH;
@@ -1045,6 +1053,19 @@ export function createHUD(THREE, A) {
     ctx.strokeStyle = 'rgba(88, 255, 154, 0.34)'; ctx.lineWidth = 1;
     for (const fr of [0.33, 0.66, 0.97]) { ctx.beginPath(); ctx.arc(cx, cy, half * 0.90 * fr, 0, Math.PI * 2); ctx.stroke(); }
 
+    // Friendly ESM umbrella: a translucent cyan circle in the same heading-up
+    // world transform as the contour sheet; clipped by the radar frame already.
+    const esm = A.getESM ? A.getESM() : null;
+    if (esm && esm.on) {
+      const a = 0.25 + 0.15 * Math.sin(performance.now() * 0.003);
+      ctx.save();
+      ctx.translate(cx, cy); ctx.rotate(-hRad); ctx.scale(k, k); ctx.translate(-S.position.x, -S.position.z);
+      ctx.beginPath(); ctx.arc(esm.x, esm.z, esm.r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,200,255,' + (a * 0.25).toFixed(3) + ')'; ctx.fill();
+      ctx.strokeStyle = 'rgba(0,200,255,' + a.toFixed(3) + ')'; ctx.lineWidth = 1 / k;
+      ctx.stroke(); ctx.restore();
+    }
+
     // Forward FOV wedge: diagonals from the ownship arrow to the two top corners.
     ctx.strokeStyle = 'rgba(88, 255, 154, 0.62)'; ctx.lineWidth = 1;
     ctx.beginPath();
@@ -1180,6 +1201,10 @@ export function createHUD(THREE, A) {
       if (act) {                                             // jammer bar drains over 6 s
         glow(ctx, CYAN, 3); ctx.fillRect(x0 + 2, y0 - 4, (s - 4) * Math.max(0, C.ecmT / 6), 2);
       }
+    }
+    if (esm && esm.in) {
+      ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'; ctx.font = f(12, true);
+      labelText(ctx, '[ ESM ACTIVE ]', x0 + 2, y0 - 20, '#00c8ff', 6);
     }
     if (C.rwrTrack || C.banditLock >= 1) {
       const rCol = C.banditLock >= 1 ? WARN : AMBER;
@@ -1473,6 +1498,9 @@ export function createHUD(THREE, A) {
     if (C.buzzBannerT && now - C.buzzBannerT < 1800) {
       const age = now - C.buzzBannerT;
       drawBanner(ctx, cx, upperY + 288, C.buzzLabel || 'SONIC PASS', '#5fe8ff', 330, 1 - age / 1800);
+    }
+    if ((S.cloudIce || 0) > 0.65 || (C.iceBannerT && now - C.iceBannerT < 1600)) {
+      drawBanner(ctx, cx, upperY + 144, '[ ICING ]', '#ffb000', 260, 0.55 + 0.45 * (Math.floor(now / 250) % 2));
     }
     if (C.scrambleT && now - C.scrambleT < 3000) {
       const age = now - C.scrambleT;
@@ -1964,6 +1992,12 @@ export function createHUD(THREE, A) {
         r.addColorStop(1, nvgOn ? `rgba(60,170,105,${0.2 * mist})` : `rgba(245,248,252,${0.48 * mist})`);
         hctx.fillStyle = r; hctx.fillRect(0, 0, HW, HH);
       }
+    }
+
+    if (!fp && (S.cloudIce || 0) > 0.15) {
+      const f = Math.min(1, (S.cloudIce - 0.15) / 0.85);
+      hctx.save(); hctx.globalAlpha = f * 0.5;
+      hctx.drawImage(frostCv, 0, 0, HW, HH); hctx.restore();
     }
 
     if (A.getMode && A.getMode() === 'EJECT') {
