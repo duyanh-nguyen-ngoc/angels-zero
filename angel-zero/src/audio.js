@@ -11,7 +11,8 @@
 
 import { MISSIONS } from './missions.js?v=s9dq';
 
-export function createAudio() {
+export function createAudio(opts = {}) {
+  const isF22 = opts.aircraft === 'F22A';
   let ctx = null, master = null, cockpitLP = null, ready = false;
   let volume = 0.7, muted = false, musicVol = 1;
   // Volume persists; MUTE does not -- a mute pressed in an earlier session (M on the
@@ -138,6 +139,25 @@ export function createAudio() {
     f15AimExplode: 'f15/f15_aim_explode.wav', f15AirExplode: 'f15/f15_air_explode.wav',
     f15Strike: 'f15/f15_strike.wav', f15FlareOut: 'f15/f15_flare_out.wav',
   };
+  if (isF22) {
+    Object.assign(SFX, {
+      f15Whine: 'f22/f22_whine.wav', f15Exh: 'f22/f22_exhaust.wav',
+      f15AbOut: 'f22/f22_ab_out.wav', f15AbIn: 'f22/f22_ab_in.wav',
+      f15Efflux: 'f22/f22_efflux.wav', f15Intake: 'f22/f22_intake.wav',
+      f15Wind: 'f22/f22_wind.wav',
+      f15JfsStart: 'f22/f22_apu_start.wav', f15JfsRun: 'f22/f22_apu_run.wav', f15JfsStop: 'f22/f22_apu_stop.wav',
+      f15CanopyClose: 'f22/f22_canopy_close.wav', f15Flaps: 'f22/f22_flaps.wav',
+      f15GearTransit: 'f22/f22_gear_transit.wav', f15GearLock: 'f22/f22_gear_lock.wav',
+      f15GroundRattle: 'f22/f22_gear_roll.wav', f15TyreSqueal: 'f22/f22_tyre_squeal.wav',
+      f15Gun: 'f22/f22_m61a2.wav', f15AimLaunch: 'f22/f22_aim_launch.wav',
+      f15AimExplode: 'f22/f22_aim_explode.wav', f15Flare: 'f22/f22_chaff_flare.wav',
+      f15BettyOverG: 'f22/f22_overg.wav', f15BettyBingo: 'f22/f22_bingo.wav',
+      f15BettyFuelLow: 'f22/f22_fuel_low.wav', f15BettyWarn: 'f22/f22_pullup.wav',
+      f15Incoming: 'f22/f22_rwr_launch.wav', f15WarnTone: 'f22/f22_rwr_spike.wav',
+      f15Tone115: 'f22/f22_rwr_contact.wav',
+      f15StallChop: 'f22/f22_stall.wav', f15StallCont: 'f22/f22_stall2.wav',
+    });
+  }
   const samples = {}, sfxState = {};
   function preload(base = 'assets/sfx/') {
     const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;

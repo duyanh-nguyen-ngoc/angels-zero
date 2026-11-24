@@ -3,6 +3,10 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.60', title: 'F-22A RAPTOR F119 SOUNDPACK', bullets: [
+    'Added a dedicated 29-file FlightGear F-22A Raptor sound bank (assets/sfx/f22/) that loads automatically whenever the F-22A is selected.',
+    'Includes F119 turbine whine, exhaust, intake rush, afterburner/reheat, efflux, APU start/run/stop, canopy close, flaps, gear/tyre cues, M61A2 cannon, AIM-120 launch/impact, RWR contact/spike/launch tones, and Betty over-G/fuel/pull-up/stall alerts.'
+  ] },
   { version: 'v1.1.59', title: 'F-22A RAPTOR', bullets: [
     'New aircraft: the F-22A Raptor. Pick it from the AIRCRAFT row in the hangar; WARDEN-2 and WARDEN-3 fly Raptors with you.',
     'The Raptor supercruises (about Mach 1.1 on military power, no afterburner), has its own articulated flaperons, ailerons, all-moving tails, canted rudders and twin nozzles, procedural landing gear sized to the airframe, and carries four internal AIM-9s.',

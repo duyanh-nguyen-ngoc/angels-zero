@@ -738,7 +738,7 @@ import { createHUD } from './src/hud.js?v=s9dr';
 import { createCockpit3D } from './src/cockpit3d.js?v=s9dr';
 import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9ds';
 import { createEjection } from './src/eject.js?v=s9di';
-import { createAudio } from './src/audio.js?v=s9dq';
+import { createAudio } from './src/audio.js?v=s9ds';
 import { createRadio } from './src/radio.js?v=s9dd';
 import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9dd';
 import { createLivery } from './src/livery.js?v=s9dd';
@@ -4565,7 +4565,7 @@ let glFilter = '';
 /* ============================================================================
    8. VFX + HUD MODULES (src/vfx.js, src/hud.js)
    ============================================================================ */
-const audio = createAudio();
+const audio = createAudio({ aircraft: AC.id });
 if (DEBUG && Q.has('bgm')) audio.setBgmForce(Q.get('bgm'));   // force a soundtrack scenario for headless checks
 /* ---- Tactical Voice Box: DOM state machine driven by the radio queue ---- */
 const crtBox = document.getElementById('crtBox'), activePortrait = document.getElementById('activePortrait');
