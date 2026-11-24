@@ -751,7 +751,7 @@ import { createFreeLook } from './src/freelook.js?v=s9dd';
 import { createCanopyGlass } from './src/canopyglass.js?v=s9dd';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9dd';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9dd';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9dm';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9dn';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9de';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9dd';
 import { createRadioQueue } from './src/radioQueue.js?v=s9dj';
@@ -1141,7 +1141,7 @@ const state = {
   position: SPAWN.clone(), velocity: new THREE.Vector3(0, 0, -200), quaternion: new THREE.Quaternion(),
   throttle: 0.65, afterburner: 0, pitchRate: 0, rollRate: 0, yawRate: 0,
   gLoad: 1, alpha: 0, speed: 200, mach: 0.6, heading: 0, pitch: 0, bank: 0, radalt: 1500,
-  gStrain: 0, negGStrain: 0, cloudIce: 0, gHoldT: 0, glocT: 0, glocWakeT: 0, gPeak: 0, gNeg: 0,
+  gStrain: 0, negGStrain: 0, cloudIce: 0, gHoldT: 0, glocT: 0, glocWakeT: 0, gPeak: 0, gNeg: 0, gPushPull: 0,
   gSmooth: 1, pilotK: 1,                              // pilot G physiology + airframe ice accretion (0..1)
   beta: 0, mass: 20400, cl: 0, cd: 0, stalled: false, fuel: 13455, fuelFlow: 0,   // internal fuel (lb) / total burn (pph)   // sideslip, mass, aero coefficients, low-speed stall (hysteresis)
   ctl: { pitch: 0, roll: 0, yaw: 0, airbrake: 0 },
@@ -1184,11 +1184,11 @@ let cloudWet = 0;
 const ICE_CLOUD_T = 0.45, ICE_FROST_T = 0.35, ICE_WARN_T = 0.65;
 const ICE_BUILD_S = 6.0, ICE_MELT_S = 2.5, ICE_AB_MELT_K = 2.0;
 const ICE_CTRL_LOSS = 0.20, ICE_DRAG_K = 0.12;
-// Pilot G physiology, calibrated for greyout -> tunnel -> blackout timings.
-const G_ONSET = 3.2, G_RATE_A = 0.112, G_RATE_P = 0.62;
-const G_HOLD_S = 0.4, G_DRAIN = 0.33, G_DRAIN_UNLOAD = 0.65;
-const GLOC_T = 1.8, GLOC_WAKE_S = 0.6;
-const GNEG_ONSET = -1.8, GNEG_RATE = 0.35, GNEG_DRAIN = 0.8;
+// Pilot G physiology: F-15C ATAGS + AGSM (blackout.nas / NASA-USAF Stoll curve).
+const G_ONSET = 5.0, G_RATE_A = 0.022, G_RATE_P = 1.15;
+const G_HOLD_S = 0.4, G_DRAIN = 0.09, G_DRAIN_UNLOAD = 0.16;
+const GLOC_T = 6.0, GLOC_WAKE_S = 0.65;
+const GNEG_ONSET = -2.0, GNEG_RATE = 0.14, GNEG_DRAIN = 0.25;
 const PILOTK_S0 = 0.65, PILOTK_MIN = 0.35;
 let iceCaution = false, iceCautionT = 0, iceCloudUntil = -1, iceForcedCloud = false;
 
@@ -1427,7 +1427,7 @@ function resetAircraft() {
   state.quaternion.identity();
   state.throttle = 0.65; state.afterburner = 0;
   state.pitchRate = state.rollRate = state.yawRate = 0;
-  state.gLoad = 1; state.speed = 200; state.gStrain = 0; state.negGStrain = 0; state.gNeg = 0; state.gHoldT = 0; state.glocT = 0; state.glocWakeT = 0; state.gPeak = 0; state.gSmooth = 1; state.stalled = false; state.fuel = 13455;
+  state.gLoad = 1; state.speed = 200; state.gStrain = 0; state.negGStrain = 0; state.gNeg = 0; state.gPushPull = 0; state.gHoldT = 0; state.glocT = 0; state.glocWakeT = 0; state.gPeak = 0; state.gSmooth = 1; state.stalled = false; state.fuel = 13455;
   Object.assign(state, { gearDown: false, gear: 0, brakeLatch: false, brakeHeld: false, onGround: false, wheelBrake: false });
   Object.assign(state.pit, { t: 0, done: false, active: false });
   if (DEBUG && Q.has('alt')) state.position.y = Number(Q.get('alt')) || SPAWN.y;
@@ -3626,8 +3626,9 @@ function updatePhysics(dt) {
         if (DEBUG) console.log('[ANGELS_ZERO] gloc wake alt=' + Math.round(state.position.y));
       }
     } else {
-      if (G > G_ONSET) {
-        state.gStrain += G_RATE_A * Math.pow(G - G_ONSET, G_RATE_P) * dt;
+      const gOnset = Math.max(3.5, G_ONSET - (state.gPushPull || 0));
+      if (G > gOnset) {
+        state.gStrain += G_RATE_A * Math.pow(G - gOnset, G_RATE_P) * dt;
         state.gHoldT = G_HOLD_S;
         state.gPeak = Math.max(state.gPeak, state.gStrain);
       } else if (state.gHoldT > 0) {
@@ -3641,6 +3642,8 @@ function updatePhysics(dt) {
         if (DEBUG) console.log('[ANGELS_ZERO] gloc enter G=' + state.gLoad.toFixed(1) + ' alt=' + Math.round(state.position.y));
       }
     }
+    if (G < 0.5) state.gPushPull = clamp((state.gPushPull || 0) + 0.35 * (0.5 - G) * dt, 0, 1.5);
+    else state.gPushPull = Math.max(0, (state.gPushPull || 0) - 0.12 * dt);
     if (G < GNEG_ONSET) state.gNeg = clamp(state.gNeg + GNEG_RATE * (-G + GNEG_ONSET) * dt, 0, 1);
     else state.gNeg = Math.max(0, state.gNeg - GNEG_DRAIN * dt);
     state.negGStrain = state.gNeg;

@@ -3,6 +3,10 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.54', title: 'REALISTIC F-15C G-LOC & PUSH-PULL PHYSIOLOGY', bullets: [
+    'Tuned pilot G physiology to the NASA/USAF F-15C ATAGS + AGSM Stoll curve (matching FlightGear blackout.nas): 5.0 G strain onset, ~10 s to G-LOC at 9 G, and realistic 6 s incapacitation / 7-15 s recovery.',
+    'Added the physiological push-pull effect: negative-G pushes prior to a positive-G pull temporarily lower G-LOC onset down toward 3.5 G, while negative-G redout builds from -2 G to -4 G.'
+  ] },
   { version: 'v1.1.53', title: 'COMPLETE 58-FILE F-15C AUDIO SUITE', bullets: [
     'Compiled and integrated all 58 FlightGear F-15C sound files into src/audio.js (61 total SFX samples): added aft efflux, intake rush, slipstream wind, ground rattle, JFS/GPU ground power, and canopy close.',
     'Added full 3-stage OWS overload tones (85/92/96%), 900 Hz departure/spin tones, chopped/continuous stall warnings, gear-AoA, Betty low-fuel, flaps transit, tyre sideslip, and 1-12 o\'clock incoming missile callouts.',
