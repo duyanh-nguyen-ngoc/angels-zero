@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.58', title: 'FREE FLIGHT — CLEAN MISSION SWITCHING & COCKPIT UNARMED POLISH', bullets: [
+    'Fixed switching from Free Flight back to combat missions in the same session so cannon ammo, missiles, special weapons, flares, chaff, selected weapon, weather, and time-of-day restore cleanly.',
+    'Silenced the Standby launch combat callout ("CLEARED HOT — SPLASH THE BANDITS") and AWACS launch radio when launching Free Flight, and gated wingman/target-designate keys (G / C) while in Free Flight.',
+    'Updated the 3D cockpit STORES MFD to read UNARMED instead of GUN ONLY, updated the Standby roster badge to UNARMED, and tightened the Free Flight F1 controls overlay.'
+  ] },
   { version: 'v1.1.57', title: 'FREE FLIGHT — HIGH ABOVE THE CLOUDS, SCENIC & UNARMED', bullets: [
     'Raised Free Flight cruise altitudes way above the cloud sea (18,000–22,300 ft) with Golden Hour lighting, an endless 3,500–5,800 ft cumulus cloud sea below, expanded 60 km horizon visibility, and high-altitude twin contrails.',
     'Added a wider, silky-smooth cinematic chase camera, calm cruise speed, and ambient hangar soundtrack for a relaxed, scenic flight feel.',

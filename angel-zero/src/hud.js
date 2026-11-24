@@ -2129,7 +2129,7 @@ export function createHUD(THREE, A) {
     const ff = !!(C.mcfg && C.mcfg.freeFlight);
     const skip = ff ? new Set(['LMB/F', 'RMB/M', '1-3/R', 'C', 'X', 'Z', 'J', 'G']) : null;
     const rows = skip ? CHEAT_ROWS.filter(r => !skip.has(r[0])) : CHEAT_ROWS;
-    const w = 320, h = 260, x = 20, y = HH / 2 - h / 2;
+    const w = 320, h = ff ? Math.max(110, 28 + Math.ceil(rows.length / 3) * 34 + 10) : 260, x = 20, y = HH / 2 - h / 2;
     ctx.save();
     noGlow(ctx); ctx.fillStyle = 'rgba(0, 20, 10, 0.62)'; ctx.fillRect(x, y, w, h);
     ctx.strokeStyle = '#00ff66'; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);

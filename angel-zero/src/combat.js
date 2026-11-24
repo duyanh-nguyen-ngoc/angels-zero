@@ -6453,15 +6453,20 @@ export function createCombat(THREE, env) {
       C.weaponsLock.gun = !C.mcfg.weapons.gun;
       C.weaponsLock.msl = !C.mcfg.weapons.msl || C.mcfg.gunsOnly; C.weaponsLock.spw = !C.mcfg.weapons.spw || C.mcfg.gunsOnly;
       if (C.weaponsLock.gun) { C.ammo = 0; C.gunHeat = 0; C.gunOverheat = false; gunIdle(); }
+      else C.ammo = GUN_MAX;
       if (C.weaponsLock.msl && C.weapon === 'MSL') C.weapon = C.weaponsLock.gun ? 'NONE' : 'GUN';
       if (C.weaponsLock.spw && C.weapon === 'BOMB') C.weapon = C.weaponsLock.gun ? 'NONE' : 'GUN';
       // Locked stores: zero ammo and empty pylons, so the HUD / MFD never show a round.
       if (C.weaponsLock.msl) { C.missiles = 0; C.aam4 = 0; C.qaam = 0; for (const st of stores.msl) st.node.visible = false; }
+      else { rearm('msl'); C.missiles = MSL_MAX; C.aam4 = AAM4_MAX; C.qaam = QAAM_MAX; }
       if (C.weaponsLock.spw) { C.bombs = 0; for (const st of stores.bomb) st.node.visible = false; }
-      if (!C.weaponsLock.msl) rearm('msl');                 // a previous guns-only sortie must not leave empty pylons
-      if (!C.weaponsLock.spw) rearm('bomb');
+      else { rearm('bomb'); C.bombs = stores.bomb.length; }
       if (C.mcfg.gunsOnly || C.mcfg.freeFlight) { C.lockTarget = null; C.lockState = 'NONE'; C.lockProgress = 0; disarmSeeker(null); setMulti([]); }
-      if (C.mcfg.freeFlight) { C.flares = 0; C.chaff = 0; C.weapon = 'NONE'; }
+      if (C.mcfg.freeFlight) { C.flares = 0; C.chaff = 0; C.weapon = 'NONE'; C.comms.length = 0; }
+      else {
+        C.flares = FLR_MAX; C.chaff = C.chaffMax;
+        if (C.weapon === 'NONE') C.weapon = C.weaponsLock.msl ? 'GUN' : 'MSL';
+      }
       C.blockedLaunches = 0; C.aceRounds = 0; C.aceHits = 0;
       C.sunT = 0; C.sunCD = 0; C.sunBlinds = 0; C.sunBannerT = 0;
       C.mslIntercepts = 0; C.interceptBannerT = 0; C.interceptSlowCD = 0;

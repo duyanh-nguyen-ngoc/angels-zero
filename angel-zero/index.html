@@ -733,9 +733,9 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createVFX } from './src/vfx.js?v=s9dd';
 import { createAmbient } from './src/ambient.js?v=s9dd';
 import { createBlastFX } from './src/blastfx.js?v=s9dd';
-import { createHUD } from './src/hud.js?v=s9dq';
-import { createCockpit3D } from './src/cockpit3d.js?v=s9di';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9dq';
+import { createHUD } from './src/hud.js?v=s9dr';
+import { createCockpit3D } from './src/cockpit3d.js?v=s9dr';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9dr';
 import { createEjection } from './src/eject.js?v=s9di';
 import { createAudio } from './src/audio.js?v=s9dq';
 import { createRadio } from './src/radio.js?v=s9dd';
@@ -752,7 +752,7 @@ import { createFreeLook } from './src/freelook.js?v=s9dd';
 import { createCanopyGlass } from './src/canopyglass.js?v=s9dd';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9dd';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9dd';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9dq';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9dr';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9de';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9dd';
 import { createRadioQueue } from './src/radioQueue.js?v=s9dj';
@@ -1690,8 +1690,12 @@ function launchSortie() {
   resetAircraft();
   setView(Q.has('cockpit') || menuPreviewCockpit);
   hideMenu();
-  combatSys.say('ALPHA 1, CLEARED HOT — SPLASH THE BANDITS', 3);
-  radioSys.reset(); radioSys.event('LAUNCH');
+  if (!mission().freeFlight) {
+    combatSys.say('ALPHA 1, CLEARED HOT — SPLASH THE BANDITS', 3);
+    radioSys.reset(); radioSys.event('LAUNCH');
+  } else {
+    radioSys.reset();
+  }
   startSortie();
 }
 
@@ -1751,7 +1755,12 @@ function loadMissionScene(m) {
     const clon = Q.has('lon') ? Number(Q.get('lon')) : NaN;
     freeFlight.start(selectedFfCity, Number.isFinite(clat) && Number.isFinite(clon) ? { lat: clat, lon: clon } : null);
   } else {
+    const leavingFF = freeFlight.active;
     freeFlight.clearAll();
+    if (leavingFF) {
+      if (!WX_FORCED) rollWeather(true);
+      if (!(DEBUG && Q.has('tod'))) applyTod(true);
+    }
   }
   if (typeof syncCrtVisible === 'function') syncCrtVisible();
   setupBuzzAnchors();
@@ -2782,9 +2791,11 @@ const SPW_FILL = { '4AAM': [0.85, 0.35], UGB: [0.55, 0.90], QAAM: [0.95, 0.25] }
 // Roster badge + benchmark bars follow the persistent SPW choice (renderHangar -> syncLoadoutUI).
 function syncSBRoster() {
   const el = document.getElementById('sbSpwBadge'); if (!el) return;
-  el.textContent = combat && combat.mcfg && combat.mcfg.wingmen === 'NONE' ? 'LEAD ONLY' : selectedSPW;
+  const m = typeof mission === 'function' ? mission() : null;
+  const ff = !!(m && m.freeFlight);
+  const solo = ff || (combat && combat.mcfg && combat.mcfg.wingmen === 'NONE');
+  el.textContent = ff ? 'UNARMED' : (combat && combat.mcfg && combat.mcfg.wingmen === 'NONE' ? 'LEAD ONLY' : selectedSPW);
   el.className = 'spwBadge spw-' + selectedSPW;
-  const solo = combat && combat.mcfg && combat.mcfg.wingmen === 'NONE';
   const r2 = document.getElementById('sbRole2'), r3 = document.getElementById('sbRole3');
   if (r2) { r2.textContent = solo ? '—' : selectedRoles.w2; r2.style.display = solo ? 'none' : ''; }
   if (r3) { r3.textContent = solo ? '—' : selectedRoles.w3; r3.style.display = solo ? 'none' : ''; }
@@ -2988,7 +2999,7 @@ addEventListener('keydown', e => {
   // bottle (press) / windmill relight switch (hold 2.5 s). LMB always fires the gun.
   if (k === 'f') {
     if (flightMode === 'FLY' && combatSys.engineEmergency()) { if (!e.repeat) { keys.fire = false; fKeyEngine = true; combatSys.fireKey(true); } }
-    else keys.fire = true;
+    else if (!freeFlight.active) keys.fire = true;
   }
   if (k === 'm') { if (!e.repeat && !freeFlight.active) { combatSys.fireSelected(); mcam.held = true; } }
   if (k === 'r' && !e.repeat) combatSys.toggleWeapon();
@@ -3002,7 +3013,7 @@ addEventListener('keydown', e => {
     if (autolandPrompt() && !autoland.on) engageAutoland();
     else { gearAutoLock = true; toggleGear(); }
   }
-  if (k === 'g' && !e.repeat) combatSys.setWingOrder();
+  if (k === 'g' && !e.repeat && !freeFlight.active) combatSys.setWingOrder();
   if ((k === '[' || k === ']') && !e.repeat && firstPerson && flightMode === 'FLY' && !slowActive()) {
     mfdPage = (mfdPage + (k === ']' ? 1 : 2)) % 3;
     cockpit.setMfdPage(mfdPage);
@@ -3011,7 +3022,7 @@ addEventListener('keydown', e => {
   }
   // B: dorsal speedbrake / wheel brakes. Tap (< 0.35 s) toggles the latch; hold = momentary.
   if (k === 'b' && !e.repeat) { keys.b = true; state.brakeHeld = true; brakeTap = { t: performance.now(), was: state.brakeLatch }; state.brakeLatch = !state.brakeLatch; }
-  if (k === 'c' && !e.repeat) combatSys.designateInSight();
+  if (k === 'c' && !e.repeat && !freeFlight.active) combatSys.designateInSight();
   if (e.code === 'KeyT' && !e.repeat) pad.held = true;
   if (e.code === 'KeyY' && !e.repeat) {
     const tag = hud.setRadarZoom(hud.radarZoom + 1);
@@ -4549,7 +4560,7 @@ const portraitImg = {};
 for (const k in PORTRAIT) { const im = new Image(); im.onerror = () => { portraitImg[k].failed = true; }; portraitImg[k] = im; im.src = PORTRAIT[k]; }
 const CH_PORTRAIT = { AWACS: 'AWACS', WARDEN2: 'WARDEN-2', WARDEN3: 'WARDEN-3', CRIMSON: 'CRIMSON-1' };
 let crtFallbackTimer = 0, boxHoldUntil = 0;
-function syncCrtVisible() { crtBox.hidden = appMode !== 'PLAY' || freeFlight.active; }
+function syncCrtVisible() { crtBox.hidden = appMode !== 'PLAY' || freeFlight.active || !!(typeof mission === 'function' && mission().freeFlight); }
 function clearBox() {
   boxHoldUntil = 0;
   crtBox.classList.remove('flash', 'talk', 'fade');
@@ -4596,7 +4607,7 @@ function radioPlay(slot) {
   return audio.textLineSecs(slot.line || slot);
 }
 const rq = createRadioQueue(THREE, { audio, onTx: radioPlay, onIdle: clearBox, debug: DEBUG });
-function radioEvent(ev, opts) { if (freeFlight.active) return false; return rq.say(ev, opts); }
+function radioEvent(ev, opts) { if (freeFlight.active || (typeof mission === 'function' && mission().freeFlight)) return false; return rq.say(ev, opts); }
 function radioReset(gap = 0) { rq.clear(gap); clearBox(); audio.stopRadio(0.08); }
 function radioPump() { rq.update(performance.now() / 1000); }
 
