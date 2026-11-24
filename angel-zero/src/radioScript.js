@@ -38,10 +38,11 @@ const CAT_OVERRIDE = {
   ON_NEAR_MISS: { pri: 3, cat: 'MISSILE' },
   ON_CANYON_LOW: { pri: 3, cat: 'PULLUP' }
 };
+const TEXT_ONLY = new Set(['stage_1_awacs', 'stage_2_awacs', 'stage_3_awacs', 'ceil_awacs_01', 'climb_awacs_01', 'gate_w2_01', 'hurt_c1_01']);
 const L = (id, speaker, event, priority, text, trailerHero = false) => {
   const ambient = priority === 3 && AMBIENT_EVENTS.has(event);
   const o = CAT_OVERRIDE[event] || {};
-  return { id, speaker, text, event, priority, file: DIR + id + '.mp3', trailerHero,
+  return { id, speaker, text, event, priority, file: TEXT_ONLY.has(id) ? null : DIR + id + '.mp3', trailerHero,
     pri: o.pri !== undefined ? o.pri : (ambient ? 0 : PRI_OF[priority]),
     cat: o.cat || (priority === 1 ? 'CRITICAL' : priority === 2 ? 'STORY' : ambient ? 'AMBIENT' : 'COMBAT'),
     ch: CH_OF[speaker] || 'AWACS' };

@@ -3,6 +3,12 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.45', title: 'PLAYTEST STABILITY, AUDIO & WINGMAN FIXES', bullets: [
+    'Fixed ACE DUEL mission isolation so only CRIMSON-1 spawns with no fleet ships or extra waves, and fixed the G wingman order key cycle so FOCUS returns cleanly to FORM on the third press.',
+    'Silenced cold menus and debrief audio completely by gating the transonic rumble modulator and keeping pause/debrief BGM running smoothly without crossfade errors.',
+    'Smoothed catapult release climbs so wingmen no longer jump vertically leaving the deck, tuned G onset (3.2 G) with saturated mouse pitch pull and CAS AoA tracking, and constrained autoland wave-off ambushes to the 600-1,200 m glideslope window.',
+    'Restored ?alt/?spd runway overrides, eliminated a per-frame cockpit vector allocation and 7 missing radio 404s, enabled Escape to return to briefing from debrief, and un-gated debug test hooks from warp.'
+  ] },
   { version: 'v1.1.44', title: 'REAL WINGMAN FLIGHT & ACE BFM', bullets: [
     'WARDEN-2 and WARDEN-3 now fly as real bank-to-turn jets instead of rubber-banding onto formation slots. They visibly bank into turns, break out of formation on COVER / FOCUS orders, pursue with lead and rejoin at realistic jet speeds.',
     'CRIMSON and SOL aces read the fight: high yo-yo energy attacks, rear-hemisphere scissors and cobra overshoot traps, plus missile-aware flares, chaff and beam notches. Two-ace flights bracket and swap drag / bag roles.',

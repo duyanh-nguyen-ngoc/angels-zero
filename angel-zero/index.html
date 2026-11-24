@@ -674,7 +674,7 @@
       </div>
       <div class="db-unlocks" id="dbUnlocks"></div>
       <div class="db-btns">
-        <button id="dbBrief" type="button">[ BRIEFING ]</button>
+        <button id="dbBrief" type="button">[ BRIEFING / ESC ]</button>
         <button id="dbReplay" class="primary" type="button">[ SORTIE AGAIN ]</button>
         <button id="dbEquip" class="equip" type="button" hidden>[ EQUIP &amp; FLY AGAIN ]</button>
       </div>
@@ -731,9 +731,9 @@ import { createAmbient } from './src/ambient.js?v=s9dd';
 import { createBlastFX } from './src/blastfx.js?v=s9dd';
 import { createHUD } from './src/hud.js?v=s9dd';
 import { createCockpit3D } from './src/cockpit3d.js?v=s9dd';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9dd';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9de';
 import { createEjection } from './src/eject.js?v=s9dd';
-import { createAudio } from './src/audio.js?v=s9dd';
+import { createAudio } from './src/audio.js?v=s9de';
 import { createRadio } from './src/radio.js?v=s9dd';
 import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9dd';
 import { createLivery } from './src/livery.js?v=s9dd';
@@ -748,10 +748,10 @@ import { createFreeLook } from './src/freelook.js?v=s9dd';
 import { createCanopyGlass } from './src/canopyglass.js?v=s9dd';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9dd';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9dd';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9dd';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9dd';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9de';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9de';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9dd';
-import { createRadioQueue } from './src/radioQueue.js?v=s9dd';
+import { createRadioQueue } from './src/radioQueue.js?v=s9de';
 import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9dd';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
   GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9dd';
@@ -1182,7 +1182,7 @@ const ICE_CLOUD_T = 0.45, ICE_FROST_T = 0.35, ICE_WARN_T = 0.65;
 const ICE_BUILD_S = 6.0, ICE_MELT_S = 2.5, ICE_AB_MELT_K = 2.0;
 const ICE_CTRL_LOSS = 0.20, ICE_DRAG_K = 0.12;
 // Pilot G physiology, calibrated for greyout -> tunnel -> blackout timings.
-const G_ONSET = 4.0, G_RATE_A = 0.112, G_RATE_P = 0.62;
+const G_ONSET = 3.2, G_RATE_A = 0.112, G_RATE_P = 0.62;
 const G_HOLD_S = 0.4, G_DRAIN = 0.33, G_DRAIN_UNLOAD = 0.65;
 const GLOC_T = 1.8, GLOC_WAKE_S = 0.6;
 const GNEG_ONSET = -1.8, GNEG_RATE = 0.35, GNEG_DRAIN = 0.8;
@@ -1199,6 +1199,9 @@ if (Q.has('mouse')) { const [mx, my] = Q.get('mouse').split(',').map(Number); mo
 const camVelocity = new THREE.Vector3();
 let blastShake = 0, blast = null, fxHold = false;
 const gforce = { g: 0, until: -1 }, nogloc = DEBUG && Q.has('nogloc');
+const GFORCE_PARTS = DEBUG && Q.has('gforce') ? Q.get('gforce').split(':') : null;
+const CARRIER_FINAL_AT = DEBUG && Q.has('carrierfinalat') ? Number(Q.get('carrierfinalat')) : -1;
+let gforceHookDone = false, carrierFinalDone = false;
 const vwsState = { fuelLatched: false, missilePrev: false, overGT: 0, altLatched: false, alertT: 0 };
 function vwsTrigger(id, caption) {
   audio.vws.say(id);
@@ -1983,8 +1986,9 @@ function updateAutoland(dt) {
   state.pitchRate = state.rollRate = state.yawRate = 0;     // pilot input is locked out
   state.gearDown = true; state.gear = Math.min(1, state.gear + dt / GEAR_TRAVEL);
   state.afterburner = 0;
-  if (!waveoff.rolled && !waveoff.used && autoland.ph === 'GLIDE' && combat.carrierVisible !== false &&
-      (missionId === 'NAVAL_BATTLE' || missionId === 'AIR_SUPERIORITY') && !carrier.phase) {
+  const alStern = autoland.d - AL_TD_DZ;
+  if (!waveoff.rolled && !waveoff.used && autoland.ph === 'GLIDE' && alStern >= WO_D_MIN && alStern <= WO_D_MAX &&
+      combat.carrierVisible !== false && (missionId === 'NAVAL_BATTLE' || missionId === 'AIR_SUPERIORITY') && !carrier.phase) {
     waveoff.rolled = true;
     const chance = Q.has('waveoff') ? Number(Q.get('waveoff')) : WO_CHANCE;
     const hit = Math.random() < chance;
@@ -2257,12 +2261,19 @@ function updateWingCat(dt, a) {
     if (wc.ph === 'HOLD') {
       wc.t += dt;
       catTrackWorld(trk, w.catPos); catTrackQuat(trk, w.catQ); w.catVel.copy(a.vel);
+      w.pos.copy(w.catPos); w.vel.copy(w.catVel); w.quat.copy(w.catQ);
+      if (w.mesh) { w.mesh.position.copy(w.catPos); w.mesh.quaternion.copy(w.catQ); }
       _catFwd.set(0, 0, -1).applyQuaternion(w.catQ);
       if (cat.ph !== 'NONE') vfx.catSteam.hold(w.catPos, _catFwd, dt * 0.5);
       if (cat.ph === 'LAUNCH') { wc.ph = 'LAUNCH'; wc.t = -wc.delay; }
     } else if (wc.ph === 'LAUNCH') {
       wc.t += dt;
-      if (wc.t < 0) { catTrackWorld(trk, w.catPos); catTrackQuat(trk, w.catQ); w.catVel.copy(a.vel); continue; }
+      if (wc.t < 0) {
+        catTrackWorld(trk, w.catPos); catTrackQuat(trk, w.catQ); w.catVel.copy(a.vel);
+        w.pos.copy(w.catPos); w.vel.copy(w.catVel); w.quat.copy(w.catQ);
+        if (w.mesh) { w.mesh.position.copy(w.catPos); w.mesh.quaternion.copy(w.catQ); }
+        continue;
+      }
       if (!wc.fired) { wc.fired = true; onSfx('catapult', w.catPos, 0.7); if (i === 0) radioEvent('ON_CATAPULT'); }
       const t = Math.min(wc.t, CAT_T), rel = 0.5 * CAT_ACC * t * t, v = Math.min(CAT_VEND, CAT_ACC * t);
       catTrackWorld(trk, w.catPos, rel);
@@ -2273,6 +2284,8 @@ function updateWingCat(dt, a) {
       }
       _catFwd.set(0, 0, -1).applyQuaternion(w.catQ);
       w.catVel.copy(_catFwd).multiplyScalar(v).add(a.vel);
+      w.pos.copy(w.catPos); w.vel.copy(w.catVel); w.quat.copy(w.catQ);
+      if (w.mesh) { w.mesh.position.copy(w.catPos); w.mesh.quaternion.copy(w.catQ); }
       vfx.catSteam.stroke(w.catPos, _catFwd, v / CAT_VEND, dt);
       if (wc.t >= CAT_T) {
         wc.ph = 'AIRBORNE'; wc.blend = 0;
@@ -2342,6 +2355,7 @@ async function startSortie() {
   if (hintEl) hintEl.textContent = oldHint;
   combat.styleCounts = {}; combat.comboPeak = 1;
   Object.assign(sortie, { active: true, t0: sortie.active ? sortie.t0 : simTime, ace0: combat.aceDowns || 0, endAt: null, failReason: '' });
+  gforceHookDone = false; carrierFinalDone = false; gforce.until = -1;
   if (cat.ph === 'HOLD') {
     const a = combat.ally;
     catTrackWorld(CAT_BOW[0], state.position); catTrackQuat(CAT_BOW[0], state.quaternion);
@@ -2445,6 +2459,7 @@ async function startSortie() {
     combatSys.setWingOrder(0);
     combatSys.say('FURBALL // WEAPONS FREE — ENDLESS BANDITS', 3, '#ffbf3f');
   }
+  applyDebugAltSpd();
 }
 function sortieStats() {
   const sc = combat.styleCounts || {};
@@ -2473,9 +2488,9 @@ function endSortie(outcome) {
   const res = profile.recordSortie({ outcome, ...st, rankOverride: st.rankInfo.rank });
   appMode = 'DEBRIEF';
   audio.silenceFlight();
+  audio.resume();
   if (typeof syncCrtVisible === 'function') syncCrtVisible();
   for (const k in keys) keys[k] = false;
-  audio.suspend();
   hBadge.style.display = 'none';
   showDebrief(outcome, st, res);
   renderHangar();
@@ -2696,6 +2711,7 @@ function debriefToBriefing() {
   if (!(DEBUG && Q.has('bgmtrack'))) audio.setAuto(true);
   appMode = 'MENU';
   audio.silenceFlight();
+  audio.resume();
   showMenu('brief');
   setView(menuPreviewCockpit);
 }
@@ -2790,9 +2806,8 @@ function pauseSim() {
   if (appMode !== 'PLAY') return;
   appMode = 'PAUSED';
   audio.silenceFlight();
+  audio.resume();
   clearFlightInput();
-  audio.setBgmPause(true);
-  audio.suspend();
   showMenu('pause');
 }
 function resumeSim() {
@@ -2883,7 +2898,7 @@ addEventListener('keydown', e => {
   if (!e.repeat && e.code === 'Slash') { audio.setAuto(!audio.bgm.auto); hud.setMusicToast('♪ ' + (audio.bgm.title || '—')); return; }
   if (appMode === 'DEBRIEF') {                         // debrief: Enter = primary action, B = briefing; no flight input
     if (k === 'enter' && !['dbBrief', 'dbReplay', 'dbEquip'].includes(document.activeElement?.id)) { e.preventDefault(); replaySortie(dbEquipId); }
-    else if (k === 'b' && !e.repeat) debriefToBriefing();
+    else if ((k === 'b' || k === 'escape') && !e.repeat) debriefToBriefing();
     else if (k === 'r' && !e.repeat) { e.preventDefault(); startDebriefMap(); }
     else if (k === 'm' && !e.repeat) { audio.toggleMute(); syncAudioUI(); }
     if (e.code === 'Space') e.preventDefault();
@@ -3222,7 +3237,7 @@ function updatePhysics(dt) {
   kbAxis.roll += clamp(tR - kbAxis.roll, -KB_RATE * dt, KB_RATE * dt);
   // While keys are held the mouse aim stays centred on the nose; no auto-leveler chase.
   if (kbActive) { mouse.nx = 0; mouse.ny = 0; }
-  const pitchIn0 = shaped(mouse.ny) * mouseW - kbAxis.pitch;
+  const pitchIn0 = clamp(clamp(shaped(mouse.ny) * mouseW, -1, 1) - kbAxis.pitch, -1, 1);
   const rollIn0 = shaped(mouse.nx) * mouseW + kbAxis.roll;
   const highG0 = (keys.shift || (DEBUG && Q.has('highg'))) && Math.abs(pitchIn0) > 0.6;
   let psmActive = flightMode === 'FLY' && !state.onGround && kts < PSM_KT &&
@@ -3424,11 +3439,13 @@ function updatePhysics(dt) {
     qCmd = clamp(gammaDot - alpha * 1.3, -0.6, 0.6);
   } else {
     // Lead-compensated AoA: alpha a moment ahead (body pitch rate minus flight-path
-    // rate) so the limiter brakes the nose early -- no overshoot past the stall at low q.
-    const alphaPred = alpha + 0.22 * (state.pitchRate - gammaDot);
+    // rate including decoupled AoA velocity coupling) so the limiter brakes cleanly
+    // while tracking full nCmd load factor.
+    const gammaDotEff = gammaDot + AOA_COUPLE * alpha;
+    const alphaPred = alpha + 0.22 * (state.pitchRate - gammaDotEff);
     let aErr = (alphaCmd - alphaPred) * 6.0 * machStiff;
     if (aErr > 0) aErr *= 1 - sstep(alphaPred, 20 * Math.PI / 180, 26 * Math.PI / 180);   // CAS taper: no extra nose-up past 20-26 deg
-    qCmd = clamp(gammaDot + aErr, -1.4, 1.4);
+    qCmd = clamp(gammaDotEff + aErr, -1.4, 1.4);
   }
   // Pitch moment: control chases qCmd (inertia + q-scaled authority) with aero damping.
   const pitchGain = state.stalled ? 2.2 : (1.0 + 5.0 * authQ);             // stalled: heavy, critically damped
@@ -3801,7 +3818,8 @@ function enterGround(td) {
 function updateGround(dt) {
   const clamp = THREE.MathUtils.clamp, sstep = THREE.MathUtils.smoothstep, R = world.runway;
   const kts = state.groundSpeed * 1.94384;
-  const pitchIn = shaped(mouse.ny), rudderIn = rudderInput(dt);   // same tap ramp for nose-wheel steering
+  const gforceActive = gforce.until > simTime && Math.abs(gforce.g) > 0.1 && flightMode === 'FLY';
+  const pitchIn = gforceActive ? clamp((gforce.g - 1) / (gforce.g >= 1 ? 6.5 : 3), -1, 1) : shaped(mouse.ny), rudderIn = rudderInput(dt);   // same tap ramp for nose-wheel steering
   state.wheelBrake = !!(keys.ctrl || keys.b || state.brakeHeld || state.brakeLatch);
   updateAirbrake(dt, 0);
   updateThrottle(dt);
@@ -3879,6 +3897,30 @@ function updatePitStop(dt, kts) {
     combatSys.say('REARM ABORTED — ROLLING', 1.6, '#ffbf3f');
   }
 }
+function applyDebugAltSpd() {
+  if (!DEBUG || (!Q.has('alt') && !Q.has('spd'))) return;
+  if (Q.has('alt')) {
+    const alt = Number(Q.get('alt'));
+    if (Number.isFinite(alt)) {
+      state.position.y = alt;
+      if (alt > groundLevel(state.position.x, state.position.z) + GEAR_H + 5) {
+        state.onGround = false; state.gearDown = false; state.gear = 0; gearAutoLock = false;
+        if (cat.ph !== 'NONE') cat.ph = 'AIRBORNE';
+        for (const w of wingmen) if (w.cat && w.cat.ph !== 'NONE') w.cat.ph = 'AIRBORNE';
+      }
+    }
+  }
+  if (Q.has('spd')) {
+    const spd = Number(Q.get('spd'));
+    if (Number.isFinite(spd)) {
+      state.speed = spd;
+      state.velocity.set(0, 0, -spd).applyQuaternion(state.quaternion);
+      if (state.onGround) state.groundSpeed = spd;
+    }
+  }
+  prevPlanePos.copy(state.position); camVelocity.set(0, 0, 0);
+  camera.position.copy(CAM_OFFSET).applyQuaternion(state.quaternion).add(state.position);
+}
 // Debug / test: jet at rest on the RWY 36 centreline at world z, heading 360, gear down and locked.
 function placeOnRunway(z) {
   const R = world.runway;
@@ -3887,6 +3929,7 @@ function placeOnRunway(z) {
   Object.assign(state, { gearDown: true, gear: 1, onGround: true, groundSpeed: 0, groundYaw: 0, groundPitch: 0, throttle: 0.2, afterburner: 0,
     speed: 1, pitchRate: 0, rollRate: 0, yawRate: 0 });
   Object.assign(state.pit, { t: 0, done: false, active: false });
+  applyDebugAltSpd();
   camera.position.copy(CAM_OFFSET).applyQuaternion(state.quaternion).add(state.position); prevPlanePos.copy(state.position);
 }
 function toggleGear() {
@@ -3942,8 +3985,6 @@ function updatePadlock(dt) {
     console.log('[ANGELS_ZERO] pad k=' + pad.k.toFixed(2) + ' yaw=' + pad.yaw.toFixed(2) + ' pitch=' + pad.pitch.toFixed(2));
 }
 function punchValue() { return punchT > 0 ? Math.pow(punchT / PUNCH_T, 1.5) : 0; }
-function gforceActiveNow() { return gforcePartsLocal !== null; }
-let gforcePartsLocal = null;
 function cloudDeck() {
   const d = (vfx.cloudSea && typeof vfx.cloudSea === 'object') ? vfx.cloudSea : (world.map && world.map.cloudSea);
   return (d && Number.isFinite(d.base) && Number.isFinite(d.top)) ? d : null;
@@ -4221,7 +4262,7 @@ function updateCameraAndVisuals(dt, now) {
   }
   updateHeadG(dt);
   if (firstPerson && (Math.abs(head.y) + Math.abs(head.z) + Math.abs(head.r)) > 0.0005) {
-    _hq.setFromAxisAngle(new THREE.Vector3(0, 0, 1), head.r);
+    _hq.setFromAxisAngle(AX_Z, head.r);
     camera.quaternion.multiply(_hq);
     _hv.set(head.z * 0.4, head.y, head.z).applyQuaternion(camera.quaternion);
     camera.position.add(_hv);
@@ -5376,7 +5417,6 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
     const padlockAt = Q.has('padlockat') ? Number(Q.get('padlockat')) : -1;
     const mupdateAtHook = Q.has('mupdateat') ? Q.get('mupdateat').split(':') : null;
     const punchAt = Q.has('punchat') ? Number(Q.get('punchat')) : -1;
-    const gforceParts = Q.has('gforce') ? Q.get('gforce').split(':') : null;
     const dmgAt = Q.has('dmgat') ? Q.get('dmgat').split(':') : null;
     const enemyDmgAt = Q.has('dmgenemyat') ? Q.get('dmgenemyat').split(':') : null;
     const tdAt = Q.has('tdat') ? Q.get('tdat').split(':') : null;
@@ -5605,18 +5645,6 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
           console.log('[ANGELS_ZERO] duelbehind @', t1.toFixed(2), e.label);
         }
       }
-      // ?carrierfinalat=s -> on the carrier centreline 450 m behind the stern (just short of the
-      // 400 m final gate), on the 3.5 deg slope.
-      if (Q.has('carrierfinalat') && Number(Q.get('carrierfinalat')) >= t0 && Number(Q.get('carrierfinalat')) < t1 && combat.ally) {
-        const a = combat.ally;
-        _lp.set(0, a.deckY + 450 * AL_TAN, a.len / 2 + 450);
-        alToWorld(a, _lp, state.position);
-        state.quaternion.copy(a.root.quaternion);
-        state.speed = 85; state.velocity.set(0, 0, -state.speed).applyQuaternion(state.quaternion).add(a.vel);
-        state.throttle = 0.6; state.afterburner = 0; state.pitchRate = state.rollRate = state.yawRate = 0;
-        state.gearDown = true; state.gear = 1; state.onGround = false; mouse.nx = 0; mouse.ny = 0;
-        console.log('[ANGELS_ZERO] carrier final @', t1.toFixed(2));
-      }
       if (trapAt >= t0 && trapAt < t1 && combat.ally) {
         const a = combat.ally, half = a.len / 2;
         _lp.set(0, ((a.deckYLocal && a.deckYLocal.trap) || a.deckY) + 2, half - 78);
@@ -5691,10 +5719,6 @@ loader.load('assets/angels_zero_jet.glb', async gltf => {
       for (const va of vwsAts) if (Number(va[0]) >= t0 && Number(va[0]) < t1) {
         vwsTrigger(va[1] || 'PULL_UP', '');
         console.log('[ANGELS_ZERO] vwsat @', t1.toFixed(2), va[1]);
-      }
-      if (gforceParts && Number(gforceParts[1]) >= t0 && Number(gforceParts[1]) < t1) {
-        gforce.g = Number(gforceParts[0]) || 0; gforce.until = simTime + Math.max(0.5, Number(gforceParts[1]) || 1);
-        console.log('[ANGELS_ZERO] gforce', gforce.g, 's', gforceParts[1]);
       }
       if (punchAt >= t0 && punchAt < t1) {
         const deck = cloudDeck();
@@ -5904,6 +5928,27 @@ function stepSim(dt) {
   if (DEBUG_HOLD) for (const k of DEBUG_HOLD) keys[k] = true;   // test hook: ?hold=s,a,...
   if (appMode === 'PLAY' && flightMode === 'FLY') tele.tick(dt, state, simTime);
   if (sortie.active) missionT = simTime - sortie.t0;
+  if (DEBUG && appMode === 'PLAY' && sortie.active) {
+    if (!carrierFinalDone && CARRIER_FINAL_AT >= 0 && missionT >= CARRIER_FINAL_AT && combat.ally) {
+      carrierFinalDone = true;
+      const a = combat.ally;
+      _lp.set(0, a.deckY + 450 * AL_TAN, a.len / 2 + 450);
+      alToWorld(a, _lp, state.position);
+      state.quaternion.copy(a.root.quaternion);
+      state.speed = 85; state.velocity.set(0, 0, -state.speed).applyQuaternion(state.quaternion).add(a.vel);
+      state.throttle = 0.6; state.afterburner = 0; state.pitchRate = state.rollRate = state.yawRate = 0;
+      state.gearDown = true; state.gear = 1; state.onGround = false; mouse.nx = 0; mouse.ny = 0;
+      if (cat.ph !== 'NONE') cat.ph = 'AIRBORNE'; carrier.phase = null;
+      prevPlanePos.copy(state.position);
+      console.log('[ANGELS_ZERO] carrier final @', missionT.toFixed(2));
+    }
+    if (!gforceHookDone && GFORCE_PARTS && missionT >= 0.5) {
+      gforceHookDone = true;
+      gforce.g = Number(GFORCE_PARTS[0]) || 0;
+      gforce.until = simTime + Math.max(0.5, Number(GFORCE_PARTS[1]) || 1);
+      console.log('[ANGELS_ZERO] gforce', gforce.g, 's', GFORCE_PARTS[1]);
+    }
+  }
   if (DEBUG && combat.missionBgm === '08_crimson_duel') {
     duelCheckT += dt;
     if (duelCheckT >= 1) {

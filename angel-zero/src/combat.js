@@ -1530,13 +1530,16 @@ export function createCombat(THREE, env) {
     _btQ = new THREE.Quaternion(), _btM = new THREE.Matrix4(), _btZax = new THREE.Vector3(0, 0, 1);
   function flyBTT(a, desDir, desSpeed, dt, lim) {
     const G = 9.81, v0 = Math.max(a.speed || 100, 60);
+    desSpeed = Math.max(desSpeed, lim.vMin || 100);
     _btDir.copy(desDir);
     // Terrain look-ahead: blend the demand upward before the predicted path hits the floor.
     const minAGL = lim.minAGL || 0;
     if (minAGL > 0) {
       _btAhead.copy(a.fwd).multiplyScalar(Math.min(v0 * 2, 700)).add(a.pos);
+      const curFloor = groundLevel(a.pos.x, a.pos.z);
       const aheadFloor = groundLevel(_btAhead.x, _btAhead.z) + minAGL;
-      if (aheadFloor > a.pos.y && a.fwd.y < 0.15) _btDir.y += clamp((aheadFloor - a.pos.y) / 400, 0, 0.5);
+      if (a.pos.y < curFloor + minAGL * 0.5 && a.fwd.y < 0.25) _btDir.y = Math.max(_btDir.y, 0.35);
+      else if (aheadFloor > a.pos.y && a.fwd.y < 0.15) _btDir.y += clamp((aheadFloor - a.pos.y) / 400, 0, 0.5);
     }
     _btDir.normalize();
     const cosA = clamp(a.fwd.dot(_btDir), -1, 1), ang = Math.acos(cosA);
@@ -1560,15 +1563,18 @@ export function createCombat(THREE, env) {
     const rate = dv > 0 ? (lim.accAB || lim.acc || 9) : (lim.dec || 14);
     const induced = 0.08 * Math.max(0, a.gNow * a.gNow - 1);
     a.speed += clamp(dv, -rate * dt, rate * dt) - induced * dt;
-    a.speed = clamp(a.speed, lim.vMin || 100, lim.vMax || 340);
+    a.speed = clamp(a.speed, 60, lim.vMax || 340);
     a.ab = dv > 25 ? 1 : Math.max(0, (a.ab || 0) - dt);
     _btM.lookAt(_btOrg, a.fwd, _btUp);
     a.quat.setFromRotationMatrix(_btM).multiply(_btQ.setFromAxisAngle(_btZax, a.bank));
     a.vel.copy(a.fwd).multiplyScalar(a.speed);
     a.pos.addScaledVector(a.vel, dt);
-    if (minAGL > 0 && a.pos.y < groundLevel(a.pos.x, a.pos.z) + minAGL * 0.5) {
-      a.pos.y = groundLevel(a.pos.x, a.pos.z) + minAGL * 0.5;
-      a.fwd.y = Math.max(a.fwd.y, 0.1); a.fwd.normalize();
+    if (minAGL > 0) {
+      const floorY = groundLevel(a.pos.x, a.pos.z) + 10;
+      if (a.pos.y < floorY) {
+        a.pos.y = floorY;
+        a.fwd.y = Math.max(a.fwd.y, 0.15); a.fwd.normalize();
+      }
     }
     return Math.abs(a.gNow);
   }
@@ -3165,8 +3171,9 @@ export function createCombat(THREE, env) {
     if (st.clear === 'TARGETS') return !strikeAlive() && !C.climb.on;
     if (st.clear === 'ACE') {
       if (!aceFlightDone) return false;
-      for (const e of enemies) if (e.alive && e.aceFlight) return false;
-      return true;
+      let hadAce = false;
+      for (const e of enemies) if (e.aceFlight) { hadAce = true; if (e.alive) return false; }
+      return hadAce;
     }
     return false;
   }
@@ -3574,7 +3581,7 @@ export function createCombat(THREE, env) {
     }
     const stages = C.mcfg.stages;
     if (stages && stages.length) {
-      if (C.rtb) { C.obj = { done: 0, total: 1 }; return; }
+      if (C.rtb || C.stage >= stages.length) { C.obj = { done: 0, total: 1 }; return; }
       const st = stages[C.stage];
       if (!st) return;
       if (stageClear(C.stage)) {
@@ -3766,10 +3773,9 @@ export function createCombat(THREE, env) {
           C.wingNoDesignationT = performance.now();
           if (env.onWing) env.onWing('NO DESIGNATION — COVERING', 'WARDEN-2', '#ffb838');
         }
-        setWingOrder(1);                                  // drop to COVER, no target this tick
-        return null;
+      } else {
+        w.tgt = d; return d;
       }
-      w.tgt = d; return d;
     }
     let best = null, bestScore = Infinity;
     _wmFwd.set(0, 0, -1).applyQuaternion(S.quaternion);
@@ -5523,6 +5529,7 @@ export function createCombat(THREE, env) {
   function spawnFleet() {
     for (const t of taskForce) { scene.remove(t.g); const i = surface.indexOf(t); if (i >= 0) surface.splice(i, 1); }
     taskForce.length = 0;
+    if (C.mcfg && C.mcfg.noShips) return;
     let d = 0;
     SLOTS.forEach((sl, i) => {
       const t = sl.kind === 'CVN' ? buildCarrier() : destroyerShip();
@@ -6042,10 +6049,20 @@ export function createCombat(THREE, env) {
     collectStores(model);
     buildFleet(model, nozzleLocal);
     buildBaseDefences();
+    const mp = env.getMapProps && env.getMapProps();
+    if (mp) { const vis = !!(mp.islands && mp.baseBldg); for (const g of baseDefG) g.visible = vis; }
     buildAlliedCarrier();
-    spawnFleet();
-    spawnWave();
-    spawnSurface();
+    if (!(C.mcfg && C.mcfg.noShips)) spawnFleet();
+    const hasStages = !!(C.mcfg && C.mcfg.stages && C.mcfg.stages.length);
+    if (!hasStages) {
+      spawnWave();
+      spawnSurface();
+    } else {
+      if (C.weaponsLock.msl) for (const st of stores.msl) st.node.visible = false;
+      if (C.weaponsLock.spw) for (const st of stores.bomb) st.node.visible = false;
+      tintFleet();
+      writeFleet();
+    }
     ready = true;
   }
 

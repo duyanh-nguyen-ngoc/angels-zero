@@ -245,7 +245,7 @@ export function createAudio() {
     const mkShaper = curve => { const ws = ctx.createWaveShaper(); ws.curve = curve; ws.oversample = '2x'; return ws; };
     const mkShelf = (type, f, db, q) => { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.gain.value = db; if (q) b.Q.value = q; return b; };
     E.ckBus = gain(1); E.chBus = gain(1);
-    E.ckMixG = gain(0); E.chMixG = gain(1);
+    E.ckMixG = gain(0); E.chMixG = gain(0);
     E.comp = ctx.createDynamicsCompressor();
     E.comp.threshold.value = -18; E.comp.knee.value = 12; E.comp.ratio.value = 3;
     E.comp.attack.value = 0.01; E.comp.release.value = 0.2;
@@ -323,7 +323,7 @@ export function createAudio() {
     }
     // Cockpit ECS hiss + chase air shear (both persistent, gain-only per frame).
     {
-      const ecsG = gain(0.025); loopNoise(white).connect(filt('bandpass', 4500, 0.7)).connect(ecsG).connect(E.ckBus);
+      const ecsG = gain(0); loopNoise(white).connect(filt('bandpass', 4500, 0.7)).connect(ecsG).connect(E.ckBus);
       const shearG = gain(0); loopNoise(white).connect(filt('highpass', 3000)).connect(shearG).connect(E.chBus);
       E.ecsG = ecsG; E.shearG = shearG;
     }
@@ -504,9 +504,9 @@ export function createAudio() {
     // Transonic shear / buffet and high-AoA airframe creak.
     N.shearN = loopNoise(N.whiteBuf); N.shearBP = filt('bandpass', 2200, 0.8); N.shearG = gain(0);
     N.shearN.connect(N.shearBP).connect(N.shearG).connect(cockpitLP);
-    N.transBufN = loopNoise(N.whiteBuf); N.transBufLP = filt('lowpass', 90, 0.8); N.transBufG = gain(0);
-    N.transBufN.connect(N.transBufLP).connect(N.transBufG).connect(cockpitLP);
-    N.transAM = osc('sine', 9); N.transAMG = gain(0.35); N.transAM.connect(N.transAMG).connect(N.transBufG.gain);
+    N.transBufN = loopNoise(N.whiteBuf); N.transBufLP = filt('lowpass', 90, 0.8); N.transBufVCA = gain(0.65); N.transBufG = gain(0);
+    N.transBufN.connect(N.transBufLP).connect(N.transBufVCA).connect(N.transBufG).connect(cockpitLP);
+    N.transAM = osc('sine', 9); N.transAMG = gain(0.35); N.transAM.connect(N.transAMG).connect(N.transBufVCA.gain);
     N.creakN = loopNoise(pink); N.creakBP = filt('bandpass', 140, 4); N.creakG = gain(0);
     N.creakN.connect(N.creakBP).connect(N.creakG).connect(cockpitLP);
 
@@ -523,28 +523,48 @@ export function createAudio() {
     N.clankN.connect(N.clankBP).connect(N.clankG).connect(cockpitLP);
     N.clankOsc = osc('square', 220); N.clankToneG = gain(0); N.clankOsc.connect(N.clankToneG).connect(cockpitLP);
 
+    // Procedural fallbacks for the sampled layers.
+    N.buffNoise = loopNoise(brown); N.buffBP = filt('bandpass', 75, 1.1); N.buffFGain = gain(0);
+    N.buffNoise.connect(N.buffBP).connect(N.buffFGain).connect(cockpitLP);
+    N.nextBeat = 0;
+
     // Persistent list of every continuous flight gain, built once for silenceFlight().
     N.silenceParams = [
       E.out.gain, E.ckMixG.gain, E.chMixG.gain,
       ...E.choir.map(c => c.bus.gain),
       ...E.exh.map(x => x.g.gain),
       E.crackG.gain, E.sub && E.sub.bus.gain,
+      E.ecsG && E.ecsG.gain, E.shearG && E.shearG.gain,
+      E.th && E.th.sg.gain, E.th && E.th.bg.gain,
       N.lockGain && N.lockGain.gain, N.growlGain && N.growlGain.gain, N.alertGain && N.alertGain.gain,
-      N.tinG && N.tinG.gain, N.flagG && N.flagG.gain, N.droneG && N.droneG.gain,
+      N.tinG && N.tinG.gain, N.flagG && N.flagG.gain, N.flagAM && N.flagAM.gain, N.droneG && N.droneG.gain,
       N.breathG && N.breathG.gain, N.breathEnv && N.breathEnv.gain,
       N.hissG && N.hissG.gain, N.hissEnv && N.hissEnv.gain,
-      N.gaspG && N.gaspG.gain, N.gaspEnv && N.gaspEnv.gain,
-      N.heartG && N.heartG.gain, N.hydG && N.hydG.gain,
-      N.windGain && N.windGain.gain, N.buffGain && N.buffGain.gain,
-      N.groanGain && N.groanGain.gain, N.lugGain && N.lugGain.gain
+      N.gaspEnv && N.gaspEnv.gain,
+      N.heartG && N.heartG.gain, N.heartAGain && N.heartAGain.gain, N.heartBGain && N.heartBGain.gain,
+      N.hydG && N.hydG.gain,
+      N.whistleGain && N.whistleGain.gain, N.windGain && N.windGain.gain,
+      N.cloudGain && N.cloudGain.gain, N.cloudHissGain && N.cloudHissGain.gain,
+      N.mistG && N.mistG.gain, N.mistAM && N.mistAM.gain,
+      N.boomNG && N.boomNG.gain, N.boomSubG && N.boomSubG.gain,
+      N.sprayG && N.sprayG.gain, N.rumbleG && N.rumbleG.gain,
+      N.egunG && N.egunG.gain, N.gunHitG && N.gunHitG.gain, N.gunBus && N.gunBus.gain,
+      N.rainGain && N.rainGain.gain, N.rainLowGain && N.rainLowGain.gain,
+      N.canopyBus && N.canopyBus.gain, N.canopyHissGain && N.canopyHissGain.gain,
+      N.coreGain && N.coreGain.gain, N.compGain && N.compGain.gain, N.subGain && N.subGain.gain,
+      N.groanGain && N.groanGain.gain, ...(N.res ? N.res.map(r => r.g.gain) : []), N.lugGain && N.lugGain.gain,
+      N.buffGain && N.buffGain.gain, N.buffGain2 && N.buffGain2.gain, N.buffFGain && N.buffFGain.gain,
+      N.windBus && N.windBus.gain, N.slipGain && N.slipGain.gain, N.windBuffGain && N.windBuffGain.gain,
+      N.thumpG && N.thumpG.gain, N.whooshG && N.whooshG.gain,
+      N.shearG && N.shearG.gain, N.transBufG && N.transBufG.gain, N.creakG && N.creakG.gain,
+      N.chirpG && N.chirpG.gain, N.chirpRingG && N.chirpRingG.gain,
+      N.noseG && N.noseG.gain, N.noseClickG && N.noseClickG.gain,
+      N.clankG && N.clankG.gain, N.clankToneG && N.clankToneG.gain
     ].filter(Boolean);
 
-    // Procedural fallbacks for the sampled layers.
-    N.buffNoise = loopNoise(brown); N.buffBP = filt('bandpass', 75, 1.1); N.buffFGain = gain(0);
-    N.buffNoise.connect(N.buffBP).connect(N.buffFGain).connect(cockpitLP);
-    N.nextBeat = 0;
-
     ready = true;
+    N.flightSilent = true;
+    silenceFlight(0.01);
     resume();
     return true;
   }
@@ -934,9 +954,16 @@ export function createAudio() {
       N.turbPeak = ctx.createBiquadFilter(); N.turbPeak.type = 'peaking'; N.turbPeak.frequency.value = 90; N.turbPeak.Q.value = 0.9; N.turbPeak.gain.value = 0;
       N.turbLP = filt('lowpass', 4000, 0.7); N.turbGain = gain(0);
       N.turb.connect(N.turbPeak).connect(N.turbLP).connect(N.turbGain).connect(cockpitLP);
+      if (N.silenceParams) N.silenceParams.push(N.turbGain.gain);
     }
-    if (samples.buffet && !N.buff) { N.buff = loopVoice(samples.buffet); N.buffGain = gain(0); N.buff.connect(N.buffGain).connect(cockpitLP); }
-    if (samples.breath && !N.breath) { N.breath = loopVoice(samples.breath); N.breathGain = gain(0); N.breath.connect(N.breathGain).connect(N.body); }
+    if (samples.buffet && !N.buff) {
+      N.buff = loopVoice(samples.buffet); N.buffGain = gain(0); N.buff.connect(N.buffGain).connect(cockpitLP);
+      if (N.silenceParams) N.silenceParams.push(N.buffGain.gain);
+    }
+    if (samples.breath && !N.breath) {
+      N.breath = loopVoice(samples.breath); N.breathGain = gain(0); N.breath.connect(N.breathGain).connect(N.body);
+      if (N.silenceParams) N.silenceParams.push(N.breathGain.gain);
+    }
   }
   // ---- cockpit voice warning system -------------------------------------------
   const VWS_IDS = ['PULL_UP', 'ENGINE_FIRE', 'CHAFF_FLARE', 'OVER_G', 'ALTITUDE', 'BINGO_FUEL'];
@@ -1563,18 +1590,19 @@ export function createAudio() {
     const d = decks[idle], o = decks[out];
     d.el.src = BGM_DIR + list[i].file; d.el.currentTime = 0;
     d.el.loop = list.length === 1;
-    d.g.gain.cancelScheduledValues(ctx.currentTime); d.g.gain.setValueAtTime(0, ctx.currentTime);
     const now = ctx.currentTime;
+    d.g.gain.cancelScheduledValues(now); d.g.gain.setValueAtTime(0, now);
     d.g.gain.setValueCurveAtTime(sinCurve, now, XFADE);
-    o.g.gain.cancelScheduledValues(now); o.g.gain.setValueAtTime(o.g.gain.value, now);
+    if (o.g.gain.cancelAndHoldAtTime) o.g.gain.cancelAndHoldAtTime(now);
+    else { o.g.gain.cancelScheduledValues(now); o.g.gain.setValueAtTime(o.g.gain.value, now); }
     o.g.gain.setValueCurveAtTime(cosCurve, now, XFADE);
+    o.g.gain.setValueAtTime(0, now + XFADE + 0.01);
     cScn = scn; cIdx = i; cIdle = idle; cSeq = seq;
     loading = true; dwell = 0; setPending(null); pendingForce = false;
     playDeck(d);
     setTimeout(() => {
       if (seq !== switchSeq || active !== idle) return;
       try { o.el.pause(); o.el.removeAttribute('src'); o.el.load(); } catch (e) { /* already released */ }
-      o.g.gain.value = 0;
     }, (XFADE + 0.1) * 1000);
   }
   function switchTo(scn, force = false) {
@@ -1911,7 +1939,7 @@ export function createAudio() {
     const worker = async () => {
       while (next < lines.length) {
         const line = lines[next++];
-        if (!line || radioBufs[line.id]) continue;
+        if (!line || !line.file || radioBufs[line.id]) continue;
         try {
           const res = await fetch(line.file);
           if (!res.ok) continue;
@@ -2175,6 +2203,16 @@ export function createAudio() {
       p.cancelScheduledValues(now);
       p.setTargetAtTime(0, now, tc);
       p._t = 0;
+    }
+    if (N.tunnel) {
+      N.tunnel.frequency.cancelScheduledValues(now);
+      N.tunnel.frequency.setTargetAtTime(12000, now, tc);
+      N.tunnel.frequency._t = 12000;
+    }
+    if (N.gBgmG) {
+      N.gBgmG.gain.cancelScheduledValues(now);
+      N.gBgmG.gain.setTargetAtTime(1, now, tc);
+      N.gBgmG.gain._t = 1;
     }
     N.flightSilent = true;
   }
