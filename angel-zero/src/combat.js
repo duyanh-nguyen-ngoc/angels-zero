@@ -4792,9 +4792,17 @@ export function createCombat(THREE, env) {
   }
   // Land targets (SAM sites + SEC-02 coastal flak nests); the naval task force is
   // managed separately (spawnFleet) and kept in the same `surface` list.
+  // SAM / AAA sites own every geometry + material they use (buildSAM / buildFlak),
+  // so a retired site must free them or each respawn leaks ~90 GPU geometries.
+  function disposeGroup(g) {
+    g.traverse(o => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) { if (Array.isArray(o.material)) for (const m of o.material) m.dispose(); else o.material.dispose(); }
+    });
+  }
   function spawnSurface() {
     if (C.mcfg.enemyMsl === false && C.mcfg.wingmen === 'NONE') return;
-    for (let i = surface.length - 1; i >= 0; i--) if (!surface[i].fleet && !surface[i].strike) { scene.remove(surface[i].g); surface.splice(i, 1); }
+    for (let i = surface.length - 1; i >= 0; i--) if (!surface[i].fleet && !surface[i].strike) { scene.remove(surface[i].g); disposeGroup(surface[i].g); surface.splice(i, 1); }
     const { land } = siteSpots();
     land.forEach((p, i) => {
       const t = buildSAM();

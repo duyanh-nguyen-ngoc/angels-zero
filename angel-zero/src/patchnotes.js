@@ -3,6 +3,10 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.48', title: 'GROUND SITE MEMORY LEAK FIX', bullets: [
+    'Fixed a memory leak where every replay or mission switch rebuilt the island SAM and AAA sites without freeing the old ones, so long sessions no longer slowly grow GPU memory.',
+    'Retired ground sites now release their meshes and materials, which also applies to the timed ground-target respawn mid-sortie.'
+  ] },
   { version: 'v1.1.47', title: 'REPLAY WAVE RESET & DEBRIEF RADIO FIXES', bullets: [
     'Fixed non-staged sorties (AIR SUPERIORITY and FURBALL) after replay or debrief return so BANDIT 01-06 and strike targets respawn cleanly at phase 1 instead of skipping straight to CRIMSON-1.',
     'Cut active flight radio transmissions immediately on sortie end so lines no longer bleed into the debrief, and pumped the radio queue in debrief so ON_MISSION_CLEAR plays cleanly on victory.'
