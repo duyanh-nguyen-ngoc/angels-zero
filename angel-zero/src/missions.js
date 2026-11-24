@@ -1,7 +1,7 @@
 // ANGELS ZERO — mission registry. One block + one MISSION_ORDER entry adds a mission.
 // Each mission supplies its spawn, waves, targets, map tag and soundtrack scenario.
 
-import { CEIL_M, GORGE_FORT, GORGE_SPAWN_Z, gorgeCentreX } from './maps.js?v=s9bc';
+import { CEIL_M, GORGE_FORT, GORGE_SPAWN_Z, gorgeCentreX } from './maps.js?v=s9dq';
 
 export const MISSION_KEY = 'angelsZero_mission';
 
@@ -65,10 +65,11 @@ export const MISSIONS = {
   },
   FREE_FLIGHT: {
     id: 'FREE_FLIGHT', title: 'FREE FLIGHT',
-    brief: 'Scenic free flight over real-world satellite terrain and 3D cities. No hostiles, no timers.',
-    mapTag: 'REAL_WORLD', launch: 'AIRBORNE', rtbType: null, bgmScenario: '01_title', wxOverride: true,
+    brief: 'Scenic, unarmed high-altitude cruise way above the clouds over real-world 3D cities and mountains. No weapons, no hostiles — just relax and fly.',
+    mapTag: 'REAL_WORLD', launch: 'AIRBORNE', rtbType: null, bgmScenario: '01_hangar', wxOverride: true,
     freeFlight: true, noShips: true, wingmen: 'SOLO',
-    spawn: { pos: [0, 1200, 0], hdg: 0.15, spd: 210, onDeck: false },
+    weapons: { gun: false, msl: false, spw: false }, enemyMsl: false,
+    spawn: { pos: [0, 5500, 0], hdg: 0.15, spd: 175, onDeck: false },
     waves: [], targets: [], ceilingFt: null
   }
 };

@@ -3,11 +3,11 @@
 // OpenFreeMap MVT vector buildings at zoom 13 in a pooled 5x5 tile ring.
 
 export const FREE_FLIGHT_PRESETS = {
-  TORONTO: { id: 'TORONTO', name: 'TORONTO', lat: 43.6426, lon: -79.3871, alt: 1200, hdg: 0.15, spd: 210, desc: 'CN Tower & Lake Ontario waterfront' },
-  TOKYO:   { id: 'TOKYO',   name: 'TOKYO',   lat: 35.6762, lon: 139.6503, alt: 1300, hdg: 0.85, spd: 215, desc: 'Shinjuku, Imperial Palace & Skytree' },
-  SF:      { id: 'SF',      name: 'SAN FRANCISCO', lat: 37.7955, lon: -122.3937, alt: 1200, hdg: 5.5, spd: 210, desc: 'Financial District & Golden Gate' },
-  NYC:     { id: 'NYC',     name: 'NEW YORK', lat: 40.7128, lon: -74.0060, alt: 1400, hdg: 0.35, spd: 215, desc: 'Lower Manhattan & Hudson River' },
-  ALPS:    { id: 'ALPS',    name: 'SWISS ALPS', lat: 46.5472, lon: 7.9821, alt: 3200, hdg: 2.1, spd: 225, desc: 'Lauterbrunnen Valley & Jungfrau' },
+  TORONTO: { id: 'TORONTO', name: 'TORONTO', lat: 43.6426, lon: -79.3871, alt: 5500, hdg: 0.15, spd: 175, desc: 'High above the clouds over Lake Ontario & CN Tower' },
+  TOKYO:   { id: 'TOKYO',   name: 'TOKYO',   lat: 35.6762, lon: 139.6503, alt: 5600, hdg: 0.85, spd: 175, desc: 'High above the clouds over Tokyo Bay & Skytree' },
+  SF:      { id: 'SF',      name: 'SAN FRANCISCO', lat: 37.7955, lon: -122.3937, alt: 5500, hdg: 5.5, spd: 175, desc: 'High above the clouds over Golden Gate & the Bay' },
+  NYC:     { id: 'NYC',     name: 'NEW YORK', lat: 40.7128, lon: -74.0060, alt: 5800, hdg: 0.35, spd: 178, desc: 'High above the clouds over Manhattan & the Hudson' },
+  ALPS:    { id: 'ALPS',    name: 'SWISS ALPS', lat: 46.5472, lon: 7.9821, alt: 6800, hdg: 2.1, spd: 185, desc: 'High above the peaks & cloud sea over Jungfrau' },
 };
 
 const FF_CITY_KEY = 'az_ff_city';

@@ -960,6 +960,17 @@ export function createHUD(THREE, A) {
   function drawTopLeft(ctx) {
     // Minimal AC8 telemetry: no opaque box, dark text shadows only.
     const x = 22, y = 18;
+    if (C.mcfg && C.mcfg.freeFlight) {
+      ctx.save();
+      ctx.globalAlpha = 0.78;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      ctx.font = f(13, true);
+      labelText(ctx, 'FREE FLIGHT', x, y, '#5eead4', 3);
+      ctx.font = f(12, true);
+      labelText(ctx, A.missionClock(), x, y + 18, '#a7f3d0', 2);
+      ctx.restore();
+      return;
+    }
     ctx.save();
     glow(ctx, G, 4); ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(x - 6, y + 10); ctx.lineTo(x - 6, y - 4); ctx.lineTo(x + 18, y - 4); ctx.stroke();
@@ -1861,6 +1872,16 @@ export function createHUD(THREE, A) {
 
     if (!compact) {
       // 3rd person (AC8): no ladders / tapes — reticle + pointed SPEED / ALT boxes only.
+      // In Free Flight: clean, unarmed scenic view — no gun reticle, no gun funnel, softer wider speed/alt cues.
+      if (C.mcfg && C.mcfg.freeFlight) {
+        ctx.save();
+        ctx.globalAlpha = 0.62;
+        drawTrueFPV(ctx, '#5eead4');
+        drawChevronBox(ctx, g.cx - (BOX_OFF + 40), g.cy, Math.round(kts), 'SPEED', 'right', spdCol === WARN ? WARN : '#5eead4', '', AMBER);
+        drawChevronBox(ctx, g.cx + (BOX_OFF + 40), g.cy, Math.round(altFt), 'ALT', 'left', altCol === WARN ? WARN : '#5eead4', '', raltCol);
+        ctx.restore();
+        return;
+      }
       drawReticle(ctx, g, dt, hudCol);
       drawTrueFPV(ctx, hudCol);
       drawGunFunnel(ctx, hudCol);
@@ -1877,9 +1898,9 @@ export function createHUD(THREE, A) {
     drawConformalLadder(ctx, g, hudCol, compact);
     const fwd = _chFwd.set(0, 0, -1).applyQuaternion(S.quaternion);
     const bore = toScreen(_tp.copy(cam.position).addScaledVector(fwd, 5000));
-    if (bore.ok) { drawWaterline(ctx, bore, hudCol); heatArc(ctx, bore.x, bore.y, 30, C.gunHeat || 0, 0.85); }
+    if (bore.ok) { drawWaterline(ctx, bore, hudCol); if (!(C.mcfg && C.mcfg.freeFlight)) heatArc(ctx, bore.x, bore.y, 30, C.gunHeat || 0, 0.85); }
     drawFPV(ctx, { cx: g.cx, minY: g.minY + (compact ? 40 : 12), maxY: g.maxY - 12, boxW: g.boxW - (compact ? 84 : 120) }, dt, hudCol);
-    drawGunFunnel(ctx, hudCol);
+    if (!(C.mcfg && C.mcfg.freeFlight)) drawGunFunnel(ctx, hudCol);
 
     if (compact) {
       drawHeadingStrip(ctx, g.cx, g.minY + 18, g.boxW * 0.56, hudCol, true);
@@ -1888,7 +1909,7 @@ export function createHUD(THREE, A) {
       drawSlimTape(ctx, { x: g.maxX - 68, top: g.minY + 72, bot: g.maxY - 30, value: altFt, pxPerUnit: 0.13, step: 100, side: 'right',
         label: 'ALT', sub: raltFt < 1000 ? raltText : '', subCol: raltCol, compact: true }, altCol);
       if (S.afterburner > 0.3) drawModeTag(ctx, g.minX + 18, g.minY + 14, 'A/B', AMBER, true);
-      if (!C.dead && (C.missiles > 0 || C.ammo > 0)) drawModeTag(ctx, g.minX + 18, g.minY + 35, 'ARM', hudCol, true);
+      if (!C.dead && !(C.mcfg && C.mcfg.freeFlight) && (C.missiles > 0 || C.ammo > 0)) drawModeTag(ctx, g.minX + 18, g.minY + 35, 'ARM', hudCol, true);
     }
 
     ctx.restore();
@@ -2105,14 +2126,17 @@ export function createHUD(THREE, A) {
 
   function drawCheat(ctx) {
     if (!C.cheat) return;
+    const ff = !!(C.mcfg && C.mcfg.freeFlight);
+    const skip = ff ? new Set(['LMB/F', 'RMB/M', '1-3/R', 'C', 'X', 'Z', 'J', 'G']) : null;
+    const rows = skip ? CHEAT_ROWS.filter(r => !skip.has(r[0])) : CHEAT_ROWS;
     const w = 320, h = 260, x = 20, y = HH / 2 - h / 2;
     ctx.save();
     noGlow(ctx); ctx.fillStyle = 'rgba(0, 20, 10, 0.62)'; ctx.fillRect(x, y, w, h);
     ctx.strokeStyle = '#00ff66'; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
     ctx.font = f(12); ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     const colW = (w - 24) / 3;
-    for (let i = 0; i < CHEAT_ROWS.length; i++) {
-      const row = CHEAT_ROWS[i], rx = x + 12 + (i % 3) * colW, ry = y + 28 + Math.floor(i / 3) * 34;
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i], rx = x + 12 + (i % 3) * colW, ry = y + 28 + Math.floor(i / 3) * 34;
       labelText(ctx, row[0], rx, ry - 7, G, 2);
       labelText(ctx, row[1], rx, ry + 8, GB, 2);
     }
@@ -2206,35 +2230,36 @@ export function createHUD(THREE, A) {
       }
     }
 
-    if (!C.dead) { drawTargets(hctx); drawWingmen(hctx); }
-    drawStrikeTargets(hctx); drawWeakTargets(hctx);
+    const ff = !!(C.mcfg && C.mcfg.freeFlight);
+    if (!C.dead && !ff) { drawTargets(hctx); drawWingmen(hctx); }
+    if (!ff) { drawStrikeTargets(hctx); drawWeakTargets(hctx); }
     drawRadio(hctx);
     drawTopLeft(hctx);
-    if (!C.dead) drawKillFlash(hctx, g);
+    if (!C.dead && !ff) drawKillFlash(hctx, g);
     drawStamps(hctx, dt); radarPulseT += dt;
-    if (C.jamming > 0) {
-      // EW jitter: radar is painted directly on this canvas, so translate the
-      // draw by +/-2 px instead of a drawImage source-offset.
-      hctx.save();
-      hctx.translate((Math.random() - 0.5) * 4, (Math.random() - 0.5) * 4);
-      drawSquareRadar(hctx);
-      hctx.restore();
-    } else drawSquareRadar(hctx);
-    drawDLZ(hctx); drawJHMCS(hctx);
-    drawSectorBadge(hctx);
-    drawBottomRight(hctx);
-    drawObjective(hctx);
+    if (!ff) {
+      if (C.jamming > 0) {
+        // EW jitter: radar is painted directly on this canvas, so translate the
+        // draw by +/-2 px instead of a drawImage source-offset.
+        hctx.save();
+        hctx.translate((Math.random() - 0.5) * 4, (Math.random() - 0.5) * 4);
+        drawSquareRadar(hctx);
+        hctx.restore();
+      } else drawSquareRadar(hctx);
+      drawDLZ(hctx); drawJHMCS(hctx);
+      drawSectorBadge(hctx);
+      drawBottomRight(hctx);
+      drawObjective(hctx);
+    }
     drawCenterBanners(hctx, fp ? g : null);
-    if (!C.dead) drawApproach(hctx, g);
-    drawStyleFeed(hctx, g);
-    drawDangerPill(hctx);
-    drawPrompt(hctx);
+    if (!C.dead && !ff) drawApproach(hctx, g);
+    if (!ff) { drawStyleFeed(hctx, g); drawDangerPill(hctx); drawPrompt(hctx); }
     drawCheat(hctx);
     drawComms(hctx, fp ? HH * 0.71 : HH * 0.84);
     if (!A.isModal()) drawStickCue(hctx);
     drawFreeLookTag(hctx);
     drawGLoc(hctx);
-    drawJam(hctx);
+    if (!ff) drawJam(hctx);
     if (glitchT > 0 && !C.dead) {
       const k = Math.min(1, glitchT / 0.55), y = HH * (0.36 + 0.22 * Math.sin(now / 90));
       hctx.save(); hctx.globalAlpha = 0.35 * k;

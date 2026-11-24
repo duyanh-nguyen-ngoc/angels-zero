@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.57', title: 'FREE FLIGHT — HIGH ABOVE THE CLOUDS, SCENIC & UNARMED', bullets: [
+    'Raised Free Flight cruise altitudes way above the cloud sea (18,000–22,300 ft) with Golden Hour lighting, an endless 3,500–5,800 ft cumulus cloud sea below, expanded 60 km horizon visibility, and high-altitude twin contrails.',
+    'Added a wider, silky-smooth cinematic chase camera, calm cruise speed, and ambient hangar soundtrack for a relaxed, scenic flight feel.',
+    'Completely disarmed Free Flight (no cannon, no missiles, no bombs, no flares/chaff/ECM, clean unarmed pylons) and stripped combat HUD clutter (no gun reticle, tactical radar, or weapon/stores panel).'
+  ] },
   { version: 'v1.1.56', title: 'FREE FLIGHT POLISH — CLEAR SKY, ZERO OVERLAYS & AUDIO FIX', bullets: [
     'Cleared Canyon Run SITE markers, BRIDGE STRAIT sector badge, and RWR tracks during Free Flight.',
     'Disabled the ocean shader plane and cloud-sea whiteout in Free Flight, raised camera near plane to eliminate skyline Z-fighting, and anchored building bases into sloped terrain.',

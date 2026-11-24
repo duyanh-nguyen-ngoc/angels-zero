@@ -733,11 +733,11 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createVFX } from './src/vfx.js?v=s9dd';
 import { createAmbient } from './src/ambient.js?v=s9dd';
 import { createBlastFX } from './src/blastfx.js?v=s9dd';
-import { createHUD } from './src/hud.js?v=s9dp';
+import { createHUD } from './src/hud.js?v=s9dq';
 import { createCockpit3D } from './src/cockpit3d.js?v=s9di';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9dp';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9dq';
 import { createEjection } from './src/eject.js?v=s9di';
-import { createAudio } from './src/audio.js?v=s9dp';
+import { createAudio } from './src/audio.js?v=s9dq';
 import { createRadio } from './src/radio.js?v=s9dd';
 import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9dd';
 import { createLivery } from './src/livery.js?v=s9dd';
@@ -752,14 +752,14 @@ import { createFreeLook } from './src/freelook.js?v=s9dd';
 import { createCanopyGlass } from './src/canopyglass.js?v=s9dd';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9dd';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9dd';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9dp';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9dq';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9de';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9dd';
 import { createRadioQueue } from './src/radioQueue.js?v=s9dj';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9do';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9dq';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
-  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9do';
-import { createFreeFlight, FREE_FLIGHT_PRESETS, loadFreeFlightCity, saveFreeFlightCity } from './src/freeflight.js?v=s9dp';
+  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9dq';
+import { createFreeFlight, FREE_FLIGHT_PRESETS, loadFreeFlightCity, saveFreeFlightCity } from './src/freeflight.js?v=s9dq';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -1397,6 +1397,8 @@ const camFrame = new THREE.Quaternion(), _camQ = new THREE.Quaternion(), _camAli
 const prevPlanePos = new THREE.Vector3();
 const CAM_OFFSET = new THREE.Vector3(0, 4.4, 26);
 const LOOK_OFFSET = new THREE.Vector3(0, 1.6, -14);
+const FF_CAM_OFFSET = new THREE.Vector3(0, 5.4, 34);
+const FF_LOOK_OFFSET = new THREE.Vector3(0, 1.4, -36);
 
 function applyPose() {
   if (!Q.has('pose')) return;
@@ -1742,14 +1744,16 @@ function loadMissionScene(m) {
   applyMapProps(MAPS[m.mapTag] || MAPS.ARCHIPELAGO);
   ocean.visible = !m.freeFlight;
   if (m.freeFlight) {
-    if (!WX_FORCED) { weather.set('SCATTERED', { instant: true }); vfx.setCloudSea(false); }
-    if (!(DEBUG && Q.has('tod'))) atmosphere.applyTimeOfDay('DAYLIGHT', { instant: true });
+    if (typeof radioReset === 'function') radioReset(0);
+    if (!WX_FORCED) { weather.set('CLOUD_SEA', { instant: true }); vfx.setCloudSea(true); }
+    if (!(DEBUG && Q.has('tod'))) atmosphere.applyTimeOfDay('GOLDEN_HOUR', { instant: true });
     const clat = Q.has('lat') ? Number(Q.get('lat')) : NaN;
     const clon = Q.has('lon') ? Number(Q.get('lon')) : NaN;
     freeFlight.start(selectedFfCity, Number.isFinite(clat) && Number.isFinite(clon) ? { lat: clat, lon: clon } : null);
   } else {
     freeFlight.clearAll();
   }
+  if (typeof syncCrtVisible === 'function') syncCrtVisible();
   setupBuzzAnchors();
   vfx.clearTrails();
   ambient.reset();
@@ -2468,12 +2472,12 @@ async function startSortie() {
     state.position.set(0, p.alt, 0);
     state.quaternion.setFromAxisAngle(AX_Y, p.hdg);
     state.pitchRate = state.rollRate = state.yawRate = 0;
-    state.speed = p.spd; state.throttle = 0.78; state.afterburner = 0;
+    state.speed = p.spd; state.throttle = 0.62; state.afterburner = 0;
     state.velocity.set(0, 0, -state.speed).applyQuaternion(state.quaternion);
     state.gear = 0; state.gearDown = false; state.onGround = false; gearAutoLock = false;
     flightMode = 'FLY';
     vfx.clearTrails(); prevPlanePos.copy(state.position); camVelocity.set(0, 0, 0);
-    camera.position.copy(CAM_OFFSET).applyQuaternion(state.quaternion).add(state.position);
+    camera.position.copy(FF_CAM_OFFSET).applyQuaternion(state.quaternion).add(state.position);
     combatSys.setWingOrder(0);
     combatSys.say('FREE FLIGHT // ' + p.name + ' — ' + p.desc, 4, '#5eead4');
   }
@@ -2986,7 +2990,7 @@ addEventListener('keydown', e => {
     if (flightMode === 'FLY' && combatSys.engineEmergency()) { if (!e.repeat) { keys.fire = false; fKeyEngine = true; combatSys.fireKey(true); } }
     else keys.fire = true;
   }
-  if (k === 'm') { if (!e.repeat) { combatSys.fireSelected(); mcam.held = true; } }
+  if (k === 'm') { if (!e.repeat && !freeFlight.active) { combatSys.fireSelected(); mcam.held = true; } }
   if (k === 'r' && !e.repeat) combatSys.toggleWeapon();
   if (k === '1' && !e.repeat) combatSys.setWeapon('MSL');
   if (k === '2' && !e.repeat) combatSys.setWeapon(SPW[selectedSPW].wpn);   // special weapon
@@ -3048,8 +3052,8 @@ addEventListener('mousedown', e => {
   if (e.button === 1) e.preventDefault();             // never middle-click autoscroll
   if (uiModal || appMode !== 'PLAY') return;
   if (freeLook.onMouseButton(e, true)) return;
-  if (e.button === 0) keys.fire = true;
-  if (e.button === 2) { combatSys.fireSelected(); mcam.held = true; }
+  if (e.button === 0) { if (!freeFlight.active) keys.fire = true; }
+  if (e.button === 2) { if (!freeFlight.active) { combatSys.fireSelected(); mcam.held = true; } }
 });
 addEventListener('mouseup', e => {
   if (e.button === 2) mcam.held = false;
@@ -4263,31 +4267,35 @@ function updateCameraAndVisuals(dt, now) {
     // pulls show the jet pitched above its flight path, carving with visible inertia.
     _camAlign.setFromUnitVectors(_camNose.set(0, 0, -1).applyQuaternion(q), velDir);
     _camQ.identity().slerp(_camAlign, 0.55).multiply(q);
-    camFrame.slerp(_camQ, 1 - Math.exp(-dt * 14));
+    const ffCam = freeFlight.active;
+    const camOff = ffCam ? FF_CAM_OFFSET : CAM_OFFSET;
+    const lookOff = ffCam ? FF_LOOK_OFFSET : LOOK_OFFSET;
+    camFrame.slerp(_camQ, 1 - Math.exp(-dt * (ffCam ? 7.5 : 14)));
     const cq = camFrame;
-    const desired = _cv.des.copy(CAM_OFFSET).applyQuaternion(cq).add(state.position)
+    const desired = _cv.des.copy(camOff).applyQuaternion(cq).add(state.position)
       .lerp(_cv.b.copy(state.position).setY(state.position.y + 42).addScaledVector(horiz, -9), dive);
     const toDesired = desired.sub(camera.position);
     const lag = toDesired.length();
-    // Stiff, near-critically damped spring: stays locked behind the jet through fast rolls.
-    if (lag > 9) { camera.position.addScaledVector(toDesired, (lag - 9) / lag); camVelocity.multiplyScalar(0.4); }
-    camVelocity.addScaledVector(toDesired, 150 * dt);
-    camVelocity.addScaledVector(camVelocity, -Math.min(1, 22 * dt));
+    // Stiff, near-critically damped spring in combat; silkier, wider cinematic follow in Free Flight.
+    const maxLag = ffCam ? 15 : 9;
+    if (lag > maxLag) { camera.position.addScaledVector(toDesired, (lag - maxLag) / lag); camVelocity.multiplyScalar(0.4); }
+    camVelocity.addScaledVector(toDesired, (ffCam ? 78 : 150) * dt);
+    camVelocity.addScaledVector(camVelocity, -Math.min(1, (ffCam ? 15 : 22) * dt));
     camera.position.addScaledVector(camVelocity, dt);
-    // High-G turns tighten the chase FOV slightly.
-    const fovT = CHASE_FOV - (state.highG ? 6 : 0);
+    // High-G turns tighten the chase FOV slightly; Free Flight opens to a scenic wide-angle lens.
+    const fovT = (ffCam ? CHASE_FOV + 5 : CHASE_FOV) - (state.highG && !ffCam ? 6 : 0);
     if (Math.abs(camera.fov - fovT) > 0.05) { camera.fov += (fovT - camera.fov) * Math.min(1, 4 * dt); camera.updateProjectionMatrix(); }
     const fromPlane = _cv.a.copy(camera.position).sub(state.position);
     const fd = fromPlane.length();
     if (fd < 14) camera.position.copy(state.position).add(fromPlane.multiplyScalar(14 / Math.max(fd, 0.001)));
     const camGround = groundLevel(camera.position.x, camera.position.z) + 2;
     if (camera.position.y < camGround) camera.position.y = camGround;
-    if (state.afterburner > 0.02) {
+    if (state.afterburner > 0.02 && !ffCam) {
       const s = state.afterburner * 0.10;
       camera.position.x += (Math.random() - 0.5) * s; camera.position.y += (Math.random() - 0.5) * s; camera.position.z += (Math.random() - 0.5) * s;
     }
     camera.up.copy(AX_Y).applyQuaternion(cq).lerp(horiz, dive).normalize();
-    camera.lookAt(_cv.des.copy(LOOK_OFFSET).applyQuaternion(cq).add(state.position).lerp(_cv.b.copy(state.position).addScaledVector(velDir, 45), dive));
+    camera.lookAt(_cv.des.copy(lookOff).applyQuaternion(cq).add(state.position).lerp(_cv.b.copy(state.position).addScaledVector(velDir, 45), dive));
     // Free look: orbit the chase camera about the jet at the current radius (360 deg / -70..+75 deg).
     chaseBasePos.copy(camera.position);
     if (freeLook.applyChase(camera, state.position)) {
@@ -4541,7 +4549,7 @@ const portraitImg = {};
 for (const k in PORTRAIT) { const im = new Image(); im.onerror = () => { portraitImg[k].failed = true; }; portraitImg[k] = im; im.src = PORTRAIT[k]; }
 const CH_PORTRAIT = { AWACS: 'AWACS', WARDEN2: 'WARDEN-2', WARDEN3: 'WARDEN-3', CRIMSON: 'CRIMSON-1' };
 let crtFallbackTimer = 0, boxHoldUntil = 0;
-function syncCrtVisible() { crtBox.hidden = appMode !== 'PLAY'; }
+function syncCrtVisible() { crtBox.hidden = appMode !== 'PLAY' || freeFlight.active; }
 function clearBox() {
   boxHoldUntil = 0;
   crtBox.classList.remove('flash', 'talk', 'fade');
@@ -4588,7 +4596,7 @@ function radioPlay(slot) {
   return audio.textLineSecs(slot.line || slot);
 }
 const rq = createRadioQueue(THREE, { audio, onTx: radioPlay, onIdle: clearBox, debug: DEBUG });
-function radioEvent(ev, opts) { return rq.say(ev, opts); }
+function radioEvent(ev, opts) { if (freeFlight.active) return false; return rq.say(ev, opts); }
 function radioReset(gap = 0) { rq.clear(gap); clearBox(); audio.stopRadio(0.08); }
 function radioPump() { rq.update(performance.now() / 1000); }
 
@@ -4894,7 +4902,7 @@ function updateAudio() {
     engL: combat.engL === 'HEALTHY', engR: combat.engR === 'HEALTHY',
     speed: state.speed, mach: state.mach,
     engineOn: flightMode === 'FLY', cockpit: firstPerson,
-    firing: flightMode === 'FLY' && (keys.fire || DEBUG_FIRE) && combat.ammo > 0 && combat.reload <= 0,
+    firing: !freeFlight.active && flightMode === 'FLY' && (keys.fire || DEBUG_FIRE) && combat.ammo > 0 && combat.reload <= 0,
     seeker, alert: flightMode === 'FLY' && (combat.incoming || 0) > 0, rwr: flightMode === 'FLY' ? combat.rwrLevel || 0 : 0, whistle: bombWhistle(),
     cloud: flightMode === 'FLY' ? Math.max(combat.playerCloud || 0, vfx.mist, ambient.mistGain) : 0,
     rain: weather.rainHere,
@@ -6211,7 +6219,7 @@ function stepSim(dt) {
   updateFeelState(dt);
   updateWaveOff(dt);
   updateBuzz(dt);
-  combatSys.update(dt, simTime, { playerActive: flightMode === 'FLY', firing: keys.fire || DEBUG_FIRE });
+  combatSys.update(dt, simTime, { playerActive: flightMode === 'FLY', firing: !freeFlight.active && (keys.fire || DEBUG_FIRE) });
   if (freeFlight.active) {
     const rebase = freeFlight.update(state.position.x, state.position.z);
     if (rebase) {
@@ -6417,6 +6425,8 @@ function syncSBMenu(paused) {
     ' W3 <span class="rolePill' + (selectedRoles.w3 === 'CAP' ? ' on' : '') + '">CAP</span>' +
     '<span class="rolePill' + (selectedRoles.w3 === 'STRIKE' ? ' on' : '') + '">STRIKE</span>';
   sbMenuEl.querySelector('[data-k="role"]').hidden = missionConfigWingSolo(mission());
+  sbMenuEl.querySelector('[data-k="diff"]').hidden = !!mission().freeFlight;
+  sbMenuEl.querySelector('[data-k="spw"]').hidden = !!mission().freeFlight;
   document.getElementById('sbDiffVal').textContent = DIFFICULTY_PRESETS[diffMode] ? diffMode : 'NORMAL';
   document.getElementById('sbSpwVal').textContent = selectedSPW;
   document.getElementById('sbLivVal').textContent = selectedLivery;

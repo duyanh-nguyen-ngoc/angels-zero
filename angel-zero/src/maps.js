@@ -108,7 +108,7 @@ export const MAPS = {
   REAL_WORLD: {
     heightFn: 'ocean', islands: [], canyonAmp: 1, runway: false,
     carrier: null, fleet: [],
-    fogFar: 26000,
+    cloudSea: { base: 1067, top: 1768 }, fogFar: 60000,
     props: { terrain: false, islands: false, runway: false, baseBldg: false, radar: false, foliage: false }
   }
 };

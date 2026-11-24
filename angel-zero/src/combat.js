@@ -10,11 +10,11 @@
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { DIFFICULTY_PRESETS } from './difficulty.js?v=s9c2';
 import { SPW } from './loadout.js?v=s9c2';
-import { missionConfig } from './missions.js?v=s9c2';
+import { missionConfig } from './missions.js?v=s9dq';
 import { gorgeCentreX, gorgeSlope, gorgeHeading, gorgeDist, GORGE_GATE_Z, GORGE_GATE_N, GORGE_FLOOR_Y, GORGE_RIM_Y,
   GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_FORT, GORGE_ARC_M, GORGE_SPAWN_Z, CEIL_M,
   GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_ZB, GORGE_SC_HALF_W, GORGE_SC_ARCH_Z, GORGE_SC_ARCH_Y0,
-  GORGE_SC_ARCH_W, GORGE_SC_SKIP, GORGE_SC_SAVE_M } from './maps.js?v=s9c2';
+  GORGE_SC_ARCH_W, GORGE_SC_SKIP, GORGE_SC_SAVE_M } from './maps.js?v=s9dq';
 
 const NM = 1852, FT = 0.3048, G0 = 9.81;
 // Allied CVN model: same 360 m deck as the procedural ship, re-anchored to the GLB.
@@ -168,7 +168,7 @@ export function createCombat(THREE, env) {
     swarm: { on: false, n: 0, alive: 0, anchor: 'PLAYER', bonusPaid: true, t: 0 } });
   Object.assign(C, { mcfg: missionConfig({}), stage: 0, stageT: 0,
     ceil: { st: 'CLEAR', phase: 'CLEAR', armed: false, t: 0, warnT: 0, salvoT: 0, rail: 0, railT: 0, fired: 0, lastSam: 0, live: true, belowT: 0 },
-    climb: { on: false, t: 0, sams: 0, salvoT: 0, rail: 0, railT: 0 }, gateIdx: 0, weaponsLock: { msl: false, spw: false },
+    climb: { on: false, t: 0, sams: 0, salvoT: 0, rail: 0, railT: 0 }, gateIdx: 0, weaponsLock: { gun: false, msl: false, spw: false },
     samSitesOn: false, samLive: 0, samLaunched: 0, samFlared: 0, samMasked: 0, samHit: 0 });
 
   const say = (text, secs = 2.5, color = '#4dff91') => {
@@ -825,7 +825,7 @@ export function createCombat(THREE, env) {
     return m;
   }
   function fireMissile() {
-    if (gunsOnly() || C.weaponsLock.msl) return false;
+    if ((C.mcfg && C.mcfg.freeFlight) || gunsOnly() || C.weaponsLock.msl) return false;
     if (!env.isReady() || C.dead || C.missiles <= 0 || C.missileReload > 0 || mslCooldown > 0) return false;
     // Next missile still hanging on its pylon: hide it on the wing and fly its clone.
     const store = stores.msl.find(st => st.node.visible);
@@ -879,6 +879,7 @@ export function createCombat(THREE, env) {
     }
   }
   function fireGun(dt) {
+    if (C.weaponsLock.gun || (C.mcfg && C.mcfg.freeFlight)) { gunIdle(); return; }
     if (!env.isReady() || C.dead || C.ammo <= 0 || C.reload > 0 || C.gunOverheat) { gunIdle(); return; }
     gunAcc += GUN_RATE * dt;
     _gFwd.set(0, 0, -1).applyQuaternion(S.quaternion);
@@ -2986,7 +2987,7 @@ export function createCombat(THREE, env) {
   const ripple = [];
   let aamRack = 0;
   function fireAAM4() {
-    if (gunsOnly() || C.weaponsLock.spw) return false;
+    if ((C.mcfg && C.mcfg.freeFlight) || gunsOnly() || C.weaponsLock.spw) return false;
     if (!env.isReady() || C.dead || C.aam4 <= 0 || C.aam4Reload > 0 || mslCooldown > 0 || ripple.length) return false;
     const locked = C.multi.filter((e, i) => C.multiState[i] === 'LOCK' && e.alive);
     const targets = locked.length ? locked : [null];
@@ -3012,7 +3013,7 @@ export function createCombat(THREE, env) {
     if (C.aam4 <= 0) C.aam4Reload = AAM4_RELOAD;
   }
   function fireQAAM() {
-    if (gunsOnly() || C.weaponsLock.spw) return false;
+    if ((C.mcfg && C.mcfg.freeFlight) || gunsOnly() || C.weaponsLock.spw) return false;
     if (!env.isReady() || C.dead || C.qaam <= 0 || C.qaamReload > 0 || mslCooldown > 0) return false;
     const tgt = C.lockState === 'LOCK' ? C.designated : null;
     const rail = RAILS[railNext]; railNext = 1 - railNext;
@@ -3685,6 +3686,7 @@ export function createCombat(THREE, env) {
   }
   // Z: ALQ-135 internal jammer, 6 s on then a 14 s capacitor recharge.
   function activateECM() {
+    if (C.mcfg && C.mcfg.freeFlight) return false;
     if (!env.isReady() || C.dead || C.ecmState !== 'READY') {
       if (C.ecmState === 'RECHARGE') say(`ECM RECHARGING — ${C.ecmT.toFixed(1)} S`, 0.9, '#ffbf3f');
       return false;
@@ -4354,6 +4356,7 @@ export function createCombat(THREE, env) {
   let bombCooldown = 0, lastImpact = null;
   // R cycles >MSL -> >4AAM -> >UGB. Switching drops the seeker back to passive radar tracking.
   function setWeapon(w) {
+    if (C.mcfg && C.mcfg.freeFlight) return C.weapon;
     w = String(w).toUpperCase();
     if (w === '4AAM') w = 'AAM4';
     if (C.weaponsLock.msl && w === 'MSL') { if (env.onSfx) env.onSfx('mfd'); say('GUNS ONLY', 1.0, '#ffbf3f'); return C.weapon; }
@@ -4380,6 +4383,7 @@ export function createCombat(THREE, env) {
   // >UGB with a CCRP solution: holding the pickle arms the automatic release;
   // otherwise it is a CCIP drop now.
   function fireSelected() {
+    if (C.mcfg && C.mcfg.freeFlight) return false;
     if (gunsOnly()) {                                        // weapon-fire handler hard block
       if (env.onSfx) env.onSfx('mfd');
       say('GUNS ONLY — NO MISSILES', 1.0, '#ffbf3f');
@@ -4398,7 +4402,7 @@ export function createCombat(THREE, env) {
   }
   function pickleUp() { if (C.ccrpArmed) { C.ccrpArmed = false; say('CCRP SAFE', 0.9, '#ffbf3f'); } }
   function dropBomb() {
-    if (gunsOnly() || C.weaponsLock.spw) return false;
+    if ((C.mcfg && C.mcfg.freeFlight) || gunsOnly() || C.weaponsLock.spw) return false;
     if (!env.isReady() || C.dead || C.bombs <= 0 || C.bombReload > 0 || bombCooldown > 0) return false;
     const st = stores.bomb.find(b => b.node.visible); if (!st) return false;
     jet.updateMatrixWorld(true);
@@ -4579,6 +4583,7 @@ export function createCombat(THREE, env) {
   let chaffCD = 0, chaffRecharge = 0, chaffSalvo = 0;
   const CHAFF_CD = 0.5, CHAFF_RECHARGE = 10, CHAFF_LIFE = 4.5, CHAFF_DECOY_RANGE = 900;
   function dispenseFlares() {
+    if (C.mcfg && C.mcfg.freeFlight) return false;
     if (!env.isReady() || C.dead || C.flares <= 0 || flareCD > 0) return false;
     C.flares--; flareCD = 0.45; flareSalvo++;
     if (C.flares < FLR_MAX && flareRecharge <= 0) flareRecharge = FLR_RECHARGE;
@@ -4604,6 +4609,7 @@ export function createCombat(THREE, env) {
   // Z: chaff cartridge. One cartridge -> a slow foil cloud that decoys RADAR
   // seekers inside 900 m (one roll per cloud per missile).
   function dispenseChaff() {
+    if (C.mcfg && C.mcfg.freeFlight) return false;
     if (!env.isReady() || C.dead || C.chaff <= 0 || chaffCD > 0) return false;
     C.chaff--; chaffCD = CHAFF_CD;
     if (C.chaff < C.chaffMax && chaffRecharge <= 0) chaffRecharge = CHAFF_RECHARGE;
@@ -4623,7 +4629,7 @@ export function createCombat(THREE, env) {
   }
   function updateChaff(dt) {
     chaffCD = Math.max(0, chaffCD - dt);
-    if (C.chaff < C.chaffMax) {
+    if (!(C.mcfg && C.mcfg.freeFlight) && C.chaff < C.chaffMax) {
       chaffRecharge -= dt;
       if (chaffRecharge <= 0) { C.chaff++; chaffRecharge = C.chaff < C.chaffMax ? CHAFF_RECHARGE : 0; }
     }
@@ -4647,7 +4653,7 @@ export function createCombat(THREE, env) {
   const _flCentre = [new THREE.Vector3(), new THREE.Vector3()], _flCnt = [0, 0];
   function updateFlares(dt) {
     flareCD = Math.max(0, flareCD - dt);
-    if (C.flares < FLR_MAX) {
+    if (!(C.mcfg && C.mcfg.freeFlight) && C.flares < FLR_MAX) {
       flareRecharge -= dt;
       if (flareRecharge <= 0) { C.flares++; flareRecharge = C.flares < FLR_MAX ? FLR_RECHARGE : 0; }
     }
@@ -6149,9 +6155,12 @@ export function createCombat(THREE, env) {
     director.reset();
     flareRecharge = 0;
     chaff.length = 0; chaffCD = 0; chaffRecharge = 0; C.chaff = C.chaffMax; C.notchT = 0;
-    Object.assign(C, { ammo: GUN_MAX, missiles: MSL_MAX, reload: 0, missileReload: 0, lockTarget: null, nextTarget: null, designated: null, health: 100, dead: false, hitFlash: 0, missileWarning: 0,
+    Object.assign(C, { ammo: C.weaponsLock.gun ? 0 : GUN_MAX, missiles: C.weaponsLock.msl ? 0 : MSL_MAX, reload: 0, missileReload: 0, lockTarget: null, nextTarget: null, designated: null, health: 100, dead: false, hitFlash: 0, missileWarning: 0,
       lockProgress: 0, lockState: 'NONE', rwrTrack: false, banditLock: 0, events: [], tti: undefined, pitbull: false,
       gunRounds: 0, gunHitsP: 0, mslFiredP: 0, mslHitsP: 0, playerLaunches: 0, maxDmg: 0, traps: 0, furballKills: 0, lowHpSaid: false });
+    if (C.weaponsLock.msl) { C.aam4 = 0; C.qaam = 0; for (const st of stores.msl) st.node.visible = false; }
+    if (C.weaponsLock.spw) { C.bombs = 0; for (const st of stores.bomb) st.node.visible = false; }
+    if (C.mcfg && C.mcfg.freeFlight) { C.flares = 0; C.chaff = 0; C.weapon = 'NONE'; }
     furT = 0; furSwarmT = 75;
     Object.assign(C.bw, { eligible: false, landed: false, logged: false });
     Object.assign(C.intr, { st: 'IDLE', t: 0, ace: -1, used: false, farT: 0 }); C.wingHold = false;
@@ -6441,15 +6450,18 @@ export function createCombat(THREE, env) {
       C.ceil.lastSam = 0; C.ceil.live = !!C.mcfg.ceiling; C.ceil.belowT = 0;
       C.climb.on = false; C.climb.t = 0; C.climb.sams = 0; C.climb.salvoT = 0; C.climb.rail = 0; C.climb.railT = 0; C.climb.fired = 0;
       C.dlz.on = false; C.tti = undefined; C.pitbull = false; lastPitbullT = -1e9;
+      C.weaponsLock.gun = !C.mcfg.weapons.gun;
       C.weaponsLock.msl = !C.mcfg.weapons.msl || C.mcfg.gunsOnly; C.weaponsLock.spw = !C.mcfg.weapons.spw || C.mcfg.gunsOnly;
-      if (C.weaponsLock.msl && C.weapon === 'MSL') C.weapon = 'GUN';
-      if (C.weaponsLock.spw && C.weapon === 'BOMB') C.weapon = 'GUN';
+      if (C.weaponsLock.gun) { C.ammo = 0; C.gunHeat = 0; C.gunOverheat = false; gunIdle(); }
+      if (C.weaponsLock.msl && C.weapon === 'MSL') C.weapon = C.weaponsLock.gun ? 'NONE' : 'GUN';
+      if (C.weaponsLock.spw && C.weapon === 'BOMB') C.weapon = C.weaponsLock.gun ? 'NONE' : 'GUN';
       // Locked stores: zero ammo and empty pylons, so the HUD / MFD never show a round.
       if (C.weaponsLock.msl) { C.missiles = 0; C.aam4 = 0; C.qaam = 0; for (const st of stores.msl) st.node.visible = false; }
       if (C.weaponsLock.spw) { C.bombs = 0; for (const st of stores.bomb) st.node.visible = false; }
       if (!C.weaponsLock.msl) rearm('msl');                 // a previous guns-only sortie must not leave empty pylons
       if (!C.weaponsLock.spw) rearm('bomb');
-      if (C.mcfg.gunsOnly) { C.lockTarget = null; C.lockState = 'NONE'; C.lockProgress = 0; disarmSeeker(null); setMulti([]); }
+      if (C.mcfg.gunsOnly || C.mcfg.freeFlight) { C.lockTarget = null; C.lockState = 'NONE'; C.lockProgress = 0; disarmSeeker(null); setMulti([]); }
+      if (C.mcfg.freeFlight) { C.flares = 0; C.chaff = 0; C.weapon = 'NONE'; }
       C.blockedLaunches = 0; C.aceRounds = 0; C.aceHits = 0;
       C.sunT = 0; C.sunCD = 0; C.sunBlinds = 0; C.sunBannerT = 0;
       C.mslIntercepts = 0; C.interceptBannerT = 0; C.interceptSlowCD = 0;
