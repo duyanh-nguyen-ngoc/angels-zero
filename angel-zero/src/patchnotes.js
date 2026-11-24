@@ -3,6 +3,10 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.64', title: 'F-22A RAPTOR 5TH-GEN PERFORMANCE & STEALTH', bullets: [
+    'Wired F-22A F119 dry/AB thrust (1.35x dry supercruise, 1.18x AB) and 0.90x aerodynamic drag directly into airborne flight physics.',
+    'Added 2D thrust-vectoring agility (+22% pitch authority, +15% roll rate, +5 deg higher AoA CAS margin), reduced RCS stealth (-38% bandit lock range & slower enemy lock-on), and +35% faster APG-77 AESA target lock.'
+  ] },
   { version: 'v1.1.63', title: 'F-22A RAPTOR ALL-GLASS 3D COCKPIT', bullets: [
     'Built a dedicated sculpted F-22A Raptor all-glass cockpit (src/cockpit_f22.js): frameless gold-tinted bubble canopy with no front bow, swept beveled trapezoidal shroud, and curved wide-angle HUD combiner.',
     'Added the 6-screen glass avionics suite: top ICP keypad with left ICAW/CNI and right synthetic backup ADI UFDs, large 8x8" center Tactical Situation Display, left APG-77 AESA radar, right ALR-94 defense/EW scope, and tilted lower F-22A stores & twin F119 engine display.',

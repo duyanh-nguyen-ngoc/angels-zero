@@ -737,7 +737,7 @@ import { createBlastFX } from './src/blastfx.js?v=s9dd';
 import { createHUD } from './src/hud.js?v=s9dr';
 import { createCockpit3D } from './src/cockpit3d.js?v=s9dr';
 import { createCockpitF22 } from './src/cockpit_f22.js?v=s9dv';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9ds';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9dw';
 import { createEjection } from './src/eject.js?v=s9di';
 import { createAudio } from './src/audio.js?v=s9du';
 import { createRadio } from './src/radio.js?v=s9dd';
@@ -754,7 +754,7 @@ import { createFreeLook } from './src/freelook.js?v=s9dd';
 import { createCanopyGlass } from './src/canopyglass.js?v=s9dd';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9dd';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9dd';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9dv';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9dw';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9de';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9dd';
 import { createRadioQueue } from './src/radioQueue.js?v=s9dj';
@@ -1093,11 +1093,12 @@ const WINGTIP_R = new THREE.Vector3(6.6, -0.5, 3.0);
    F-15 airframe. F-22A data: assets/f22_prep_report.json (scripts/prep_f22.py). */
 const AIRCRAFT = {
   F15C: { id: 'F15C', name: 'F-15C EAGLE', short: 'F-15C', glb: 'assets/angels_zero_jet.glb', eye: null,
-    livery: true, interiorMat: /^(cock|seats|poly_27)/i, bellyHideY: -0.95, tipY: [-1.2, 1.2], nav: null, thrustDryK: 1, thrustAbK: 1 },
+    livery: true, interiorMat: /^(cock|seats|poly_27)/i, bellyHideY: -0.95, tipY: [-1.2, 1.2], nav: null,
+    thrustDryK: 1, thrustAbK: 1, pitchK: 1, rollK: 1, dragK: 1, stallAoaAdd: 0, stealthK: 1, radarLockK: 1 },
   F22A: { id: 'F22A', name: 'F-22A RAPTOR', short: 'F-22A', glb: 'assets/angels_zero_f22.glb', eye: [0, -0.054, -7.334],
     livery: false, interiorMat: /^Cabin_black/i, bellyHideY: -1.97, tipY: [-1.6, -0.6],
     nav: { finL: [-3.19, 1.98, 3.57], finR: [3.19, 1.98, 3.57], belly: [0, -1.96, 1.2], dorsal: [0, -0.27, 1.0], bellyBeacon: [0, -1.96, -0.6] },
-    thrustDryK: 1.35, thrustAbK: 1.15 }                 // F119 vs F100: supercruise-class dry thrust
+    thrustDryK: 1.35, thrustAbK: 1.18, pitchK: 1.22, rollK: 1.15, dragK: 0.90, stallAoaAdd: 5, stealthK: 0.62, radarLockK: 1.35 }
 };
 const AIRCRAFT_KEY = 'angelsZero_aircraft';
 const selectedAircraft = (() => {
@@ -3511,8 +3512,8 @@ function updatePhysics(dt) {
     const gammaDotEff = gammaDot + AOA_COUPLE * alpha;
     const alphaPred = alpha + 0.22 * (state.pitchRate - gammaDotEff);
     let aErr = (alphaCmd - alphaPred) * 6.0 * machStiff;
-    if (aErr > 0) aErr *= 1 - sstep(alphaPred, 20 * Math.PI / 180, 26 * Math.PI / 180);   // CAS taper: no extra nose-up past 20-26 deg
-    qCmd = clamp(gammaDotEff + aErr, -1.4, 1.4);
+    if (aErr > 0) aErr *= 1 - sstep(alphaPred, (20 + AC.stallAoaAdd) * Math.PI / 180, (26 + AC.stallAoaAdd) * Math.PI / 180);   // CAS taper: F-22 TVC holds higher AoA
+    qCmd = clamp(gammaDotEff + aErr, -1.4 * AC.pitchK, 1.4 * AC.pitchK);
   }
   if (waveoff.pitchBias > 0) {
     if (Math.abs(pitchIn0) > 0.15 || Math.abs(kbAxis.pitch) > 0.15 || Math.abs(rollIn0) > 0.15 || Math.abs(kbAxis.roll) > 0.15) waveoff.pitchBias = 0;  // pilot override
@@ -3523,19 +3524,19 @@ function updatePhysics(dt) {
   }
   // Pitch moment: control chases qCmd (inertia + q-scaled authority) with aero damping.
   const pitchGain = state.stalled ? 2.2 : (1.0 + 5.0 * authQ);             // stalled: heavy, critically damped
-  let qDot = (qCmd - state.pitchRate) * pitchGain * kyy * machStiff * hydK * iceK;
+  let qDot = (qCmd - state.pitchRate) * pitchGain * kyy * machStiff * hydK * iceK * AC.pitchK;
   // Hammerhead pivot: with the nose vertical, neutral stick lets gravity tip it through.
   if (pivot) {
     // Hammerhead pivot: keep rotating nose-down through the vertical (no FCS
     // recovery spring fighting it), so the nose ends up pointing back at the ground.
     qCmd -= 1.2 + 0.6 * (1 - kts / APEX_KT);
-    qDot = (qCmd - state.pitchRate) * pitchGain * kyy * machStiff * hydK * iceK;
+    qDot = (qCmd - state.pitchRate) * pitchGain * kyy * machStiff * hydK * iceK * AC.pitchK;
     qDot += -0.6 * (1 - kts / APEX_KT);
   }
-  state.pitchRate = clamp(state.pitchRate + qDot * dt, psmActive ? -3.6 : -1.4, psmActive ? 3.6 : 1.4);
+  state.pitchRate = clamp(state.pitchRate + qDot * dt, psmActive ? -3.6 : -1.4 * AC.pitchK, psmActive ? 3.6 : 1.4 * AC.pitchK);
 
-  // Roll: up to ~240 deg/s at high q, degrading with AoA; dihedral rolls away from sideslip.
-  const pMax = 4.2 * (0.25 + 0.75 * auth) * (1 - 0.55 * sstep(alpha, 0.2, 0.45)) * hydK;
+  // Roll: up to ~240 deg/s at high q (higher on F-22A), degrading with AoA; dihedral rolls away from sideslip.
+  const pMax = 4.2 * AC.rollK * (0.25 + 0.75 * auth) * (1 - 0.55 * sstep(alpha, 0.2, 0.45)) * hydK;
   let pCmd = (roll.left > 0 ? -roll.dir * ROLL_RATE : -rollIn * pMax * pilotK * (state.stalled ? 0.4 : 1)) * iceK;
   // Dihedral (roll due to sideslip): cut to 30 % for small / no rudder (|rudder| < 0.5,
   // i.e. taps) so flat nose nudges don't bank the wings; full with a held rudder.
@@ -3639,10 +3640,10 @@ function updatePhysics(dt) {
   const wave = 0.034 * sstep(mach, 0.92, 1.04) - 0.012 * sstep(mach, 1.15, 1.7);   // transonic drag rise
   const form = 1.1 * Math.pow(Math.sin(Math.min(Math.abs(a2), 1.2)), 2) * sstep(Math.abs(a2), 0.3, 0.6);
   // Post-stall flat-plate drag, with PSM-induced drag multiplied for the energy bleed.
-  const CD = postStall ? CD0 + 1.8 * Math.sin(a2) ** 2 + (psmActive ? PSM_DRAG_K * 0.1 : 0)
-    : CD0 + K_INDUCED * CL * CL * (psmActive ? PSM_DRAG_K : 1) + wave + form + configDrag();
+  const CD = (postStall ? CD0 + 1.8 * Math.sin(a2) ** 2 + (psmActive ? PSM_DRAG_K * 0.1 : 0)
+    : CD0 + K_INDUCED * CL * CL * (psmActive ? PSM_DRAG_K : 1) + wave + form + configDrag()) * AC.dragK;
   state.cd = CD; state.cl = CL;
-  const thrust = (THRUST_DRY * state.throttle + THRUST_AB * state.afterburner) * (0.55 + 0.45 * rho / 1.225) * ceilThrustK(state.position.y) * (1 + 0.12 * Math.min(mach, 1.6))
+  const thrust = (THRUST_DRY * AC.thrustDryK * state.throttle + THRUST_AB * AC.thrustAbK * state.afterburner) * (0.55 + 0.45 * rho / 1.225) * ceilThrustK(state.position.y) * (1 + 0.12 * Math.min(mach, 1.6))
     * (outSide ? SINGLE_ENGINE_K : 1);                                 // one F100 down: 58 % max thrust
   _aero.copy(_lift).add(_side).addScaledVector(_vdir, -qBar * WING_AREA * CD * (1 + ICE_DRAG_K * state.cloudIce));
   _force.copy(_aero).addScaledVector(_fwd, thrust);
@@ -5071,6 +5072,7 @@ const tele = createTelemetry();                             // one fixed buffer 
 let ambient = null;                                     // set after combatSys exists; onSmoke closure reads it later
 const combatSys = createCombat(THREE, { scene, camera, renderer, state, combat, jet, groundLevel, terrainHeight, onRadio, runway: world.runway, blast,
   difficulty: DIFF_FORCED || loadDifficulty(),
+  stealthK: AC.stealthK, radarLockK: AC.radarLockK,
   cloudDensity: p => vfx.cloudDensity(p),
   terrainCenter: { x: TERRAIN_CENTER.x, z: TERRAIN_CENTER.y }, bridges: world.bridges, canyonX: world.canyonX,
   sectorAt: world.sectorAt, isTerrainOccluded: world.isTerrainOccluded, fleetLane: world.fleetLane, canyonCenter: world.canyonCenter,
@@ -6395,7 +6397,7 @@ if (DEBUG) {
     killDrone: (i, how) => combatSys.killDrone(i, how), get swarm() { return combat.swarm; },
     get model() { return model; }, get ready() { return modelReady; },
     get missionId() { return missionId; }, get mission() { return mission(); }, cycleMission, loadMissionScene, startSortie, launchSortie,
-    get surfaces() { return surfaces; }, get aircraft() { return AC.id; }, get gearPts() { return GEAR_PTS; },
+    get surfaces() { return surfaces; }, get aircraft() { return AC.id; }, get aircraftStats() { return AC; }, get gearPts() { return GEAR_PTS; },
     get reactive() { return { ...audio.reactive, log: RX_LOG ? RX_LOG.slice(-30) : [] }; }, rxFire, sayText, rxTelemetry,
     get autoland() { return autoland; }, autolandPrompt, engageAutoland, finishCarrierTrap, getMusicCtx, get hudPrompt() { return hud.promptText; }, get debrief() { return !debriefEl.hidden; },
     get cat() { return cat; }, get skimK() { return skimK; }, catEnter, catTick, catFire, catSnapAll, carrierDiag, enterCarrierLaunch, carrierReady,

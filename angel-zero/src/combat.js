@@ -126,6 +126,7 @@ export function createCombat(THREE, env) {
   // Bandit seekers: within 3.2 NM, player inside a 22 deg cone off the bandit's nose
   // while the bandit sits in the player's rear hemisphere; ~2.2 s to a full lock.
   const B_LOCK_RANGE = 3.2 * NM, B_CONE = 22 * D2R, B_LOCK_TIME = 2.2, B_SOFT = 0.45;
+  const STEALTH_K = env.stealthK || 1, RADAR_LOCK_K = env.radarLockK || 1;
   // Missile guidance quality by lock state at launch.
   const MSL_FULL = { turn: 34 * D2R, fov: 45 * D2R, N: 4.2, noise: 0, tag: 'FULL' };
   const MSL_SOFT = { turn: 14 * D2R, fov: 18 * D2R, N: 3.0, noise: 0.35, err: 5 * D2R, tag: 'SOFT' };
@@ -2115,11 +2116,11 @@ export function createCombat(THREE, env) {
     const pFwd = _pFwd.set(0, 0, -1).applyQuaternion(S.quaternion);
     const onSix = pFwd.dot(toPdir) > 0;                              // bandit is behind the player
     const engaging = e.tac === 'ENGAGE' && playerActive;
-    const inCone = engaging && dist < B_LOCK_RANGE && Math.acos(clamp(aligned, -1, 1)) < B_CONE && onSix;
+    const inCone = engaging && dist < B_LOCK_RANGE * STEALTH_K && Math.acos(clamp(aligned, -1, 1)) < B_CONE && onSix;
     // Player inside thick cloud: the bandit's seeker loses the picture (-1.5/s).
     const hidden = C.playerCloud > CLOUD_T;
-    // ALQ-135 jamming: bandit radar locks take 2.5x longer to build.
-    const lockTime = B_LOCK_TIME * (C.ecmState === 'ACTIVE' ? ECM_SLOW : 1) * (e.ace ? 0.6 : 1);
+    // ALQ-135 jamming + low-observable stealth: bandit radar locks take longer to build.
+    const lockTime = B_LOCK_TIME * (C.ecmState === 'ACTIVE' ? ECM_SLOW : 1) * (e.ace ? 0.6 : 1) / STEALTH_K;
     if (e.ace) aceTrail(e, dt);
     // Terrain masking: a ridge / canyon wall above the line of sight blocks the radar
     // (sampled every 0.15 s) -- an established lock breaks at once.
@@ -2910,7 +2911,7 @@ export function createCombat(THREE, env) {
     const inSeeker = C.jamming <= 0.5 && d < (qaam ? QAAM_RANGE : LOCK_RANGE) && off < (qaam ? QAAM_HALF : DIFF.seekerHalf) &&
       (qaam ? C.qaam > 0 && C.qaamReload <= 0 : C.missiles > 0 && C.missileReload <= 0);
     const lockT = (qaam ? QAAM_LOCK : DIFF.lockTime) * (t.kind === 'DRONE' ? 0.6 : 1) * (jhmcs ? JHMCS_LOCK_T_K : 1);
-    C.lockProgress = clamp(C.lockProgress + (obscured ? -1.0 * dt : inSeeker ? dt / lockT * (C.inESM ? ESM_LOCK_K : 1) : -LOCK_DECAY * dt), 0, 1);
+    C.lockProgress = clamp(C.lockProgress + (obscured ? -1.0 * dt : inSeeker ? dt / lockT * RADAR_LOCK_K * (C.inESM ? ESM_LOCK_K : 1) : -LOCK_DECAY * dt), 0, 1);
     const prev = C.lockState;
     if (obscured && !wasObscured) {
       say('CLOUD OBSCURED — ' + t.label, 1.4, '#ffbf3f');
