@@ -2288,7 +2288,7 @@ export function createCombat(THREE, env) {
     if (C.mode === 'FURBALL') {
       C.furballKills++;
       if (C.furballKills % FURBALL_ACE_EVERY === 0 && !enemies.some(x => x.aceFlight && x.alive)) {
-        aceFlightDone = false; spawnAceFlight();
+        aceFlightDone = false; C.acePair = []; spawnAceFlight();
       }
     }
     if (e.intrAce) finishIntrusion(true);
@@ -3170,10 +3170,8 @@ export function createCombat(THREE, env) {
     }
     if (st.clear === 'TARGETS') return !strikeAlive() && !C.climb.on;
     if (st.clear === 'ACE') {
-      if (!aceFlightDone) return false;
-      let hadAce = false;
-      for (const e of enemies) if (e.aceFlight) { hadAce = true; if (e.alive) return false; }
-      return hadAce;
+      if (!aceFlightDone || !C.acePair || !C.acePair.length) return false;
+      return C.acePair.every(id => !enemies[id] || !enemies[id].alive);
     }
     return false;
   }
@@ -3569,7 +3567,7 @@ export function createCombat(THREE, env) {
     say('[ OBJECTIVE ] ' + label, 3, '#00ff66');
     if (env.onWing) env.onWing(label + ', Lead. WARDEN-2 copies.', 'WARDEN-2');
     if (p === 2 && env.onRadio) env.onRadio('ON_PHASE_2_CANYON');
-    if (p === 3) { aceFlightDone = false; spawnAceFlight(); }
+    if (p === 3) { aceFlightDone = false; C.acePair = []; spawnAceFlight(); }
   }
   function updateMissionPhase() {
     if (C.mode === 'FURBALL' || C.ambushActive) return;
@@ -6085,7 +6083,7 @@ export function createCombat(THREE, env) {
     pushEvent('BONUS', 'TRAP BONUS', 1000, '#ffd45a');
   }
   function resetPlayer() {
-    aceFlightDone = false;
+    aceFlightDone = false; C.acePair = [];
     rearm('msl'); rearm('bomb');
     Object.assign(C, { comboMult: 1, comboTimer: 0, dangerClose: false, dangerMult: 1, styleFeed: [] });
     Object.assign(C, { bombs: stores.bomb.length, bombReload: 0, flares: FLR_MAX, ccip: null, aam4: AAM4_MAX, aam4Reload: 0, qaam: QAAM_MAX, qaamReload: 0, ecmState: 'READY', ecmT: 0 });
@@ -6400,7 +6398,7 @@ export function createCombat(THREE, env) {
       const stages = C.mcfg.stages;
       if (stages && stages.length) {
         for (const e of enemies) if (!e.ace && !e.bomber) { e.alive = false; e.wreck = null; if (e.g) e.g.visible = false; }
-        aceFlightDone = false;
+        aceFlightDone = false; C.acePair = [];
         spawnStage(0);
       }
       if (C.mcfg.noShips || (C.mcfg.enemyMsl === false && C.mcfg.wingmen === 'NONE')) {

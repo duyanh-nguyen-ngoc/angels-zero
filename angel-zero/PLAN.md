@@ -1768,6 +1768,13 @@ Status legend: `[x]` implemented and verified Â· `[ ]` open — gaps listed.
    - **M1–M4:** Scheduled `o.g.gain.setValueAtTime(0, now + XFADE + 0.01)` on the audio clock (removing the `setTimeout` `.value = 0` assignment that threw `NotSupportedError`); lowered `G_ONSET = 3.2`, saturated `pitchIn0`, and added `AOA_COUPLE * alpha` CAS feedforward (`gammaDotEff`) so a full 300 m/s / 3,500 m pull reaches `> 7 G` with breathing and greyout; gated wave-off rolls to `GLIDE` in `[600, 1200] m` astern; hoisted `gforce=G:s` and `carrierfinalat=s` into `stepSim` so both work with or without `warp`.
    - **L1–L4:** Re-applied `?alt`/`?spd` after runway spawn/`placeOnRunway`; hoisted cockpit head-roll `AX_Z`; marked 7 missing radio clips `file: null` with text fallback (`0` 404s); bound `Escape` in `DEBRIEF` to `debriefToBriefing()`.
 
+- [x] **Playtest follow-ups: ACE_DUEL kill completion, runway rotation, wave-off climb & pause on hide (`v1.1.46`)** *(build `s9df`, v1.1.46, `index.html`, `src/combat.js`, `src/patchnotes.js`, `PLAN.md`)*
+   - **B1 (`ACE_DUEL` kill completion):** `stageClear('ACE')` checks `aceFlightDone && C.acePair?.length && C.acePair.every(id => !enemies[id] || !enemies[id].alive)` independent of `destroyEnemy()`'s `e.aceFlight = false` reset, and resets `C.acePair = []` alongside every `aceFlightDone = false`.
+   - **B2 (`updateGround()` keyboard rotation):** Extracted shared `updateStickAxes(dt)` for air and ground paths so `W`/`S`/Arrow pitch rotates cleanly past `120 kt` without engaging `wheelBrake` (Ctrl/B only) and blends seamlessly across lift-off.
+   - **B3 (wave-off full-AB climb):** Removed the `waveoff.st = 'AMBUSH'` overwrite in `triggerWaveOff()`, kept `gearAutoLock = true` + go-around stall protection during `ABORT`, forced AB in `updateThrottle()` + combat music context during abort, and replaced open-loop `rotateBody` with closed-loop pitch-attitude hold (`12 deg` in `ABORT`, `4 deg` in `AMBUSH` until pilot stick/roll override or ambush clear).
+   - **B4 (`visibilitychange` auto-pause):** Added `if (appMode === 'PLAY') pauseSim()` when `document.hidden` and gated `simTime += dt` on `appMode !== 'PAUSED'` so backgrounded sorties freeze cleanly.
+   - **L1–L2:** Added `ceilThrustK(alt)` tapering thrust 92 % across `14,000..20,000 m`, and added a debounced `ROTATE — PULL UP (S / MOUSE)` callout above `145 kt` on takeoff roll.
+
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.

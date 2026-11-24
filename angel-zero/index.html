@@ -731,7 +731,7 @@ import { createAmbient } from './src/ambient.js?v=s9dd';
 import { createBlastFX } from './src/blastfx.js?v=s9dd';
 import { createHUD } from './src/hud.js?v=s9dd';
 import { createCockpit3D } from './src/cockpit3d.js?v=s9dd';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9de';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9df';
 import { createEjection } from './src/eject.js?v=s9dd';
 import { createAudio } from './src/audio.js?v=s9de';
 import { createRadio } from './src/radio.js?v=s9dd';
@@ -748,7 +748,7 @@ import { createFreeLook } from './src/freelook.js?v=s9dd';
 import { createCanopyGlass } from './src/canopyglass.js?v=s9dd';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9dd';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9dd';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9de';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9df';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9de';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9dd';
 import { createRadioQueue } from './src/radioQueue.js?v=s9de';
@@ -1456,7 +1456,7 @@ function resetAircraft() {
   iceCaution = false; iceForcedCloud = false;
   iceCloudUntil = DEBUG && Q.has('icecloud') ? Number(Q.get('icecloud')) : -1;
   roll.left = 0;
-  gearAutoLock = false; gearCheckT = 0; state.assist = 0;
+  gearAutoLock = false; gearCheckT = 0; state.assist = 0; rotateCueAt = -99;
   resetKB();
   vfx.clearTrails(); if (blast) blast.clear(); hud.resetMaxG();
   jet.visible = true;
@@ -1864,7 +1864,8 @@ function triggerWaveOff() {
   autoland.on = false; autoland.ph = ''; autoland.prevLz = Infinity;
   combat.allyHold = false;
   // Keep the jet's pose and velocity: no snap, no deck clipping.
-  state.gearDown = false; gearAutoLock = false;
+  state.gearDown = false; gearAutoLock = true; state.stalled = false;
+  state.throttle = 1; state.afterburner = 1; waveoff.pitchBias = WO_PITCH_DEG * D2R;
   flightMode = 'FLY'; mouse.nx = 0; mouse.ny = 0; kbActive = false; kbHold = 0; kbHeld.clear();
   combat.waveoffBannerT = performance.now();
   if (typeof rq !== 'undefined') rq.say('WAVE OFF! BANDITS ON THE BOW!', { pri: 3, bypass: true, cat: 'MISSILE', ch: 'AWACS' });
@@ -1873,7 +1874,7 @@ function triggerWaveOff() {
   _bz0.copy(a.root.position);
   _bz1.set(0, 0, -1).applyQuaternion(a.root.quaternion);
   waveoff.n = combatSys.spawnAmbush(n, _bz0, _bz1, waveoff.ids);
-  waveoff.st = 'AMBUSH'; combat.ambushActive = true;
+  combat.ambushActive = true;
   if (DEBUG) console.log('[ANGELS_ZERO] waveoff ABORT d=' + autoland.d.toFixed(0) + ' vs=' + state.speed.toFixed(1) + ' alt=' + state.position.y.toFixed(1));
   return true;
 }
@@ -1881,10 +1882,9 @@ function updateWaveOff(dt) {
   if (waveoff.st === 'ABORT') {
     waveoff.t -= dt;
     state.afterburner = 1; state.throttle = 1;
-    waveoff.pitchBias = WO_PITCH_DEG * D2R;
     const a = combat.ally;
     const alt = a ? state.position.y - a.deckY : 999;
-    if (waveoff.t <= 0 || alt > WO_CLIMB_MIN) { waveoff.pitchBias = 0; waveoff.t = 0; }
+    if (waveoff.t <= 0 || alt > WO_CLIMB_MIN) { waveoff.pitchBias = 4 * D2R; waveoff.t = 0; waveoff.st = 'AMBUSH'; }
     return;
   }
   if (waveoff.st !== 'AMBUSH') return;
@@ -1894,7 +1894,7 @@ function updateWaveOff(dt) {
     if (id >= 0 && combatSys.enemies[id] && combatSys.enemies[id].alive) live++;
   }
   if (live) return;
-  waveoff.st = 'CLEAR'; waveoff.ids.fill(-1); waveoff.n = 0;
+  waveoff.st = 'CLEAR'; waveoff.pitchBias = 0; waveoff.ids.fill(-1); waveoff.n = 0;
   combat.ambushActive = false;
   if (typeof rq !== 'undefined') rq.say('BOW IS CLEAR — CLEARED TO LAND, OVERLORD', { pri: 3, bypass: true, ch: 'AWACS' });
   combat.score += 800;
@@ -3033,7 +3033,7 @@ function clearFlightInput() {
   }
 }
 addEventListener('blur', clearFlightInput);
-addEventListener('visibilitychange', () => { if (document.hidden) clearFlightInput(); });
+addEventListener('visibilitychange', () => { if (document.hidden) { clearFlightInput(); if (appMode === 'PLAY') pauseSim(); } });
 addEventListener('beforeunload', e => {
   if (appMode !== 'PLAY') return;
   e.preventDefault(); e.returnValue = ''; return '';
@@ -3227,18 +3227,9 @@ function updatePhysics(dt) {
   const iceK = 1 - ICE_CTRL_LOSS * THREE.MathUtils.smoothstep(state.cloudIce, ICE_FROST_T, 1);
   // ---- PSM entry (air data from the last integrated velocity; one frame of lag is fine)
   const kts = Math.max(1, state.velocity.length()) * 1.94384;
-  // WASD keyboard axes: ramped, blended with the mouse over KB_BLEND_OUT after release.
-  if (kbHeld.size) kbHold = KB_BLEND_OUT; else kbHold = Math.max(0, kbHold - dt);
-  kbActive = kbHold > 0;
-  const mouseW = 1 - kbHold / KB_BLEND_OUT;
-  const tP = (kbHeld.has('KeyW') ? 1 : 0) - (kbHeld.has('KeyS') ? 1 : 0);
-  const tR = (kbHeld.has('KeyD') ? 1 : 0) - (kbHeld.has('KeyA') ? 1 : 0);
-  kbAxis.pitch += clamp(tP * (invertPitch ? -1 : 1) - kbAxis.pitch, -KB_RATE * dt, KB_RATE * dt);
-  kbAxis.roll += clamp(tR - kbAxis.roll, -KB_RATE * dt, KB_RATE * dt);
-  // While keys are held the mouse aim stays centred on the nose; no auto-leveler chase.
-  if (kbActive) { mouse.nx = 0; mouse.ny = 0; }
-  const pitchIn0 = clamp(clamp(shaped(mouse.ny) * mouseW, -1, 1) - kbAxis.pitch, -1, 1);
-  const rollIn0 = shaped(mouse.nx) * mouseW + kbAxis.roll;
+  const stStick = updateStickAxes(dt);
+  const pitchIn0 = stStick.pitch;
+  const rollIn0 = stStick.roll;
   const highG0 = (keys.shift || (DEBUG && Q.has('highg'))) && Math.abs(pitchIn0) > 0.6;
   let psmActive = flightMode === 'FLY' && !state.onGround && kts < PSM_KT &&
     ((keys.b && keys.shift) || (highG0 && Math.abs(mouse.ny) > 0.8)) || (DEBUG && Q.has('psm'));
@@ -3415,7 +3406,7 @@ function updatePhysics(dt) {
   const pitchDeg = Math.asin(clamp(_fwd.y, -1, 1)) * 180 / Math.PI;
   // Landing configuration (gear down -> F-15 flaps follow the gear): the stall
   // moves down to 118 kt in / 132 kt out so the 145-175 kt approach is flyable.
-  const ldg = state.gear > 0.9, stallIn = ldg ? 118 : 160, stallOut = ldg ? 132 : 180;
+  const ldg = state.gear > 0.9 || waveoff.st === 'ABORT', stallIn = ldg ? 118 : 160, stallOut = ldg ? 132 : 180;
   if (!state.stalled && (kts < stallIn || (pitchDeg > 65 && kts < 190))) state.stalled = true;
   else if (state.stalled && kts > stallOut && alpha < 16 * Math.PI / 180) state.stalled = false;
   // STALL warning, debounced in sim time: once triggered it holds >= 0.25 s.
@@ -3447,6 +3438,13 @@ function updatePhysics(dt) {
     if (aErr > 0) aErr *= 1 - sstep(alphaPred, 20 * Math.PI / 180, 26 * Math.PI / 180);   // CAS taper: no extra nose-up past 20-26 deg
     qCmd = clamp(gammaDotEff + aErr, -1.4, 1.4);
   }
+  if (waveoff.pitchBias > 0) {
+    if (Math.abs(pitchIn0) > 0.15 || Math.abs(kbAxis.pitch) > 0.15 || Math.abs(rollIn0) > 0.15 || Math.abs(kbAxis.roll) > 0.15) waveoff.pitchBias = 0;  // pilot override
+    else {
+      const curPitch = Math.asin(clamp(_fwd.y, -1, 1));
+      qCmd = clamp((waveoff.pitchBias - curPitch) * 2.0, -0.35, 0.45);
+    }
+  }
   // Pitch moment: control chases qCmd (inertia + q-scaled authority) with aero damping.
   const pitchGain = state.stalled ? 2.2 : (1.0 + 5.0 * authQ);             // stalled: heavy, critically damped
   let qDot = (qCmd - state.pitchRate) * pitchGain * kyy * machStiff * hydK * iceK;
@@ -3469,6 +3467,7 @@ function updatePhysics(dt) {
   if (!psmActive) pCmd += 0.5 * beta * auth * (smallYaw ? 0.3 : 1);   // no dihedral spring while post-stall
   // (high-AoA buffet is camera / airframe micro-vibration only -- see updateCameraAndVisuals)
   if (outSide) pCmd += outSide * 0.06;                                   // dead-engine roll-off (stick holds it)
+  if (waveoff.pitchBias > 0) pCmd = clamp(-bank * 2.0, -0.5, 0.5);
   // Stop-damping: with no roll stick and no rudder key the rate converges 1.8x faster,
   // so the jet stops rotating when the input is released instead of coasting.
   const rollIdle = roll.left <= 0 && Math.abs(rollIn) < 0.04 && rudderIn === 0;
@@ -3532,10 +3531,6 @@ function updatePhysics(dt) {
   // Storm gusts kick the body rates (src/weather.js).
   if (weather && weather.current.turb > 0.01) { state.rollRate += weather.gust.roll * 6 * dt; state.pitchRate += weather.gust.pitch * 6 * dt; }
 
-  if (waveoff.pitchBias > 0) {
-    if (Math.abs(pitchIn0) > 0.3 || Math.abs(kbAxis.pitch) > 0.3) waveoff.pitchBias = 0;  // pilot override
-    else rotateBody(AX_X, waveoff.pitchBias * dt);
-  }
   rotateBody(AX_X, state.pitchRate * dt);
   rotateBody(AX_Z, state.rollRate * dt);
   rotateBody(AX_Y, state.yawRate * dt);
@@ -3571,7 +3566,7 @@ function updatePhysics(dt) {
   const CD = postStall ? CD0 + 1.8 * Math.sin(a2) ** 2 + (psmActive ? PSM_DRAG_K * 0.1 : 0)
     : CD0 + K_INDUCED * CL * CL * (psmActive ? PSM_DRAG_K : 1) + wave + form + configDrag();
   state.cd = CD; state.cl = CL;
-  const thrust = (THRUST_DRY * state.throttle + THRUST_AB * state.afterburner) * (0.55 + 0.45 * rho / 1.225) * (1 + 0.12 * Math.min(mach, 1.6))
+  const thrust = (THRUST_DRY * state.throttle + THRUST_AB * state.afterburner) * (0.55 + 0.45 * rho / 1.225) * ceilThrustK(state.position.y) * (1 + 0.12 * Math.min(mach, 1.6))
     * (outSide ? SINGLE_ENGINE_K : 1);                                 // one F100 down: 58 % max thrust
   _aero.copy(_lift).add(_side).addScaledVector(_vdir, -qBar * WING_AREA * CD * (1 + ICE_DRAG_K * state.cloudIce));
   _force.copy(_aero).addScaledVector(_fwd, thrust);
@@ -3708,7 +3703,7 @@ function updatePhysics(dt) {
      < 205 kt, sink rate better than -9.5 m/s, pitch -4..+17 deg.
    - ON_GROUND: heading + pitch only, nose-wheel steering on A/D (0.42 rad/s
      taxiing -> 0.05 at 140 kt), rolling friction 0.025 N, wheel brakes 0.5 N
-     on S or B, rotation above 120 kt (pitch up to 14 deg), lift-off above
+     on Ctrl or B, rotation above 120 kt (pitch up to 14 deg), lift-off above
      155 kt once lift reaches the weight. Leaving the paved airfield = crash.
    - Below 25 kt: 4 s REARMING & REPAIRING, then full stores / gun / flares /
      airframe / engines / fuel; rolling above 30 kt first aborts it.
@@ -3737,7 +3732,7 @@ function updateThrottle(dt) {
     else if (simTime >= abatAt + 1.0) debugABOn = true;
   }
   // AB engages only when Shift is held and the throttle is already at the stop.
-  const abWanted = ((keys.shift && state.throttle >= 0.999) || Q.has('ab') || debugABOn) ? 1 : 0;
+  const abWanted = ((keys.shift && state.throttle >= 0.999) || Q.has('ab') || debugABOn || waveoff.st === 'ABORT') ? 1 : 0;
   state.afterburner += (abWanted - state.afterburner) * Math.min(1, 4 * dt);
   // MIL -> AB rising edge: thump / kick / plume flash once per engagement with cooldown.
   // Catapult HOLD / LAUNCH own their own audio, so the thump waits until release.
@@ -3757,9 +3752,10 @@ function updateThrottle(dt) {
   state.fuelFlow = (combat.engineOut ? 1 : 2) * (700 + 4300 * state.throttle + 17000 * state.afterburner);
   state.fuel = Math.max(0, state.fuel - state.fuelFlow * dt / 3600);
 }
+function ceilThrustK(alt) { return 1 - THREE.MathUtils.smoothstep(alt, 14000, 20000) * 0.92; }
 function engineThrust(mach) {
   const rho = airDensity(state.position.y);
-  return (THRUST_DRY * state.throttle + THRUST_AB * state.afterburner) * (0.55 + 0.45 * rho / 1.225) * (1 + 0.12 * Math.min(mach, 1.6))
+  return (THRUST_DRY * state.throttle + THRUST_AB * state.afterburner) * (0.55 + 0.45 * rho / 1.225) * ceilThrustK(state.position.y) * (1 + 0.12 * Math.min(mach, 1.6))
     * (combat.engineOut ? SINGLE_ENGINE_K : 1);
 }
 // Engine fire / extinguished / relighting / seized F100: single-engine thrust cap.
@@ -3815,11 +3811,30 @@ function enterGround(td) {
   combatSys.say(td.vy > -2.5 ? 'TOUCHDOWN — GREASED IT' : td.vy > -5.5 ? 'TOUCHDOWN — ON THE NUMBERS' : 'TOUCHDOWN — FIRM ARRIVAL', 2.0, '#52ff9c');
   if (DEBUG) console.log('[ANGELS_ZERO] touchdown', JSON.stringify(state.touchdown));
 }
+const _stickOut = { pitch: 0, roll: 0 };
+function updateStickAxes(dt) {
+  const clamp = THREE.MathUtils.clamp;
+  // WASD keyboard axes: ramped, blended with the mouse over KB_BLEND_OUT after release.
+  if (kbHeld.size) kbHold = KB_BLEND_OUT; else kbHold = Math.max(0, kbHold - dt);
+  kbActive = kbHold > 0;
+  const mouseW = 1 - kbHold / KB_BLEND_OUT;
+  const tP = (kbHeld.has('KeyW') ? 1 : 0) - (kbHeld.has('KeyS') ? 1 : 0);
+  const tR = (kbHeld.has('KeyD') ? 1 : 0) - (kbHeld.has('KeyA') ? 1 : 0);
+  kbAxis.pitch += clamp(tP * (invertPitch ? -1 : 1) - kbAxis.pitch, -KB_RATE * dt, KB_RATE * dt);
+  kbAxis.roll += clamp(tR - kbAxis.roll, -KB_RATE * dt, KB_RATE * dt);
+  // While keys are held the mouse aim stays centred on the nose; no auto-leveler chase.
+  if (kbActive) { mouse.nx = 0; mouse.ny = 0; }
+  _stickOut.pitch = clamp(clamp(shaped(mouse.ny) * mouseW, -1, 1) - kbAxis.pitch, -1, 1);
+  _stickOut.roll = shaped(mouse.nx) * mouseW + kbAxis.roll;
+  return _stickOut;
+}
+let rotateCueAt = -99;
 function updateGround(dt) {
   const clamp = THREE.MathUtils.clamp, sstep = THREE.MathUtils.smoothstep, R = world.runway;
   const kts = state.groundSpeed * 1.94384;
+  const stStick = updateStickAxes(dt);
   const gforceActive = gforce.until > simTime && Math.abs(gforce.g) > 0.1 && flightMode === 'FLY';
-  const pitchIn = gforceActive ? clamp((gforce.g - 1) / (gforce.g >= 1 ? 6.5 : 3), -1, 1) : shaped(mouse.ny), rudderIn = rudderInput(dt);   // same tap ramp for nose-wheel steering
+  const pitchIn = gforceActive ? clamp((gforce.g - 1) / (gforce.g >= 1 ? 6.5 : 3), -1, 1) : stStick.pitch, rudderIn = rudderInput(dt);   // same tap ramp for nose-wheel steering
   state.wheelBrake = !!(keys.ctrl || keys.b || state.brakeHeld || state.brakeLatch);
   updateAirbrake(dt, 0);
   updateThrottle(dt);
@@ -3859,6 +3874,10 @@ function updateGround(dt) {
     heading: (Math.atan2(fwd.x, -fwd.z) * 180 / Math.PI + 360) % 360, pitchRate: 0, rollRate: 0, yawRate: steer, highG: false, barrelRoll: false });
   state.gStrain = Math.max(0, state.gStrain - 0.2 * dt); state.negGStrain = Math.max(0, state.negGStrain - 0.35 * dt);
   state.ctl.pitch = clamp(pitchIn, -1, 1); state.ctl.roll = clamp(shaped(mouse.nx) * 0.5, -1, 1); state.ctl.yaw = clamp(rudderIn * 0.8, -1, 1);
+  if (flightMode === 'FLY' && !state.autobrake && kts >= 145 && state.groundPitch < 0.02 && simTime - rotateCueAt > 8) {
+    combatSys.say('ROTATE — PULL UP (S / MOUSE)', 1.5, '#52ff9c');
+    rotateCueAt = simTime;
+  }
   // Lift-off.
   if (kts > 155 && lift > 0.98 * W && th > 4 * Math.PI / 180) {
     state.onGround = false;
@@ -4641,7 +4660,7 @@ function getMusicCtx() {
   musicCtx.banditDist = musicCtx.airborne ? nearestBandit() : Infinity;
   musicCtx.combo = C.comboMult || 1;
   musicCtx.ace = !!(C.ace && C.ace.alive);
-  musicCtx.ambush = waveoff.st === 'AMBUSH' ? 1 : 0;
+  musicCtx.ambush = (waveoff.st === 'ABORT' || waveoff.st === 'AMBUSH') ? 1 : 0;
   musicCtx.intrusion = combat.intr && (combat.intr.st === 'DUEL' || combat.intr.st === 'DONE' && !combat.rtb) ? 1 : 0;
   musicCtx.scramble = scramble.st === 'PASS' ? 1 : 0;
   return musicCtx;
@@ -4654,7 +4673,7 @@ const musicKeyParts = ['', '', '', '', false, 0, '', 0, 0, false];
 function syncMusicScenario(force = false) {
   const C = combat;
   const a = appMode, f = flightMode, cp = cat.ph, ap = autoland.ph;
-  const rt = !!(C.rtb && C.rtb.on), ph = C.missionPhase | 0, mid = missionId, amb = waveoff.st === 'AMBUSH' ? 1 : 0;
+  const rt = !!(C.rtb && C.rtb.on), ph = C.missionPhase | 0, mid = missionId, amb = (waveoff.st === 'ABORT' || waveoff.st === 'AMBUSH') ? 1 : 0;
   const ps = !!musicCtx.pitstop;
   if (!force && musicKeyParts[0] === a && musicKeyParts[1] === f && musicKeyParts[2] === cp &&
       musicKeyParts[3] === ap && musicKeyParts[4] === rt && musicKeyParts[5] === ph && musicKeyParts[6] === mid &&
@@ -6025,7 +6044,7 @@ function animate() {
   advanceTimeScale(realDt);
   const sdt = dt * timeScale;                                  // scaled time: sim + camera / vfx
   updateMissileCamState(realDt);
-  simTime += dt;
+  if (appMode !== 'PAUSED') simTime += dt;
   if (appMode === 'MENU') menuOrbit(dt);
   else if (appMode === 'PLAY' && modelReady && !FREEZE) stepSim(sdt);
   if (appMode !== 'PAUSED') updateCameraAndVisuals(sdt, simTime);

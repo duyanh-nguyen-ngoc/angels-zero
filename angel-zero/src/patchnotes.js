@@ -3,6 +3,12 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.46', title: 'DUEL COMPLETION, RUNWAY ROTATION & WAVE-OFF CLIMB', bullets: [
+    'Fixed ACE DUEL mission completion so downing CRIMSON-1 advances cleanly to carrier RTB and debrief.',
+    'Enabled W/S and arrow-key pitch rotation during runway takeoff rolls without engaging wheel brakes, and added a ROTATE prompt past 145 kt.',
+    'Fixed carrier autoland wave-off go-arounds to hold full afterburner, retract gear without re-dropping, and fly a controlled climb until pilot override.',
+    'Auto-pauses active sorties when switching away from the tab and tapers jet thrust between 14 km and 20 km for a realistic service ceiling.'
+  ] },
   { version: 'v1.1.45', title: 'PLAYTEST STABILITY, AUDIO & WINGMAN FIXES', bullets: [
     'Fixed ACE DUEL mission isolation so only CRIMSON-1 spawns with no fleet ships or extra waves, and fixed the G wingman order key cycle so FOCUS returns cleanly to FORM on the third press.',
     'Silenced cold menus and debrief audio completely by gating the transonic rumble modulator and keeping pause/debrief BGM running smoothly without crossfade errors.',
