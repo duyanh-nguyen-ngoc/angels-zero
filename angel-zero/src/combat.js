@@ -3642,6 +3642,7 @@ export function createCombat(THREE, env) {
   }
 
   function updateRWR(playerActive) {
+    if (C.mcfg && C.mcfg.freeFlight) { C.rwr = []; C.rwrLevel = 0; return; }
     const list = [];
     let level = 0;
     if (playerActive) {
@@ -4935,7 +4936,8 @@ export function createCombat(THREE, env) {
       if (v.ship && v.ship.alive && v.ship.sub.on) { subWorld(v.ship, v.pos); v.alive = true; }
       else { v.alive = false; v.ship = null; }
     }
-    for (let i = 0; i < SITE_TGT.length; i++) SITE_TGT[i].alive = SITE_ON[i] === 1;
+    const canyon = !!(C.mcfg && C.mcfg.ceiling);
+    for (let i = 0; i < SITE_TGT.length; i++) SITE_TGT[i].alive = canyon && SITE_ON[i] === 1;
     let anyAlive = false;
     for (const t of surface) {
       if (t.spin) t.spin.rotation.y += dt * (t.alive ? 1.6 : 0);
@@ -4965,7 +4967,7 @@ export function createCombat(THREE, env) {
     }
     // Staged missions (NAVAL / CANYON / ACE) own every surface target: no legacy
     // 40 s jammer / task-force respawn, which used to resurrect ships in ACE_DUEL.
-    if (surface.length && !anyAlive && !stagedMission()) {
+    if (surface.length && !anyAlive && !stagedMission() && !(C.mcfg && C.mcfg.freeFlight)) {
       surfRespawn += dt;
       if (surfRespawn > SURF_RESPAWN) { surfRespawn = 0; spawnSurface(); spawnFleet(); say('NEW STRIKE TARGETS ON THE GROUND MAP', 2.5); }
     } else surfRespawn = 0;

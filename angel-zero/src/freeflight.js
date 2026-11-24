@@ -399,7 +399,12 @@ export function createFreeFlight(THREE, scene) {
     vertexColors: true,
     side: THREE.FrontSide,
   });
-  const placeholderGroundMat = new THREE.MeshLambertMaterial({ color: 0x3b4840 });
+  const placeholderGroundMat = new THREE.MeshLambertMaterial({
+    color: 0x3b4840,
+    polygonOffset: true,
+    polygonOffsetFactor: 2,
+    polygonOffsetUnits: 2,
+  });
 
   let active = false;
   let cityId = 'TORONTO';
@@ -570,7 +575,7 @@ export function createFreeFlight(THREE, scene) {
         const flip = area < 0;
 
         const baseY = sampleTileHeight(tile, cx, cz);
-        const yBot = baseY + feat.minHeight;
+        const yBot = baseY + feat.minHeight - (feat.minHeight <= 0 ? 4 : 0);
         const yTop = baseY + feat.height;
         const wallH = yTop - yBot;
         if (wallH < 1) continue;
@@ -701,7 +706,12 @@ export function createFreeFlight(THREE, scene) {
           tex.wrapT = THREE.ClampToEdgeWrapping;
           tex.needsUpdate = true;
           tile.satTex = tex;
-          tile.satMat = new THREE.MeshLambertMaterial({ map: tex });
+          tile.satMat = new THREE.MeshLambertMaterial({
+            map: tex,
+            polygonOffset: true,
+            polygonOffsetFactor: 2,
+            polygonOffsetUnits: 2,
+          });
           if (tile.groundMesh) tile.groundMesh.material = tile.satMat;
         })
         .catch(() => {});

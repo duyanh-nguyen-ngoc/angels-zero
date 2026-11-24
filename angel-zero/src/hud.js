@@ -1000,7 +1000,8 @@ export function createHUD(THREE, A) {
     const alive = A.getEnemies().filter(e => e.alive).length;
     ctx.font = f(12, true);
     const ph = C.phase ? `PHASE ${C.phase}  ` : '';
-    labelText(ctx, ph + 'BANDITS ' + alive, x, y + 40 + comboH, C.phase === 3 ? BLAZE : G, 3);
+    if (C.mcfg && C.mcfg.freeFlight) labelText(ctx, 'FREE FLIGHT', x, y + 40 + comboH, '#5eead4', 3);
+    else labelText(ctx, ph + 'BANDITS ' + alive, x, y + 40 + comboH, C.phase === 3 ? BLAZE : G, 3);
     // PHASE 3: Ace structural integrity bar.
     if (C.ace && C.ace.alive) {
       const yy = y + 58 + comboH, frac = clamp(C.ace.hp / (C.ace.hpMax || 1), 0, 1);
@@ -1076,10 +1077,12 @@ export function createHUD(THREE, A) {
     ctx.clip(frame);
 
     // Island contours (heading-up).
-    ctx.save();
-    ctx.translate(cx, cy); ctx.rotate(-hRad); ctx.scale(k, k); ctx.translate(-S.position.x, -S.position.z);
-    ctx.globalAlpha = 0.6; ctx.drawImage(topo.cv, topo.x0, topo.z0, topo.size, topo.size);
-    ctx.restore();
+    if (!(C.mcfg && C.mcfg.freeFlight)) {
+      ctx.save();
+      ctx.translate(cx, cy); ctx.rotate(-hRad); ctx.scale(k, k); ctx.translate(-S.position.x, -S.position.z);
+      ctx.globalAlpha = 0.6; ctx.drawImage(topo.cv, topo.x0, topo.z0, topo.size, topo.size);
+      ctx.restore();
+    }
 
     // Three concentric range rings.
     ctx.strokeStyle = 'rgba(88, 255, 154, 0.34)'; ctx.lineWidth = 1;
@@ -1944,6 +1947,7 @@ export function createHUD(THREE, A) {
     }
   }
   function drawObjective(ctx) {
+    if (C.mcfg && C.mcfg.freeFlight) return;
     const cat = A.getCat && A.getCat();
     if (cat && (cat.ph === 'HOLD' || cat.ph === 'LAUNCH')) return;
     ctx.save();
@@ -2565,6 +2569,7 @@ export function createHUD(THREE, A) {
   // Live sector badge tucked above the radar: `SEC-02 // BRIDGE STRAIT`; brightens
   // for 2.5 s after a sector change.
   function drawSectorBadge(ctx) {
+    if (C.mcfg && C.mcfg.freeFlight) return;
     const sc = C.sector; if (!sc) return;
     const s = Math.round(Math.min(216, HH * 0.30, HW * 0.22)), x0 = 20, y0 = HH - s - 20;
     const fresh = clamp(1 - (performance.now() - (C.sectorT || 0)) / 2500, 0, 1);

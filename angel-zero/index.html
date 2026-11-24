@@ -733,11 +733,11 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createVFX } from './src/vfx.js?v=s9dd';
 import { createAmbient } from './src/ambient.js?v=s9dd';
 import { createBlastFX } from './src/blastfx.js?v=s9dd';
-import { createHUD } from './src/hud.js?v=s9di';
+import { createHUD } from './src/hud.js?v=s9dp';
 import { createCockpit3D } from './src/cockpit3d.js?v=s9di';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9do';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9dp';
 import { createEjection } from './src/eject.js?v=s9di';
-import { createAudio } from './src/audio.js?v=s9dm';
+import { createAudio } from './src/audio.js?v=s9dp';
 import { createRadio } from './src/radio.js?v=s9dd';
 import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9dd';
 import { createLivery } from './src/livery.js?v=s9dd';
@@ -752,14 +752,14 @@ import { createFreeLook } from './src/freelook.js?v=s9dd';
 import { createCanopyGlass } from './src/canopyglass.js?v=s9dd';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9dd';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9dd';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9do';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9dp';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9de';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9dd';
 import { createRadioQueue } from './src/radioQueue.js?v=s9dj';
 import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9do';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
   GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9do';
-import { createFreeFlight, FREE_FLIGHT_PRESETS, loadFreeFlightCity, saveFreeFlightCity } from './src/freeflight.js?v=s9do';
+import { createFreeFlight, FREE_FLIGHT_PRESETS, loadFreeFlightCity, saveFreeFlightCity } from './src/freeflight.js?v=s9dp';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -1740,7 +1740,10 @@ function loadMissionScene(m) {
   if (hud.setAlertState) hud.setAlertState('');
   world.rebuild(MAPS[m.mapTag] || MAPS.ARCHIPELAGO);
   applyMapProps(MAPS[m.mapTag] || MAPS.ARCHIPELAGO);
+  ocean.visible = !m.freeFlight;
   if (m.freeFlight) {
+    if (!WX_FORCED) { weather.set('SCATTERED', { instant: true }); vfx.setCloudSea(false); }
+    if (!(DEBUG && Q.has('tod'))) atmosphere.applyTimeOfDay('DAYLIGHT', { instant: true });
     const clat = Q.has('lat') ? Number(Q.get('lat')) : NaN;
     const clon = Q.has('lon') ? Number(Q.get('lon')) : NaN;
     freeFlight.start(selectedFfCity, Number.isFinite(clat) && Number.isFinite(clon) ? { lat: clat, lon: clon } : null);
@@ -4171,6 +4174,8 @@ function updateWingmanFlight(dt) {
 }
 
 function updateCameraAndVisuals(dt, now) {
+  const wantNear = (freeFlight.active && !firstPerson) ? 0.8 : 0.05;
+  if (camera.near !== wantNear) { camera.near = wantNear; camera.updateProjectionMatrix(); }
   const q = state.quaternion;
   freeLook.update(dt);
   updateLookVector();
@@ -6348,6 +6353,9 @@ if (DEBUG) {
     get sunDir() { return SUN_DIR; },
     get freeFlight() { return freeFlight; },
     get freeFlightStats() { return freeFlight.getStats(); },
+    get oceanVisible() { return ocean.visible; },
+    get cloudSea() { return !!vfx.cloudSea; },
+    get combatSys() { return combatSys; },
     killSub: i => combatSys.killSub(i), killSite: i => combatSys.killSite(i), forceSalvo: () => combatSys.forceSalvo(),
     get siteOn() { return combatSys.siteOn; },
     get waveoff() { return waveoff; }, triggerWaveOff, onBuzz,

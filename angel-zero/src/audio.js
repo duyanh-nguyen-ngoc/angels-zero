@@ -2368,7 +2368,7 @@ export function createAudio() {
     for (const c of E.choir) c.bus && set(c.bus.gain, choirK * (c.e ? 0.97 : 1), 0.12);
     if (N.f15Whine) {
       set(N.f15Whine.playbackRate, 0.72 + 0.68 * rpmL, 0.1);
-      set(N.f15WhineG.gain, live ? (p.cockpit ? 0.14 : 0.22) * (0.35 + 0.65 * rpmL) * (1 - 0.35 * abK) : 0, 0.12);
+      set(N.f15WhineG.gain, live ? (p.cockpit ? 0.08 : 0.12) * (0.35 + 0.65 * rpmL) * (1 - 0.35 * abK) : 0, 0.12);
     }
     if (N.f15Exh) {
       set(N.f15Exh.playbackRate, 0.78 + 0.55 * rpmL, 0.1);
@@ -2507,10 +2507,10 @@ export function createAudio() {
       playSample('f15GearAoa', N.vwsHP, 0.34);
     }
     const yr = Math.abs(p.yawRate || 0);
-    if (live && (p.spin || yr > 0.9) && (!N.depAt || ctx.currentTime - N.depAt > 1.1)) {
+    if (live && (p.spin || ((p.stalled || p.spin) && yr > 0.9)) && (!N.depAt || ctx.currentTime - N.depAt > 1.1)) {
       N.depAt = ctx.currentTime;
       playSample('f15Tone900Cont', N.vwsHP, 0.3);
-    } else if (live && yr > 0.52 && (!N.depAt || ctx.currentTime - N.depAt > 1.1)) {
+    } else if (live && (p.stalled || p.spin) && yr > 0.85 && (!N.depAt || ctx.currentTime - N.depAt > 1.1)) {
       N.depAt = ctx.currentTime;
       playSample('f15Tone900Int', N.vwsHP, 0.28);
     }

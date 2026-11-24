@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.56', title: 'FREE FLIGHT POLISH — CLEAR SKY, ZERO OVERLAYS & AUDIO FIX', bullets: [
+    'Cleared Canyon Run SITE markers, BRIDGE STRAIT sector badge, and RWR tracks during Free Flight.',
+    'Disabled the ocean shader plane and cloud-sea whiteout in Free Flight, raised camera near plane to eliminate skyline Z-fighting, and anchored building bases into sloped terrain.',
+    'Gated the 900 Hz departure/spin warning tone strictly to actual stall/spin departures and smoothed F100 turbine whine gain in normal flight.'
+  ] },
   { version: 'v1.1.55', title: 'FREE FLIGHT — REAL-WORLD 3D CITIES & TERRAIN', bullets: [
     'Added FREE FLIGHT mission with infinite streaming zoom-13 AWS Terrarium elevation, ESRI World Imagery satellite ground tiles, and 3D extruded OpenFreeMap OSM buildings.',
     'Added 5 scenic location presets (Toronto, Tokyo, San Francisco, New York, Swiss Alps) with parametric 3D landmarks (CN Tower, Tokyo Skytree, One WTC, Transamerica Pyramid) and automatic origin rebasing.'
