@@ -3,6 +3,12 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.59', title: 'F-22A RAPTOR', bullets: [
+    'New aircraft: the F-22A Raptor. Pick it from the AIRCRAFT row in the hangar; WARDEN-2 and WARDEN-3 fly Raptors with you.',
+    'The Raptor supercruises (about Mach 1.1 on military power, no afterburner), has its own articulated flaperons, ailerons, all-moving tails, canted rudders and twin nozzles, procedural landing gear sized to the airframe, and carries four internal AIM-9s.',
+    'Carrier catapult, autoland, cockpit view and every mission work in either jet; enemy bandits keep their own airframe.',
+    'F-22 model: "F22 Raptor FREE" by NLM-Group (CC BY 4.0), credited in assets/CREDITS.md.'
+  ] },
   { version: 'v1.1.58', title: 'FREE FLIGHT — CLEAN MISSION SWITCHING & COCKPIT UNARMED POLISH', bullets: [
     'Fixed switching from Free Flight back to combat missions in the same session so cannon ammo, missiles, special weapons, flares, chaff, selected weapon, weather, and time-of-day restore cleanly.',
     'Silenced the Standby launch combat callout ("CLEARED HOT — SPLASH THE BANDITS") and AWACS launch radio when launching Free Flight, and gated wingman/target-designate keys (G / C) while in Free Flight.',

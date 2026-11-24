@@ -1,0 +1,334 @@
+{
+  "source": "f22_raptor_free.glb",
+  "license": "CC-BY-4.0, NLM-Group (sketchfab.com/3d-models/f22-raptor-free-2a64abf0866a405c865466c7642ca689)",
+  "rest_frame": 1,
+  "gear_down_frame": 176,
+  "removed": [
+    "Object_11",
+    "Object_113",
+    "Object_13",
+    "Object_15",
+    "Object_17",
+    "Object_19",
+    "Object_21",
+    "Object_23",
+    "Object_24",
+    "Object_26",
+    "Object_28",
+    "Object_31",
+    "Object_33",
+    "Object_35",
+    "Object_38",
+    "Object_47",
+    "Object_49",
+    "Object_5",
+    "Object_51",
+    "Object_53",
+    "Object_55",
+    "Object_57",
+    "Object_59",
+    "Object_61",
+    "Object_63",
+    "Object_65",
+    "Object_67",
+    "Object_7",
+    "Object_89",
+    "Object_9"
+  ],
+  "scale": 6.849491,
+  "z_shift": -1.7366,
+  "dimensions_m": [
+    13.818,
+    3.968,
+    18.92
+  ],
+  "tris": 33113,
+  "bbox_min": [
+    -6.909,
+    -1.984,
+    -11.197
+  ],
+  "bbox_max": [
+    6.909,
+    1.984,
+    7.723
+  ],
+  "canopy_pilot_eye": [
+    0.0,
+    -0.054,
+    -7.334
+  ],
+  "gear": {
+    "Gear_Nose": [
+      0.0,
+      -2.555,
+      -5.542
+    ],
+    "Gear_Main_L": [
+      -1.524,
+      -2.404,
+      0.7
+    ],
+    "Gear_Main_R": [
+      1.524,
+      -2.404,
+      0.7
+    ]
+  },
+  "wheel_radius_m": {
+    "nose": 0.257,
+    "mainA": 0.323,
+    "mainB": 0.323
+  },
+  "controls": [
+    {
+      "name": "Ctrl_Stabilator_L",
+      "src": "Object_121",
+      "kind": "stabilator",
+      "hinge": [
+        -3.212,
+        -0.968,
+        5.473
+      ],
+      "axis": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "size": [
+        2.634,
+        0.213,
+        4.092
+      ],
+      "faces": 26
+    },
+    {
+      "name": "Ctrl_Stabilator_R",
+      "src": "Object_151",
+      "kind": "stabilator",
+      "hinge": [
+        3.212,
+        -0.968,
+        5.473
+      ],
+      "axis": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "size": [
+        2.634,
+        0.213,
+        4.092
+      ],
+      "faces": 26
+    },
+    {
+      "name": "Ctrl_Aileron_L",
+      "src": "Object_79",
+      "kind": "aileron",
+      "hinge": [
+        -5.321,
+        -1.204,
+        2.89
+      ],
+      "axis": [
+        0.9446,
+        0.03475,
+        0.32638
+      ],
+      "size": [
+        1.447,
+        0.21,
+        1.206
+      ],
+      "faces": 56
+    },
+    {
+      "name": "Ctrl_Aileron_R",
+      "src": "Object_85",
+      "kind": "aileron",
+      "hinge": [
+        5.321,
+        -1.204,
+        2.89
+      ],
+      "axis": [
+        0.9446,
+        -0.03475,
+        -0.32638
+      ],
+      "size": [
+        1.447,
+        0.21,
+        1.206
+      ],
+      "faces": 56
+    },
+    {
+      "name": "Ctrl_Flap_L",
+      "src": "Object_76",
+      "kind": "flap",
+      "hinge": [
+        -3.246,
+        -1.079,
+        3.076
+      ],
+      "axis": [
+        0.95232,
+        0.06916,
+        0.29716
+      ],
+      "size": [
+        2.717,
+        0.22,
+        1.784
+      ],
+      "faces": 92
+    },
+    {
+      "name": "Ctrl_Flap_R",
+      "src": "Object_82",
+      "kind": "flap",
+      "hinge": [
+        3.246,
+        -1.079,
+        3.076
+      ],
+      "axis": [
+        0.95232,
+        -0.06916,
+        -0.29716
+      ],
+      "size": [
+        2.717,
+        0.22,
+        1.784
+      ],
+      "faces": 92
+    },
+    {
+      "name": "Ctrl_Rudder_R",
+      "src": "Object_70",
+      "kind": "rudder",
+      "hinge": [
+        2.451,
+        0.716,
+        4.264
+      ],
+      "axis": [
+        0.45734,
+        0.78421,
+        -0.41935
+      ],
+      "size": [
+        1.479,
+        2.585,
+        2.287
+      ],
+      "faces": 80
+    },
+    {
+      "name": "Ctrl_Rudder_L",
+      "src": "Object_73",
+      "kind": "rudder",
+      "hinge": [
+        -2.499,
+        0.704,
+        4.264
+      ],
+      "axis": [
+        -0.43048,
+        0.79765,
+        -0.42243
+      ],
+      "size": [
+        1.479,
+        2.585,
+        2.287
+      ],
+      "faces": 80
+    }
+  ],
+  "nozzles": [
+    {
+      "name": "Nozzle_R",
+      "center": [
+        0.741,
+        -1.081,
+        3.955
+      ],
+      "faces": 2160
+    },
+    {
+      "name": "Nozzle_L",
+      "center": [
+        -0.741,
+        -1.081,
+        3.955
+      ],
+      "faces": 2160
+    }
+  ],
+  "ordnance": [
+    {
+      "name": "Pylon_MSL_1",
+      "center": [
+        -1.207,
+        -1.338,
+        -2.415
+      ],
+      "size": [
+        0.724,
+        0.538,
+        2.642
+      ],
+      "parts": 3
+    },
+    {
+      "name": "Pylon_MSL_2",
+      "center": [
+        1.207,
+        -1.338,
+        -2.415
+      ],
+      "size": [
+        0.724,
+        0.538,
+        2.642
+      ],
+      "parts": 3
+    },
+    {
+      "name": "Pylon_MSL_3",
+      "center": [
+        -0.543,
+        -1.338,
+        -1.815
+      ],
+      "size": [
+        0.724,
+        0.538,
+        2.642
+      ],
+      "parts": 3
+    },
+    {
+      "name": "Pylon_MSL_4",
+      "center": [
+        0.543,
+        -1.338,
+        -1.815
+      ],
+      "size": [
+        0.724,
+        0.538,
+        2.642
+      ],
+      "parts": 3
+    }
+  ],
+  "textures_downscaled": 0,
+  "meshes_sanitized": 1,
+  "glb_bytes": 2434052
+}

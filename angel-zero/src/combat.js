@@ -6102,9 +6102,11 @@ export function createCombat(THREE, env) {
   }
   const mountCbs = [];
   const onCarrierMounted = cb => { if (typeof cb === 'function') mountCbs.push(cb); };
-  function init(model, nozzleLocal) {
+  // model: the player's airframe (stores). fleetModel / fleetNozzles: the airframe the
+  // bandit fleet is cloned from (the F-15 when the player flies another aircraft).
+  function init(model, nozzleLocal, fleetModel = model, fleetNozzles = nozzleLocal) {
     collectStores(model);
-    buildFleet(model, nozzleLocal);
+    buildFleet(fleetModel, fleetNozzles);
     buildBaseDefences();
     const mp = env.getMapProps && env.getMapProps();
     if (mp) { const vis = !!(mp.islands && mp.baseBldg); for (const g of baseDefG) g.visible = vis; }

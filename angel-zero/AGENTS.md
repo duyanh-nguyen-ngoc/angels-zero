@@ -21,6 +21,19 @@ procedural ocean archipelago with a 2D HUD, cockpit MFDs and combat.
   seals the skin, writes `assets/f15_prep_report.json`).
 - `assets/mcdonnell_douglas_f-15_eagle_fighter_jet.glb` — Sketchfab source model,
   supplied separately and not committed (>50 MB). `prep_f15.py` needs it in place.
+- `scripts/prep_f22.py` — headless Blender script; **source of truth** for
+  `assets/angels_zero_f22.glb` + `assets/f22_prep_report.json` (second player
+  aircraft). Input `assets/f22_raptor_free.glb` (Sketchfab "F22 Raptor FREE",
+  NLM-Group, CC BY 4.0) is supplied separately and git-ignored. Bakes animation
+  frame 1 (gear up, doors shut), strips gear / display plane, re-pivots the
+  already-separate surfaces to the same `Ctrl_*` / `Nozzle_*` contract, groups
+  `Pylon_MSL_1..4`, writes `Gear_Nose` / `Gear_Main_L/R` and `Canopy_Pilot_Eye`
+  empties. Credits: `assets/CREDITS.md`.
+- Aircraft selection: `AIRCRAFT` registry in `index.html` (`F15C` / `F22A`,
+  `angelsZero_aircraft` localStorage, `?debug&aircraft=F22A`); switching reloads.
+  Per-aircraft eye / clip box, interior material, belly-hide height, wingtip band,
+  nav lights, thrust factors; gear units in `src/gear.js` `GEAR_UNITS`. The bandit
+  fleet always uses the F-15 GLB (`combatSys.init(model, nozzles, fleetModel, fleetNozzles)`).
 - `scripts/build_jet.py` — retired Step 1A procedural stealth-jet generator
   (kept for reference; running it would overwrite the F-15 GLB).
 - `index.html` — the game shell: scene, terrain/ocean, flight model, combat,

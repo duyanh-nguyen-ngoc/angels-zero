@@ -13,3 +13,5 @@ raw_bgm/
 
 # Sketchfab source model (>50 MB, supplied separately per angel-zero/AGENTS.md)
 angel-zero/assets/mcdonnell_douglas_f-15_eagle_fighter_jet.glb
+# Sketchfab F-22 source (NLM-Group "F22 Raptor FREE", CC-BY; supplied separately, prep_f22.py input)
+angel-zero/assets/f22_raptor_free.glb
