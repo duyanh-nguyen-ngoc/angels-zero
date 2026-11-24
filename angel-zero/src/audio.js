@@ -1977,6 +1977,102 @@ export function createAudio() {
     rxState = 'TALK'; rxT = now + PTT_OPEN_S;
     return buf.duration + PTT_OPEN_S;
   }
+  /* ==================================================================================
+     REACTIVE TACTICAL RADIO — procedural text callouts (no voice audio).
+     generateReactiveLine(kind, t) stitches [Caller] + [Observation] + [Live telemetry]
+     + [Action] from fragment tables (recent-hash guard: never repeats back-to-back).
+     Lines are shown on the cockpit radio subtitle box only; textLineSecs(line) gives
+     the on-screen reading time. Runs only when a callout fires, never per frame.
+     ================================================================================== */
+  const CALLSIGNS = {                                         // subtitle channel (colour / tag / portrait) + address
+    'AWACS':     { ch: 'AWACS',   addr: 'Warden One, AWACS.' },
+    'OVERLORD':  { ch: 'AWACS',   addr: 'Warden One, Overlord.' },
+    'WARDEN-2':  { ch: 'WARDEN2', addr: 'Lead, Two.' },
+    'WARDEN-3':  { ch: 'WARDEN3', addr: 'Lead, Three.' },
+    'CRIMSON-1': { ch: 'CRIMSON', addr: '' }
+  };
+  const pick = a => a[(Math.random() * a.length) | 0];
+  const num = n => String(Math.max(0, Math.round(n)));
+  const brg = d => String(((Math.round(d) % 360) + 360) % 360).padStart(3, '0');
+  const plural = (n, w) => `${num(n)} ${w}${Math.round(n) === 1 ? '' : 's'}`;
+  // Brevity altitude: feet down low, 'angels N' (thousands of feet) above 1,000 ft.
+  const alt = ft => ft < 1000 ? `${Math.max(0, Math.round(ft / 50) * 50)} feet` : `angels ${num(ft / 1000)}`;
+  const Alt = ft => { const v = alt(ft); return v[0].toUpperCase() + v.slice(1); };
+  // Fragment grammar. Each kind: callers, observations, telemetry(t) builders, actions,
+  // queue class ('URGENT' interrupts routine chatter through the priority queue).
+  const RX = {
+    CAT_LAUNCH: { who: ['OVERLORD'], cls: 'ROUTINE', obs: ['Good shot.', 'Clean launch.', 'Shooter is clear of the bow.', 'Good catapult stroke.'],
+      tel: [t => `Passing ${num(t.speedKts)} knots.`, t => `Climbing through ${alt(t.altFt)}.`, () => 'Deck is clear behind you.'],
+      act: ['Contact AWACS on button two.', 'Climb and join your flight.', 'Have a good hunt.'] },
+    GEAR_UP: { who: ['WARDEN-2', 'WARDEN-3'], cls: 'ROUTINE', obs: ['Gear is up.', 'Wheels in the wells.', 'Clean jet.'],
+      tel: [t => `${num(t.speedKts)} knots, ${alt(t.altFt)}.`, () => 'Formation is tight.'], act: ['Lead, on your wing.', 'Two is in.', 'Ready when you are.'] },
+    SEA_SKIM: { who: ['WARDEN-2', 'WARDEN-3'], cls: 'ROUTINE', obs: ['Whoa, Lead, you are kissing the waves!', 'Lead, that is way too low!', 'You are throwing spray, Lead!', 'Are you trying to swim home?'],
+      tel: [t => `${num(t.altFt)} feet over the water!`, t => `I read ${num(t.altFt)} feet!`], act: ['Pull up a little!', 'Easy on the stick!', 'Show-off.'] },
+    LOCK: { who: ['AWACS', 'WARDEN-2'], cls: 'ROUTINE', obs: ['Good lock.', 'Tone is solid.', 'You have a track.'],
+      tel: [t => `${t.targetClass}, bearing ${brg(t.targetBrg)}, ${num(t.targetRangeKm)} kilometers.`, t => `${t.targetClass} at ${alt(t.targetAltFt)}.`],
+      act: ['Cleared to fire.', 'Take the shot.', 'Weapons free.'] },
+    FOX2: { who: ['WARDEN-2', 'WARDEN-3', 'AWACS'], cls: 'ROUTINE', obs: ['Fox two, missile away.', 'Missile off the rail.', 'Fox two.'],
+      tel: [t => `Tracking the ${t.targetClass}.`, t => `${plural(t.banditsLeft, 'bandit')} on the scope.`], act: ['Watch it guide.', 'Stay on him.', 'Good shot, Lead.'] },
+    GUN_HITS: { who: ['WARDEN-2', 'WARDEN-3'], cls: 'ROUTINE', obs: ['Rounds on target!', 'Guns, guns, hits!', 'You are walking rounds onto him!'],
+      tel: [t => `${t.targetClass} is smoking.`, () => 'He is bleeding fuel.'], act: ['Keep pressing!', 'Finish him!', 'Stay in his six!'] },
+    SPLASH: { who: ['AWACS', 'WARDEN-2', 'WARDEN-3'], cls: 'ROUTINE', obs: ['Splash one!', 'Bandit destroyed.', 'Good kill.', 'Scratch one bandit.'],
+      tel: [t => `${plural(t.banditsLeft, 'bandit')} remaining.`, t => t.banditsLeft ? `Next bandit bearing ${brg(t.threatBrg)}.` : 'Scope is clean.'],
+      act: ['Keep it up.', 'Reacquire.', 'Check six and re-engage.'] },
+    SHIP_SUNK: { who: ['AWACS', 'OVERLORD'], cls: 'ROUTINE', obs: ['Ship is going down.', 'Surface contact destroyed.', 'She is breaking up.'],
+      tel: [t => `${plural(t.shipsLeft, 'hostile hull')} remaining.`, t => t.shipsLeft ? `Next hull bearing ${brg(t.shipBrg)}.` : 'Surface picture is clear.'],
+      act: ['Press the attack.', 'Good hunting.', 'Keep their heads down.'] },
+    MISSILE: { who: ['AWACS', 'WARDEN-2'], cls: 'URGENT', obs: ['Missile inbound!', 'Missile launch, missile launch!', 'Break, break, missile on you!'],
+      tel: [t => `${plural(t.incoming, 'missile')}, bearing ${brg(t.missileBrg)}!`, t => `Closing from ${brg(t.missileBrg)}!`], act: ['Flares, now!', 'Break and dispense!', 'Defend!'] },
+    SAM: { who: ['AWACS'], cls: 'URGENT', obs: ['You broke the radar ceiling!', 'Rim radars have you!', 'SAM sites are painting you!'],
+      tel: [t => `${Alt(t.altFt)}, ceiling is twelve hundred feet!`, t => `${num(t.altFt)} feet, too high!`], act: ['Get back in the trench!', 'Dive, dive!', 'Get low now!'] },
+    HULL_LOW: { who: ['WARDEN-2', 'WARDEN-3', 'AWACS'], cls: 'URGENT', obs: ['Lead, you are trailing smoke!', 'Your airframe is shot up!', 'Heavy damage on your jet!'],
+      tel: [t => `Hull at ${num(t.hpPercent)} percent.`, t => `I read ${num(t.hpPercent)} percent integrity.`], act: ['Get out of the fight!', 'Disengage and RTB!', 'Do not take another hit!'] },
+    FLARES_OUT: { who: ['WARDEN-2', 'WARDEN-3'], cls: 'URGENT', obs: ['Lead, your flares are dry!', 'You are out of flares!', 'No more countermeasures!'],
+      tel: [t => `${plural(t.incoming, 'missile')} still airborne.`, () => 'Dispenser is empty.'], act: ['Fly the missile, notch it!', 'Use the terrain!', 'Go defensive, beam it!'] },
+    NAVAL_WAVE: { who: ['AWACS', 'OVERLORD'], cls: 'ROUTINE', obs: ['Next wave inbound.', 'Fresh contacts on the surface picture.', 'The enemy fleet is committing reserves.'],
+      tel: [t => `${plural(t.shipsLeft, 'ship')} and ${plural(t.banditsLeft, 'bandit')}, bearing ${brg(t.shipBrg)}.`, t => `Stage ${num(t.stage + 1)}, ${plural(t.shipsLeft, 'hull')} on scope.`],
+      act: ['Engage.', 'Weapons free on the fleet.', 'Take them apart.'] },
+    BUNKER_DOWN: { who: ['AWACS', 'WARDEN-2'], cls: 'URGENT', obs: ['Bunker destroyed!', 'Crater target is down!', 'Direct hit on the fortress!'],
+      tel: [t => `${Alt(t.altFt)}, climb corridor is open.`, () => 'Every SAM on the rim is waking up.'], act: ['Climb out now!', 'Burner and climb!', 'Get out of the canyon!'] },
+    ACE_MERGE: { who: ['CRIMSON-1', 'AWACS'], cls: 'URGENT', obs: ['So you are the one they call Warden.', 'Merge, merge! Crimson is on you!', 'Let us see what you are made of.'],
+      tel: [t => `Bearing ${brg(t.threatBrg)}, ${num(t.threatRangeKm)} kilometers.`, () => 'Guns only. No missiles to save you.'], act: ['Dance with me.', 'Fight him in the vertical!', 'Do not let him behind you!'] },
+    ACE_LOW: { who: ['CRIMSON-1'], cls: 'ROUTINE', obs: ['Impressive. You actually hit me.', 'My jet is bleeding, but I am not finished.', 'You fly like a demon.'],
+      tel: [t => `Hull at ${num(t.aceHpPercent)} percent, and still flying.`, () => 'One more pass decides it.'], act: ['Come on, then!', 'This ends now.', 'Finish it if you can.'] },
+    RTB_5K: { who: ['OVERLORD'], cls: 'ROUTINE', obs: ['Radar contact.', 'Overlord has you on approach.', 'Paddles has you in sight.'],
+      tel: [t => `Five kilometers, ${alt(t.altFt)}, ${num(t.speedKts)} knots.`, () => 'Five kilometers, on centerline.'], act: ['Call the ball.', 'Gear down, hook down.', 'Press [L] for autoland.'] },
+    RTB_2K: { who: ['OVERLORD'], cls: 'ROUTINE', obs: ['On glideslope.', 'Looking good.', 'Slightly high, easy with it.'],
+      tel: [t => `Two kilometers, ${num(t.altFt)} feet.`, t => `Two kilometers, ${num(t.speedKts)} knots.`], act: ['Keep it coming.', 'Hold your lineup.', 'Fly the ball.'] },
+    AUTOLAND: { who: ['OVERLORD'], cls: 'ROUTINE', obs: ['Autoland engaged.', 'We have your jet.', 'Coupled approach is up.'],
+      tel: [t => `${num(t.speedKts)} knots, ${alt(t.altFt)}.`, () => 'Glideslope captured.'], act: ['Hands off, Warden.', 'Ride it down.', 'Welcome home.'] },
+    WIRE: { who: ['OVERLORD', 'WARDEN-2'], cls: 'ROUTINE', obs: ['Trap! Three wire.', 'Wire caught, good trap.', 'You are on deck.'],
+      tel: [t => `Hull ${num(t.hpPercent)} percent.`, () => 'Deck crew is moving in.'], act: ['Welcome back, Warden One.', 'Nice flying.', 'Taxi to the cat.'] },
+    WAVE_OFF: { who: ['OVERLORD'], cls: 'URGENT', obs: ['Wave off, wave off!', 'Foul deck, wave off!', 'Abort, abort!'],
+      tel: [t => `Bandits on the bow, ${plural(t.banditsLeft, 'contact')}!`, () => 'Bandits inbound to the ship!'], act: ['Burner, climb and engage!', 'Go around and clear the bow!', 'Defend the carrier!'] },
+    AMBUSH_CLEAR: { who: ['OVERLORD'], cls: 'ROUTINE', obs: ['Bow is clear.', 'Ambush group destroyed.', 'Deck is safe again.'],
+      tel: [t => `Hull ${num(t.hpPercent)} percent, ${num(t.speedKts)} knots.`, () => 'Recovery window is open.'], act: ['Cleared to land, Warden One.', 'Bring it home.', 'Press [L] when ready.'] }
+  };
+  const RX_RECENT = new Int32Array(8); let rxRecentI = 0, rxSeq = 0;
+  const rxStats = { generated: 0, lastText: '', lastKind: '', lastCaller: '' };
+  const hash32 = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h | 0; };
+  const recent = h => { for (let i = 0; i < RX_RECENT.length; i++) if (RX_RECENT[i] === h) return true; return false; };
+  function generateReactiveLine(kind, t) {
+    const g = RX[kind]; if (!g || !t) return null;
+    let text = '', caller = '', h = 0;
+    for (let tries = 0; tries < 8; tries++) {                 // re-roll until the line differs from the last eight
+      caller = pick(g.who);
+      const prof = CALLSIGNS[caller] || CALLSIGNS.AWACS;
+      text = (prof.addr ? prof.addr + ' ' : '') + pick(g.obs) + ' ' + pick(g.tel)(t) + ' ' + pick(g.act);
+      h = hash32(text);
+      if (!recent(h)) break;
+    }
+    RX_RECENT[rxRecentI] = h; rxRecentI = (rxRecentI + 1) % RX_RECENT.length;
+    rxStats.generated++; rxStats.lastText = text; rxStats.lastKind = kind; rxStats.lastCaller = caller;
+    const prof = CALLSIGNS[caller] || CALLSIGNS.AWACS;
+    return { id: 'rx_' + kind + '_' + (++rxSeq), text, ch: prof.ch, caller, kind, textOnly: true, urgent: g.cls === 'URGENT' };
+  }
+  // On-screen reading time (s) for a text-only radio line: drives the queue + subtitle hold.
+  const textLineSecs = line => (line && line.text) ? Math.min(7, 1.2 + line.text.split(' ').length * 0.28) : 0;
+
   function stopRadio(fade = 0.08) {
     if (!ready || !ctx) return;
     const now = ctx.currentTime;
@@ -2397,7 +2493,7 @@ export function createAudio() {
   }
 
   return {
-    init, resume, suspend, update, updateMusic, bgmCut, bgmDip, bgmStaticEnd, setSpray, setFlagCharge, setDroneHum, enemyGun, gunhit, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, samLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, setBgmPause, bumpBgmDwell() { dwell = MIN_DWELL; }, setBgmForce: v => { bgmForce = v || ''; }, switchTo, selectTrack, skip, setAuto, onBgmChange, get bgmTracks() { return allTracks() || []; }, radioSquelch, preloadRadio, playRadio, stopRadio, txOpen, txTail, txClose, preload,
+    init, resume, suspend, update, updateMusic, bgmCut, bgmDip, bgmStaticEnd, setSpray, setFlagCharge, setDroneHum, enemyGun, gunhit, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, samLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, setBgmPause, bumpBgmDwell() { dwell = MIN_DWELL; }, setBgmForce: v => { bgmForce = v || ''; }, switchTo, selectTrack, skip, setAuto, onBgmChange, get bgmTracks() { return allTracks() || []; }, radioSquelch, preloadRadio, playRadio, stopRadio, txOpen, txTail, txClose, preload, generateReactiveLine, textLineSecs, callsigns: CALLSIGNS, get reactive() { return rxStats; },
     get radioAnalyser() { return N.rAnalyser || null; }, get radioFreq() { return N.rFreq || null; }, get radioTime() { return N.rTime || null; },
     get radioCh() { return RADIO_CH; },
     get radioDsp() { return { pttOpen: !!N.pttOpen, pttTail: !!N.pttTail, static: !!N.rStatic, hp: N.rHP ? N.rHP.frequency.value : 0,

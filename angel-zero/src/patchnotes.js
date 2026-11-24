@@ -3,6 +3,12 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.50', title: 'REACTIVE TACTICAL RADIO', bullets: [
+    'AWACS, the carrier OVERLORD, WARDEN-2/3 and CRIMSON-1 now react in real time on the cockpit radio display: fresh, never-repeating text callouts built from live telemetry (bearing, altitude, speed, hull, bandit and ship counts).',
+    'Calls cover catapult shots, gear up, wave-skimming, locks, Fox two, gun hits, splashes, sunk ships, incoming missiles, canyon SAM breaches, low hull, empty flares, fleet waves, the bunker kill, the CRIMSON merge and taunts, and every carrier approach milestone.',
+    'Urgent threat calls now cut in over routine chatter, and the wave-off, scramble, turnaround and ESM calls that never appeared before now show on the radio display.',
+    'Fixed the cockpit glare and launch puff firing when wingmen or base defences launched missiles.'
+  ] },
   { version: 'v1.1.49', title: 'MISSION ISOLATION & SMOOTHER FRAMES', bullets: [
     'Fixed NAVAL BATTLE first launches where the stage-1 destroyers could be invisible but still targetable, and stopped the old enemy carrier group from appearing in NAVAL BATTLE and CANYON RUN.',
     'AIR SUPERIORITY now has the same enemy task force whether you launch fresh, replay or switch missions, and ACE DUEL no longer counts missiles or bombs you cannot fire.',

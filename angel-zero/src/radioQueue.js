@@ -5,7 +5,7 @@ export const PRI = { CRITICAL: 3, STORY: 2, COMBAT: 1, AMBIENT: 0 };
 export const GAP_S = 0.35;
 export const CD = { CRITICAL: 1.0, STORY: 0, COMBAT: 6.0, AMBIENT: 20.0 };
 export const LINE_CD = 30;                               // seconds per line id, except CRITICAL
-export const TTL = { CRITICAL: 3, STORY: 30, COMBAT: 4, AMBIENT: 8 };
+export const TTL = { CRITICAL: 3, STORY: 30, COMBAT: 4, AMBIENT: 8, REACT: 8, MISSILE: 5, DMG: 6 };
 export const Q_N = 8;
 const CRIT_CATS = new Set(['MISSILE', 'STALL', 'CAT', 'PULLUP', 'BINGO', 'DMG']);
 
@@ -57,19 +57,28 @@ export function createRadioQueue(THREE, env) {
         }
       }
     }
-    let slot = null, low = -1, oldest = 0;
+    // Free slot first (expired ones count as free); otherwise evict the lowest-priority,
+    // oldest queued line -- but never one that outranks the newcomer. (The old search
+    // started at low = -1, so a full queue silently dropped even urgent lines.)
+    const newScore = critical ? PRI.CRITICAL : cat === 'STORY' ? PRI.STORY : cat === 'AMBIENT' ? PRI.AMBIENT : PRI.COMBAT;
+    let slot = null, victim = null, low = Infinity, oldest = Infinity;
     for (let i = 0; i < Q_N; i++) {
       const s = slots[i];
+      if (s.live && s !== cur && now > s.exp) resetSlot(s);
       if (!s.live) { slot = s; break; }
       if (s.cat === cat && s.line && s.line.id === line.id) return false;
-      if (priorityScore(s) < low || (priorityScore(s) === low && s.t < oldest)) { low = priorityScore(s); oldest = s.t; slot = s; }
+      if (s === cur) continue;
+      const sc = priorityScore(s);
+      if (sc < low || (sc === low && s.t < oldest)) { low = sc; oldest = s.t; victim = s; }
     }
+    if (!slot && victim && low <= newScore) { resetSlot(victim); slot = victim; }
     if (!slot) return false;
     slot.live = true; slot.line = line; slot.id = line.id; slot.pri = pri; slot.cat = cat;
     slot.ch = opts && opts.ch ? opts.ch : (line.ch || 'AWACS');
     slot.text = line.text || ''; slot.t = now; slot.exp = now + (TTL[cat] || 4); slot.dur = 0;
-    // CRITICAL pre-empts a live COMBAT / AMBIENT line; STORY is never cut off.
-    if (critical && cur && cur.pri <= PRI.COMBAT && CRIT_CATS.has(cat)) {
+    // CRITICAL pre-empts a live COMBAT / AMBIENT line; a threat call (MISSILE: missile /
+    // SAM / wave-off / merge) also cuts a STORY line, which otherwise outlives the alert's TTL.
+    if (critical && cur && CRIT_CATS.has(cat) && (cur.pri <= PRI.COMBAT || cur.cat === 'REACT' || (cat === 'MISSILE' && cur.cat === 'STORY'))) {
       if (audio.stopRadio) audio.stopRadio(0.04);
       if (audio.txTail) audio.txTail();
       if (onIdle) onIdle();
@@ -80,7 +89,9 @@ export function createRadioQueue(THREE, env) {
 
   function priorityScore(s) {
     const cat = s.cat;
-    if (cat === 'CRITICAL') return PRI.CRITICAL;
+    // Urgent lines are queued as pri 3 with an alert category (MISSILE / SAM / WAVEOFF ...):
+    // rank them by their priority, not only by the literal 'CRITICAL' category.
+    if (cat === 'CRITICAL' || s.pri === PRI.CRITICAL) return PRI.CRITICAL;
     if (cat === 'STORY') return PRI.STORY;
     return cat === 'AMBIENT' ? PRI.AMBIENT : PRI.COMBAT;
   }

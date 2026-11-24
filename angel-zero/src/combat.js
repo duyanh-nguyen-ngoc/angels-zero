@@ -819,7 +819,9 @@ export function createCombat(THREE, env) {
     if (!enemy) C.lastPlayerMsl = m;                    // missile cam tracks the most recent player shot
     if (hostileAtPlayer && !isSam) director.noteLaunch();
     if (env.onSfx) env.onSfx('launch', fromPos, 1);
-    if (!enemy && env.onPlayerLaunch) env.onPlayerLaunch(fromPos, fromQuat, fromVel);
+    // Player launches only (wingman / base-defence shots are also !enemy but use their own
+    // quaternion): cockpit glare, motor puff and the reactive-radio FOX callout counter.
+    if (!enemy && fromQuat === S.quaternion) { C.playerLaunches = (C.playerLaunches || 0) + 1; if (env.onPlayerLaunch) env.onPlayerLaunch(fromPos, fromQuat, fromVel); }
     return m;
   }
   function fireMissile() {
@@ -1735,6 +1737,7 @@ export function createCombat(THREE, env) {
     if (env.onSfx) env.onSfx('flare', e.pos, 0.6);
   }
 
+  const _eLnPos = new THREE.Vector3();                      // bandit launch point scratch (launch() copies it)
   function updateEnemy(e, dt, playerActive) {
     if (e.ambush) { e.ambushT -= dt; if (e.ambushT <= 0 || e.pos.distanceTo(S.position) < 2000) e.ambush = false; }
     if (e.buzzCD > 0) e.buzzCD -= dt;
@@ -2142,14 +2145,14 @@ export function createCombat(THREE, env) {
       const target = { pos: S.position, vel: S.velocity, alive: true, isPlayer: true };
       if (e.bLock >= 1 && e.mslCD <= 0 && dist > 700) {
         // Full lock: aggressive, accurate shot.
-        if (launch(e.pos.clone().addScaledVector(e.fwd, 6), e.quat, e.vel, target, true, BANDIT_FULL, undefined, dist > 2500 ? 'RADAR' : 'IR')) {
+        if (launch(_eLnPos.copy(e.pos).addScaledVector(e.fwd, 6), e.quat, e.vel, target, true, BANDIT_FULL, undefined, dist > 2500 ? 'RADAR' : 'IR')) {
           e.mslCD = e.aceFlight ? 9 + rand() * 4 : e.ace ? 8 + rand() * 4 : 14 + rand() * 8;
           say(e.ace ? `${e.label} — FOX ${dist > 2500 ? 'THREE' : 'TWO'}! BREAK! BREAK!`
             : dist > 2500 ? 'RADAR MISSILE — CHAFF / NOTCH!' : 'IR MISSILE — FLARES! BREAK!', 2.2, '#ff4d3d');
         }
       } else if (e.bLock >= B_SOFT && e.bLock < 1 && e.mslCD <= 0 && dist > 900 && rand() < 0.12 * dt) {
         // Impatient bandit fires early on a soft lock: weak, easily defeated shot.
-        if (launch(e.pos.clone().addScaledVector(e.fwd, 6), e.quat, e.vel, target, true, BANDIT_SOFT, undefined, dist > 2500 ? 'RADAR' : 'IR')) {
+        if (launch(_eLnPos.copy(e.pos).addScaledVector(e.fwd, 6), e.quat, e.vel, target, true, BANDIT_SOFT, undefined, dist > 2500 ? 'RADAR' : 'IR')) {
           e.mslCD = 12 + rand() * 6; say(`${dist > 2500 ? 'RADAR' : 'IR'} MISSILE — LOW-QUALITY TRACK`, 1.8, '#ffbf3f');
         }
       }
@@ -6145,7 +6148,7 @@ export function createCombat(THREE, env) {
     chaff.length = 0; chaffCD = 0; chaffRecharge = 0; C.chaff = C.chaffMax; C.notchT = 0;
     Object.assign(C, { ammo: GUN_MAX, missiles: MSL_MAX, reload: 0, missileReload: 0, lockTarget: null, nextTarget: null, designated: null, health: 100, dead: false, hitFlash: 0, missileWarning: 0,
       lockProgress: 0, lockState: 'NONE', rwrTrack: false, banditLock: 0, events: [], tti: undefined, pitbull: false,
-      gunRounds: 0, gunHitsP: 0, mslFiredP: 0, mslHitsP: 0, maxDmg: 0, traps: 0, furballKills: 0, lowHpSaid: false });
+      gunRounds: 0, gunHitsP: 0, mslFiredP: 0, mslHitsP: 0, playerLaunches: 0, maxDmg: 0, traps: 0, furballKills: 0, lowHpSaid: false });
     furT = 0; furSwarmT = 75;
     Object.assign(C.bw, { eligible: false, landed: false, logged: false });
     Object.assign(C.intr, { st: 'IDLE', t: 0, ace: -1, used: false, farT: 0 }); C.wingHold = false;

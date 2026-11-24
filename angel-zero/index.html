@@ -734,9 +734,9 @@ import { createAmbient } from './src/ambient.js?v=s9dd';
 import { createBlastFX } from './src/blastfx.js?v=s9dd';
 import { createHUD } from './src/hud.js?v=s9di';
 import { createCockpit3D } from './src/cockpit3d.js?v=s9di';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9di';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9dj';
 import { createEjection } from './src/eject.js?v=s9di';
-import { createAudio } from './src/audio.js?v=s9dg';
+import { createAudio } from './src/audio.js?v=s9dj';
 import { createRadio } from './src/radio.js?v=s9dd';
 import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9dd';
 import { createLivery } from './src/livery.js?v=s9dd';
@@ -751,10 +751,10 @@ import { createFreeLook } from './src/freelook.js?v=s9dd';
 import { createCanopyGlass } from './src/canopyglass.js?v=s9dd';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9dd';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9dd';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9di';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9dj';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9de';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9dd';
-import { createRadioQueue } from './src/radioQueue.js?v=s9dg';
+import { createRadioQueue } from './src/radioQueue.js?v=s9dj';
 import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9dd';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
   GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9dd';
@@ -1871,7 +1871,7 @@ function triggerWaveOff() {
   state.throttle = 1; state.afterburner = 1; waveoff.pitchBias = WO_PITCH_DEG * D2R;
   flightMode = 'FLY'; mouse.nx = 0; mouse.ny = 0; kbActive = false; kbHold = 0; kbHeld.clear();
   combat.waveoffBannerT = performance.now();
-  if (typeof rq !== 'undefined') rq.say('WAVE OFF! BANDITS ON THE BOW!', { pri: 3, bypass: true, cat: 'MISSILE', ch: 'AWACS' });
+  rxFire('WAVE_OFF');                                         // radio subtitle (the old free-text rq.say id never matched a line)
   audio.masterCaution();
   const n = WO_BANDITS_MIN + ((Math.random() * (WO_BANDITS_MAX - WO_BANDITS_MIN + 1)) | 0);
   _bz0.copy(a.root.position);
@@ -1899,7 +1899,7 @@ function updateWaveOff(dt) {
   if (live) return;
   waveoff.st = 'CLEAR'; waveoff.pitchBias = 0; waveoff.ids.fill(-1); waveoff.n = 0;
   combat.ambushActive = false;
-  if (typeof rq !== 'undefined') rq.say('BOW IS CLEAR — CLEARED TO LAND, OVERLORD', { pri: 3, bypass: true, ch: 'AWACS' });
+  rxFire('AMBUSH_CLEAR');
   combat.score += 800;
   combat.ambushClearT = performance.now();
   if (DEBUG) console.log('[ANGELS_ZERO] ambush clear t=' + simTime.toFixed(2));
@@ -1974,7 +1974,7 @@ function finishCarrierTrap(src) {
   autoland.on = false; autoland.ph = ''; autoland.prevLz = Infinity;
   combat.allyHold = false; vyPrev = 0;
   pitstopCat = true;
-  if (typeof rq !== 'undefined') rq.say('OVERLORD: TURNAROUND COMPLETE — CAT ONE, YOU\'RE UP', { pri: 2, ch: 'AWACS' });
+  sayText('OVERLORD', 'Warden One, Overlord. Turnaround complete. Cat one, you are up.', false);
   combatSys.say('REARMED · REPAIRED · REFUELED', 2.5, '#52ff9c');
   if (DEBUG) console.log('[ANGELS_ZERO] pitstop rearm=ok hp=' + combat.health + ' fuel=' + state.fuel);
   enterCarrierLaunch(mission());                          // snap to the bow cat track: WAIT -> DECK PREP -> HOLD
@@ -2213,7 +2213,7 @@ function stepHotScramble(dt) {
     scramble.st = 'PASS'; scramble.t = 0; scramble.splashT = 0;
     combat.scrambleT = performance.now();
     musicCtx.scramble = 1;
-    if (typeof rq !== 'undefined') rq.say('SCRAMBLE! BANDITS OVERHEAD — LAUNCH NOW!', { pri: 3, bypass: true, cat: 'MISSILE', ch: 'AWACS' });
+    sayText('OVERLORD', 'Scramble, scramble! Bandits overhead! Launch now!', true);
     if (DEBUG) console.log('[ANGELS_ZERO] scramble pass start n=' + n);
   }
   if (scramble.st !== 'PASS') return;
@@ -2359,6 +2359,7 @@ async function startSortie() {
   combat.styleCounts = {}; combat.comboPeak = 1;
   Object.assign(sortie, { active: true, t0: sortie.active ? sortie.t0 : simTime, ace0: combat.aceDowns || 0, endAt: null, failReason: '' });
   gforceHookDone = false; carrierFinalDone = false; gforce.until = -1;
+  rxResetWatch();                                            // reactive radio: fresh edge baselines per sortie
   if (cat.ph === 'HOLD') {
     const a = combat.ally;
     catTrackWorld(CAT_BOW[0], state.position); catTrackQuat(CAT_BOW[0], state.quaternion);
@@ -4548,12 +4549,165 @@ function onWing(text, caption, tint, force = false, hold = 2600) {
 // Only the queue calls radioPlay; it owns timing and the Voice Box lifecycle.
 function radioPlay(slot) {
   setBox(slot, 0, true);
+  if (slot.line && slot.line.textOnly) return audio.textLineSecs(slot.line);   // reactive callout: subtitle text only, no audio
   return audio.playRadio(slot.id, slot.ch);
 }
 const rq = createRadioQueue(THREE, { audio, onTx: radioPlay, onIdle: clearBox, debug: DEBUG });
 function radioEvent(ev, opts) { return rq.say(ev, opts); }
 function radioReset(gap = 0) { rq.clear(gap); clearBox(); audio.stopRadio(0.08); }
 function radioPump() { rq.update(performance.now() / 1000); }
+
+/* ---- Reactive Tactical Radio: 0.5 s telemetry watcher -> audio.generateReactiveLine -> rq ----
+   Edge-detects flight / combat / mission changes, assembles a fresh callout and queues it.
+   Urgent kinds (MISSILE, SAM, WAVE_OFF ...) go in as pri 3 + an alert category, which
+   pre-empts routine chatter in the queue. All watcher state is scalar: zero allocations
+   unless a callout actually fires. */
+const RX_TICK = 0.5;
+const RX_CD = { CAT_LAUNCH: 20, GEAR_UP: 30, SEA_SKIM: 25, LOCK: 9, FOX2: 6, GUN_HITS: 10, SPLASH: 4, SHIP_SUNK: 4, MISSILE: 5, SAM: 8,
+  HULL_LOW: 20, FLARES_OUT: 15, NAVAL_WAVE: 3, BUNKER_DOWN: 10, ACE_MERGE: 60, ACE_LOW: 60, RTB_5K: 30, RTB_2K: 30, AUTOLAND: 15, WIRE: 15, WAVE_OFF: 5, AMBUSH_CLEAR: 10 };
+const RX_URGENT_CAT = { MISSILE: 'MISSILE', SAM: 'MISSILE', WAVE_OFF: 'MISSILE', ACE_MERGE: 'MISSILE', BUNKER_DOWN: 'MISSILE', HULL_LOW: 'DMG', FLARES_OUT: 'DMG' };
+const RXT = { missionId: '', phase: 0, stage: 0, altFt: 0, speedKts: 0, hpPercent: 100, targetClass: 'bandit', targetBrg: 0, targetRangeKm: 0, targetAltFt: 0,
+  incoming: 0, missileBrg: 0, banditsLeft: 0, shipsLeft: 0, shipBrg: 0, threatBrg: 0, threatRangeKm: 0, aceHpPercent: 100 };
+const RXW = { acc: 0, nextOk: Object.create(null), catPh: '', gear: true, kills: 0, ships: -1, fired: 0, gunHits: 0, lock: 'NONE', incoming: 0,
+  ceil: 'CLEAR', climb: false, stage: 0, rtb: false, d5: false, d2: false, al: false, traps: 0, wo: 'IDLE', hullLow: false, flares: -1,
+  skimT: 0, aceMerged: false, aceLow: false, fired_n: 0, log: DEBUG && Q.has('rxradio') };
+const RX_LOG = DEBUG ? [] : null;                            // debug ring of generated lines (headless checks)
+const _rxP = new THREE.Vector3();
+const rxBrg = p => (Math.atan2(p.x - state.position.x, -(p.z - state.position.z)) / D2R + 360) % 360;
+function rxResetWatch() {
+  RXW.acc = 0; for (const k in RXW.nextOk) RXW.nextOk[k] = 0;
+  RXW.catPh = cat.ph; RXW.gear = !!state.gearDown; RXW.kills = combat.kills || 0; RXW.ships = -1; RXW.fired = combat.playerLaunches || 0;
+  RXW.gunHits = combat.gunHitsP || 0; RXW.lock = combat.lockState || 'NONE'; RXW.incoming = 0; RXW.ceil = 'CLEAR'; RXW.climb = false;
+  RXW.stage = combat.stage || 0; RXW.rtb = false; RXW.d5 = false; RXW.d2 = false; RXW.al = false; RXW.traps = combat.traps || 0;
+  RXW.wo = 'IDLE'; RXW.hullLow = false; RXW.flares = -1; RXW.skimT = 0; RXW.aceMerged = false; RXW.aceLow = false;
+}
+// Generate + queue one reactive callout (also the public entry for scripted call sites).
+function rxFire(kind, force = false) {
+  if (typeof rq === 'undefined') return false;
+  if (!force && simTime < (RXW.nextOk[kind] || 0)) return false;
+  rxTelemetry();
+  const line = audio.generateReactiveLine(kind, RXT);
+  if (!line) return false;
+  RXW.nextOk[kind] = simTime + (RX_CD[kind] || 6);
+  const urgent = line.urgent;
+  const ok = rq.say(line, urgent ? { pri: 3, bypass: true, cat: RX_URGENT_CAT[kind] || 'MISSILE', ch: line.ch } : { pri: 1, cat: 'REACT', ch: line.ch });
+  if (RX_LOG) { RX_LOG.push(kind + (ok ? '' : '(dropped)') + ' | ' + line.caller + ' | ' + line.text); if (RX_LOG.length > 60) RX_LOG.shift(); }
+  if (RXW.log) console.log('[ANGELS_ZERO] rx', kind, ok ? 'queued' : 'dropped', line.caller, '|', line.text);
+  return ok;
+}
+// Fixed text through the same subtitle pipeline (story beats that are not grammar-driven).
+function sayText(caller, text, urgent) {
+  if (typeof rq === 'undefined') return false;
+  const prof = audio.callsigns[caller] || audio.callsigns.AWACS;
+  const line = { id: 'tx_' + caller + '_' + text.length + '_' + (text.charCodeAt(0) || 0), text, ch: prof.ch, caller, textOnly: true, urgent: !!urgent };
+  return rq.say(line, urgent ? { pri: 3, bypass: true, cat: 'MISSILE', ch: prof.ch } : { pri: 2, bypass: true, cat: 'STORY', ch: prof.ch });
+}
+// Live telemetry snapshot into the reused RXT record (no allocations).
+function rxTelemetry() {
+  const T = RXT, P = state.position;
+  T.missionId = missionId; T.phase = combat.missionPhase | 0; T.stage = combat.stage | 0;
+  T.altFt = (state.radalt < 120 ? Math.max(0, state.radalt) : P.y) / FT;   // radar altitude down low (sea-skim), MSL otherwise
+  T.speedKts = (state.speed || 0) * 1.94384; T.hpPercent = Math.max(0, combat.health || 0);
+  const tg = combat.lockTarget || combat.designated;
+  if (tg && tg.pos) {
+    const k = String(tg.type || tg.kind || 'bandit');
+    T.targetClass = k === 'DDG' || k === 'DESTROYER' ? 'destroyer' : k === 'CG' ? 'cruiser' : k === 'CV_FLAG' || k === 'CARRIER' ? 'carrier' : k === 'DRONE' ? 'drone' : k === 'ACE' ? 'Crimson ace' : k;
+    T.targetBrg = rxBrg(tg.pos); T.targetRangeKm = tg.pos.distanceTo(P) / 1000; T.targetAltFt = tg.pos.y / FT;
+  } else { T.targetClass = 'bandit'; T.targetBrg = state.heading || 0; T.targetRangeKm = 0; T.targetAltFt = P.y / FT; }
+  let n = 0, md = Infinity, bandits = 0, bd = Infinity, aceHp = 100;
+  for (const m of combatSys.missiles) {
+    if (!m.active || !m.enemy || !m.target || !m.target.isPlayer) continue;
+    n++; const d = m.mesh.position.distanceToSquared(P); if (d < md) { md = d; T.missileBrg = rxBrg(m.mesh.position); }
+  }
+  for (const e of combatSys.enemies) {
+    if (!e.alive) continue;
+    bandits++; const d = e.pos.distanceToSquared(P);
+    if (d < bd) { bd = d; T.threatBrg = rxBrg(e.pos); T.threatRangeKm = Math.sqrt(d) / 1000; }
+    if (e.aceFlight && e.hpMax) aceHp = Math.min(aceHp, 100 * e.hp / e.hpMax);
+  }
+  let ships = 0, sd = Infinity;
+  for (const t of combatSys.taskForce) {
+    if (!t.alive) continue;
+    ships++; const d = t.pos.distanceToSquared(P); if (d < sd) { sd = d; T.shipBrg = rxBrg(t.pos); }
+  }
+  T.incoming = n; T.banditsLeft = bandits; T.shipsLeft = ships; T.aceHpPercent = aceHp;
+  return T;
+}
+function updateReactiveRadio(dt) {
+  if (appMode !== 'PLAY' || !sortie.active || flightMode !== 'FLY') return;
+  RXW.acc += dt;
+  if (RXW.acc < RX_TICK) return;
+  RXW.acc = 0;
+  const T = rxTelemetry(), W = RXW;
+  // Urgent first: the queue pre-empts routine chatter for these.
+  if (T.incoming > W.incoming) rxFire('MISSILE');
+  W.incoming = T.incoming;
+  const ceilSt = combat.ceil && combat.ceil.st || 'CLEAR';
+  if (missionId === 'CANYON_RUN' && ceilSt !== 'CLEAR' && W.ceil === 'CLEAR') rxFire('SAM');
+  W.ceil = ceilSt;
+  if (!W.hullLow && T.hpPercent < 35 && T.hpPercent > 0) { W.hullLow = true; rxFire('HULL_LOW'); }
+  else if (W.hullLow && T.hpPercent > 50) W.hullLow = false;
+  const fl = combat.flares | 0;
+  if (W.flares > 0 && fl === 0) rxFire('FLARES_OUT');
+  W.flares = fl;
+  const climb = !!(combat.climb && combat.climb.on);
+  if (missionId === 'CANYON_RUN' && climb && !W.climb) rxFire('BUNKER_DOWN');
+  W.climb = climb;
+  if (missionId === 'ACE_DUEL' && !W.aceMerged && T.banditsLeft && T.threatRangeKm < 2.2 && cat.ph !== 'HOLD') { W.aceMerged = true; rxFire('ACE_MERGE'); }
+  if (missionId === 'ACE_DUEL' && !W.aceLow && T.banditsLeft && T.aceHpPercent < 35) { W.aceLow = true; rxFire('ACE_LOW'); }
+  // Launch / flight.
+  if (W.catPh !== 'AIRBORNE' && cat.ph === 'AIRBORNE' && (W.catPh === 'LAUNCH' || W.catPh === 'HOLD')) rxFire('CAT_LAUNCH');
+  W.catPh = cat.ph;
+  const gearDown = !!state.gearDown;
+  if (W.gear && !gearDown && !state.onGround && P_ALT_OK()) rxFire('GEAR_UP');
+  W.gear = gearDown;
+  const overWater = groundLevel(state.position.x, state.position.z) <= 0.5;
+  // Not off the bow after a cat shot, nor around the ship on a recovery: open-ocean skimming only.
+  let nearShip = false;
+  if (carrierLive()) { const ar = combat.ally.root.position; nearShip = Math.hypot(state.position.x - ar.x, state.position.z - ar.z) < 2500; }
+  const skim = overWater && !nearShip && !state.onGround && !autoland.on && state.radalt < 100 * FT && state.speed > 90 && cat.ph !== 'HOLD';
+  W.skimT = skim ? W.skimT + RX_TICK : 0;
+  if (W.skimT >= 1) { W.skimT = -6; rxFire('SEA_SKIM'); }
+  // Combat.
+  const lock = combat.lockState || 'NONE';
+  if (lock === 'LOCK' && W.lock !== 'LOCK') rxFire('LOCK');
+  W.lock = lock;
+  const fired = combat.playerLaunches || 0;                 // player launches only (not wingman / resolved shots)
+  if (fired > W.fired) rxFire('FOX2');
+  W.fired = fired;
+  const hits = combat.gunHitsP || 0;
+  if (hits - W.gunHits >= 3) rxFire('GUN_HITS');
+  W.gunHits = hits;
+  const kills = combat.kills || 0;
+  if (kills > W.kills) rxFire('SPLASH');
+  W.kills = kills;
+  if (W.ships >= 0 && T.shipsLeft < W.ships) rxFire('SHIP_SUNK');
+  W.ships = T.shipsLeft;
+  if (missionId === 'NAVAL_BATTLE' && T.stage > W.stage && !rtbOn()) rxFire('NAVAL_WAVE');
+  W.stage = T.stage;
+  // Recovery milestones.
+  const rtb = rtbOn();
+  if (!rtb) { W.d5 = W.d2 = false; }
+  else {
+    let d = Infinity;
+    if (combat.rtb && combat.rtb.type === 'CARRIER' && carrierLive()) {
+      const a = combat.ally;
+      _rxP.set(0, a.deckY, a.len / 2).applyQuaternion(a.root.quaternion).add(a.root.position);
+      d = Math.hypot(state.position.x - _rxP.x, state.position.z - _rxP.z);
+    } else if (world.runway) {
+      d = Math.hypot(state.position.x - world.runway.x, state.position.z - world.runway.z1);
+    }
+    const agl = state.position.y - groundLevel(state.position.x, state.position.z);   // on an approach, not overflying high
+    if (!W.d5 && d < 5000 && d > 2600 && agl < 1200) { W.d5 = true; rxFire('RTB_5K'); }
+    if (!W.d2 && d < 2000 && d > 400 && agl < 600) { W.d2 = true; rxFire('RTB_2K'); }
+  }
+  if (autoland.on && !W.al) rxFire('AUTOLAND');
+  W.al = !!autoland.on;
+  const traps = combat.traps || 0;
+  if (traps > W.traps) rxFire('WIRE');
+  W.traps = traps;
+}
+function P_ALT_OK() { return state.position.y - groundLevel(state.position.x, state.position.z) > 15; }
 let radioPreloaded = false;
 function preloadRadioOnce() {
   if (radioPreloaded || !audio.ready) return;
@@ -4850,7 +5004,7 @@ const combatSys = createCombat(THREE, { scene, camera, renderer, state, combat, 
       return out;
     },
     onHitStamp: (pos, kind) => hud.addStamp(pos, kind), onMissionUpdate: kind => missionUpdate(kind),
-    onESM(on) { if (on) rq.say('OVERLORD: YOU ARE IN MY UMBRELLA, ANGEL — ESM LINK UP', { pri: 2, bypass: true, ch: 'AWACS' }); },
+    onESM(on) { if (on) sayText('AWACS', 'Warden One, AWACS. You are under my umbrella. E S M link is up.', false); },
     onIntrusion(phase) {
       if (phase === 'CUT') { audio.bgmCut(1.5); hud.setAlertState('NORMAL'); }
       else if (phase === 'SPAWN') {
@@ -4858,7 +5012,7 @@ const combatSys = createCombat(THREE, { scene, camera, renderer, state, combat, 
         setBox({ ch: 'CRIMSON', text: 'THIS IS MY SKY NOW, ANGEL.', id: '' }, 4);
         syncMusicScenario(true);
       } else if (phase === 'DONE' || phase === 'RESET') {
-        if (phase === 'DONE') rq.say('CRIMSON-1 IS DOWN. NET IS CLEAR.', { pri: 2, bypass: true, ch: 'AWACS' });
+        if (phase === 'DONE') sayText('AWACS', 'Warden One, AWACS. Crimson One is down. The net is clear.', false);
         audio.bgmStaticEnd(); syncMusicScenario(true);
       }
     },
@@ -5953,6 +6107,7 @@ function stepSim(dt) {
   if (DEBUG_HOLD) for (const k of DEBUG_HOLD) keys[k] = true;   // test hook: ?hold=s,a,...
   if (appMode === 'PLAY' && flightMode === 'FLY') tele.tick(dt, state, simTime);
   if (sortie.active) missionT = simTime - sortie.t0;
+  updateReactiveRadio(dt);                                   // 0.5 s throttled telemetry watcher -> reactive callouts
   if (DEBUG && appMode === 'PLAY' && sortie.active) {
     if (!carrierFinalDone && CARRIER_FINAL_AT >= 0 && missionT >= CARRIER_FINAL_AT && combat.ally) {
       carrierFinalDone = true;
@@ -6113,6 +6268,7 @@ if (DEBUG) {
     killDrone: (i, how) => combatSys.killDrone(i, how), get swarm() { return combat.swarm; },
     get model() { return model; }, get ready() { return modelReady; },
     get missionId() { return missionId; }, get mission() { return mission(); }, cycleMission, loadMissionScene, startSortie, launchSortie,
+    get reactive() { return { ...audio.reactive, log: RX_LOG ? RX_LOG.slice(-30) : [] }; }, rxFire, sayText, rxTelemetry,
     get autoland() { return autoland; }, autolandPrompt, engageAutoland, finishCarrierTrap, getMusicCtx, get hudPrompt() { return hud.promptText; }, get debrief() { return !debriefEl.hidden; },
     get cat() { return cat; }, get skimK() { return skimK; }, catEnter, catTick, catFire, catSnapAll, carrierDiag, enterCarrierLaunch, carrierReady,
     get scramble() { return scramble; }, get bw() { return combat.bw; }, get intrusion() { return combat.intr; },
