@@ -104,5 +104,11 @@ export const MAPS = {
     carrier: { pos: [0, 0, 9000], hdg: 0, spd: 4.1 }, fleet: [],
     cloudSea: { base: 3000, top: 3600 }, fogFar: 52000,
     props: { terrain: false, islands: false, runway: false, baseBldg: false, radar: false, foliage: false }
+  },
+  REAL_WORLD: {
+    heightFn: 'ocean', islands: [], canyonAmp: 1, runway: false,
+    carrier: null, fleet: [],
+    fogFar: 26000,
+    props: { terrain: false, islands: false, runway: false, baseBldg: false, radar: false, foliage: false }
   }
 };

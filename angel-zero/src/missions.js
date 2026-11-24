@@ -62,10 +62,18 @@ export const MISSIONS = {
     mapTag: 'ARCHIPELAGO', launch: 'AIRBORNE', rtbType: null, bgmScenario: '09_furball', wxOverride: true,
     spawn: { pos: [0, 1829, -3000], hdg: 0, spd: 216, onDeck: false },
     waves: [{ t: 0, kind: 'CAP', n: 6, alt: 6000 }], targets: [], ceilingFt: null
+  },
+  FREE_FLIGHT: {
+    id: 'FREE_FLIGHT', title: 'FREE FLIGHT',
+    brief: 'Scenic free flight over real-world satellite terrain and 3D cities. No hostiles, no timers.',
+    mapTag: 'REAL_WORLD', launch: 'AIRBORNE', rtbType: null, bgmScenario: '01_title', wxOverride: true,
+    freeFlight: true, noShips: true, wingmen: 'SOLO',
+    spawn: { pos: [0, 1200, 0], hdg: 0.15, spd: 210, onDeck: false },
+    waves: [], targets: [], ceilingFt: null
   }
 };
 
-export const MISSION_ORDER = ['AIR_SUPERIORITY', 'NAVAL_BATTLE', 'CANYON_RUN', 'ACE_DUEL', 'FURBALL'];
+export const MISSION_ORDER = ['AIR_SUPERIORITY', 'NAVAL_BATTLE', 'CANYON_RUN', 'ACE_DUEL', 'FURBALL', 'FREE_FLIGHT'];
 
 // Normalised per-sortie configuration. Missions without the new fields (AIR_SUPERIORITY
 // and FURBALL) get defaults that reproduce their existing behaviour exactly.
@@ -79,6 +87,7 @@ export function missionConfig(m) {
     ilsOnRtbOnly: !!m.ilsOnRtbOnly,
     gunsOnly: !!m.gunsOnly,                                // hard block on every missile / rocket (ACE_DUEL)
     noShips: !!m.noShips,                                  // no surface ships may exist (ACE_DUEL)
+    freeFlight: !!m.freeFlight,
     stages: m.stages || null                               // null = legacy PHASE 1..4 flow
   };
 }

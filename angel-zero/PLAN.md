@@ -1875,7 +1875,7 @@ Status legend: `[x]` implemented and verified Â· `[ ]` open — gaps listed.
 | Backspace | Reset aircraft |
 | M (in menus) | Mute |
 
-## Baseline verification (2026-11-18, build `s19b`; re-run on `s21a`)
+## Baseline verification (2026-11-18, build `s19b`; re-run on `s21a`; Free Flight added in `v1.1.55`, build `s9do`)
 Headless Edge (SwiftShader) runs with zero page console errors / warnings:
 briefing menu, chase daylight, cockpit dusk, High-G pull, guns + C-lock +
 missile, UGB + CCIP impact, flares + bandit shot + cloud cover, night NVG

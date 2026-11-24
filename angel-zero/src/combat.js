@@ -1428,6 +1428,7 @@ export function createCombat(THREE, env) {
   }
 
   function spawnWave() {
+    if (C.mcfg && C.mcfg.freeFlight) return;
     C.wave++;
     C.phase = ((C.wave - 1) % 3) + 1;
     // AIR_SUPERIORITY mid/late wave: a drone swarm rides in with the bandits.
@@ -3589,7 +3590,7 @@ export function createCombat(THREE, env) {
     if (p === 3) { aceFlightDone = false; C.acePair = []; spawnAceFlight(); }
   }
   function updateMissionPhase() {
-    if (C.mode === 'FURBALL' || C.ambushActive) return;
+    if (C.mode === 'FURBALL' || C.ambushActive || (C.mcfg && C.mcfg.freeFlight)) return;
     if (C.intr.st === 'CUT' || C.intr.st === 'DUEL') return;
     if (C.intr.st === 'IDLE' && !C.intr.used && (C.missionId === 'AIR_SUPERIORITY' || C.missionId === 'NAVAL_BATTLE')) {
       const staged = C.mcfg.stages && C.mcfg.stages.length;
@@ -6082,7 +6083,7 @@ export function createCombat(THREE, env) {
     }
     C.wave = 0; C.phase = 1; C.ace = null; waveTimer = 0; aceFlightDone = false; C.acePair = [];
     furT = 0; furSwarmT = 75;
-    if (C.mode !== 'FURBALL' && C.missionId !== 'FURBALL') {
+    if (C.mode !== 'FURBALL' && C.missionId !== 'FURBALL' && !(C.mcfg && C.mcfg.freeFlight)) {
       spawnWave();
       spawnSurface();
       spawnFleet();                                   // same enemy task force on fresh boot, replay and mission switch
@@ -6288,7 +6289,7 @@ export function createCombat(THREE, env) {
             if (playerActive && env.onRadio) env.onRadio('FLEET_REMAIN');
           } else {
             waveTimer += dt;
-            if (waveTimer > 4) { waveTimer = 0; if (!(C.mcfg.stages && C.mcfg.stages.length)) spawnWave(); }
+            if (waveTimer > 4) { waveTimer = 0; if (!(C.mcfg.stages && C.mcfg.stages.length) && !(C.mcfg && C.mcfg.freeFlight)) spawnWave(); }
           }
         } else waveTimer = 0;
       }

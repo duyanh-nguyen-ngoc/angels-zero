@@ -630,6 +630,7 @@
       <button class="sbRow" data-k="resume" type="button" hidden><span class="sbLabel">RESUME SORTIE</span><span class="sbValue"></span></button>
       <button class="sbRow" data-k="restart" type="button" hidden><span class="sbLabel">RESTART</span><span class="sbValue"></span></button>
       <button class="sbRow" data-k="mission" type="button"><span class="sbLabel">MISSION</span><span class="sbValue" id="sbMissionVal"></span></button>
+      <button class="sbRow" data-k="ffcity" type="button" id="sbFfCityRow" hidden><span class="sbLabel">LOCATION</span><span class="sbValue" id="sbFfCityVal"></span></button>
        <button class="sbRow" data-k="role" type="button"><span class="sbLabel">WINGMAN ROLES</span><span class="sbValue" id="sbRoleVal"></span></button>
       <button class="sbRow" data-k="diff" type="button"><span class="sbLabel">DIFFICULTY</span><span class="sbValue" id="sbDiffVal"></span></button>
       <button class="sbRow" data-k="spw" type="button"><span class="sbLabel">SPECIAL WEAPON</span><span class="sbValue" id="sbSpwVal"></span></button>
@@ -734,7 +735,7 @@ import { createAmbient } from './src/ambient.js?v=s9dd';
 import { createBlastFX } from './src/blastfx.js?v=s9dd';
 import { createHUD } from './src/hud.js?v=s9di';
 import { createCockpit3D } from './src/cockpit3d.js?v=s9di';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9dj';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9do';
 import { createEjection } from './src/eject.js?v=s9di';
 import { createAudio } from './src/audio.js?v=s9dm';
 import { createRadio } from './src/radio.js?v=s9dd';
@@ -751,13 +752,14 @@ import { createFreeLook } from './src/freelook.js?v=s9dd';
 import { createCanopyGlass } from './src/canopyglass.js?v=s9dd';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9dd';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9dd';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9dn';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9do';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9de';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9dd';
 import { createRadioQueue } from './src/radioQueue.js?v=s9dj';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9dd';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9do';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
-  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9dd';
+  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9do';
+import { createFreeFlight, FREE_FLIGHT_PRESETS, loadFreeFlightCity, saveFreeFlightCity } from './src/freeflight.js?v=s9do';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -769,6 +771,7 @@ let selectedSPW = DEBUG && Q.has('spw') && SPW[Q.get('spw')] ? Q.get('spw') : lo
 let selectedLivery = DEBUG && Q.has('livery') && SQUADRON[Q.get('livery')] ? Q.get('livery') : loadLivery();
 let selectedMode = DEBUG && Q.has('mode') && MODES.includes(Q.get('mode')) ? Q.get('mode') : loadMode();
 let missionId = DEBUG && Q.has('mission') && MISSIONS[Q.get('mission')] ? Q.get('mission') : loadMission();
+let selectedFfCity = DEBUG && Q.has('city') && FREE_FLIGHT_PRESETS[Q.get('city').toUpperCase()] ? Q.get('city').toUpperCase() : loadFreeFlightCity();
 const FORCE_SCRAMBLE = DEBUG && Q.get('scramble') === '1', NO_SCRAMBLE = DEBUG && Q.get('scramble') === '0';
 const FORCE_INTRUSION = DEBUG && Q.get('intrusion') === '1', NO_INTRUSION = DEBUG && Q.get('intrusion') === '0';
 if (DEBUG && Q.has('vws')) audioGuardVWS(Q.get('vws'));
@@ -882,8 +885,9 @@ const TERRAIN_SIZE = WORLD.SIZE;
 const TERRAIN_CENTER = new THREE.Vector2(WORLD.CX, WORLD.CZ);
 const _wt0 = performance.now();
 const world = createWorld(THREE, { scene, createNoise2D, fbm, mulberry32 });
+const freeFlight = createFreeFlight(THREE, scene);
 if (DEBUG) console.log('[ANGELS_ZERO] world built in', Math.round(performance.now() - _wt0), 'ms; obstacles', world.obstacleCount());
-function terrainHeight(x, z) { return world.heightAt(x, z); }
+function terrainHeight(x, z) { return freeFlight.active ? freeFlight.heightAt(x, z) : world.heightAt(x, z); }
 function groundLevel(x, z) { return Math.max(0, terrainHeight(x, z)); }
 
 
@@ -1736,6 +1740,13 @@ function loadMissionScene(m) {
   if (hud.setAlertState) hud.setAlertState('');
   world.rebuild(MAPS[m.mapTag] || MAPS.ARCHIPELAGO);
   applyMapProps(MAPS[m.mapTag] || MAPS.ARCHIPELAGO);
+  if (m.freeFlight) {
+    const clat = Q.has('lat') ? Number(Q.get('lat')) : NaN;
+    const clon = Q.has('lon') ? Number(Q.get('lon')) : NaN;
+    freeFlight.start(selectedFfCity, Number.isFinite(clat) && Number.isFinite(clon) ? { lat: clat, lon: clon } : null);
+  } else {
+    freeFlight.clearAll();
+  }
   setupBuzzAnchors();
   vfx.clearTrails();
   ambient.reset();
@@ -1768,7 +1779,7 @@ function loadMissionScene(m) {
 }
 function missionConfigWingSolo(m) {
   if (!m) return false;
-  return m.wingmen === 'NONE' || m.id === 'ACE_DUEL';
+  return m.wingmen === 'NONE' || m.wingmen === 'SOLO' || m.id === 'ACE_DUEL' || !!m.freeFlight;
 }
 /* --------------------------------------------------------------------------
    CARRIER_AUTOLAND. Everything is solved in the carrier ROOT frame (bow = local
@@ -2448,6 +2459,20 @@ async function startSortie() {
     state.onGround = false; state.gear = 0; state.gearDown = false;
     cat.ph = 'AIRBORNE'; carrier.phase = null;
     for (const w of wingmen) { w.pos.copy(state.position).addScaledVector(a.fwd, -3000); w.alive = false; }
+  }
+  if (m.freeFlight) {
+    const p = FREE_FLIGHT_PRESETS[selectedFfCity] || FREE_FLIGHT_PRESETS.TORONTO;
+    state.position.set(0, p.alt, 0);
+    state.quaternion.setFromAxisAngle(AX_Y, p.hdg);
+    state.pitchRate = state.rollRate = state.yawRate = 0;
+    state.speed = p.spd; state.throttle = 0.78; state.afterburner = 0;
+    state.velocity.set(0, 0, -state.speed).applyQuaternion(state.quaternion);
+    state.gear = 0; state.gearDown = false; state.onGround = false; gearAutoLock = false;
+    flightMode = 'FLY';
+    vfx.clearTrails(); prevPlanePos.copy(state.position); camVelocity.set(0, 0, 0);
+    camera.position.copy(CAM_OFFSET).applyQuaternion(state.quaternion).add(state.position);
+    combatSys.setWingOrder(0);
+    combatSys.say('FREE FLIGHT // ' + p.name + ' — ' + p.desc, 4, '#5eead4');
   }
   if (combat.mode === 'FURBALL') {
     state.position.set(0, 1829, -3000);                       // cloud-sea centre, 6,000 ft, above the 5,800 ft tops
@@ -6182,9 +6207,18 @@ function stepSim(dt) {
   updateWaveOff(dt);
   updateBuzz(dt);
   combatSys.update(dt, simTime, { playerActive: flightMode === 'FLY', firing: keys.fire || DEBUG_FIRE });
+  if (freeFlight.active) {
+    const rebase = freeFlight.update(state.position.x, state.position.z);
+    if (rebase) {
+      state.position.x += rebase.dx; state.position.z += rebase.dz;
+      prevPlanePos.x += rebase.dx; prevPlanePos.z += rebase.dz;
+      camera.position.x += rebase.dx; camera.position.z += rebase.dz;
+      vfx.clearTrails();
+    }
+  }
   if (vwsState.alertT > 0) { vwsState.alertT -= dt; if (vwsState.alertT <= 0) hud.setAlertState(''); }
   if (flightMode === 'FLY' && appMode === 'PLAY' && !autoland.on && cat.ph !== 'HOLD' && cat.ph !== 'LAUNCH' && !carrier.phase) {
-    const agl = state.position.y - Math.max(world.heightAt(state.position.x, state.position.z), 0);
+    const agl = state.position.y - groundLevel(state.position.x, state.position.z);
     const vs = state.velocity.y;
     if (agl < 600 && agl / Math.max(1, -vs) < 5 && state.gear < 0.5) vwsTrigger('PULL_UP', 'PULL UP');
     if (state.gLoad > 9) { vwsState.overGT += dt; if (vwsState.overGT > 0.3) vwsTrigger('OVER_G', 'OVER G'); }
@@ -6312,6 +6346,8 @@ if (DEBUG) {
     spawnHeadOn: (dist = 600) => { combatSys.placeAhead(0, dist); combatSys.banditShot(0, false, true, 'IR'); },
     aimAtSun: () => { state.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), SUN_DIR); state.velocity.set(0, 0, -(state.speed || 180)).applyQuaternion(state.quaternion); },
     get sunDir() { return SUN_DIR; },
+    get freeFlight() { return freeFlight; },
+    get freeFlightStats() { return freeFlight.getStats(); },
     killSub: i => combatSys.killSub(i), killSite: i => combatSys.killSite(i), forceSalvo: () => combatSys.forceSalvo(),
     get siteOn() { return combatSys.siteOn; },
     get waveoff() { return waveoff; }, triggerWaveOff, onBuzz,
@@ -6362,6 +6398,12 @@ function syncSBMenu(paused) {
   sbMenuEl.querySelector('[data-k="resume"]').hidden = !isPause;
   sbMenuEl.querySelector('[data-k="restart"]').hidden = !isPause;
   document.getElementById('sbMissionVal').textContent = mission().title;
+  const ffRow = document.getElementById('sbFfCityRow');
+  if (ffRow) {
+    ffRow.hidden = !mission().freeFlight;
+    const p = FREE_FLIGHT_PRESETS[selectedFfCity] || FREE_FLIGHT_PRESETS.TORONTO;
+    document.getElementById('sbFfCityVal').textContent = p.name;
+  }
   document.getElementById('sbRoleVal').innerHTML = 'W2 <span class="rolePill' + (selectedRoles.w2 === 'CAP' ? ' on' : '') + '">CAP</span>' +
     '<span class="rolePill' + (selectedRoles.w2 === 'STRIKE' ? ' on' : '') + '">STRIKE</span>' +
     ' W3 <span class="rolePill' + (selectedRoles.w3 === 'CAP' ? ' on' : '') + '">CAP</span>' +
@@ -6382,6 +6424,12 @@ function sbAction(k, dir) {
     case 'resume': resumeSim(); break;
     case 'restart': restartBtn.click(); break;
     case 'mission': cycleMission(dir || 1); break;
+    case 'ffcity': {
+      const ids = Object.keys(FREE_FLIGHT_PRESETS), i = ids.indexOf(selectedFfCity);
+      selectedFfCity = ids[(i + (dir || 1) + ids.length) % ids.length];
+      saveFreeFlightCity(selectedFfCity);
+      break;
+    }
     case 'role': {
       const key = sbRoleIdx === 0 ? 'w2' : 'w3';
       selectedRoles[key] = ROLES[(ROLES.indexOf(selectedRoles[key]) + 1) % ROLES.length];

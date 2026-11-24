@@ -3,6 +3,10 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.55', title: 'FREE FLIGHT — REAL-WORLD 3D CITIES & TERRAIN', bullets: [
+    'Added FREE FLIGHT mission with infinite streaming zoom-13 AWS Terrarium elevation, ESRI World Imagery satellite ground tiles, and 3D extruded OpenFreeMap OSM buildings.',
+    'Added 5 scenic location presets (Toronto, Tokyo, San Francisco, New York, Swiss Alps) with parametric 3D landmarks (CN Tower, Tokyo Skytree, One WTC, Transamerica Pyramid) and automatic origin rebasing.'
+  ] },
   { version: 'v1.1.54', title: 'REALISTIC F-15C G-LOC & PUSH-PULL PHYSIOLOGY', bullets: [
     'Tuned pilot G physiology to the NASA/USAF F-15C ATAGS + AGSM Stoll curve (matching FlightGear blackout.nas): 5.0 G strain onset, ~10 s to G-LOC at 9 G, and realistic 6 s incapacitation / 7-15 s recovery.',
     'Added the physiological push-pull effect: negative-G pushes prior to a positive-G pull temporarily lower G-LOC onset down toward 3.5 G, while negative-G redout builds from -2 G to -4 G.'
