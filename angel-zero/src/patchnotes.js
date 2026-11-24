@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.63', title: 'F-22A RAPTOR ALL-GLASS 3D COCKPIT', bullets: [
+    'Built a dedicated sculpted F-22A Raptor all-glass cockpit (src/cockpit_f22.js): frameless gold-tinted bubble canopy with no front bow, swept beveled trapezoidal shroud, and curved wide-angle HUD combiner.',
+    'Added the 6-screen glass avionics suite: top ICP keypad with left ICAW/CNI and right synthetic backup ADI UFDs, large 8x8" center Tactical Situation Display, left APG-77 AESA radar, right ALR-94 defense/EW scope, and tilted lower F-22A stores & twin F119 engine display.',
+    'Added an animated right-hand side-stick with ribbed boot and castle hats alongside animated left-hand twin throttles.'
+  ] },
   { version: 'v1.1.62', title: 'F-22A MISSILE ALERT VWS FIX', bullets: [
     'Fixed the F-22A missile alert voice warning (CHAFF_FLARE) so it plays the F-22 "Chaff, Flare!" warning instead of "Pull Up!".'
   ] },

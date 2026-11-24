@@ -736,6 +736,7 @@ import { createAmbient } from './src/ambient.js?v=s9dd';
 import { createBlastFX } from './src/blastfx.js?v=s9dd';
 import { createHUD } from './src/hud.js?v=s9dr';
 import { createCockpit3D } from './src/cockpit3d.js?v=s9dr';
+import { createCockpitF22 } from './src/cockpit_f22.js?v=s9dv';
 import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9ds';
 import { createEjection } from './src/eject.js?v=s9di';
 import { createAudio } from './src/audio.js?v=s9du';
@@ -753,7 +754,7 @@ import { createFreeLook } from './src/freelook.js?v=s9dd';
 import { createCanopyGlass } from './src/canopyglass.js?v=s9dd';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9dd';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9dd';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9du';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9dv';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9de';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9dd';
 import { createRadioQueue } from './src/radioQueue.js?v=s9dj';
@@ -5317,9 +5318,10 @@ modeBtn.addEventListener('click', e => {
 });
 syncModeUI();
 
-const cockpit = createCockpit3D(THREE, { scene, camera, renderer, sunLight, sunDir: SUN_DIR, envTex, state, combat,
+const cockpitOpts = { scene, camera, renderer, sunLight, sunDir: SUN_DIR, envTex, state, combat,
   missiles, STALL_AOA, debug: DEBUG, getEnemies: () => combatSys.enemies,
-  getWingmen: () => wingmen, getStrikeTargets: () => combatSys.strikeTargets });
+  getWingmen: () => wingmen, getStrikeTargets: () => combatSys.strikeTargets };
+const cockpit = AC.id === 'F22A' ? createCockpitF22(THREE, cockpitOpts) : createCockpit3D(THREE, cockpitOpts);
 cockpit.setFreeLook(freeLook.view);
 if (DEBUG && Q.has('mfdpage')) {
   const p = ((Number(Q.get('mfdpage')) || 0) % 3 + 3) % 3;
