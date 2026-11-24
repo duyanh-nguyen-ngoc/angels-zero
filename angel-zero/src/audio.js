@@ -152,7 +152,7 @@ export function createAudio(opts = {}) {
       f15Gun: 'f22/f22_m61a2.wav', f15AimLaunch: 'f22/f22_aim_launch.wav',
       f15AimExplode: 'f22/f22_aim_explode.wav', f15Flare: 'f22/f22_chaff_flare.wav',
       f15BettyOverG: 'f22/f22_overg.wav', f15BettyBingo: 'f22/f22_bingo.wav',
-      f15BettyFuelLow: 'f22/f22_fuel_low.wav', f15BettyWarn: 'f22/f22_pullup.wav',
+      f15BettyFuelLow: 'f22/f22_fuel_low.wav', f22PullUp: 'f22/f22_pullup.wav',
       f15Incoming: 'f22/f22_rwr_launch.wav', f15WarnTone: 'f22/f22_rwr_spike.wav',
       f15Tone115: 'f22/f22_rwr_contact.wav',
       f15StallChop: 'f22/f22_stall.wav', f15StallCont: 'f22/f22_stall2.wav',
@@ -1082,7 +1082,12 @@ export function createAudio(opts = {}) {
     vwsQ[i] = 1; vwsCd[i] = VWS_CD[id];
     return true;
   }
-  const VWS_F15_KEY = { OVER_G: 'f15BettyOverG', BINGO_FUEL: 'f15BettyBingo', PULL_UP: 'f15BettyWarn', ENGINE_FIRE: 'f15BettyWarn', ALTITUDE: 'f15BettyWarn', CHAFF_FLARE: 'f15BettyWarn' };
+  const VWS_F15_KEY = {
+    OVER_G: 'f15BettyOverG', BINGO_FUEL: 'f15BettyBingo',
+    PULL_UP: isF22 ? 'f22PullUp' : 'f15BettyWarn',
+    ENGINE_FIRE: 'f15BettyWarn', ALTITUDE: 'f15BettyWarn',
+    CHAFF_FLARE: isF22 ? 'f15Flare' : 'f15BettyWarn'
+  };
   function vwsPlay(id) {
     vwsLast.id = id; vwsLast.t = ctx ? ctx.currentTime : 0;
     const f15Key = VWS_F15_KEY[id];

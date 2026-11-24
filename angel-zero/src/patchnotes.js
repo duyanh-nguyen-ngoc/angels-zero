@@ -3,6 +3,9 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.62', title: 'F-22A MISSILE ALERT VWS FIX', bullets: [
+    'Fixed the F-22A missile alert voice warning (CHAFF_FLARE) so it plays the F-22 "Chaff, Flare!" warning instead of "Pull Up!".'
+  ] },
   { version: 'v1.1.61', title: 'F-22A RAPTOR ENGINE & AERODYNAMIC VFX', bullets: [
     'Shaped the F-22A F119 afterburner plumes to match its 2D rectangular thrust-vectoring nozzles with live pitch-deflecting exhaust vectors, tighter shock diamonds, hotter core tint, and lower dry-MIL IR glow.',
     'Re-aligned over-wing condensation vapor, chine/LERX ribbons, contrail emitters, and the Prandtl-Glauert Mach cone to the Raptor\'s low-set diamond wing and nose geometry.'
