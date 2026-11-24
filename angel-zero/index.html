@@ -736,7 +736,7 @@ import { createHUD } from './src/hud.js?v=s9di';
 import { createCockpit3D } from './src/cockpit3d.js?v=s9di';
 import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9dj';
 import { createEjection } from './src/eject.js?v=s9di';
-import { createAudio } from './src/audio.js?v=s9dj';
+import { createAudio } from './src/audio.js?v=s9dk';
 import { createRadio } from './src/radio.js?v=s9dd';
 import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9dd';
 import { createLivery } from './src/livery.js?v=s9dd';
@@ -751,7 +751,7 @@ import { createFreeLook } from './src/freelook.js?v=s9dd';
 import { createCanopyGlass } from './src/canopyglass.js?v=s9dd';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9dd';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9dd';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9dj';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9dk';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9de';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9dd';
 import { createRadioQueue } from './src/radioQueue.js?v=s9dj';
@@ -4547,10 +4547,11 @@ function onWing(text, caption, tint, force = false, hold = 2600) {
   setBox({ ch, text: text || '', id: '' }, Math.max(1.6, String(text || '').length * 0.055));
 }
 // Only the queue calls radioPlay; it owns timing and the Voice Box lifecycle.
+// Radio is text-only: every line (scripted story beats and reactive callouts) is shown on
+// the CRT subtitle box for its reading time; no recorded voice clips and no speech.
 function radioPlay(slot) {
   setBox(slot, 0, true);
-  if (slot.line && slot.line.textOnly) return audio.textLineSecs(slot.line);   // reactive callout: subtitle text only, no audio
-  return audio.playRadio(slot.id, slot.ch);
+  return audio.textLineSecs(slot.line || slot);
 }
 const rq = createRadioQueue(THREE, { audio, onTx: radioPlay, onIdle: clearBox, debug: DEBUG });
 function radioEvent(ev, opts) { return rq.say(ev, opts); }
@@ -4708,16 +4709,10 @@ function updateReactiveRadio(dt) {
   W.traps = traps;
 }
 function P_ALT_OK() { return state.position.y - groundLevel(state.position.x, state.position.z) > 15; }
-let radioPreloaded = false;
-function preloadRadioOnce() {
-  if (radioPreloaded || !audio.ready) return;
-  radioPreloaded = true; audio.preloadRadio(RADIO_LINES);
-}
+// Text-only radio: voice clips are never downloaded or decoded.
+function preloadRadioOnce() { /* no voice clips */ }
 if (DEBUG && Q.has('radiohero')) {
-  audio.init(); radioPreloaded = true;
-  audio.preloadRadio(RADIO_LINES).then(() => {
-    RADIO_HERO.forEach((line, i) => setTimeout(() => rq.say(line, { pri: 3, bypass: true }), 400 + i * (Math.max(3, line.text.length * 0.06) * 1000 + 400)));
-  });
+  RADIO_HERO.forEach((line, i) => setTimeout(() => rq.say(line, { pri: 3, bypass: true }), 400 + i * (Math.max(3, line.text.length * 0.06) * 1000 + 400)));
 }
 window.__playTrailerLine = key => {
   const line = RADIO_HERO.find(l => l.id === key || l.event === key) || RADIO_HERO[0];

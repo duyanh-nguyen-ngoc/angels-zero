@@ -976,10 +976,6 @@ export function createAudio() {
   let vwsPlaying = -1, vwsUntil = 0, vwsSpeech = false, vwsMuted = true, vwsDebug = false;
   const vwsLast = { id: '', src: '', t: 0 };
   try { vwsMuted = localStorage.getItem('angelsZero_vws') !== '0'; } catch (e) { /* storage unavailable */ }
-  const vwsUtt = typeof SpeechSynthesisUtterance !== 'undefined' ? VWS_IDS.reduce((o, id) => {
-    const u = new SpeechSynthesisUtterance(VWS_PHRASE[id]); u.rate = 1.15; u.pitch = 1.1; u.volume = 0.9;
-    o[id] = u; return o;
-  }, Object.create(null)) : null;
   function vwsSay(id) {
     const i = VWS_IDS.indexOf(id);
     if (i < 0) return false;
@@ -989,15 +985,10 @@ export function createAudio() {
   }
   function vwsPlay(id) {
     vwsLast.id = id; vwsLast.t = ctx ? ctx.currentTime : 0;
-    let src = 'chime';
-    if (VWS_BUF[id]) {
-      const s = ctx.createBufferSource(); s.buffer = VWS_BUF[id];
-      const g = gain(1); s.connect(g).connect(N.vwsHP); s.start(); s.onended = () => { try { g.disconnect(); } catch (e) {} };
-      src = 'buf'; vwsUntil = performance.now() / 1000 + Math.min(2, VWS_BUF[id].duration);
-    } else if (vwsSpeech && vwsUtt && typeof speechSynthesis !== 'undefined') {
-      try { speechSynthesis.speak(vwsUtt[id]); src = 'speech'; } catch (e) { src = 'chime'; }
-      vwsUntil = performance.now() / 1000 + 1.1;
-    } else {
+    // Voice-free cockpit: warnings are a two-tone chime only (the warning text is on the HUD);
+    // no recorded voice clips and no speech synthesis.
+    const src = 'chime';
+    {
       const t = ctx.currentTime;
       for (let rep = 0; rep < 2; rep++) for (const [f, off] of [[1000, 0], [800, 0.12]]) {
         const o = ctx.createOscillator(), g = gain(0); o.type = 'sine'; o.frequency.value = f;
@@ -2545,12 +2536,8 @@ export function createAudio() {
     get feelCounts() { return { tyre: tyreCount, nose: noseCount, clank: clankCount }; },    get engine() { return N.engineDbg || null; },
     vws: { say: vwsSay }, get vwsLast() { return { ...vwsLast }; },
     get vwsState() { return { q: Array.from(vwsQ), cd: Array.from(vwsCd), playing: vwsPlaying, until: vwsUntil }; }, get hydWhine() { return N.hydG ? +N.hydG.gain.value.toFixed(4) : 0; },
-    preloadVWS(files) {
-      return Promise.all(Object.entries(files || {}).map(([id, url]) => fetch(url).then(r => r.arrayBuffer())
-        .then(ab => new Promise(res => { const pr = ctx.decodeAudioData(ab, res); if (pr && pr.catch) pr.catch(() => {}); }))
-        .then(buf => { VWS_BUF[id] = buf; }).catch(() => {})));
-    },
-    setVWS(on) { vwsSpeech = !!on; }, setVWSMuted(on) { vwsMuted = !!on; }, setVWSLog(on) { vwsDebug = !!on; },
+    preloadVWS() { return Promise.resolve(); },            // voice-free: no VWS voice clips
+    setVWS() { vwsSpeech = false; }, setVWSMuted(on) { vwsMuted = !!on; }, setVWSLog(on) { vwsDebug = !!on; },
     // Slipstream / buffet bus targets + live AudioParam values (for __audioDebug).
     get wind() { return N.windDbg || null; },
     // Last two-stage detonation (crack band, sub sweep, crack / boom times, travel delay).

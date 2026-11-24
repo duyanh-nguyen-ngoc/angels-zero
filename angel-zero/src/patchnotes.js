@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.51', title: 'TEXT-ONLY RADIO', bullets: [
+    'All radio chatter is now text only: AWACS, OVERLORD, WARDEN and CRIMSON lines appear on the cockpit radio display with no voice audio.',
+    'Cockpit warnings (PULL UP, OVER G, BINGO FUEL ...) are now a chime plus the HUD warning text, with no spoken voice.',
+    'Radio voice clips are no longer downloaded, so sorties load lighter.'
+  ] },
   { version: 'v1.1.50', title: 'REACTIVE TACTICAL RADIO', bullets: [
     'AWACS, the carrier OVERLORD, WARDEN-2/3 and CRIMSON-1 now react in real time on the cockpit radio display: fresh, never-repeating text callouts built from live telemetry (bearing, altitude, speed, hull, bandit and ship counts).',
     'Calls cover catapult shots, gear up, wave-skimming, locks, Fox two, gun hits, splashes, sunk ships, incoming missiles, canyon SAM breaches, low hull, empty flares, fleet waves, the bunker kill, the CRIMSON merge and taunts, and every carrier approach milestone.',
