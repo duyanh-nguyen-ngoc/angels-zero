@@ -102,6 +102,7 @@ export function createCockpitF22(THREE, env) {
     const tex = new THREE.CanvasTexture(cv);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 4;
+    tex.flipY = false;   // glTF UVs are top-left origin (the exporter flips V)
     const mat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
     return { cv, ctx, tex, mat };
   }

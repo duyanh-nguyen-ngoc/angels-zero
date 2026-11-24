@@ -3,6 +3,9 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.66', title: 'F-22A DISPLAY ORIENTATION FIX', bullets: [
+    'Fixed the F-22A cockpit displays drawing upside-down; all six screens now read the right way up.'
+  ] },
   { version: 'v1.1.65', title: 'F-22A COCKPIT REBUILT IN BLENDER', bullets: [
     'The F-22A cockpit is now a modelled 3D pit built in Blender to match the real jet: faceted glare shield with hood wings, ICP keypad, two UFDs, the 8x8 in centre display flanked by two side displays, and a fourth display on the centre pedestal.',
     'Every display now has its real ring of push-buttons, and the side consoles carry knobs, toggles, guarded switches and the yellow-and-black striped gear handle.',
