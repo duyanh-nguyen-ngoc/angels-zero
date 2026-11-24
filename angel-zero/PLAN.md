@@ -1775,6 +1775,10 @@ Status legend: `[x]` implemented and verified Â· `[ ]` open — gaps listed.
    - **B4 (`visibilitychange` auto-pause):** Added `if (appMode === 'PLAY') pauseSim()` when `document.hidden` and gated `simTime += dt` on `appMode !== 'PAUSED'` so backgrounded sorties freeze cleanly.
    - **L1–L2:** Added `ceilThrustK(alt)` tapering thrust 92 % across `14,000..20,000 m`, and added a debounced `ROTATE — PULL UP (S / MOUSE)` callout above `145 kt` on takeoff roll.
 
+- [x] **Replay wave reset & debrief radio fixes (`v1.1.47`)** *(build `s9dg`, v1.1.47, `src/combat.js`, `src/audio.js`, `src/radioQueue.js`, `index.html`, `src/patchnotes.js`, `PLAN.md`)*
+   - **R1 (`resetWaves()` on replay/relaunch):** Added `resetWaves()` and `wavesFresh` guard in `src/combat.js` (clearing `e.aceFlight` in `clearAce(e)`, resetting `C.wave`/`C.phase`/`C.ace`/`aceFlightDone`/`C.acePair`, calling `spawnWave()` + `spawnSurface()` for non-FURBALL, updating `waveKill0` after respawn), called from `init()`, `configureMission()` else-branch, and `resetPlayer()`, and cleared `wavesFresh` in `resetMission()`. Verified across fresh boot, `replaySortie()`, `debriefToBriefing()` -> `launchSortie()`, x3 replays, `FURBALL`, and staged relaunches.
+   - **R2 (debrief radio cut & pump):** Updated `audio.stopRadio(fade)` to fade voice + static gain and restore ducking; added `gap` support to `rq.clear(gap)` and `radioReset(gap)`; cut live flight radio before queuing `ON_MISSION_CLEAR` in `endSortie()` (silent on `FAILED`), added defensive `radioReset()` in `debriefToBriefing()`, and pumped `radioPump()` when `appMode === 'DEBRIEF'`.
+
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.

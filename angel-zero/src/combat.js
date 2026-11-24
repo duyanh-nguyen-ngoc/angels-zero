@@ -1148,6 +1148,7 @@ export function createCombat(THREE, env) {
   }
   function clearAce(e) {
     if (e.bomber) { e.bomber = false; e.bombed = false; e.label = 'BANDIT ' + String(e.id + 1).padStart(2, '0'); e.type = TYPES[e.id % 6]; e.hpMax = 100; e.scale = 1; }
+    if (e.aceFlight) { e.aceFlight = false; e.label = 'BANDIT ' + String(e.id + 1).padStart(2, '0'); e.type = TYPES[e.id % 6]; e.hpMax = 100; e.scale = 1; }
     if (!e.ace) return; e.ace = false; e.label = 'BANDIT ' + String(e.id + 1).padStart(2, '0'); e.type = TYPES[e.id % 6]; e.hpMax = 100; tintFleet();
   }
   function makeBomber(e, n) {
@@ -6040,7 +6041,24 @@ export function createCombat(THREE, env) {
   }
 
   /* ================================================================ API */
-  let ready = false, waveTimer = 0, allyStepped = false;
+  let ready = false, waveTimer = 0, allyStepped = false, wavesFresh = false;
+  function resetWaves() {
+    if (!enemies.length || wavesFresh) return;
+    for (const e of enemies) {
+      e.alive = false; e.wreck = null;
+      clearAce(e);
+      if (e.g) e.g.visible = false;
+    }
+    C.wave = 0; C.phase = 1; C.ace = null; waveTimer = 0; aceFlightDone = false; C.acePair = [];
+    furT = 0; furSwarmT = 75;
+    if (C.mode !== 'FURBALL' && C.missionId !== 'FURBALL') {
+      spawnWave();
+      spawnSurface();
+    }
+    tintFleet(); writeFleet();
+    waveKill0 = C.kills || 0;
+    wavesFresh = true;
+  }
   const mountCbs = [];
   const onCarrierMounted = cb => { if (typeof cb === 'function') mountCbs.push(cb); };
   function init(model, nozzleLocal) {
@@ -6053,8 +6071,8 @@ export function createCombat(THREE, env) {
     if (!(C.mcfg && C.mcfg.noShips)) spawnFleet();
     const hasStages = !!(C.mcfg && C.mcfg.stages && C.mcfg.stages.length);
     if (!hasStages) {
-      spawnWave();
-      spawnSurface();
+      wavesFresh = false;
+      resetWaves();
     } else {
       if (C.weaponsLock.msl) for (const st of stores.msl) st.node.visible = false;
       if (C.weaponsLock.spw) for (const st of stores.bomb) st.node.visible = false;
@@ -6111,6 +6129,7 @@ export function createCombat(THREE, env) {
     }
     Object.assign(C, { jamming: 0, sectorLow: false, strikeDoneT: 0,
       missionPhase: 1, mpT: 0, obj: { done: 0, total: WAVE_SIZE } });
+    if (!(C.mcfg && C.mcfg.stages && C.mcfg.stages.length)) resetWaves();
     waveKill0 = C.kills || 0;
     sectorLowPrev = false; sectorLowT = -1e9;
     mslCooldown = 0; gunAcc = 0;
@@ -6400,6 +6419,9 @@ export function createCombat(THREE, env) {
         for (const e of enemies) if (!e.ace && !e.bomber) { e.alive = false; e.wreck = null; if (e.g) e.g.visible = false; }
         aceFlightDone = false; C.acePair = [];
         spawnStage(0);
+      } else {
+        wavesFresh = false;
+        resetWaves();
       }
       if (C.mcfg.noShips || (C.mcfg.enemyMsl === false && C.mcfg.wingmen === 'NONE')) {
         for (const t of surface) { t.alive = false; if (t.g) t.g.visible = false; }
@@ -6417,6 +6439,7 @@ export function createCombat(THREE, env) {
     },
     // Mission switch: return every pooled actor to its pool without allocating.
     resetMission() {
+      wavesFresh = false;
       intrForce = false; intrDisabled = false;
       Object.assign(C.bw, { eligible: false, landed: false, logged: false });
       Object.assign(C.intr, { st: 'IDLE', t: 0, ace: -1, used: false, farT: 0 }); C.wingHold = false;

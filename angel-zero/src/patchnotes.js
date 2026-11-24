@@ -3,6 +3,10 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.47', title: 'REPLAY WAVE RESET & DEBRIEF RADIO FIXES', bullets: [
+    'Fixed non-staged sorties (AIR SUPERIORITY and FURBALL) after replay or debrief return so BANDIT 01-06 and strike targets respawn cleanly at phase 1 instead of skipping straight to CRIMSON-1.',
+    'Cut active flight radio transmissions immediately on sortie end so lines no longer bleed into the debrief, and pumped the radio queue in debrief so ON_MISSION_CLEAR plays cleanly on victory.'
+  ] },
   { version: 'v1.1.46', title: 'DUEL COMPLETION, RUNWAY ROTATION & WAVE-OFF CLIMB', bullets: [
     'Fixed ACE DUEL mission completion so downing CRIMSON-1 advances cleanly to carrier RTB and debrief.',
     'Enabled W/S and arrow-key pitch rotation during runway takeoff rolls without engaging wheel brakes, and added a ROTATE prompt past 145 kt.',

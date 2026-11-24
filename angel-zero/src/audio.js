@@ -1977,14 +1977,23 @@ export function createAudio() {
     rxState = 'TALK'; rxT = now + PTT_OPEN_S;
     return buf.duration + PTT_OPEN_S;
   }
-  function stopRadio(fade = 0.04) {
-    if (!N.radioSrc) return;
-    const now = ctx.currentTime, src = N.radioSrc;
-    try { src.onended = null; src.stop(now + fade); } catch (e) { /* already ended */ }
+  function stopRadio(fade = 0.08) {
+    if (!ready || !ctx) return;
+    const now = ctx.currentTime;
+    if (N.radioSrc) {
+      const src = N.radioSrc;
+      try { src.onended = null; src.stop(now + fade); } catch (e) { /* already ended */ }
+    }
     if (N.radioVg) {
       const g = N.radioVg.gain;
       g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.linearRampToValueAtTime(0, now + fade);
     }
+    if (N.rStaticG) {
+      const sg = N.rStaticG.gain;
+      sg.cancelScheduledValues(now); sg.setValueAtTime(sg.value, now); sg.linearRampToValueAtTime(0, now + fade);
+    }
+    rampDuck(1, fade);
+    rxState = 'IDLE'; rxCur = null;
     N.radioSrc = null; N.radioVg = null; radioState.playing = false;
   }
   // Legacy hook: PTT open click only (the box is now driven by the queue).

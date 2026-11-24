@@ -111,9 +111,9 @@ export function createRadioQueue(THREE, env) {
     return best;
   }
 
-  function clear() {
+  function clear(gap = 0) {
     for (let i = 0; i < Q_N; i++) resetSlot(slots[i]);
-    cur = null; curEnd = 0; gapUntil = 0;
+    cur = null; curEnd = 0; gapUntil = gap > 0 ? performance.now() / 1000 + gap : 0;
     for (const k in lastCatT) delete lastCatT[k];
     lastLineT.clear();
   }

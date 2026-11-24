@@ -731,9 +731,9 @@ import { createAmbient } from './src/ambient.js?v=s9dd';
 import { createBlastFX } from './src/blastfx.js?v=s9dd';
 import { createHUD } from './src/hud.js?v=s9dd';
 import { createCockpit3D } from './src/cockpit3d.js?v=s9dd';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9df';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9dg';
 import { createEjection } from './src/eject.js?v=s9dd';
-import { createAudio } from './src/audio.js?v=s9de';
+import { createAudio } from './src/audio.js?v=s9dg';
 import { createRadio } from './src/radio.js?v=s9dd';
 import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9dd';
 import { createLivery } from './src/livery.js?v=s9dd';
@@ -748,10 +748,10 @@ import { createFreeLook } from './src/freelook.js?v=s9dd';
 import { createCanopyGlass } from './src/canopyglass.js?v=s9dd';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9dd';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9dd';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9df';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9dg';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9de';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9dd';
-import { createRadioQueue } from './src/radioQueue.js?v=s9de';
+import { createRadioQueue } from './src/radioQueue.js?v=s9dg';
 import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9dd';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
   GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9dd';
@@ -2482,6 +2482,7 @@ function endSortie(outcome) {
   sortie.active = false;
   clearFlightInput();
   audio.setBgmPause(false);
+  radioReset(outcome === 'CLEARED' ? 0.35 : 0);
   if (outcome === 'CLEARED') radioEvent('ON_MISSION_CLEAR');
   const st = sortieStats();
   st.rankInfo = computeRank(st, outcome);
@@ -2703,6 +2704,7 @@ function replaySortie(equipId) {
 }
 function debriefToBriefing() {
   if (appMode !== 'DEBRIEF') return;
+  radioReset();
   clearFlightInput();
   stopDebriefMap();
   debriefEl.hidden = true;
@@ -4547,7 +4549,7 @@ function radioPlay(slot) {
 }
 const rq = createRadioQueue(THREE, { audio, onTx: radioPlay, onIdle: clearBox, debug: DEBUG });
 function radioEvent(ev, opts) { return rq.say(ev, opts); }
-function radioReset() { rq.clear(); clearBox(); }
+function radioReset(gap = 0) { rq.clear(gap); clearBox(); audio.stopRadio(0.08); }
 function radioPump() { rq.update(performance.now() / 1000); }
 let radioPreloaded = false;
 function preloadRadioOnce() {
@@ -6047,6 +6049,7 @@ function animate() {
   if (appMode !== 'PAUSED') simTime += dt;
   if (appMode === 'MENU') menuOrbit(dt);
   else if (appMode === 'PLAY' && modelReady && !FREEZE) stepSim(sdt);
+  else if (appMode === 'DEBRIEF') radioPump();
   if (appMode !== 'PAUSED') updateCameraAndVisuals(sdt, simTime);
   if (appMode === 'PLAY') updateAudio();
   audio.updateMusic(getMusicCtx());                          // BGM scenario resolve (one preallocated object)
