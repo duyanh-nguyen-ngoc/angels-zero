@@ -103,7 +103,18 @@ export function createAudio() {
   // Fetched + decoded at page load (OfflineAudioContext), so they are ready the
   // moment the LAUNCH click creates the live AudioContext.
   // (the F100 engine is fully synthesized -- no turbine file is requested)
-  const SFX = { buffet: 'airframe_buffet.mp3', breath: 'gloc_breathing_heartbeat.mp3', chime: 'gloc_warning_chime.mp3' };
+  const SFX = {
+    buffet: 'airframe_buffet.mp3', breath: 'gloc_breathing_heartbeat.mp3', chime: 'gloc_warning_chime.mp3',
+    f15Whine: 'f15/f15_whine.wav', f15Exh: 'f15/f15_exhaust.wav',
+    f15AbOut: 'f15/f15_ab_out.wav', f15AbIn: 'f15/f15_ab_in.wav',
+    f15Airbrake: 'f15/f15_airbrake.wav', f15StallBuffet: 'f15/f15_stall_buffet.wav',
+    f15BettyOverG: 'f15/f15_betty_overg.wav', f15BettyBingo: 'f15/f15_betty_bingo.wav',
+    f15BettyWarn: 'f15/f15_betty_warning.wav', f15WarnTone: 'f15/f15_warning_tone.wav',
+    f15HighAoa: 'f15/f15_high_aoa.wav', f15Ows85: 'f15/f15_ows_85.wav', f15Ows96: 'f15/f15_ows_96.wav',
+    f15Gun: 'f15/f15_m61a1.wav', f15AimLaunch: 'f15/f15_aim_launch.wav',
+    f15Flare: 'f15/f15_flare.wav', f15GearTransit: 'f15/f15_gear_transit.wav',
+    f15GearLock: 'f15/f15_gear_lock.wav', f15TyreSqueal: 'f15/f15_tyre_squeal.wav',
+  };
   const samples = {}, sfxState = {};
   function preload(base = 'assets/sfx/') {
     const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
@@ -759,6 +770,12 @@ export function createAudio() {
   function missileLaunch() {
     if (!ready) return;
     const t = ctx.currentTime;
+    if (playSample('f15AimLaunch', cockpitLP, 0.45)) {
+      const thump = ctx.createOscillator(); thump.type = 'sine'; thump.frequency.setValueAtTime(140, t); thump.frequency.exponentialRampToValueAtTime(50, t + 0.25);
+      const tg = gain(0); tg.gain.setValueAtTime(0.35, t); tg.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+      thump.connect(tg).connect(cockpitLP); thump.start(t); thump.stop(t + 0.32);
+      return;
+    }
     const n = ctx.createBufferSource(); n.buffer = N.white;
     const bp = filt('bandpass', 3200, 0.9); bp.frequency.setValueAtTime(3200, t); bp.frequency.exponentialRampToValueAtTime(500, t + 1.4);
     const g = gain(0); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.55, t + 0.05); g.gain.exponentialRampToValueAtTime(0.001, t + 1.6);
@@ -805,6 +822,7 @@ export function createAudio() {
   function flare(intensity = 1) {
     if (!ready) return;
     const t = ctx.currentTime, k = Math.min(1, Math.max(0.1, intensity));
+    playSample('f15Flare', cockpitLP, 0.42 * k);
     for (let i = 0; i < 6; i++) {
       const at = t + i * 0.07;
       const o = ctx.createOscillator(); o.type = 'sine';
@@ -947,6 +965,15 @@ export function createAudio() {
   }
 
   // Sample voices are built lazily once both the context and the decoded buffer exist.
+  function playSample(key, dest, vol = 0.5, rate = 1) {
+    if (!ready || !ctx || !samples[key] || !dest) return 0;
+    const buf = samples[key], src = ctx.createBufferSource(), g = gain(vol);
+    src.buffer = buf; src.playbackRate.value = rate;
+    src.connect(g).connect(dest);
+    src.onended = () => { try { src.disconnect(); g.disconnect(); } catch (e) {} };
+    src.start(ctx.currentTime);
+    return buf.duration / Math.max(0.1, rate);
+  }
   function loopVoice(buf) { const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true; s.start(0, Math.random() * Math.max(0.01, buf.duration - 0.05)); return s; }
   function ensureSampleVoices() {
     if (samples.turbine && !N.turb) {
@@ -963,6 +990,23 @@ export function createAudio() {
     if (samples.breath && !N.breath) {
       N.breath = loopVoice(samples.breath); N.breathGain = gain(0); N.breath.connect(N.breathGain).connect(N.body);
       if (N.silenceParams) N.silenceParams.push(N.breathGain.gain);
+    }
+    const addF15Loop = (sampKey, nodeKey, gainKey, dest) => {
+      if (samples[sampKey] && !N[nodeKey]) {
+        N[nodeKey] = loopVoice(samples[sampKey]); N[gainKey] = gain(0);
+        N[nodeKey].connect(N[gainKey]).connect(dest);
+        if (N.silenceParams) N.silenceParams.push(N[gainKey].gain);
+      }
+    };
+    addF15Loop('f15Whine', 'f15Whine', 'f15WhineG', cockpitLP);
+    addF15Loop('f15Exh', 'f15Exh', 'f15ExhG', cockpitLP);
+    addF15Loop('f15AbOut', 'f15AbOut', 'f15AbOutG', cockpitLP);
+    addF15Loop('f15AbIn', 'f15AbIn', 'f15AbInG', cockpitLP);
+    addF15Loop('f15Airbrake', 'f15Brake', 'f15BrakeG', cockpitLP);
+    addF15Loop('f15StallBuffet', 'f15StallB', 'f15StallBG', cockpitLP);
+    if (samples.f15Gun && !N.f15Gun && N.gunBus) {
+      N.f15Gun = loopVoice(samples.f15Gun); N.f15GunG = gain(0.65);
+      N.f15Gun.connect(N.f15GunG).connect(N.gunBus);
     }
   }
   // ---- cockpit voice warning system -------------------------------------------
@@ -983,12 +1027,16 @@ export function createAudio() {
     vwsQ[i] = 1; vwsCd[i] = VWS_CD[id];
     return true;
   }
+  const VWS_F15_KEY = { OVER_G: 'f15BettyOverG', BINGO_FUEL: 'f15BettyBingo', PULL_UP: 'f15BettyWarn', ENGINE_FIRE: 'f15BettyWarn', ALTITUDE: 'f15BettyWarn', CHAFF_FLARE: 'f15BettyWarn' };
   function vwsPlay(id) {
     vwsLast.id = id; vwsLast.t = ctx ? ctx.currentTime : 0;
-    // Voice-free cockpit: warnings are a two-tone chime only (the warning text is on the HUD);
-    // no recorded voice clips and no speech synthesis.
-    const src = 'chime';
-    {
+    const f15Key = VWS_F15_KEY[id];
+    const dur = f15Key ? playSample(f15Key, N.vwsHP, 0.55) : 0;
+    let src = 'chime';
+    if (dur > 0) {
+      src = 'f15-sample';
+      vwsUntil = performance.now() / 1000 + dur + 0.15;
+    } else {
       const t = ctx.currentTime;
       for (let rep = 0; rep < 2; rep++) for (const [f, off] of [[1000, 0], [800, 0.12]]) {
         const o = ctx.createOscillator(), g = gain(0); o.type = 'sine'; o.frequency.value = f;
@@ -1176,6 +1224,7 @@ export function createAudio() {
   // Master caution: three quick high / low avionics tones on the headset bus.
   function masterCaution() {
     if (!ready) return;
+    if (playSample('f15WarnTone', N.body, 0.32)) return;
     const t = ctx.currentTime;
     for (let i = 0; i < 3; i++) for (const [f0, dt] of [[1450, 0], [1050, 0.11]]) {
       const at = t + i * 0.26 + dt, o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = f0;
@@ -1302,7 +1351,9 @@ export function createAudio() {
   // Landing gear hydraulics: 1.6 s actuator whine (pump saw 210 -> 150 Hz down /
   // 150 -> 210 Hz up, low-passed) over pressurised-fluid hiss, through the cockpit filter.
   function gearMotor(down = true) {
-    if (!ready || !N.whiteBuf) return;
+    if (!ready) return;
+    if (playSample('f15GearTransit', cockpitLP, 0.35, down ? 1.0 : 1.08)) return;
+    if (!N.whiteBuf) return;
     const t = ctx.currentTime, T = 1.6;
     const o = ctx.createOscillator(); o.type = 'sawtooth';
     o.frequency.setValueAtTime(down ? 210 : 150, t); o.frequency.linearRampToValueAtTime(down ? 150 : 210, t + T);
@@ -1317,6 +1368,7 @@ export function createAudio() {
   // Up-and-locked / down-and-locked: a heavy mechanical clunk felt through the airframe.
   function gearLock(down = true) {
     if (!ready) return;
+    if (playSample('f15GearLock', cockpitLP, 0.42)) { flareClack(); return; }
     const t = ctx.currentTime;
     const o = ctx.createOscillator(); o.type = 'sine';
     o.frequency.setValueAtTime(down ? 120 : 140, t); o.frequency.exponentialRampToValueAtTime(48, t + 0.14);
@@ -1327,8 +1379,15 @@ export function createAudio() {
   // Touchdown: two rubber screeches (main tyres spinning up), band-passed noise
   // swept 2.6 -> 1.4 kHz with a tonal squeal, k 0..1.2 by sink rate.
   function tireScreech(k = 1) {
-    if (!ready || !N.whiteBuf) return;
+    if (!ready) return;
     const t0 = ctx.currentTime;
+    if (playSample('f15TyreSqueal', master, 0.45 * k)) {
+      const th = ctx.createOscillator(); th.type = 'sine'; th.frequency.setValueAtTime(70, t0); th.frequency.exponentialRampToValueAtTime(35, t0 + 0.2);
+      const tg = gain(0); tg.gain.setValueAtTime(0.4 * k, t0); tg.gain.exponentialRampToValueAtTime(0.001, t0 + 0.25);
+      th.connect(tg).connect(master); th.start(t0); th.stop(t0 + 0.27);
+      return;
+    }
+    if (!N.whiteBuf) return;
     [0, 0.07].forEach((dt, i) => {
       const t = t0 + dt, s = ctx.createBufferSource(); s.buffer = N.whiteBuf;
       const bp = filt('bandpass', 2600, 6), g = gain(0);
@@ -2263,6 +2322,22 @@ export function createAudio() {
       ex.fl2.frequency && set(ex.fl2.frequency, Math.min(12000, flutterHz * 1.71 * (i ? DETUNE : 1)), 0.08);
     }
     for (const c of E.choir) c.bus && set(c.bus.gain, choirK * (c.e ? 0.97 : 1), 0.12);
+    if (N.f15Whine) {
+      set(N.f15Whine.playbackRate, 0.72 + 0.68 * rpmL, 0.1);
+      set(N.f15WhineG.gain, live ? (p.cockpit ? 0.14 : 0.22) * (0.35 + 0.65 * rpmL) * (1 - 0.35 * abK) : 0, 0.12);
+    }
+    if (N.f15Exh) {
+      set(N.f15Exh.playbackRate, 0.78 + 0.55 * rpmL, 0.1);
+      set(N.f15ExhG.gain, live ? (p.cockpit ? 0.14 : 0.28) * (0.2 + 0.8 * rpmL * rpmL) : 0, 0.12);
+    }
+    if (N.f15AbIn) {
+      set(N.f15AbIn.playbackRate, 0.92 + 0.2 * abK, 0.1);
+      set(N.f15AbInG.gain, live && p.cockpit ? 0.32 * Math.pow(abK, 1.2) : 0, 0.12);
+    }
+    if (N.f15AbOut) {
+      set(N.f15AbOut.playbackRate, 0.92 + 0.2 * abK, 0.1);
+      set(N.f15AbOutG.gain, live && !p.cockpit ? 0.38 * Math.pow(abK, 1.2) : 0, 0.12);
+    }
     // View crossfade + run-state gate.
     set(E.ckMixG.gain, p.cockpit ? 1 : 0, 0.25);
     set(E.chMixG.gain, p.cockpit ? 0 : 1, 0.25);
@@ -2345,6 +2420,19 @@ export function createAudio() {
     set(N.buffSweep.frequency, 220 + 460 * buffK, 0.1); set(N.buffGain2.gain, 0.42 * buffK, 0.1);
     if (N.buff) { set(N.buffGain.gain, 0.25 * buffK, 0.12); set(N.buff.playbackRate, 0.9 + 0.3 * buffK, 0.2); }
     set(N.buffFGain.gain, 0.25 * buffK * (0.7 + 0.3 * Math.random()), 0.05);
+    if (N.f15Brake) {
+      set(N.f15BrakeG.gain, live ? 0.24 * (p.airbrake || 0) * sm(kts, 100, 420) : 0, 0.1);
+      set(N.f15Brake.playbackRate, 0.85 + 0.35 * sm(kts, 100, 500), 0.15);
+    }
+    if (N.f15StallB) set(N.f15StallBG.gain, live ? 0.26 * sm(aoa, 14, 24) : 0, 0.1);
+    if (live && gl >= 7.2 && gl < 9.0 && (!N.owsAt || ctx.currentTime - N.owsAt > 1.2)) {
+      N.owsAt = ctx.currentTime;
+      playSample(gl >= 8.2 ? 'f15Ows96' : 'f15Ows85', N.vwsHP, 0.38);
+    }
+    if (live && aoa >= 21 && kts < 280 && (!N.aoaWarnAt || ctx.currentTime - N.aoaWarnAt > 1.4)) {
+      N.aoaWarnAt = ctx.currentTime;
+      playSample('f15HighAoa', N.vwsHP, 0.38);
+    }
     updateWind(p, kts, live);
     // ---- pilot G physiology mix -------------------------------------------------
     const gStrain = p.gStrain || 0, gloc = !!p.gloc, gNeg = p.gNeg || 0;
@@ -2534,7 +2622,7 @@ export function createAudio() {
     get engineGains() { return N.E ? { out: +N.E.out.gain.value.toFixed(4), choir: +N.E.choir[0].bus.gain.value.toFixed(4), crack: +N.E.crackG.gain.value.toFixed(4), params: N.silenceParams ? N.silenceParams.length : -1 } : null; },
     tyreChirp, noseThump, shuttleClank,
     get feelCounts() { return { tyre: tyreCount, nose: noseCount, clank: clankCount }; },    get engine() { return N.engineDbg || null; },
-    vws: { say: vwsSay }, get vwsLast() { return { ...vwsLast }; },
+    vws: { say: vwsSay }, get vwsLast() { return { ...vwsLast }; }, get sfx() { return { ...sfxState }; },
     get vwsState() { return { q: Array.from(vwsQ), cd: Array.from(vwsCd), playing: vwsPlaying, until: vwsUntil }; }, get hydWhine() { return N.hydG ? +N.hydG.gain.value.toFixed(4) : 0; },
     preloadVWS() { return Promise.resolve(); },            // voice-free: no VWS voice clips
     setVWS() { vwsSpeech = false; }, setVWSMuted(on) { vwsMuted = !!on; }, setVWSLog(on) { vwsDebug = !!on; },

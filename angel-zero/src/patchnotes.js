@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.52', title: 'F-15C SOUND BANK & COCKPIT WARNING AUDIO', bullets: [
+    'Compiled and integrated 19 FlightGear F-15C sound assets into src/audio.js, layering real F100 compressor whine, jet exhaust, internal/external afterburner, airbrake, and stall buffet over the procedural engine.',
+    'Added real F-15C cockpit warning audio: Bitching Betty VMS alerts (Over-G, Bingo Fuel, Warning), progressive 900 Hz OWS overload tones, High-AoA warning, and Master Caution tone.',
+    'Wired real M61A1 Vulcan loop, AIM-9 missile launch, flare salvo, landing gear transit/door lock, and touchdown tyre squeal samples with seamless procedural fallback.'
+  ] },
   { version: 'v1.1.51', title: 'TEXT-ONLY RADIO', bullets: [
     'All radio chatter is now text only: AWACS, OVERLORD, WARDEN and CRIMSON lines appear on the cockpit radio display with no voice audio.',
     'Cockpit warnings (PULL UP, OVER G, BINGO FUEL ...) are now a chime plus the HUD warning text, with no spoken voice.',
