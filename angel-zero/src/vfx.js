@@ -23,6 +23,7 @@ function rng(seed) {
 
 export function createVFX(THREE, env) {
   const { scene, camera, jet, renderer, terrainHeight } = env;
+  const isF22 = env.aircraft === 'F22A';
   // Debug-only overrides (e.g. ?debug&force=cone,vapor,mist) so stills can show transient effects.
   const force = {};
   for (const k of (env.force || [])) force[k] = true;
@@ -128,11 +129,13 @@ export function createVFX(THREE, env) {
   const plumes = [];
   function attachPlume(localPos) {
     const g = new THREE.Group();
-    g.position.copy(localPos).add(new THREE.Vector3(0, 0, 0.45));
+    g.position.copy(localPos).add(new THREE.Vector3(0, 0, isF22 ? 0.35 : 0.45));
+    const bx = isF22 ? 1.28 : 1, by = isF22 ? 0.50 : 1;
+    g.scale.set(bx, by, 1);
     const outer = new THREE.Mesh(plumeGeo, outerMat);
     const core = new THREE.Mesh(plumeGeo, coreMat);
     const glow = new THREE.Mesh(glowCoreGeo, glowCoreMat);
-    glow.position.z = -0.55;                         // inside the nozzle ring, facing aft (+Z)
+    glow.position.z = isF22 ? -0.35 : -0.55;         // inside the nozzle ring, facing aft (+Z)
     outer.frustumCulled = core.frustumCulled = glow.frustumCulled = false;
     outer.renderOrder = 2; core.renderOrder = 3; glow.renderOrder = 2;
     const light = new THREE.PointLight(0xff8a30, 2.5, 26, 2);
@@ -140,9 +143,10 @@ export function createVFX(THREE, env) {
     g.add(outer, core, glow);
     jet.add(g);
     scene.add(light);                                // keep light in scene so hiding plume/jet never changes NUM_POINT_LIGHTS
-    plumes.push({ g, light, lightOff });
+    plumes.push({ g, light, lightOff, bx, by });
   }
-  const CORE_COOL = new THREE.Color(0.75, 0.30, 0.08), CORE_HOT = new THREE.Color(2.5, 1.65, 1.05);
+  const CORE_COOL = new THREE.Color(0.75, 0.30, 0.08),
+    CORE_HOT = isF22 ? new THREE.Color(2.4, 1.95, 1.65) : new THREE.Color(2.5, 1.65, 1.05);
   let engineOut = -1;
   function setEngineOut(i) {                         // battle damage: the dead F100's plume + glow go out
     if (i === engineOut) return;
@@ -157,20 +161,22 @@ export function createVFX(THREE, env) {
     const pulse = 1 + ab * 0.24 * Math.sin(now * 17.0) + ab * 0.08 * Math.sin(now * 41.0);
     const coreLen = 1.5 + 3.2 * t + 4.6 * ab;
     coreMat.uniforms.uLen.value = coreLen;
-    coreMat.uniforms.uDiam.value = coreLen / 1.05;
+    coreMat.uniforms.uDiam.value = coreLen / (isF22 ? 0.92 : 1.05);
     coreMat.uniforms.uRad.value = 0.30 * (0.85 + 0.15 * t + 0.12 * ab);
     // Dry thrust stays below the 0.92 bloom threshold; burner level drives the HDR glare.
-    coreMat.uniforms.uInt.value = ((0.2 + 0.32 * t) * (1 - ab) + 1.25 * ab) * pulse;
+    coreMat.uniforms.uInt.value = (((isF22 ? 0.12 : 0.2) + (isF22 ? 0.24 : 0.32) * t) * (1 - ab) + 1.25 * ab) * pulse;
     outerMat.uniforms.uLen.value = (2.0 + 4.6 * t + 6.8 * ab) * (1 + 0.04 * Math.sin(now * 23));
     outerMat.uniforms.uRad.value = 0.48 * (0.9 + 0.22 * ab);
-    outerMat.uniforms.uInt.value = (0.12 + 0.3 * t + 1.15 * ab) * pulse;
+    outerMat.uniforms.uInt.value = ((isF22 ? 0.08 : 0.12) + (isF22 ? 0.22 : 0.3) * t + 1.15 * ab) * pulse;
     coreMat.uniforms.uTime.value = outerMat.uniforms.uTime.value = now;
     coreMat.uniforms.uAB.value = outerMat.uniforms.uAB.value = ab;
     // Incandescent core: warm orange scaled by throttle below the burner, HDR white-peach in AB.
     const shimmer = 1 + ab * 0.08 * (0.6 * Math.sin(now * 2 * Math.PI * 23) + 0.4 * Math.sin(now * 2 * Math.PI * 31));
-    glowCoreMat.uniforms.uCol.value.copy(CORE_COOL).multiplyScalar(0.4 + 0.6 * t).lerp(CORE_HOT, smooth(ab, 0, 1)).multiplyScalar(shimmer);
+    glowCoreMat.uniforms.uCol.value.copy(CORE_COOL).multiplyScalar((isF22 ? 0.28 : 0.4) + (isF22 ? 0.48 : 0.6) * t).lerp(CORE_HOT, smooth(ab, 0, 1)).multiplyScalar(shimmer);
+    const tvcPitch = isF22 ? THREE.MathUtils.clamp(((s.ctl && s.ctl.pitch) || 0) * 0.28, -0.32, 0.32) : 0;
     for (let k = 0; k < plumes.length; k++) {
       const p = plumes[k];
+      if (isF22) p.g.rotation.x += (tvcPitch - p.g.rotation.x) * 0.25;
       p.light.position.copy(p.lightOff).applyQuaternion(s.quaternion).add(s.position);
       if (!visible || k === engineOut) { p.light.intensity = 0; continue; }
       p.light.intensity = (0.8 + t * 2.0 + ab * 6.5) * pulse;
@@ -302,7 +308,8 @@ export function createVFX(THREE, env) {
   const lexR = new Ribbon({ w0: 0.7, w1: 2.4, life: 0.75, alpha: 0.34, wisp: 0.85 });
   const ribbons = [trailL, trailR, lexL, lexR];
   const tipL = new THREE.Vector3(-6.6, -0.6, 4.0), tipR = new THREE.Vector3(6.6, -0.6, 4.0);
-  const lexPL = new THREE.Vector3(-2.05, 0.05, -0.9), lexPR = new THREE.Vector3(2.05, 0.05, -0.9);
+  const lexPL = isF22 ? new THREE.Vector3(-1.85, -0.88, -3.2) : new THREE.Vector3(-2.05, 0.05, -0.9);
+  const lexPR = isF22 ? new THREE.Vector3(1.85, -0.88, -3.2) : new THREE.Vector3(2.05, 0.05, -0.9);
   const RIB_DAY = new THREE.Color(0xe8eef4), RIB_OVC = new THREE.Color(0xbfc7cf), _ribCol = new THREE.Color();
   let vaporTarget = 0, lexTarget = 0;
 
@@ -313,7 +320,9 @@ export function createVFX(THREE, env) {
   const SPRAY_N = 180, SPRAY_ALT = 35, SPRAY_DENSE = 15, SPRAY_KT = 120;
   const SPRAY_LIFE_MIN = 1.2, SPRAY_LIFE_MAX = 1.8, SPRAY_RATE_MAX = 140, SPRAY_Y = 0.5;
   const WAKE_N = 48, WAKE_Y = 0.15, WAKE_STEP_M = 12, WAKE_LIFE = 3.0;
-  const NOZ = [new THREE.Vector3(-0.62, -0.05, 9.0), new THREE.Vector3(0.62, -0.05, 9.0)];
+  const NOZ = isF22
+    ? [new THREE.Vector3(-0.74, -1.08, 4.4), new THREE.Vector3(0.74, -1.08, 4.4)]
+    : [new THREE.Vector3(-0.62, -0.05, 9.0), new THREE.Vector3(0.62, -0.05, 9.0)];
   const _noz = [NOZ[0], NOZ[1]];
   const _cw = new THREE.Vector3();
   const CONTRAIL_COL = new THREE.Color(0xeef2f6), _ctCol = new THREE.Color();
@@ -323,7 +332,9 @@ export function createVFX(THREE, env) {
   function updateContrails(emitters, now) {
     if (plumes.length >= 2) { _noz[0] = plumes[0].g.position; _noz[1] = plumes[1].g.position; }
     const burnerScale = 1 + 0.35 * burnerFlashK;
-    for (let bi = 0; bi < plumes.length; bi++) if (plumes[bi] && plumes[bi].g) plumes[bi].g.scale.setScalar(burnerScale);
+    for (let bi = 0; bi < plumes.length; bi++) if (plumes[bi] && plumes[bi].g) {
+      plumes[bi].g.scale.set(plumes[bi].bx * burnerScale, plumes[bi].by * burnerScale, burnerScale);
+    }
     _ctCol.copy(CONTRAIL_COL).multiply(vaporTint);
     let active = 0, live = 0;
     const n = Math.min(5, emitters.length);
@@ -398,7 +409,12 @@ export function createVFX(THREE, env) {
     const rv = rng(4711);
     let idx = 0;
     for (const sgn of [-1, 1]) {
-      const lanes = [
+      const lanes = isF22 ? [
+        // [x0, x1, zFront, zAft, yTop]   — F-22A chine & low-set diamond-wing lanes (model metres)
+        [1.35, 1.85, -4.0, 0.4, -0.92],
+        [1.85, 2.95, -1.6, 2.4, -0.98],
+        [2.95, 4.35, -0.2, 2.8, -1.06]
+      ] : [
         // [x0, x1, zFront, zAft, yTop]   — strake / wing-root lanes (model metres)
         [1.35, 1.75, -2.6, 0.8, -0.18],
         [1.8, 2.6, -0.6, 3.6, -0.24],
@@ -495,7 +511,13 @@ export function createVFX(THREE, env) {
   }
   const machConeInner = new THREE.Mesh(coneGeometry(4.2, 9.0), coneMaterial());
   const machConeOuter = new THREE.Mesh(coneGeometry(6.0, 12.0), coneMaterial());
-  machConeInner.position.copy(machConeOuter.position).set(0, -0.1, -9.45);
+  if (isF22) {
+    machConeInner.position.copy(machConeOuter.position).set(0, -0.85, -10.8);
+    machConeInner.scale.set(1.12, 1.0, 1.05);
+    machConeOuter.scale.set(1.12, 1.0, 1.05);
+  } else {
+    machConeInner.position.copy(machConeOuter.position).set(0, -0.1, -9.45);
+  }
   machConeInner.renderOrder = 5; machConeOuter.renderOrder = 4;
   machConeInner.visible = false; machConeOuter.visible = false;
   jet.add(machConeInner, machConeOuter);

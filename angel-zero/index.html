@@ -731,7 +731,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s9dd';
+import { createVFX } from './src/vfx.js?v=s9dt';
 import { createAmbient } from './src/ambient.js?v=s9dd';
 import { createBlastFX } from './src/blastfx.js?v=s9dd';
 import { createHUD } from './src/hud.js?v=s9dr';
@@ -753,7 +753,7 @@ import { createFreeLook } from './src/freelook.js?v=s9dd';
 import { createCanopyGlass } from './src/canopyglass.js?v=s9dd';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9dd';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9dd';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9ds';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9dt';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9de';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9dd';
 import { createRadioQueue } from './src/radioQueue.js?v=s9dj';
@@ -5041,7 +5041,7 @@ function onSfx(type, pos, scale = 1) {
   else if (type === 'flyby') audio.flybyWhoosh(scale, firstPerson);
 }
 const vfx = createVFX(THREE, { scene, camera, jet, renderer, terrainHeight, sunDir: SUN_DIR, canyonX: world.canyonX, runway: world.runway,
-  debug: DEBUG, force: DEBUG && Q.has('force') ? Q.get('force').split(',') : [] });
+  aircraft: AC.id, debug: DEBUG, force: DEBUG && Q.has('force') ? Q.get('force').split(',') : [] });
 // One pooled smoke ribbon for the wounded-wingman limp trail (driven by combat).
 const limpTrail = vfx.makeRibbon({ w0: 1.5, w1: 7, life: 4, alpha: 0.6, step: 6, far: [900, 9000] });
 limpTrail.mat.uniforms.uCol.value.set(0x9aa0a6); limpTrail.mesh.visible = false;

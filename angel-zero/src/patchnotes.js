@@ -3,6 +3,10 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.61', title: 'F-22A RAPTOR ENGINE & AERODYNAMIC VFX', bullets: [
+    'Shaped the F-22A F119 afterburner plumes to match its 2D rectangular thrust-vectoring nozzles with live pitch-deflecting exhaust vectors, tighter shock diamonds, hotter core tint, and lower dry-MIL IR glow.',
+    'Re-aligned over-wing condensation vapor, chine/LERX ribbons, contrail emitters, and the Prandtl-Glauert Mach cone to the Raptor\'s low-set diamond wing and nose geometry.'
+  ] },
   { version: 'v1.1.60', title: 'F-22A RAPTOR F119 SOUNDPACK', bullets: [
     'Added a dedicated 29-file FlightGear F-22A Raptor sound bank (assets/sfx/f22/) that loads automatically whenever the F-22A is selected.',
     'Includes F119 turbine whine, exhaust, intake rush, afterburner/reheat, efflux, APU start/run/stop, canopy close, flaps, gear/tyre cues, M61A2 cannon, AIM-120 launch/impact, RWR contact/spike/launch tones, and Betty over-G/fuel/pull-up/stall alerts.'
