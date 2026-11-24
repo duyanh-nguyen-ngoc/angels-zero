@@ -29,6 +29,13 @@ procedural ocean archipelago with a 2D HUD, cockpit MFDs and combat.
   already-separate surfaces to the same `Ctrl_*` / `Nozzle_*` contract, groups
   `Pylon_MSL_1..4`, writes `Gear_Nose` / `Gear_Main_L/R` and `Canopy_Pilot_Eye`
   empties. Credits: `assets/CREDITS.md`.
+- `scripts/build_f22_cockpit.py` — headless Blender script; **source of truth** for
+  `assets/f22_cockpit.glb` (F-22A first-person pit, modelled from scratch, AO
+  baked into a 2048² atlas). Rig space: eye origin, −Z fwd, +Y up. Runtime
+  (`src/cockpit_f22.js`) binds `Screen_*`, `Stick_Gimbal`, `Throttle_L/R`,
+  `Gear_Handle`, `HUD_Anchor` by name. `-- --preview out.png` renders the eye
+  view for quick iteration. Never hand-edit the GLB; bump `COCKPIT_GLB ?v=` in
+  `cockpit_f22.js` when it changes.
 - Aircraft selection: `AIRCRAFT` registry in `index.html` (`F15C` / `F22A`,
   `angelsZero_aircraft` localStorage, `?debug&aircraft=F22A`); switching reloads.
   Per-aircraft eye / clip box, interior material, belly-hide height, wingtip band,

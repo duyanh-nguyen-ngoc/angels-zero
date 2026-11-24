@@ -3,6 +3,12 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.65', title: 'F-22A COCKPIT REBUILT IN BLENDER', bullets: [
+    'The F-22A cockpit is now a modelled 3D pit built in Blender to match the real jet: faceted glare shield with hood wings, ICP keypad, two UFDs, the 8x8 in centre display flanked by two side displays, and a fourth display on the centre pedestal.',
+    'Every display now has its real ring of push-buttons, and the side consoles carry knobs, toggles, guarded switches and the yellow-and-black striped gear handle.',
+    'Baked ambient-occlusion shading gives the panels real depth, and the canopy sills now have diamond-plate tread with canopy latches.',
+    'The side-stick, twin throttles and gear handle are re-sculpted and still move with your inputs; the live displays and HUD combiner are unchanged.'
+  ] },
   { version: 'v1.1.64', title: 'F-22A RAPTOR 5TH-GEN PERFORMANCE & STEALTH', bullets: [
     'Wired F-22A F119 dry/AB thrust (1.35x dry supercruise, 1.18x AB) and 0.90x aerodynamic drag directly into airborne flight physics.',
     'Added 2D thrust-vectoring agility (+22% pitch authority, +15% roll rate, +5 deg higher AoA CAS margin), reduced RCS stealth (-38% bandit lock range & slower enemy lock-on), and +35% faster APG-77 AESA target lock.'

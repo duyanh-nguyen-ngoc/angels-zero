@@ -1,0 +1,83 @@
+{
+  "glb_bytes": 3755020,
+  "tris": 45284,
+  "ao_res": 2048,
+  "ao_baked": true,
+  "static_materials": [
+    "ckp_shroud_ao",
+    "ckp_black_ao",
+    "ckp_floor_ao",
+    "ckp_bezel_ao",
+    "ckp_osb_ao",
+    "ckp_key_ao",
+    "ckp_lcd_ao",
+    "ckp_metal_ao",
+    "ckp_sill_ao",
+    "ckp_panel_ao",
+    "ckp_white_ao",
+    "ckp_red_ao",
+    "ckp_yellow_ao",
+    "ckp_seat_ao",
+    "ckp_hudframe_ao"
+  ],
+  "nodes": {
+    "Screen_PMFD": [
+      0.0,
+      -0.3526,
+      -0.5873
+    ],
+    "Screen_SMFD_L": [
+      -0.24,
+      -0.3616,
+      -0.5828
+    ],
+    "Screen_SMFD_R": [
+      0.24,
+      -0.3616,
+      -0.5828
+    ],
+    "Screen_UFD_L": [
+      -0.152,
+      -0.1851,
+      -0.6727
+    ],
+    "Screen_UFD_R": [
+      0.152,
+      -0.1851,
+      -0.6727
+    ],
+    "Screen_SMFD_C": [
+      0.0,
+      -0.5904,
+      -0.4813
+    ],
+    "HUD_Anchor": [
+      0.0,
+      -0.118,
+      -0.785
+    ],
+    "Stick_Gimbal": [
+      0.33,
+      -0.387,
+      -0.345
+    ],
+    "Throttle_L": [
+      -0.345,
+      -0.393,
+      -0.3
+    ],
+    "Throttle_R": [
+      -0.3,
+      -0.393,
+      -0.3
+    ],
+    "Gear_Handle": [
+      -0.3847,
+      -0.3478,
+      -0.5675
+    ]
+  },
+  "panel_tilt_deg": 27,
+  "hud_tilt_deg": 20,
+  "uv_per_m": 0.1717
+}
