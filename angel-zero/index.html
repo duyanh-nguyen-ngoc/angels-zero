@@ -4,6 +4,9 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>ANGELS ZERO</title>
+<link rel="icon" href="data:,">  <!-- no favicon request: keeps the console at zero 404s -->
+
+
 <style>
   html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#05080c; font-family:'Rajdhani','Share Tech Mono',monospace; }
   #gl { position:fixed; inset:0; width:100vw; height:100vh; display:block; }
@@ -729,10 +732,10 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createVFX } from './src/vfx.js?v=s9dd';
 import { createAmbient } from './src/ambient.js?v=s9dd';
 import { createBlastFX } from './src/blastfx.js?v=s9dd';
-import { createHUD } from './src/hud.js?v=s9dd';
-import { createCockpit3D } from './src/cockpit3d.js?v=s9dd';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9dh';
-import { createEjection } from './src/eject.js?v=s9dd';
+import { createHUD } from './src/hud.js?v=s9di';
+import { createCockpit3D } from './src/cockpit3d.js?v=s9di';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9di';
+import { createEjection } from './src/eject.js?v=s9di';
 import { createAudio } from './src/audio.js?v=s9dg';
 import { createRadio } from './src/radio.js?v=s9dd';
 import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9dd';
@@ -748,7 +751,7 @@ import { createFreeLook } from './src/freelook.js?v=s9dd';
 import { createCanopyGlass } from './src/canopyglass.js?v=s9dd';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9dd';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9dd';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9dh';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9di';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9de';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9dd';
 import { createRadioQueue } from './src/radioQueue.js?v=s9dg';
@@ -4955,9 +4958,10 @@ function updateNavLights(t) {
     n.sp.scale.setScalar(n.size * (n.mode === 'steady' ? 1 : 0.6 + 0.4 * k));
   }
 }
+const _vaporTint = new THREE.Color();                   // scratch: setCloudColors runs every frame
 atmosphere.bind({
   sunLight, hemiLight, ambLight, renderer, ocean: oceanUniforms,
-  setCloudColors: (top, belly, sun, k) => { vfx.setCloudColors(top, belly, sun, k); vfx.setVaporTint(new THREE.Color(1, 1, 1).lerp(top, 0.65)); },
+  setCloudColors: (top, belly, sun, k) => { vfx.setCloudColors(top, belly, sun, k); vfx.setVaporTint(_vaporTint.setRGB(1, 1, 1).lerp(top, 0.65)); },
   setEnv: k => { for (const m of airframeMats) m.envMapIntensity = k; },
   setNavLights: k => { navLevel = k; },
   setNvgGain: k => nvg.setGain(k),

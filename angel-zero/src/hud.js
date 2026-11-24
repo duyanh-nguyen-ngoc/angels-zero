@@ -128,10 +128,22 @@ export function createHUD(THREE, A) {
     ctx.fillText(text, x, y);
   }
 
-  const _sp = new THREE.Vector3();
+  const _sp = new THREE.Vector3(), _tp = new THREE.Vector3();
+  // Pooled projection results: a ring far larger than one frame's live set (<~60), zero allocations.
+  const TS_N = 256, _tsRing = Array.from({ length: TS_N }, () => ({ x: 0, y: 0, ok: false }));
+  let _tsI = 0;
+  // Per-site direction scratch (each function owns its own: several of these nest).
+  const _clFwd = new THREE.Vector3(), _cbR = new THREE.Vector3(), _cbU = new THREE.Vector3(), _ldDir = new THREE.Vector3();
+  const _fpvV = new THREE.Vector3(), _arFwd = new THREE.Vector3(), _arUp = new THREE.Vector3(), _arFwd2 = new THREE.Vector3(), _arUp2 = new THREE.Vector3();
+  const _dtFwd = new THREE.Vector3(), _dtRel = new THREE.Vector3(), _gfFwd = new THREE.Vector3(), _gfCam = new THREE.Vector3(), _gfRel = new THREE.Vector3();
+  const _gfDir = new THREE.Vector2(), _gfV = new THREE.Vector3(), _rtV = new THREE.Vector3(), _tfV = new THREE.Vector3(), _tfB = new THREE.Vector3();
+  const _chFwd = new THREE.Vector3(), _apFwd = new THREE.Vector3(), _apV = new THREE.Vector3(), _apRw = new THREE.Vector3();
+  const _apCs = [null, null, null, null];
   function toScreen(v) {
     _sp.copy(v).project(cam);
-    return { x: (_sp.x * 0.5 + 0.5) * HW, y: (-_sp.y * 0.5 + 0.5) * HH, ok: _sp.z > -1 && _sp.z < 1 };
+    const o = _tsRing[_tsI]; _tsI = (_tsI + 1) % TS_N;
+    o.x = (_sp.x * 0.5 + 0.5) * HW; o.y = (-_sp.y * 0.5 + 0.5) * HH; o.ok = _sp.z > -1 && _sp.z < 1;
+    return o;
   }
   // Drone marker scratch: reused projection object, zero per-frame allocations.
   const _drScr = new THREE.Vector3(), _drPr = { x: 0, y: 0, ok: false }, _drCentroid = new THREE.Vector3();
@@ -167,8 +179,8 @@ export function createHUD(THREE, A) {
   // 3rd-person layout: everything keys off the boresight point (screen centre-ish).
   const BOX_OFF = 165;                                   // SPEED / ALT box centres, px either side of the reticle
   function chaseLayout() {
-    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(S.quaternion);
-    const b = toScreen(cam.position.clone().addScaledVector(fwd, 5000));
+    const fwd = _clFwd.set(0, 0, -1).applyQuaternion(S.quaternion);
+    const b = toScreen(_tp.copy(cam.position).addScaledVector(fwd, 5000));
     const cx = b.ok ? clamp(b.x, HW * 0.3, HW * 0.7) : HW / 2, cy = b.ok ? clamp(b.y, HH * 0.3, HH * 0.7) : HH / 2;
     return {
       cx, cy,
@@ -195,8 +207,8 @@ export function createHUD(THREE, A) {
   }
 
   function camBank() {
-    const r = new THREE.Vector3(1, 0, 0).applyQuaternion(cam.quaternion);
-    const u = new THREE.Vector3(0, 1, 0).applyQuaternion(cam.quaternion);
+    const r = _cbR.set(1, 0, 0).applyQuaternion(cam.quaternion);
+    const u = _cbU.set(0, 1, 0).applyQuaternion(cam.quaternion);
     return Math.atan2(r.y, u.y);
   }
 
@@ -204,7 +216,7 @@ export function createHUD(THREE, A) {
   const LADDER_ANGLES = [0, 5, -5, 10, -10, 15, -15, 20, -20, 30, -30, 45, -45, 60, -60, 75, -75];
   function drawConformalLadder(ctx, g, col, compact) {
     const h = S.heading * D2R, eye = cam.position, bank = camBank(), fl = focal();
-    const dir = new THREE.Vector3();
+    const dir = _ldDir;
     const rungW = compact ? 54 : 74, gap = compact ? 22 : 28;
     ctx.save();
     ctx.beginPath();
@@ -218,7 +230,7 @@ export function createHUD(THREE, A) {
     for (const m of LADDER_ANGLES) {
       const e = m * D2R;
       dir.set(Math.sin(h) * Math.cos(e), Math.sin(e), -Math.cos(h) * Math.cos(e));
-      const p = toScreen(eye.clone().addScaledVector(dir, 5000));
+      const p = toScreen(_tp.copy(eye).addScaledVector(dir, 5000));
       if (!p.ok || p.y < g.minY - 80 || p.y > g.maxY + 80) continue;
       ctx.save();
       ctx.translate(p.x, p.y);
@@ -280,9 +292,9 @@ export function createHUD(THREE, A) {
   }
 
   function drawFPV(ctx, box, dt, col) {
-    const v = S.velocity.clone().normalize();
+    const v = _fpvV.copy(S.velocity).normalize();
     fpvDir.lerp(v, 1 - Math.exp(-dt / 0.055)).normalize();
-    const p = toScreen(cam.position.clone().addScaledVector(fpvDir, 4500));
+    const p = toScreen(_tp.copy(cam.position).addScaledVector(fpvDir, 4500));
     if (!p.ok) return;
     const x0 = box.cx - box.boxW / 2 + 16, x1 = box.cx + box.boxW / 2 - 16;
     const y0 = box.minY + 18, y1 = box.maxY - 18;
@@ -467,10 +479,10 @@ export function createHUD(THREE, A) {
     const aam = C.weapon === 'AAM4';
     if (!C.seekerArmed || !C.designated || C.dead || C.weapon === 'BOMB') return;
     if (aam ? C.aam4 <= 0 || C.aam4Reload > 0 : C.missiles <= 0 || C.missileReload > 0) return;
-    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(S.quaternion);
-    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(S.quaternion);
-    const c = toScreen(cam.position.clone().addScaledVector(fwd, 5000));
-    const e = toScreen(cam.position.clone().addScaledVector(fwd, 5000).addScaledVector(up, 5000 * Math.tan((aam ? 25 : 7) * D2R)));
+    const fwd = _arFwd2.set(0, 0, -1).applyQuaternion(S.quaternion);
+    const up = _arUp2.set(0, 1, 0).applyQuaternion(S.quaternion);
+    const c = toScreen(_tp.copy(cam.position).addScaledVector(fwd, 5000));
+    const e = toScreen(_tp.copy(cam.position).addScaledVector(fwd, 5000).addScaledVector(up, 5000 * Math.tan((aam ? 25 : 7) * D2R)));
     if (!c.ok || !e.ok) return;
     const r = Math.hypot(e.x - c.x, e.y - c.y);
     ctx.save();
@@ -492,10 +504,10 @@ export function createHUD(THREE, A) {
   // (amber flash when C finds nothing in the cone).
   function drawAcquisitionRing(ctx) {
     if (C.dead) return;
-    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(S.quaternion);
-    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(S.quaternion);
-    const c = toScreen(cam.position.clone().addScaledVector(fwd, 5000));
-    const e = toScreen(cam.position.clone().addScaledVector(fwd, 5000).addScaledVector(up, 5000 * Math.tan((C.weapon === 'AAM4' ? 25 : 7) * D2R)));
+    const fwd = _arFwd.set(0, 0, -1).applyQuaternion(S.quaternion);
+    const up = _arUp.set(0, 1, 0).applyQuaternion(S.quaternion);
+    const c = toScreen(_tp.copy(cam.position).addScaledVector(fwd, 5000));
+    const e = toScreen(_tp.copy(cam.position).addScaledVector(fwd, 5000).addScaledVector(up, 5000 * Math.tan((C.weapon === 'AAM4' ? 25 : 7) * D2R)));
     if (!c.ok || !e.ok) return;
     const r = Math.hypot(e.x - c.x, e.y - c.y);
     const age = (performance.now() - (C.designateT || -1e9)) / 1000;
@@ -527,14 +539,14 @@ export function createHUD(THREE, A) {
     if (C.lockState === 'LOCK' && prevLockState !== 'LOCK') lockSnapT = now;
     prevLockState = C.lockState;
 
-    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+    const fwd = _dtFwd.set(0, 0, -1).applyQuaternion(cam.quaternion);
     const ch = A.isFirstPerson() ? null : chaseLayout();
     const inTape = (px, py) => ch && py > ch.tapeTop - 22 && py < ch.tapeBot + 28 &&
       ((px > ch.tapeL - 66 && px < ch.tapeL + 24) || (px > ch.tapeR - 24 && px < ch.tapeR + 66));
     const inCorner = (px, py) => (px < 268 && py < 195) || (px < 252 && py > HH - 248) || (px > HW - 200 && py > HH - 300);
     const onScreenOf = (pos, isPrim = false) => {
       const p = toScreen(pos);
-      return { p, on: pos.clone().sub(cam.position).dot(fwd) > 0 && p.ok && p.x > 36 && p.x < HW - 36 && p.y > 42 && p.y < HH - 42 && !inCorner(p.x, p.y) && (isPrim || !inTape(p.x, p.y)) };
+      return { p, on: _dtRel.copy(pos).sub(cam.position).dot(fwd) > 0 && p.ok && p.x > 36 && p.x < HW - 36 && p.y > 42 && p.y < HH - 42 && !inCorner(p.x, p.y) && (isPrim || !inTape(p.x, p.y)) };
     };
     drawAcquisitionRing(ctx);
     drawSeekerCircle(ctx);
@@ -685,7 +697,7 @@ export function createHUD(THREE, A) {
     const EDGE = 40, placed = [];
     offRing.sort((a, b) => (b.isMsl - a.isMsl) || (b.isPrim - a.isPrim) || a.range - b.range);
     for (const item of offRing) {
-      const v = item.pos.clone().applyMatrix4(cam.matrixWorldInverse);
+      const v = _dtRel.copy(item.pos).applyMatrix4(cam.matrixWorldInverse);
       let ang = Math.atan2(-v.y, v.x);
       if (v.z > 0 && Math.abs(v.x) < 1 && Math.abs(v.y) < 1) ang = Math.PI / 2;
       const mx = HW / 2 - EDGE, my = HH / 2 - EDGE;
@@ -733,8 +745,8 @@ export function createHUD(THREE, A) {
   /* --------------------------------------------------- CCIP & M61 gun sight */
   function drawCCIP(ctx) {
     if (C.weapon !== 'BOMB' || C.dead) return;
-    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(S.quaternion);
-    const w = toScreen(cam.position.clone().addScaledVector(fwd, 5000));
+    const fwd = _gfFwd.set(0, 0, -1).applyQuaternion(S.quaternion);
+    const w = toScreen(_tp.copy(cam.position).addScaledVector(fwd, 5000));
     if (!w.ok) return;
     const now = performance.now();
     ctx.save(); ctx.textAlign = 'center';
@@ -743,11 +755,11 @@ export function createHUD(THREE, A) {
       labelText(ctx, 'UGB RLD ' + Math.max(0, C.bombReload).toFixed(1), w.x, w.y + 34, AMBER, 4);
       ctx.restore(); return;
     }
-    const camFwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+    const camFwd = _gfCam.set(0, 0, -1).applyQuaternion(cam.quaternion);
     drawSurfaceTargets(ctx, camFwd);
     if (C.ccrp) { drawCCRP(ctx, camFwd, now); ctx.restore(); return; }
     const c = C.ccip;
-    const inFront = c && c.clone().sub(cam.position).dot(camFwd) > 0;
+    const inFront = c && _gfRel.copy(c).sub(cam.position).dot(camFwd) > 0;
     const p = c && inFront ? toScreen(c) : null;
     const onScreen = p && p.ok && p.x > 20 && p.x < HW - 20 && p.y > 20 && p.y < HH - 20;
     glow(ctx, G, 5); ctx.lineWidth = 1.4;
@@ -760,7 +772,7 @@ export function createHUD(THREE, A) {
       ctx.font = f(11, true); ctx.textBaseline = 'top';
       labelText(ctx, 'T ' + C.ccipTof.toFixed(1) + 'S  ' + rng.toFixed(1) + 'NM', p.x, p.y + 21, G, 3);
     } else {
-      const dir = p ? new THREE.Vector2(p.x - w.x, p.y - w.y) : new THREE.Vector2(0, 1);
+      const dir = p ? _gfDir.set(p.x - w.x, p.y - w.y) : _gfDir.set(0, 1);
       if (dir.y < 0.2 * Math.abs(dir.x) || dir.lengthSq() < 1) dir.set(dir.x, Math.abs(dir.x) * 0.2 + 1);
       dir.normalize();
       const k = Math.min((HH - 34 - w.y) / Math.max(dir.y, 1e-3), dir.x ? (dir.x > 0 ? HW - 34 - w.x : w.x - 34) / Math.abs(dir.x) : 1e9);
@@ -779,7 +791,7 @@ export function createHUD(THREE, A) {
   // Surface strike targets (>UGB): small squares, the designated one boxed and labelled.
   function drawSurfaceTargets(ctx, camFwd) {
     for (const t of A.getSurface ? A.getSurface() : []) {
-      if (!t.alive || t.pos.clone().sub(cam.position).dot(camFwd) <= 0) continue;
+      if (!t.alive || _gfRel.copy(t.pos).sub(cam.position).dot(camFwd) <= 0) continue;
       const p = toScreen(t.pos); if (!p.ok) continue;
       const prim = t === C.groundTgt, s = prim ? 13 : 6;
       ctx.save(); glow(ctx, prim ? GB : 'rgba(88,255,154,0.6)', prim ? 4 : 0); ctx.lineWidth = prim ? 1.4 : 1;
@@ -798,10 +810,10 @@ export function createHUD(THREE, A) {
   // when the bar crosses the FPV with the pickle held (C.ccrpArmed).
   function drawCCRP(ctx, camFwd, now) {
     const r = C.ccrp, t = r.tgt;
-    const vdir = S.velocity.clone().normalize();
-    const fp = toScreen(cam.position.clone().addScaledVector(vdir, 4500));
+    const vdir = _gfV.copy(S.velocity).normalize();
+    const fp = toScreen(_tp.copy(cam.position).addScaledVector(vdir, 4500));
     if (!fp.ok) return;
-    const tp = toScreen(t.pos), inFront = t.pos.clone().sub(cam.position).dot(camFwd) > 0;
+    const tp = toScreen(t.pos), inFront = _gfRel.copy(t.pos).sub(cam.position).dot(camFwd) > 0;
     const sx = inFront && tp.ok ? clamp(tp.x, 40, HW - 40) : (r.cross > 0 ? HW - 40 : 40);
     const col = C.ccrpArmed ? AMBER : G;
     ctx.save();
@@ -1781,9 +1793,9 @@ export function createHUD(THREE, A) {
   // AC8 centre reticle: circle + wing ticks + tail fin, at the boresight, nudged
   // (max 22 px) toward the flight-path vector for a subtle velocity parallax.
   function drawReticle(ctx, g, dt, col) {
-    const v = S.velocity.clone().normalize();
+    const v = _rtV.copy(S.velocity).normalize();
     fpvDir.lerp(v, 1 - Math.exp(-dt / 0.08)).normalize();
-    const p = toScreen(cam.position.clone().addScaledVector(fpvDir, 4500));
+    const p = toScreen(_tp.copy(cam.position).addScaledVector(fpvDir, 4500));
     let dx = 0, dy = 0;
     if (p.ok) { dx = clamp((p.x - g.cx) * 0.35, -22, 22); dy = clamp((p.y - g.cy) * 0.35, -22, 22); }
     const x = g.cx + dx, y = g.cy + dy;
@@ -1802,9 +1814,9 @@ export function createHUD(THREE, A) {
   // shown once AoA / sideslip push it clear of the nose reticle.
   const fpvTrue = new THREE.Vector3(0, 0, -1);
   function drawTrueFPV(ctx, col) {
-    fpvTrue.lerp(S.velocity.clone().normalize(), 0.35).normalize();
-    const p = toScreen(cam.position.clone().addScaledVector(fpvTrue, 4500));
-    const b = toScreen(cam.position.clone().addScaledVector(new THREE.Vector3(0, 0, -1).applyQuaternion(S.quaternion), 4500));
+    fpvTrue.lerp(_tfV.copy(S.velocity).normalize(), 0.35).normalize();
+    const p = toScreen(_tp.copy(cam.position).addScaledVector(fpvTrue, 4500));
+    const b = toScreen(_tp.copy(cam.position).addScaledVector(_tfB.set(0, 0, -1).applyQuaternion(S.quaternion), 4500));
     if (!p.ok || !b.ok || Math.hypot(p.x - b.x, p.y - b.y) < 7) return;
     ctx.save();
     glow(ctx, col, 3); ctx.lineWidth = 1.1; ctx.globalAlpha = 0.9;
@@ -1860,8 +1872,8 @@ export function createHUD(THREE, A) {
     if (g.path) ctx.clip(g.path);
 
     drawConformalLadder(ctx, g, hudCol, compact);
-    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(S.quaternion);
-    const bore = toScreen(cam.position.clone().addScaledVector(fwd, 5000));
+    const fwd = _chFwd.set(0, 0, -1).applyQuaternion(S.quaternion);
+    const bore = toScreen(_tp.copy(cam.position).addScaledVector(fwd, 5000));
     if (bore.ok) { drawWaterline(ctx, bore, hudCol); heatArc(ctx, bore.x, bore.y, 30, C.gunHeat || 0, 0.85); }
     drawFPV(ctx, { cx: g.cx, minY: g.minY + (compact ? 40 : 12), maxY: g.maxY - 12, boxW: g.boxW - (compact ? 84 : 120) }, dt, hudCol);
     drawGunFunnel(ctx, hudCol);
@@ -2308,9 +2320,11 @@ export function createHUD(THREE, A) {
       ctx.save();
       // Synthetic runway outline (world corners projected), so the strip reads through haze.
       const R = A.runway, E = R.elev + 0.3, hw = R.width / 2;
-      const cs = [[R.x - hw, R.z1], [R.x + hw, R.z1], [R.x + hw, R.z0], [R.x - hw, R.z0]].map(([x, z]) => toScreen(new THREE.Vector3(x, E, z)));
-      const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
-      const ahead = new THREE.Vector3(R.x, E, R.z1).sub(cam.position).dot(fwd) > 0;
+      const cs = _apCs;
+      cs[0] = toScreen(_apRw.set(R.x - hw, E, R.z1)); cs[1] = toScreen(_apRw.set(R.x + hw, E, R.z1));
+      cs[2] = toScreen(_apRw.set(R.x + hw, E, R.z0)); cs[3] = toScreen(_apRw.set(R.x - hw, E, R.z0));
+      const fwd = _apFwd.set(0, 0, -1).applyQuaternion(cam.quaternion);
+      const ahead = _apRw.set(R.x, E, R.z1).sub(cam.position).dot(fwd) > 0;
       if (ahead && cs.every(p => p.ok)) {
         glow(ctx, G, 4); ctx.lineWidth = 1.2; ctx.setLineDash([6, 5]);
         ctx.beginPath(); cs.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath(); ctx.stroke();
@@ -2339,7 +2353,7 @@ export function createHUD(THREE, A) {
     // alpha 13 deg (= ~160 kt at landing weight), band +/-2.3 deg (~145-175 kt).
     // FPV centred in the bracket = on speed; FPV below the bracket centre = slow.
     if (S.gear > 0.9 && !S.onGround && !C.dead) {
-      const p = toScreen(cam.position.clone().addScaledVector(S.velocity.clone().normalize(), 4500));
+      const p = toScreen(_tp.copy(cam.position).addScaledVector(_apV.copy(S.velocity).normalize(), 4500));
       if (p.ok) {
         const aDeg = S.alpha * R2D, k = 9, ON = 13, BAND = 2.3;
         const by = p.y - (aDeg - ON) * k, bh = BAND * k, bx = p.x - 26;

@@ -624,6 +624,7 @@ export function createCockpit3D(THREE, env) {
   }));
   rim.renderOrder = 7; rig.add(rim);
   const glassOutline = gShape.getSpacedPoints(72).map(p => new THREE.Vector3(p.x, p.y, bendZ(p.x)));
+  const glassOutlineW = glassOutline.map(() => new THREE.Vector3());
   const anodizedMat = new THREE.MeshStandardMaterial({ color: 0x14171b, roughness: 0.32, metalness: 0.7, envMap: envTex, envMapIntensity: 0.6 });
   {
     // Thin anodized posts hugging each tapered side edge, from the housing to the chamfer.
@@ -1324,7 +1325,8 @@ export function createCockpit3D(THREE, env) {
       return { pitch: +(hotas.pitch / D2R).toFixed(1), roll: +(hotas.roll / D2R).toFixed(1), trig: +hotas.trig.toFixed(2), pickle: +hotas.pickle.toFixed(2),
         thrL: +(throttles[0].angle / D2R).toFixed(1), thrR: +(throttles[1].angle / D2R).toFixed(1) };
     },
-    glassOutlineWorld() { return glassOutline.map(p => _w.copy(p).applyMatrix4(rig.matrixWorld).clone()); },
+    // Reused world-space outline (73 points): rewritten in place every call, zero allocations.
+    glassOutlineWorld() { for (let i = 0; i < glassOutline.length; i++) glassOutlineW[i].copy(glassOutline[i]).applyMatrix4(rig.matrixWorld); return glassOutlineW; },
     get head() {
       return { roll: +(head.roll / D2R).toFixed(1), lookPitch: +(head.look / D2R).toFixed(1), lookYaw: +(head.lookYaw / D2R).toFixed(1),
         off: head.off.toArray().map(v => +v.toFixed(3)) };

@@ -6,6 +6,7 @@
 export function createEjection(THREE, env) {
   const { scene, camera, jet, state: S, mouse, keys, groundLevel, terrainHeight, fx, say } = env;
   const clamp = THREE.MathUtils.clamp, rand = Math.random;
+  const _ejTarget = new THREE.Vector3(), _ejOrbit = new THREE.Vector3();
   const RESPAWN_AFTER = 5.0, DEPLOY_AT = 0.7;
 
   /* --------------------------------------------------- chute + pilot */
@@ -145,17 +146,17 @@ export function createEjection(THREE, env) {
     sway.rotation.x = Math.sin(st.t * 1.7 + 1) * 0.05;
 
     // Camera: watch the jet go for a moment, then free mouse-look orbit around the pilot.
-    const target = st.pos.clone().add(new THREE.Vector3(0, st.chute ? 3.2 : 0.4, 0));
+    const target = _ejTarget.copy(st.pos); target.y += st.chute ? 3.2 : 0.4;          // scratch: zero per-frame allocations
     const camYaw = st.yaw + Math.PI + mouse.nx * Math.PI;
     const camPitch = clamp(0.18 + mouse.ny * 0.9, -0.5, 1.2);
     const dist = st.chute ? 17 : 11;
-    const orbit = target.clone().add(new THREE.Vector3(Math.sin(camYaw) * Math.cos(camPitch) * dist, Math.sin(camPitch) * dist, Math.cos(camYaw) * Math.cos(camPitch) * dist));
+    const orbit = _ejOrbit.set(Math.sin(camYaw) * Math.cos(camPitch) * dist, Math.sin(camPitch) * dist, Math.cos(camYaw) * Math.cos(camPitch) * dist).add(target);
     const blend = clamp(st.t / 0.9, 0, 1);
     camera.position.lerpVectors(st.lookFrom, orbit, blend * blend * (3 - 2 * blend));
     const minY = groundLevel(camera.position.x, camera.position.z) + 1.5;
     if (camera.position.y < minY) camera.position.y = minY;
     camera.up.set(0, 1, 0);
-    camera.lookAt(st.t < 0.9 && st.wreck.alive ? target.clone().lerp(st.wreck.pos, 1 - blend) : target);
+    camera.lookAt(st.t < 0.9 && st.wreck.alive ? _ejOrbit.copy(target).lerp(st.wreck.pos, 1 - blend) : target);   // orbit already consumed above
     camera.updateMatrixWorld();
 
     if (!st.saidRescue && st.t > 2.3) { st.saidRescue = true; say('RESCUE CHOPPER INBOUND — STAND BY FOR RE-ENTRY', 2.8); }

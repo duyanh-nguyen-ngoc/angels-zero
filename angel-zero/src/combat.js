@@ -88,6 +88,13 @@ const LOG_V = '#include <common>\n#include <logdepthbuf_pars_vertex>\n';
 const LOG_F = '#include <logdepthbuf_pars_fragment>\n';
 
 export function createCombat(THREE, env) {
+  // Shared spawn record: Particles.spawn() copies every field immediately, so per-frame
+  // emitters pass one reused object instead of a fresh literal (zero allocations).
+  const _spo = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, life: 0, s0: 0, s1: 0, r: 0, g: 0, b: 0, a: undefined, drag: undefined, rise: undefined };
+  function spo(x, y, z, vx, vy, vz, life, s0, s1, r, g, b, a, drag, rise) {
+    const o = _spo; o.x = x; o.y = y; o.z = z; o.vx = vx; o.vy = vy; o.vz = vz; o.life = life; o.s0 = s0; o.s1 = s1;
+    o.r = r; o.g = g; o.b = b; o.a = a; o.drag = drag; o.rise = rise; return o;
+  }
   const { scene, camera, renderer, state: S, combat: C, jet, groundLevel, terrainHeight } = env;
   const clamp = THREE.MathUtils.clamp, D2R = Math.PI / 180;
   const rand = Math.random;
@@ -275,18 +282,16 @@ export function createCombat(THREE, env) {
     for (let i = 0; i < n; i++) {                                    // expanding fireball
       const v = new THREE.Vector3(rand() - 0.5, rand() - 0.5, rand() - 0.5).normalize().multiplyScalar((20 + rand() * 55) * scale);
       const hot = rand();
-      fire.spawn({ x: pos.x, y: pos.y, z: pos.z, vx: v.x, vy: v.y, vz: v.z, life: 0.5 + rand() * 0.8, s0: 5 * scale, s1: (18 + rand() * 16) * scale,
-        r: 1.0, g: 0.45 + 0.4 * hot, b: 0.12 + 0.25 * hot * hot, a: 0.95, drag: 2.2 });
+      fire.spawn(spo(pos.x, pos.y, pos.z, v.x, v.y, v.z, 0.5 + rand() * 0.8, 5 * scale, (18 + rand() * 16) * scale, 1.0, 0.45 + 0.4 * hot, 0.12 + 0.25 * hot * hot, 0.95, 2.2));
     }
     for (let i = 0; i < n * 0.6; i++) {                             // sparks / debris
       const v = new THREE.Vector3(rand() - 0.5, rand() - 0.3, rand() - 0.5).normalize().multiplyScalar((90 + rand() * 120) * scale);
-      fire.spawn({ x: pos.x, y: pos.y, z: pos.z, vx: v.x, vy: v.y, vz: v.z, life: 0.6 + rand() * 0.9, s0: 1.6, s1: 0.6, r: 1, g: 0.75, b: 0.35, a: 1, drag: 0.6 });
+      fire.spawn(spo(pos.x, pos.y, pos.z, v.x, v.y, v.z, 0.6 + rand() * 0.9, 1.6, 0.6, 1, 0.75, 0.35, 1, 0.6));
     }
     for (let i = 0; i < n * 0.7; i++) {                             // dark smoke shell
       const v = new THREE.Vector3(rand() - 0.5, rand() * 0.6 - 0.2, rand() - 0.5).normalize().multiplyScalar((8 + rand() * 22) * scale);
       const g = 0.10 + rand() * 0.08;
-      smoke.spawn({ x: pos.x + v.x * 0.2, y: pos.y + v.y * 0.2, z: pos.z + v.z * 0.2, vx: v.x, vy: v.y, vz: v.z, life: 3 + rand() * 3, s0: 8 * scale, s1: (30 + rand() * 25) * scale,
-        r: g, g: g, b: g * 1.05, a: 0.75, drag: 0.8, rise: 2.5 });
+      smoke.spawn(spo(pos.x + v.x * 0.2, pos.y + v.y * 0.2, pos.z + v.z * 0.2, v.x, v.y, v.z, 3 + rand() * 3, 8 * scale, (30 + rand() * 25) * scale, g, g, g * 1.05, 0.75, 0.8, 2.5));
     }
   }
   function splash(pos, scale = 1) {
@@ -297,8 +302,7 @@ export function createCombat(THREE, env) {
     }
     for (let i = 0; i < 60 * scale; i++) {
       const a = rand() * Math.PI * 2, s = (6 + rand() * 18) * scale;
-      smoke.spawn({ x: pos.x, y: 0.5, z: pos.z, vx: Math.cos(a) * s, vy: (18 + rand() * 40) * scale, vz: Math.sin(a) * s, life: 1.6 + rand() * 1.6, s0: 4 * scale, s1: (16 + rand() * 14) * scale,
-        r: 0.94, g: 0.96, b: 1.0, a: 0.8, drag: 0.4, rise: -16 });
+      smoke.spawn(spo(pos.x, 0.5, pos.z, Math.cos(a) * s, (18 + rand() * 40) * scale, Math.sin(a) * s, 1.6 + rand() * 1.6, 4 * scale, (16 + rand() * 14) * scale, 0.94, 0.96, 1.0, 0.8, 0.4, -16));
     }
   }
 
@@ -868,8 +872,7 @@ export function createCombat(THREE, env) {
       _gUp.set(0, 1, 0).applyQuaternion(S.quaternion);
       while (steamAcc >= 1) {
         steamAcc -= 1;
-        smoke.spawn({ x: _gPort.x, y: _gPort.y, z: _gPort.z, vx: S.velocity.x * 0.9 + _gUp.x * 4 + (rand() - 0.5) * 2, vy: S.velocity.y * 0.9 + _gUp.y * 4 + rand() * 2, vz: S.velocity.z * 0.9 + _gUp.z * 4 + (rand() - 0.5) * 2,
-          life: 0.8 + rand() * 0.6, s0: 0.6, s1: 3.5 + rand() * 2, r: 0.97, g: 0.98, b: 1.0, a: 0.55, drag: 2.2, rise: 1.2 });
+        smoke.spawn(spo(_gPort.x, _gPort.y, _gPort.z, S.velocity.x * 0.9 + _gUp.x * 4 + (rand() - 0.5) * 2, S.velocity.y * 0.9 + _gUp.y * 4 + rand() * 2, S.velocity.z * 0.9 + _gUp.z * 4 + (rand() - 0.5) * 2, 0.8 + rand() * 0.6, 0.6, 3.5 + rand() * 2, 0.97, 0.98, 1.0, 0.55, 2.2, 1.2));
       }
     }
   }
@@ -911,9 +914,7 @@ export function createCombat(THREE, env) {
     while (smokeAcc >= 1) {
       smokeAcc -= 1;
       const g = 0.55 + rand() * 0.12;
-      smoke.spawn({ x: _gPort.x + _gRight.x * 0.15, y: _gPort.y + _gRight.y * 0.15, z: _gPort.z + _gRight.z * 0.15,
-        vx: S.velocity.x * 0.82 + _gRight.x * 3 + (rand() - 0.5) * 2, vy: S.velocity.y * 0.82 + _gRight.y * 3 + (rand() - 0.5) * 2, vz: S.velocity.z * 0.82 + _gRight.z * 3 + (rand() - 0.5) * 2,
-        life: 1.0 + rand() * 0.8, s0: 0.7, s1: 4.5 + rand() * 2, r: g, g, b: g * 1.02, a: 0.42, drag: 1.6, rise: 0.4 });
+      smoke.spawn(spo(_gPort.x + _gRight.x * 0.15, _gPort.y + _gRight.y * 0.15, _gPort.z + _gRight.z * 0.15, S.velocity.x * 0.82 + _gRight.x * 3 + (rand() - 0.5) * 2, S.velocity.y * 0.82 + _gRight.y * 3 + (rand() - 0.5) * 2, S.velocity.z * 0.82 + _gRight.z * 3 + (rand() - 0.5) * 2, 1.0 + rand() * 0.8, 0.7, 4.5 + rand() * 2, g, g, g * 1.02, 0.42, 1.6, 0.4));
     }
   }
 
@@ -923,12 +924,12 @@ export function createCombat(THREE, env) {
     for (let i = 0; i < 10; i++) {
       const s = new THREE.Vector3(rand() - 0.5, rand() - 0.5, rand() - 0.5).normalize().addScaledVector(back, 0.6).normalize().multiplyScalar(40 + rand() * 90);
       const w = rand();
-      fire.spawn({ x: p.x, y: p.y, z: p.z, vx: s.x, vy: s.y, vz: s.z, life: 0.22 + rand() * 0.3, s0: 1.4 + w, s1: 0.4, r: 1, g: 0.75 + 0.25 * w, b: 0.45 + 0.5 * w, a: 1, drag: 1.2 });
+      fire.spawn(spo(p.x, p.y, p.z, s.x, s.y, s.z, 0.22 + rand() * 0.3, 1.4 + w, 0.4, 1, 0.75 + 0.25 * w, 0.45 + 0.5 * w, 1, 1.2));
     }
-    fire.spawn({ x: p.x, y: p.y, z: p.z, vx: 0, vy: 0, vz: 0, life: 0.12, s0: 6, s1: 9, r: 1, g: 0.95, b: 0.8, a: 1 });
+    fire.spawn(spo(p.x, p.y, p.z, 0, 0, 0, 0.12, 6, 9, 1, 0.95, 0.8, 1));
     for (let i = 0; i < 2; i++) {
       const g = 0.12 + rand() * 0.06;
-      smoke.spawn({ x: p.x, y: p.y, z: p.z, vx: (rand() - 0.5) * 8, vy: rand() * 4, vz: (rand() - 0.5) * 8, life: 1.2 + rand(), s0: 2, s1: 8, r: g, g, b: g, a: 0.6, drag: 1.0, rise: 1 });
+      smoke.spawn(spo(p.x, p.y, p.z, (rand() - 0.5) * 8, rand() * 4, (rand() - 0.5) * 8, 1.2 + rand(), 2, 8, g, g, g, 0.6, 1.0, 1));
     }
     C.hitMarker = performance.now();
     if (env.onSfx) env.onSfx('hit', p, 1);
@@ -1419,7 +1420,7 @@ export function createCombat(THREE, env) {
       e.aceAcc -= 1;
       for (const sx of [-6.4, 6.4]) {
         const p = _s.set(sx, 0.1, 2.2).applyQuaternion(e.quat).add(e.pos);
-        smoke.spawn({ x: p.x, y: p.y, z: p.z, vx: e.vel.x * 0.6, vy: e.vel.y * 0.6, vz: e.vel.z * 0.6, life: 1.1 + 0.6 * e.ab, s0: 0.7, s1: 2.6, r: 0.95, g: 0.16, b: 0.22, a: 0.42, drag: 1.4 });
+        smoke.spawn(spo(p.x, p.y, p.z, e.vel.x * 0.6, e.vel.y * 0.6, e.vel.z * 0.6, 1.1 + 0.6 * e.ab, 0.7, 2.6, 0.95, 0.16, 0.22, 0.42, 1.4));
       }
     }
   }
@@ -1596,9 +1597,7 @@ export function createCombat(THREE, env) {
     } else if (e.decoys > 0 && e.chaffN > 0) {
       e.chaffN--;
       for (let i = 0; i < 36; i++) {
-        fire.spawn({ x: e.pos.x + (rand() - 0.5) * 10, y: e.pos.y + (rand() - 0.5) * 8, z: e.pos.z + (rand() - 0.5) * 10,
-          vx: (rand() - 0.5) * 14, vy: (rand() - 0.5) * 8, vz: (rand() - 0.5) * 14,
-          life: 0.7 + rand(), s0: 0.7, s1: 0.25, r: 0.76, g: 0.76, b: 0.78, a: 0.75, drag: 2.8 });
+        fire.spawn(spo(e.pos.x + (rand() - 0.5) * 10, e.pos.y + (rand() - 0.5) * 8, e.pos.z + (rand() - 0.5) * 10, (rand() - 0.5) * 14, (rand() - 0.5) * 8, (rand() - 0.5) * 14, 0.7 + rand(), 0.7, 0.25, 0.76, 0.76, 0.78, 0.75, 2.8));
       }
     }
     if (env.debug) console.log('[ANGELS_ZERO] ace cm kind=' + kind + ' seduced=' + !!seduce);
@@ -2098,7 +2097,7 @@ export function createCombat(THREE, env) {
         e.trailAcc -= 1;
         for (const tip of WINGTIPS) {
           const p = _w.copy(tip).applyQuaternion(e.quat).add(e.pos);
-          smoke.spawn({ x: p.x, y: p.y, z: p.z, vx: 0, vy: 0, vz: 0, life: 0.4 + rand() * 0.15, s0: 0.55, s1: 1.5, r: 0.95, g: 0.96, b: 0.98, a: 0.5, drag: 0 });
+          smoke.spawn(spo(p.x, p.y, p.z, 0, 0, 0, 0.4 + rand() * 0.15, 0.55, 1.5, 0.95, 0.96, 0.98, 0.5, 0));
           ai.trails++;
         }
       }
@@ -2436,17 +2435,16 @@ export function createCombat(THREE, env) {
     C.styleFeed = C.styleFeed.filter(s => nowMs - s.born < 3200);
   }
 
+  const _wrQ = new THREE.Quaternion(), _wrE = new THREE.Euler();
   function updateWreck(e, dt) {
     const w = e.wreck;
     w.t += dt;
     w.vel.y -= G0 * dt; w.vel.multiplyScalar(1 - 0.08 * dt);
     e.pos.addScaledVector(w.vel, dt);
-    const sq = new THREE.Quaternion().setFromEuler(new THREE.Euler(w.spin.x * dt, w.spin.y * dt, w.spin.z * dt));
-    e.quat.multiply(sq);
-    if (rand() < 0.9) fire.spawn({ x: e.pos.x + (rand() - 0.5) * 4, y: e.pos.y, z: e.pos.z + (rand() - 0.5) * 4, vx: (rand() - 0.5) * 6, vy: 4, vz: (rand() - 0.5) * 6,
-      life: 0.5 + rand() * 0.4, s0: 5, s1: 11, r: 1, g: 0.5 + rand() * 0.3, b: 0.15, a: 0.9, drag: 1.5 });
+    e.quat.multiply(_wrQ.setFromEuler(_wrE.set(w.spin.x * dt, w.spin.y * dt, w.spin.z * dt)));   // scratch tumble
+    if (rand() < 0.9) fire.spawn(spo(e.pos.x + (rand() - 0.5) * 4, e.pos.y, e.pos.z + (rand() - 0.5) * 4, (rand() - 0.5) * 6, 4, (rand() - 0.5) * 6, 0.5 + rand() * 0.4, 5, 11, 1, 0.5 + rand() * 0.3, 0.15, 0.9, 1.5));
     const g = 0.08 + rand() * 0.06;
-    smoke.spawn({ x: e.pos.x, y: e.pos.y, z: e.pos.z, vx: (rand() - 0.5) * 4, vy: 2, vz: (rand() - 0.5) * 4, life: 4 + rand() * 2, s0: 6, s1: 30, r: g, g, b: g, a: 0.7, drag: 0.6, rise: 1.5 });
+    smoke.spawn(spo(e.pos.x, e.pos.y, e.pos.z, (rand() - 0.5) * 4, 2, (rand() - 0.5) * 4, 4 + rand() * 2, 6, 30, g, g, g, 0.7, 0.6, 1.5));
     const ground = terrainHeight(e.pos.x, e.pos.z);
     if (e.pos.y <= Math.max(0, ground) + 1) {
       // Impact: never let a wreck pass under the map — water geyser or ground fireball.
@@ -2555,8 +2553,8 @@ export function createCombat(THREE, env) {
       while (d.acc >= 1) {
         d.acc -= 1;
         const gg = 0.12 + rand() * 0.08, p = d.g.position;
-        smoke.spawn({ x: p.x, y: p.y, z: p.z, vx: (rand() - 0.5) * 3, vy: rand() * 2, vz: (rand() - 0.5) * 3, life: 2.5 + rand() * 1.5, s0: 2, s1: 11, r: gg, g: gg, b: gg, a: 0.65, drag: 0.8, rise: 0.8 });
-        if (d.t < 3 && rand() < 0.4) fire.spawn({ x: p.x, y: p.y, z: p.z, vx: d.vel.x * 0.3, vy: d.vel.y * 0.3, vz: d.vel.z * 0.3, life: 0.25, s0: 3, s1: 1, r: 1, g: 0.6, b: 0.2, a: 0.9, drag: 1 });
+        smoke.spawn(spo(p.x, p.y, p.z, (rand() - 0.5) * 3, rand() * 2, (rand() - 0.5) * 3, 2.5 + rand() * 1.5, 2, 11, gg, gg, gg, 0.65, 0.8, 0.8));
+        if (d.t < 3 && rand() < 0.4) fire.spawn(spo(p.x, p.y, p.z, d.vel.x * 0.3, d.vel.y * 0.3, d.vel.z * 0.3, 0.25, 3, 1, 1, 0.6, 0.2, 0.9, 1));
       }
       const gl = groundLevel(d.g.position.x, d.g.position.z);
       if (d.g.position.y <= gl + 0.5 || d.t > 30) {
@@ -2590,11 +2588,10 @@ export function createCombat(THREE, env) {
     e.trailAcc += dt * 70;
     while (e.trailAcc >= 1) {
       e.trailAcc -= 1;
-      if (rand() < 0.45) smoke.spawn({ x: stub.x, y: stub.y, z: stub.z, vx: e.vel.x * 0.3, vy: e.vel.y * 0.3, vz: e.vel.z * 0.3, life: 1.4 + rand(), s0: 1.2, s1: 7, r: 0.92, g: 0.94, b: 0.96, a: 0.5, drag: 1.2 });
+      if (rand() < 0.45) smoke.spawn(spo(stub.x, stub.y, stub.z, e.vel.x * 0.3, e.vel.y * 0.3, e.vel.z * 0.3, 1.4 + rand(), 1.2, 7, 0.92, 0.94, 0.96, 0.5, 1.2));
       const gg = 0.05 + rand() * 0.06;
-      smoke.spawn({ x: stub.x, y: stub.y, z: stub.z, vx: e.vel.x * 0.3 + (rand() - 0.5) * 3, vy: e.vel.y * 0.3, vz: e.vel.z * 0.3 + (rand() - 0.5) * 3,
-        life: 5 + rand() * 3, s0: 2.5, s1: 18 + rand() * 8, r: gg, g: gg, b: gg, a: 0.75, drag: 0.6, rise: 0.8 });
-      if (rand() < 0.25) fire.spawn({ x: stub.x, y: stub.y, z: stub.z, vx: e.vel.x * 0.5, vy: e.vel.y * 0.5, vz: e.vel.z * 0.5, life: 0.2 + rand() * 0.2, s0: 2.5, s1: 0.8, r: 1, g: 0.55, b: 0.15, a: 1, drag: 1 });
+      smoke.spawn(spo(stub.x, stub.y, stub.z, e.vel.x * 0.3 + (rand() - 0.5) * 3, e.vel.y * 0.3, e.vel.z * 0.3 + (rand() - 0.5) * 3, 5 + rand() * 3, 2.5, 18 + rand() * 8, gg, gg, gg, 0.75, 0.6, 0.8));
+      if (rand() < 0.25) fire.spawn(spo(stub.x, stub.y, stub.z, e.vel.x * 0.5, e.vel.y * 0.5, e.vel.z * 0.5, 0.2 + rand() * 0.2, 2.5, 0.8, 1, 0.55, 0.15, 1, 1));
     }
     engineFireFx(e, dt);
     // Impact: sea -> massive geyser, island -> fireball + shockwave; full kill credit.
@@ -2616,10 +2613,9 @@ export function createCombat(THREE, env) {
       e.fireAcc -= 1;
       const nz = nozzles[(rand() * nozzles.length) | 0];
       const p = _a.copy(nz).add(new THREE.Vector3(0, 0, 1.4)).applyQuaternion(e.quat).add(e.pos);
-      fire.spawn({ x: p.x, y: p.y, z: p.z, vx: e.vel.x * 0.55 + (rand() - 0.5) * 6, vy: e.vel.y * 0.55 + (rand() - 0.5) * 6, vz: e.vel.z * 0.55 + (rand() - 0.5) * 6,
-        life: 0.25 + rand() * 0.25, s0: 2.6, s1: 0.8, r: 1, g: 0.5 + rand() * 0.3, b: 0.12, a: 1, drag: 1.4 });
+      fire.spawn(spo(p.x, p.y, p.z, e.vel.x * 0.55 + (rand() - 0.5) * 6, e.vel.y * 0.55 + (rand() - 0.5) * 6, e.vel.z * 0.55 + (rand() - 0.5) * 6, 0.25 + rand() * 0.25, 2.6, 0.8, 1, 0.5 + rand() * 0.3, 0.12, 1, 1.4));
       const gg = 0.08 + rand() * 0.06;
-      smoke.spawn({ x: p.x, y: p.y, z: p.z, vx: e.vel.x * 0.35, vy: e.vel.y * 0.35, vz: e.vel.z * 0.35, life: 3.5 + rand() * 2, s0: 2, s1: 12, r: gg, g: gg, b: gg, a: 0.65, drag: 0.7, rise: 0.6 });
+      smoke.spawn(spo(p.x, p.y, p.z, e.vel.x * 0.35, e.vel.y * 0.35, e.vel.z * 0.35, 3.5 + rand() * 2, 2, 12, gg, gg, gg, 0.65, 0.7, 0.6));
     }
   }
 
@@ -2725,7 +2721,13 @@ export function createCombat(THREE, env) {
     aam4: AAM4_MAX, aam4Max: AAM4_MAX, aam4Reload: 0, aam4ReloadMax: AAM4_RELOAD,
     spw: '4AAM', qaam: QAAM_MAX, qaamMax: QAAM_MAX, qaamReload: 0, qaamReloadMax: QAAM_RELOAD, lowHpSaid: false });
   let seekerT = 0, seekerHadLock = false;
-  const fwdOf = () => new THREE.Vector3(0, 0, -1).applyQuaternion(S.quaternion);
+  const _fwdOfV = new THREE.Vector3();
+  const fwdOf = () => _fwdOfV.set(0, 0, -1).applyQuaternion(S.quaternion);   // shared scratch: read it before the next fwdOf() call
+  // Radar candidate pool: fixed records + one reused output array (zero per-frame allocations).
+  const RC_N = 96, _rcPool = Array.from({ length: RC_N }, () => ({ e: null, err: 0, d: 0, score: 0 })), _rcOut = [];
+  const _rcTo = new THREE.Vector3(), _lkTo = new THREE.Vector3(), _mlTo = new THREE.Vector3();
+  const _rcByScore = (a, b) => a.score - b.score;
+  const _keep = [], _keep2 = [];
   const _dlzLos = new THREE.Vector3(), _dlzRel = new THREE.Vector3(), _dlzAxis = new THREE.Vector3(), _dlzVel = new THREE.Vector3();
   const JLOOK = { active: false, offBore: 0, x: 0, y: 0, z: -1 };
   let lastPitbullT = -1e9;
@@ -2733,16 +2735,20 @@ export function createCombat(THREE, env) {
 
   // Forward radar picture, best first (off-boresight angle + small range weight).
   function radarCandidates(half = RADAR_HALF, range = RADAR_RANGE) {
-    const fwd = fwdOf(), out = [];
-    for (const e of lockables()) {                           // bandits + live task-force ships
+    const fwd = fwdOf(), out = _rcOut, L = lockables();     // pooled result: valid until the next radarCandidates() call
+    out.length = 0;
+    for (let i = 0; i < L.length && out.length < RC_N; i++) {  // bandits + live task-force ships
+      const e = L[i];
       if (!e.alive) continue;
-      const to = e.pos.clone().sub(S.position), d = to.length();
+      const to = _rcTo.copy(e.pos).sub(S.position), d = to.length();
       if (d < 1 || d > range) continue;
       const err = Math.acos(clamp(to.divideScalar(d).dot(fwd), -1, 1));
       if (err > half) continue;
-      out.push({ e, err, d, score: err + (d / NM) * 0.02 });
+      const c = _rcPool[out.length];
+      c.e = e; c.err = err; c.d = d; c.score = err + (d / NM) * 0.02;
+      out.push(c);
     }
-    return out.sort((a, b) => a.score - b.score);
+    return out.sort(_rcByScore);
   }
   // Kept for the old debug hooks: best bandit inside the 22 deg sight cone.
   function boresightTarget(exclude) {
@@ -2774,15 +2780,22 @@ export function createCombat(THREE, env) {
   function autoDesignate() {
     const cands = radarCandidates(C.weapon === 'QAAM' ? QAAM_HALF : RADAR_HALF, C.weapon === 'QAAM' ? QAAM_RANGE : RADAR_RANGE);
     if (C.weapon === 'AAM4') {
-      const keep = C.multi.filter(e => cands.some(c => c.e === e));
-      for (const c of cands) { if (keep.length >= 4) break; if (!keep.includes(c.e)) keep.push(c.e); }
-      keep.sort((a, b) => cands.findIndex(c => c.e === a) - cands.findIndex(c => c.e === b));
-      setMulti(keep);
+      // Up to four tracks in candidate (score) order, retained tracks first; rebuilt in a
+      // reused array and only committed through setMulti() when the set actually changes.
+      const pick = _keep2; pick.length = 0;
+      for (let i = 0; i < cands.length && pick.length < 4; i++) if (C.multi.indexOf(cands[i].e) >= 0) pick.push(cands[i].e);   // retained first
+      for (let i = 0; i < cands.length && pick.length < 4; i++) if (pick.indexOf(cands[i].e) < 0) pick.push(cands[i].e);     // then fill
+      const keep = _keep; keep.length = 0;                    // final order = candidate (score) order
+      for (let i = 0; i < cands.length; i++) if (pick.indexOf(cands[i].e) >= 0) keep.push(cands[i].e);
+      let same = keep.length === C.multi.length;
+      for (let i = 0; same && i < keep.length; i++) same = keep[i] === C.multi[i];
+      if (!same) setMulti(keep.slice());
       designate(keep[0] || null);
       return;
     }
     if (C.multi.length) setMulti([]);
-    const cur = cands.find(c => c.e === C.designated), best = cands[0];
+    let cur = null; const best = cands[0];
+    for (let i = 0; i < cands.length; i++) if (cands[i].e === C.designated) { cur = cands[i]; break; }
     if (!best) designate(null);
     else if (!cur || best.score < cur.score * 0.85) designate(best.e);
   }
@@ -2840,7 +2853,8 @@ export function createCombat(THREE, env) {
     if (!C.seekerArmed) autoDesignate();
     else if (!C.designated) disarmSeeker('TARGET LOST — RADAR AUTO-TRACK');
     // NEXT cue: the bandit C would cycle to once locked.
-    const nx = C.seekerArmed ? radarCandidates().filter(c => c.e !== C.designated).sort((a, b) => a.d - b.d)[0] : null;
+    let nx = null;
+    if (C.seekerArmed) { const cs = radarCandidates(); for (let i = 0; i < cs.length; i++) { const c = cs[i]; if (c.e !== C.designated && (!nx || c.d < nx.d)) nx = c; } }
     C.nextTarget = nx ? nx.e : null;
     let t = C.designated;
     if (!t) { C.lockProgress = 0; C.lockState = 'NONE'; C.lockTarget = null; C.seekerOff = 0; C.targetRange = 0; C.targetObscured = false; return; }
@@ -2864,8 +2878,8 @@ export function createCombat(THREE, env) {
         if (env.debug && jhmcs) console.log('[ANGELS_ZERO] jhmcs ob=' + (JLOOK.offBore / D2R).toFixed(0) + ' cand=' + t.label + ' lock=' + C.lockState);
       }
     }
-    const to = t.pos.clone().sub(S.position), d = to.length();
-    const off = Math.acos(clamp(to.divideScalar(d).dot(_dlzAxis), -1, 1));
+    const to = _lkTo.copy(t.pos).sub(S.position), d = to.length();
+    const off = Math.acos(clamp(to.divideScalar(Math.max(d, 1e-3)).dot(_dlzAxis), -1, 1));
     const obscured = (t.cloud || 0) > CLOUD_T;
     const wasObscured = C.targetObscured;
     C.targetObscured = obscured; C.seekerOff = off; C.targetRange = d;
@@ -2928,16 +2942,17 @@ export function createCombat(THREE, env) {
   function updateMultiLock(dt) {
     if (!C.seekerArmed) autoDesignate();
     else {
-      const alive = C.multi.filter(e => e.alive);
-      if (alive.length !== C.multi.length) setMulti(alive);
+      let dead = false;
+      for (let i = 0; i < C.multi.length; i++) if (!C.multi[i].alive) { dead = true; break; }
+      if (dead) setMulti(C.multi.filter(e => e.alive));      // allocates only when a track dies
       if (!C.multi.length) disarmSeeker('TARGETS LOST — RADAR AUTO-TRACK');
     }
     C.nextTarget = null;
     const fwd = fwdOf();
     let maxP = 0, locked = 0, acq = 0;
     C.multi.forEach((e, i) => {
-      const to = e.pos.clone().sub(S.position), d = to.length();
-      const off = Math.acos(clamp(to.divideScalar(d).dot(fwd), -1, 1));
+      const to = _mlTo.copy(e.pos).sub(S.position), d = to.length();
+      const off = Math.acos(clamp(to.divideScalar(Math.max(d, 1e-3)).dot(fwd), -1, 1));
       const obsc = (e.cloud || 0) > CLOUD_T;
       const inCone = d < AAM4_RANGE && off < DIFF.aam4Half && C.aam4 > 0 && C.aam4Reload <= 0;
       const prev = C.multiState[i];
@@ -4228,8 +4243,7 @@ export function createCombat(THREE, env) {
           _mTail.copy(pos).addScaledVector(fwd, 1.8);
           // Bandit missiles leave distinct red-tinged smoke.
           const [r, g, b] = m.enemy ? [0.78, 0.36, 0.30] : [0.88, 0.88, 0.88];
-          smoke.spawn({ x: _mTail.x, y: _mTail.y, z: _mTail.z, vx: (rand() - 0.5) * 2, vy: (rand() - 0.5) * 2, vz: (rand() - 0.5) * 2,
-            life: 2.8 + rand(), s0: 2.6, s1: 13 + rand() * 5, r, g, b, a: 0.62, drag: 0.9, rise: 0.6 });
+          smoke.spawn(spo(_mTail.x, _mTail.y, _mTail.z, (rand() - 0.5) * 2, (rand() - 0.5) * 2, (rand() - 0.5) * 2, 2.8 + rand(), 2.6, 13 + rand() * 5, r, g, b, 0.62, 0.9, 0.6));
         }
       } else {
         m.vel.y -= G0 * dt;
@@ -4302,8 +4316,9 @@ export function createCombat(THREE, env) {
     });
     stores.msl.sort((a, b) => a.n - b.n); stores.bomb.sort((a, b) => a.n - b.n);
     if (stores.msl.length) MSL_MAX = stores.msl.length;
-    Object.assign(C, { mslMax: MSL_MAX, missiles: MSL_MAX, bombMax: stores.bomb.length, bombs: stores.bomb.length });
-    if (!stores.bomb.length) C.weapon = 'MSL';
+    // The GLB can finish loading after configureMission(): honour a guns-only store lock here too.
+    Object.assign(C, { mslMax: MSL_MAX, missiles: C.weaponsLock.msl ? 0 : MSL_MAX, bombMax: stores.bomb.length, bombs: C.weaponsLock.spw ? 0 : stores.bomb.length });
+    if (!stores.bomb.length && !C.weaponsLock.msl) C.weapon = 'MSL';
   }
   // Exact clone of a store node (shared geometry) at the node's world scale.
   function cloneStore(node) {
@@ -4514,13 +4529,11 @@ export function createCombat(THREE, env) {
       splash(pos, 2.4);
       for (let i = 0; i < 110; i++) {
         const a = rand() * Math.PI * 2, r = rand() * 6;
-        smoke.spawn({ x: pos.x + Math.cos(a) * r, y: 1, z: pos.z + Math.sin(a) * r, vx: Math.cos(a) * (2 + rand() * 6), vy: 55 + rand() * 75, vz: Math.sin(a) * (2 + rand() * 6),
-          life: 2.6 + rand() * 1.8, s0: 6, s1: 26 + rand() * 18, r: 0.95, g: 0.97, b: 1.0, a: 0.85, drag: 0.35, rise: -22 });
+        smoke.spawn(spo(pos.x + Math.cos(a) * r, 1, pos.z + Math.sin(a) * r, Math.cos(a) * (2 + rand() * 6), 55 + rand() * 75, Math.sin(a) * (2 + rand() * 6), 2.6 + rand() * 1.8, 6, 26 + rand() * 18, 0.95, 0.97, 1.0, 0.85, 0.35, -22));
       }
       for (let i = 0; i < 40; i++) {
         const a = rand() * Math.PI * 2;
-        smoke.spawn({ x: pos.x, y: 2, z: pos.z, vx: Math.cos(a) * (25 + rand() * 25), vy: 2 + rand() * 4, vz: Math.sin(a) * (25 + rand() * 25),
-          life: 3 + rand() * 2, s0: 8, s1: 34, r: 0.88, g: 0.92, b: 0.96, a: 0.55, drag: 0.9, rise: 0.4 });
+        smoke.spawn(spo(pos.x, 2, pos.z, Math.cos(a) * (25 + rand() * 25), 2 + rand() * 4, Math.sin(a) * (25 + rand() * 25), 3 + rand() * 2, 8, 34, 0.88, 0.92, 0.96, 0.55, 0.9, 0.4));
       }
       if (env.onSfx) env.onSfx('bomb', pos, 0.8 * k);
     } else {
@@ -4528,13 +4541,11 @@ export function createCombat(THREE, env) {
       explosion(pos, 2.4);
       for (let i = 0; i < 60; i++) {
         const a = rand() * Math.PI * 2, sp = 30 + rand() * 45;
-        smoke.spawn({ x: pos.x, y: pos.y + 2, z: pos.z, vx: Math.cos(a) * sp, vy: 3 + rand() * 6, vz: Math.sin(a) * sp,
-          life: 3.5 + rand() * 2, s0: 10, s1: 40 + rand() * 20, r: 0.42, g: 0.36, b: 0.3, a: 0.7, drag: 1.0, rise: 1.2 });
+        smoke.spawn(spo(pos.x, pos.y + 2, pos.z, Math.cos(a) * sp, 3 + rand() * 6, Math.sin(a) * sp, 3.5 + rand() * 2, 10, 40 + rand() * 20, 0.42, 0.36, 0.3, 0.7, 1.0, 1.2));
       }
       for (let i = 0; i < 40; i++) {
         const g = 0.08 + rand() * 0.06;
-        smoke.spawn({ x: pos.x + (rand() - 0.5) * 10, y: pos.y + 5, z: pos.z + (rand() - 0.5) * 10, vx: (rand() - 0.5) * 6, vy: 18 + rand() * 22, vz: (rand() - 0.5) * 6,
-          life: 6 + rand() * 4, s0: 14, s1: 60 + rand() * 30, r: g, g, b: g, a: 0.8, drag: 0.5, rise: 3 });
+        smoke.spawn(spo(pos.x + (rand() - 0.5) * 10, pos.y + 5, pos.z + (rand() - 0.5) * 10, (rand() - 0.5) * 6, 18 + rand() * 22, (rand() - 0.5) * 6, 6 + rand() * 4, 14, 60 + rand() * 30, g, g, g, 0.8, 0.5, 3));
       }
       if (env.onSfx) env.onSfx('bomb', pos, k);
     }
@@ -4578,7 +4589,7 @@ export function createCombat(THREE, env) {
     for (let i = 0; i < 28; i++) {                      // hot orange flare sparks
       const p = DISPENSERS[i % 2].clone().applyQuaternion(S.quaternion).add(S.position);
       const v = S.velocity.clone().multiplyScalar(0.85).add(new THREE.Vector3(rand() - 0.5, rand() - 0.5, rand() - 0.5).multiplyScalar(40));
-      fire.spawn({ x: p.x, y: p.y, z: p.z, vx: v.x, vy: v.y, vz: v.z, life: 0.35 + rand() * 0.45, s0: 0.9, s1: 0.5, r: 0.95, g: 0.5, b: 0.12, a: 0.8, drag: 2.6 });
+      fire.spawn(spo(p.x, p.y, p.z, v.x, v.y, v.z, 0.35 + rand() * 0.45, 0.9, 0.5, 0.95, 0.5, 0.12, 0.8, 2.6));
     }
     for (const e of enemies) if (e.alive && e.pos.distanceTo(S.position) < 2500) e.bLock = 0;   // nearby seekers break lock
     say('FLARES — ' + C.flares + ' LEFT', 1.0, '#ffe0a0');
@@ -4597,9 +4608,7 @@ export function createCombat(THREE, env) {
       isChaff: true, id: ++chaffSalvo };
     chaff.push(cloud);
     for (let i = 0; i < 90; i++) {
-      fire.spawn({ x: p.x + (rand() - 0.5) * 6, y: p.y + (rand() - 0.5) * 4, z: p.z + (rand() - 0.5) * 6,
-        vx: cloud.vel.x + (rand() - 0.5) * 14, vy: cloud.vel.y + (rand() - 0.5) * 8, vz: cloud.vel.z + (rand() - 0.5) * 14,
-        life: 0.45 + rand() * 0.75, s0: 0.7, s1: 0.25, r: 0.7, g: 0.7, b: 0.7, a: 0.7, drag: 3 });
+      fire.spawn(spo(p.x + (rand() - 0.5) * 6, p.y + (rand() - 0.5) * 4, p.z + (rand() - 0.5) * 6, cloud.vel.x + (rand() - 0.5) * 14, cloud.vel.y + (rand() - 0.5) * 8, cloud.vel.z + (rand() - 0.5) * 14, 0.45 + rand() * 0.75, 0.7, 0.25, 0.7, 0.7, 0.7, 0.7, 3));
     }
     // Radar trackers beyond 2.5 km lose the picture (mirrors the flare rule close in).
     for (const e of enemies) if (e.alive && e.pos.distanceTo(S.position) > 2500) e.bLock = 0;
@@ -4630,13 +4639,15 @@ export function createCombat(THREE, env) {
       }
     }
   }
+  const _flCentre = [new THREE.Vector3(), new THREE.Vector3()], _flCnt = [0, 0];
   function updateFlares(dt) {
     flareCD = Math.max(0, flareCD - dt);
     if (C.flares < FLR_MAX) {
       flareRecharge -= dt;
       if (flareRecharge <= 0) { C.flares++; flareRecharge = C.flares < FLR_MAX ? FLR_RECHARGE : 0; }
     }
-    let lit = 0; const centre = [new THREE.Vector3(), new THREE.Vector3()], cnt = [0, 0];
+    let lit = 0; const centre = _flCentre, cnt = _flCnt;
+    centre[0].set(0, 0, 0); centre[1].set(0, 0, 0); cnt[0] = 0; cnt[1] = 0;
     for (let i = flares.length - 1; i >= 0; i--) {
       const f = flares[i];
       f.age += dt;
@@ -4650,28 +4661,30 @@ export function createCombat(THREE, env) {
       if (f.age > f.life || f.pos.y < groundLevel(f.pos.x, f.pos.z) || !f.alive) { f.alive = false; flares.splice(i, 1); continue; }
       const k = 1 - f.age / f.life;
       // Blinding magnesium core: one big short-lived additive point per frame, flickering.
-      fire.spawn({ x: f.pos.x, y: f.pos.y, z: f.pos.z, vx: f.vel.x, vy: f.vel.y, vz: f.vel.z, life: 0.05,
-        s0: (16 + rand() * 10) * (0.55 + 0.45 * k), s1: 12, r: 1, g: 0.97, b: 0.85, a: 1, drag: 0 });
+      fire.spawn(spo(f.pos.x, f.pos.y, f.pos.z, f.vel.x, f.vel.y, f.vel.z, 0.05, (16 + rand() * 10) * (0.55 + 0.45 * k), 12, 1, 0.97, 0.85, 1, 0));
       f.emit += dt * 40;
       while (f.emit >= 1) {
         f.emit -= 1;
         const hot = rand();
-        fire.spawn({ x: f.pos.x, y: f.pos.y, z: f.pos.z, vx: f.vel.x * 0.3 + (rand() - 0.5) * 4, vy: f.vel.y * 0.3 + (rand() - 0.5) * 4, vz: f.vel.z * 0.3 + (rand() - 0.5) * 4,
-          life: 0.18 + rand() * 0.16, s0: (5 + hot * 4) * (0.5 + 0.5 * k), s1: 1.5, r: 1, g: 0.9 + 0.1 * hot, b: 0.55 + 0.4 * hot, a: 1, drag: 1.5 });
-        if (rand() < 0.45) smoke.spawn({ x: f.pos.x, y: f.pos.y, z: f.pos.z, vx: (rand() - 0.5) * 2, vy: (rand() - 0.5) * 2, vz: (rand() - 0.5) * 2,
-          life: 4 + rand() * 2.5, s0: 2.5, s1: 16 + rand() * 8, r: 0.93, g: 0.93, b: 0.92, a: 0.55, drag: 0.9, rise: 0.8 });
+        fire.spawn(spo(f.pos.x, f.pos.y, f.pos.z, f.vel.x * 0.3 + (rand() - 0.5) * 4, f.vel.y * 0.3 + (rand() - 0.5) * 4, f.vel.z * 0.3 + (rand() - 0.5) * 4, 0.18 + rand() * 0.16, (5 + hot * 4) * (0.5 + 0.5 * k), 1.5, 1, 0.9 + 0.1 * hot, 0.55 + 0.4 * hot, 1, 1.5));
+        if (rand() < 0.45) smoke.spawn(spo(f.pos.x, f.pos.y, f.pos.z, (rand() - 0.5) * 2, (rand() - 0.5) * 2, (rand() - 0.5) * 2, 4 + rand() * 2.5, 2.5, 16 + rand() * 8, 0.93, 0.93, 0.92, 0.55, 0.9, 0.8));
       }
       const j = lit++ % 2; centre[j].add(f.pos); cnt[j]++;
     }
-    flareLights.forEach((l, j) => {
+    for (let j = 0; j < flareLights.length; j++) {
+      const l = flareLights[j];
       if (cnt[j]) { l.position.copy(centre[j].divideScalar(cnt[j])); l.intensity = 220 * (0.7 + 0.3 * rand()); } else l.intensity = 0;
-    });
+    }
     // Decoy roll for bandit missiles near any burning flare (once per missile per salvo).
     for (const m of missiles) {
       if (!m.active || !m.enemy || !m.target || !m.target.isPlayer || m.lostTrack) continue;
       const samDecoy = !!m.sam && !!m.samFlared;
       if (!samDecoy && m.guidance !== 'IR') continue;
-      const near = flares.find(f => f.alive && !f.owner && f.age >= 0 && f.salvo !== m.flareSalvo && f.pos.distanceTo(m.mesh.position) < FLR_DECOY_RANGE);
+      let near = null;
+      for (let k = 0; k < flares.length; k++) {
+        const f = flares[k];
+        if (f.alive && !f.owner && f.age >= 0 && f.salvo !== m.flareSalvo && f.pos.distanceTo(m.mesh.position) < FLR_DECOY_RANGE) { near = f; break; }
+      }
       if (!near) continue;
       m.flareSalvo = near.salvo;
       if (rand() < DIFF.flareDecoyP) {
@@ -4931,7 +4944,7 @@ export function createCombat(THREE, env) {
           t.g.position.copy(t.pos); t.g.rotation.y = Math.PI - t.ang;              // bow (-Z local) along the direction of travel
           if (rand() < dt * 6) {                                                    // bow wave / stern wake foam
             const back = new THREE.Vector3(0, 0, 71).applyQuaternion(t.g.quaternion).add(t.pos);
-            smoke.spawn({ x: back.x + (rand() - 0.5) * 10, y: 1, z: back.z + (rand() - 0.5) * 10, vx: 0, vy: 0.3, vz: 0, life: 6, s0: 8, s1: 26, r: 0.92, g: 0.95, b: 0.97, a: 0.45, drag: 0.2 });
+            smoke.spawn(spo(back.x + (rand() - 0.5) * 10, 1, back.z + (rand() - 0.5) * 10, 0, 0.3, 0, 6, 8, 26, 0.92, 0.95, 0.97, 0.45, 0.2));
           }
         } else {                                                                    // listing and settling
           t.sink = Math.min(t.sink + dt * 0.5, t.sinkMax || 14); t.vel.set(0, 0, 0);
@@ -4942,10 +4955,8 @@ export function createCombat(THREE, env) {
       if (t.alive && !t.strike) anyAlive = true;                // jammers don't gate the 40 s SAM / AAA respawn
       else if (t.burn > 0) {
         t.burn -= dt;
-        if (rand() < dt * 14) fire.spawn({ x: t.pos.x + (rand() - 0.5) * t.r, y: t.pos.y + 3, z: t.pos.z + (rand() - 0.5) * t.r, vx: 0, vy: 6, vz: 0,
-          life: 0.7 + rand() * 0.5, s0: 6, s1: 14, r: 1, g: 0.5 + rand() * 0.3, b: 0.12, a: 0.85, drag: 1.2 });
-        if (rand() < dt * 10) { const gg = 0.07 + rand() * 0.05; smoke.spawn({ x: t.pos.x + (rand() - 0.5) * t.r * 0.6, y: t.pos.y + 5, z: t.pos.z + (rand() - 0.5) * t.r * 0.6,
-          vx: (rand() - 0.5) * 3, vy: 10 + rand() * 6, vz: (rand() - 0.5) * 3, life: 8 + rand() * 4, s0: 12, s1: 70, r: gg, g: gg, b: gg, a: 0.75, drag: 0.4, rise: 2 }); }
+        if (rand() < dt * 14) fire.spawn(spo(t.pos.x + (rand() - 0.5) * t.r, t.pos.y + 3, t.pos.z + (rand() - 0.5) * t.r, 0, 6, 0, 0.7 + rand() * 0.5, 6, 14, 1, 0.5 + rand() * 0.3, 0.12, 0.85, 1.2));
+        if (rand() < dt * 10) { const gg = 0.07 + rand() * 0.05; smoke.spawn(spo(t.pos.x + (rand() - 0.5) * t.r * 0.6, t.pos.y + 5, t.pos.z + (rand() - 0.5) * t.r * 0.6, (rand() - 0.5) * 3, 10 + rand() * 6, (rand() - 0.5) * 3, 8 + rand() * 4, 12, 70, gg, gg, gg, 0.75, 0.4, 2)); }
       }
     }
     // Staged missions (NAVAL / CANYON / ACE) own every surface target: no legacy
@@ -5533,10 +5544,25 @@ export function createCombat(THREE, env) {
     return m;
   }
 
+  // Legacy task force (AIR_SUPERIORITY / FURBALL). Staged ships (NAVAL_BATTLE) are pooled
+  // in stagedShips and must survive here: removing them from the scene left the stage-0
+  // DDGs invisible-but-targetable whenever init() ran after configureMission().
+  function disposeShip(t) {
+    t.g.traverse(o => {
+      if (o.geometry && o !== t.wake) o.geometry.dispose();      // wake geometry is shared (wakeGeoCache)
+      if (o.material) { if (Array.isArray(o.material)) for (const m of o.material) m.dispose(); else o.material.dispose(); }
+    });
+  }
   function spawnFleet() {
-    for (const t of taskForce) { scene.remove(t.g); const i = surface.indexOf(t); if (i >= 0) surface.splice(i, 1); }
-    taskForce.length = 0;
+    for (let k = taskForce.length - 1; k >= 0; k--) {
+      const t = taskForce[k];
+      if (t.staged) continue;
+      scene.remove(t.g); disposeShip(t);
+      const i = surface.indexOf(t); if (i >= 0) surface.splice(i, 1);
+      taskForce.splice(k, 1);
+    }
     if (C.mcfg && C.mcfg.noShips) return;
+    if (stagedMission()) return;                                   // staged missions bring their own ships
     let d = 0;
     SLOTS.forEach((sl, i) => {
       const t = sl.kind === 'CVN' ? buildCarrier() : destroyerShip();
@@ -5581,10 +5607,9 @@ export function createCombat(THREE, env) {
   function flakBurst(p) {
     for (let k = 0; k < 2; k++) {
       const gg = 0.06 + rand() * 0.04;
-      smoke.spawn({ x: p.x + (rand() - 0.5) * 6, y: p.y + (rand() - 0.5) * 6, z: p.z + (rand() - 0.5) * 6, vx: (rand() - 0.5) * 3, vy: (rand() - 0.5) * 3, vz: (rand() - 0.5) * 3,
-        life: 3.2 + rand(), s0: 5, s1: 26 + rand() * 10, r: gg, g: gg, b: gg, a: 0.85, drag: 1.1 });
+      smoke.spawn(spo(p.x + (rand() - 0.5) * 6, p.y + (rand() - 0.5) * 6, p.z + (rand() - 0.5) * 6, (rand() - 0.5) * 3, (rand() - 0.5) * 3, (rand() - 0.5) * 3, 3.2 + rand(), 5, 26 + rand() * 10, gg, gg, gg, 0.85, 1.1));
     }
-    fire.spawn({ x: p.x, y: p.y, z: p.z, vx: 0, vy: 0, vz: 0, life: 0.14, s0: 9, s1: 20, r: 1, g: 0.7, b: 0.3, a: 0.95, drag: 0 });
+    fire.spawn(spo(p.x, p.y, p.z, 0, 0, 0, 0.14, 9, 20, 1, 0.7, 0.3, 0.95, 0));
     if (env.onSfx) env.onSfx('explosion', p, 0.3);
     if (playerActiveNow && !C.dead && S.position.distanceTo(p) < DIFF.flakRadius) { damagePlayer(DIFF.flakDmg); C.hitFlash = 0.12; }
   }
@@ -5641,11 +5666,11 @@ export function createCombat(THREE, env) {
       const k = t.hp / t.hpMax;
       if (k < 0.66 && rand() < dt * 7) {
         mountWorld(t, t.smokeAt, _da); const gg = 0.08 + rand() * 0.05;
-        smoke.spawn({ x: _da.x, y: _da.y, z: _da.z, vx: (rand() - 0.5) * 2, vy: 8 + rand() * 5, vz: (rand() - 0.5) * 2, life: 7 + rand() * 3, s0: 8, s1: 46, r: gg, g: gg, b: gg, a: 0.7, drag: 0.4, rise: 1.5 });
+        smoke.spawn(spo(_da.x, _da.y, _da.z, (rand() - 0.5) * 2, 8 + rand() * 5, (rand() - 0.5) * 2, 7 + rand() * 3, 8, 46, gg, gg, gg, 0.7, 0.4, 1.5));
       }
       if (k < 0.33 && rand() < dt * 14) {
         _da.set((rand() - 0.5) * t.beam * 0.8, t.aimH + 1, (rand() - 0.5) * t.len * 0.7).applyQuaternion(t.g.quaternion).add(t.g.position);
-        fire.spawn({ x: _da.x, y: _da.y, z: _da.z, vx: 0, vy: 5, vz: 0, life: 0.6 + rand() * 0.4, s0: 5, s1: 12, r: 1, g: 0.5 + rand() * 0.3, b: 0.1, a: 0.85, drag: 1.2 });
+        fire.spawn(spo(_da.x, _da.y, _da.z, 0, 5, 0, 0.6 + rand() * 0.4, 5, 12, 1, 0.5 + rand() * 0.3, 0.1, 0.85, 1.2));
       }
       if (!fire_ok) continue;
       const dist = t.pos.distanceTo(S.position);
@@ -5667,7 +5692,7 @@ export function createCombat(THREE, env) {
             _dv.x += (rand() - 0.5) * sp; _dv.y += (rand() - 0.5) * sp; _dv.z += (rand() - 0.5) * sp;
             enemyTracers.add(_db, _dv.normalize().multiplyScalar(1100), 2.4, DIFF.ciwsDmg);
           }
-          if (rand() < dt * 20) fire.spawn({ x: _db.x, y: _db.y, z: _db.z, vx: 0, vy: 0, vz: 0, life: 0.06, s0: 3, s1: 5, r: 1, g: 0.8, b: 0.4, a: 0.9, drag: 0 });
+          if (rand() < dt * 20) fire.spawn(spo(_db.x, _db.y, _db.z, 0, 0, 0, 0.06, 3, 5, 1, 0.8, 0.4, 0.9, 0));
           C.missileWarning = Math.max(C.missileWarning, 0.3);
         }
       }
@@ -5948,8 +5973,7 @@ export function createCombat(THREE, env) {
     C.fNeedRelease = true;                                   // relight needs a fresh press-and-hold
     // White Halon vapour burst from the nacelle.
     nozzleWorld(side, _nzp, -0.8);
-    for (let k = 0; k < 26; k++) smoke.spawn({ x: _nzp.x, y: _nzp.y, z: _nzp.z, vx: S.velocity.x * 0.5 + (rand() - 0.5) * 14, vy: S.velocity.y * 0.5 + (rand() - 0.2) * 10,
-      vz: S.velocity.z * 0.5 + (rand() - 0.5) * 14, life: 1.6 + rand() * 1.2, s0: 1.5, s1: 9 + rand() * 6, r: 0.93, g: 0.95, b: 0.97, a: 0.8, drag: 1.6 });
+    for (let k = 0; k < 26; k++) smoke.spawn(spo(_nzp.x, _nzp.y, _nzp.z, S.velocity.x * 0.5 + (rand() - 0.5) * 14, S.velocity.y * 0.5 + (rand() - 0.2) * 10, S.velocity.z * 0.5 + (rand() - 0.5) * 14, 1.6 + rand() * 1.2, 1.5, 9 + rand() * 6, 0.93, 0.95, 0.97, 0.8, 1.6));
     say(`${side} ENGINE FIRE OUT — HALON DISCHARGED`, 2.4, '#52ff9c');
     pushEvent('EVADED', `[ ${side} ENG ] FIRE EXTINGUISHED`, 0, '#52ff9c');
     if (env.onSfx) env.onSfx('extinguish', null, 1);
@@ -5991,8 +6015,7 @@ export function createCombat(THREE, env) {
       explosion(_nzp, 0.45);
       for (let k = 0; k < 40; k++) {                       // flame tongue streaming aft (slower than the jet)
         const lag = 0.55 + rand() * 0.3;
-        fire.spawn({ x: _nzp.x, y: _nzp.y, z: _nzp.z, vx: S.velocity.x * lag + (rand() - 0.5) * 6, vy: S.velocity.y * lag + (rand() - 0.5) * 6,
-          vz: S.velocity.z * lag + (rand() - 0.5) * 6, life: 0.25 + rand() * 0.35, s0: 2.6 + rand() * 2, s1: 0.6, r: 1, g: 0.55 + rand() * 0.3, b: 0.15, a: 1, drag: 1.2 });
+        fire.spawn(spo(_nzp.x, _nzp.y, _nzp.z, S.velocity.x * lag + (rand() - 0.5) * 6, S.velocity.y * lag + (rand() - 0.5) * 6, S.velocity.z * lag + (rand() - 0.5) * 6, 0.25 + rand() * 0.35, 2.6 + rand() * 2, 0.6, 1, 0.55 + rand() * 0.3, 0.15, 1, 1.2));
       }
       say('[ ENGINE RELIT! ] — FULL TWIN-ENGINE POWER', 2.8, '#52ff9c');
       pushEvent('EVADED', `[ ${side} ENG ] RELIGHT SUCCESS (${Math.round(p * 100)}%)`, 0, '#52ff9c');
@@ -6000,8 +6023,7 @@ export function createCombat(THREE, env) {
       if (env.onRadio) env.onRadio('RELIGHT_OK');
     } else {
       setEng(side, 'SEIZED');
-      for (let k = 0; k < 10; k++) smoke.spawn({ x: _nzp.x, y: _nzp.y, z: _nzp.z, vx: S.velocity.x * 0.45 + (rand() - 0.5) * 6, vy: S.velocity.y * 0.45 + rand() * 3,
-        vz: S.velocity.z * 0.45 + (rand() - 0.5) * 6, life: 2 + rand(), s0: 2, s1: 10, r: 0.25, g: 0.25, b: 0.25, a: 0.7, drag: 1 });
+      for (let k = 0; k < 10; k++) smoke.spawn(spo(_nzp.x, _nzp.y, _nzp.z, S.velocity.x * 0.45 + (rand() - 0.5) * 6, S.velocity.y * 0.45 + rand() * 3, S.velocity.z * 0.45 + (rand() - 0.5) * 6, 2 + rand(), 2, 10, 0.25, 0.25, 0.25, 0.7, 1));
       say('RELIGHT FAILED — ENGINE SEIZED', 2.8, '#ff4d3d');
       pushEvent('DAMAGED', `[ ${side} ENG ] SEIZED — SINGLE ENGINE OPS`, 0, '#ff4d3d');
       if (env.onSfx) env.onSfx('stall', null, 1);
@@ -6040,16 +6062,14 @@ export function createCombat(THREE, env) {
       dmgSmokeAcc -= 1;
       const g = fireOn ? 0.04 + rand() * 0.05 : crank ? 0.86 + rand() * 0.08 : 0.42 + rand() * 0.12;
       // Carries ~40 % of the jet's velocity at first (drag 0.9/s) so the ribbon trails visibly behind the nacelle.
-      smoke.spawn({ x: p.x, y: p.y, z: p.z, vx: S.velocity.x * 0.42 + (rand() - 0.5) * 2, vy: S.velocity.y * 0.42 + rand(), vz: S.velocity.z * 0.42 + (rand() - 0.5) * 2,
-        life: fireOn ? 4.5 + rand() * 2.5 : 2 + rand() * 1.5, s0: fireOn ? 2.6 : 1.2, s1: fireOn ? 16 + rand() * 7 : 6 + rand() * 3,
-        r: g, g: g * 0.97, b: g * 0.94, a: fireOn ? 0.82 : crank ? 0.42 : 0.35, drag: 0.9, rise: 0.6 });
-      if (fireOn && rand() < 0.8) fire.spawn({ x: p.x, y: p.y, z: p.z, vx: S.velocity.x * 0.6 + (rand() - 0.5) * 10, vy: S.velocity.y * 0.6 + (rand() - 0.5) * 10, vz: S.velocity.z * 0.6 + (rand() - 0.5) * 10,
-        life: 0.2 + rand() * 0.3, s0: 2.4 + rand() * 3, s1: 0.6, r: 1, g: 0.45 + rand() * 0.35, b: 0.1, a: 1, drag: 1.4 });
+      smoke.spawn(spo(p.x, p.y, p.z, S.velocity.x * 0.42 + (rand() - 0.5) * 2, S.velocity.y * 0.42 + rand(), S.velocity.z * 0.42 + (rand() - 0.5) * 2, fireOn ? 4.5 + rand() * 2.5 : 2 + rand() * 1.5, fireOn ? 2.6 : 1.2, fireOn ? 16 + rand() * 7 : 6 + rand() * 3, g, g * 0.97, g * 0.94, fireOn ? 0.82 : crank ? 0.42 : 0.35, 0.9, 0.6));
+      if (fireOn && rand() < 0.8) fire.spawn(spo(p.x, p.y, p.z, S.velocity.x * 0.6 + (rand() - 0.5) * 10, S.velocity.y * 0.6 + (rand() - 0.5) * 10, S.velocity.z * 0.6 + (rand() - 0.5) * 10, 0.2 + rand() * 0.3, 2.4 + rand() * 3, 0.6, 1, 0.45 + rand() * 0.35, 0.1, 1, 1.4));
     }
   }
 
   /* ================================================================ API */
   let ready = false, waveTimer = 0, allyStepped = false, wavesFresh = false;
+  const _updSeg = new THREE.Vector3(), _updCp = new THREE.Vector3();
   function resetWaves() {
     if (!enemies.length || wavesFresh) return;
     for (const e of enemies) {
@@ -6062,6 +6082,7 @@ export function createCombat(THREE, env) {
     if (C.mode !== 'FURBALL' && C.missionId !== 'FURBALL') {
       spawnWave();
       spawnSurface();
+      spawnFleet();                                   // same enemy task force on fresh boot, replay and mission switch
     }
     tintFleet(); writeFleet();
     waveKill0 = C.kills || 0;
@@ -6076,7 +6097,8 @@ export function createCombat(THREE, env) {
     const mp = env.getMapProps && env.getMapProps();
     if (mp) { const vis = !!(mp.islands && mp.baseBldg); for (const g of baseDefG) g.visible = vis; }
     buildAlliedCarrier();
-    if (!(C.mcfg && C.mcfg.noShips)) spawnFleet();
+    // Legacy task force is spawned by resetWaves() for non-staged missions only; staged
+    // missions (NAVAL_BATTLE / CANYON_RUN / ACE_DUEL) never get it.
     const hasStages = !!(C.mcfg && C.mcfg.stages && C.mcfg.stages.length);
     if (!hasStages) {
       wavesFresh = false;
@@ -6110,7 +6132,8 @@ export function createCombat(THREE, env) {
   }
   function resetPlayer() {
     aceFlightDone = false; C.acePair = [];
-    rearm('msl'); rearm('bomb');
+    if (!C.weaponsLock.msl) rearm('msl');                 // guns-only sorties keep empty pylons (as pitStop)
+    if (!C.weaponsLock.spw) rearm('bomb');
     Object.assign(C, { comboMult: 1, comboTimer: 0, dangerClose: false, dangerMult: 1, styleFeed: [] });
     Object.assign(C, { bombs: stores.bomb.length, bombReload: 0, flares: FLR_MAX, ccip: null, aam4: AAM4_MAX, aam4Reload: 0, qaam: QAAM_MAX, qaamReload: 0, ecmState: 'READY', ecmT: 0 });
     for (const st of stores.msl) st.aamHidden = false;
@@ -6141,6 +6164,8 @@ export function createCombat(THREE, env) {
     waveKill0 = C.kills || 0;
     sectorLowPrev = false; sectorLowT = -1e9;
     mslCooldown = 0; gunAcc = 0;
+    if (C.weaponsLock.msl) { C.missiles = 0; C.aam4 = 0; C.qaam = 0; }   // ACE_DUEL: HUD/MFD never show a round
+    if (C.weaponsLock.spw) C.bombs = 0;
   }
 
   /* ---------------------- AI disengage: low-altitude clutter / base safe zone */
@@ -6300,7 +6325,7 @@ export function createCombat(THREE, env) {
     updateFlagSalvo(dt);
 
     // Projectiles and hits.
-    const seg = new THREE.Vector3(), cp = new THREE.Vector3();
+    const seg = _updSeg, cp = _updCp;                               // module scratch (was 2 Vector3 per frame)
     let segT = 0;
     const segHit = (b, center, r) => {                              // swept-sphere test along this frame's travel
       seg.subVectors(b.p, b.prev); const len2 = seg.lengthSq();

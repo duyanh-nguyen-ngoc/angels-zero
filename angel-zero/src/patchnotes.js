@@ -3,6 +3,12 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.49', title: 'MISSION ISOLATION & SMOOTHER FRAMES', bullets: [
+    'Fixed NAVAL BATTLE first launches where the stage-1 destroyers could be invisible but still targetable, and stopped the old enemy carrier group from appearing in NAVAL BATTLE and CANYON RUN.',
+    'AIR SUPERIORITY now has the same enemy task force whether you launch fresh, replay or switch missions, and ACE DUEL no longer counts missiles or bombs you cannot fire.',
+    'Removed per-frame garbage from the HUD, radar lock, flares, particles and cockpit combiner (up to ~145 objects per frame before), for steadier frame times in long sorties.',
+    'Hardened radar lock math against a zero-range target and silenced the missing favicon console error.'
+  ] },
   { version: 'v1.1.48', title: 'GROUND SITE MEMORY LEAK FIX', bullets: [
     'Fixed a memory leak where every replay or mission switch rebuilt the island SAM and AAA sites without freeing the old ones, so long sessions no longer slowly grow GPU memory.',
     'Retired ground sites now release their meshes and materials, which also applies to the timed ground-target respawn mid-sortie.'
