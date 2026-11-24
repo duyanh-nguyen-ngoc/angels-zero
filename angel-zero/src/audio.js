@@ -114,6 +114,29 @@ export function createAudio() {
     f15Gun: 'f15/f15_m61a1.wav', f15AimLaunch: 'f15/f15_aim_launch.wav',
     f15Flare: 'f15/f15_flare.wav', f15GearTransit: 'f15/f15_gear_transit.wav',
     f15GearLock: 'f15/f15_gear_lock.wav', f15TyreSqueal: 'f15/f15_tyre_squeal.wav',
+    f15Incoming: 'f15/f15_incoming.wav',
+    f15In01: 'f15/f15_in_01.wav',
+    f15In02: 'f15/f15_in_02.wav',
+    f15In03: 'f15/f15_in_03.wav',
+    f15In04: 'f15/f15_in_04.wav',
+    f15In05: 'f15/f15_in_05.wav',
+    f15In06: 'f15/f15_in_06.wav',
+    f15In07: 'f15/f15_in_07.wav',
+    f15In08: 'f15/f15_in_08.wav',
+    f15In09: 'f15/f15_in_09.wav',
+    f15In10: 'f15/f15_in_10.wav',
+    f15In11: 'f15/f15_in_11.wav',
+    f15In12: 'f15/f15_in_12.wav',
+    f15JfsStart: 'f15/f15_jfs_start.wav', f15JfsRun: 'f15/f15_jfs_run.wav', f15JfsStop: 'f15/f15_jfs_stop.wav',
+    f15GpuStart: 'f15/f15_gpu_start.wav', f15GpuRun: 'f15/f15_gpu_run.wav', f15GpuComp: 'f15/f15_gpu_comp.wav',
+    f15CanopyTrans: 'f15/f15_canopy_trans.wav', f15CanopyClose: 'f15/f15_canopy_close.wav',
+    f15Tone115: 'f15/f15_tone_115.wav', f15Tone900Cont: 'f15/f15_tone_900_cont.wav', f15Tone900Int: 'f15/f15_tone_900_int.wav',
+    f15BettyFuelLow: 'f15/f15_betty_fuel_low.wav', f15GearAoa: 'f15/f15_gear_aoa.wav', f15Ows92: 'f15/f15_ows_92.wav',
+    f15StallChop: 'f15/f15_stall_chop.wav', f15StallCont: 'f15/f15_stall_cont.wav',
+    f15Efflux: 'f15/f15_efflux.wav', f15Intake: 'f15/f15_intake.wav', f15Wind: 'f15/f15_wind.wav',
+    f15Flaps: 'f15/f15_flaps.wav', f15GroundRattle: 'f15/f15_ground_rattle.wav', f15TyreSlip: 'f15/f15_tyre_slip.wav',
+    f15AimExplode: 'f15/f15_aim_explode.wav', f15AirExplode: 'f15/f15_air_explode.wav',
+    f15Strike: 'f15/f15_strike.wav', f15FlareOut: 'f15/f15_flare_out.wav',
   };
   const samples = {}, sfxState = {};
   function preload(base = 'assets/sfx/') {
@@ -709,6 +732,7 @@ export function createAudio() {
     const lp = filt('lowpass', 900, 0.8); lp.frequency.setValueAtTime(1400, tb); lp.frequency.exponentialRampToValueAtTime(120, tb + 1.8);
     const ng = gain(0); ng.gain.setValueAtTime(0, tb); ng.gain.linearRampToValueAtTime(1.0 * k, tb + 0.02); ng.gain.exponentialRampToValueAtTime(0.001, tb + 2.2);
     n.connect(lp).connect(ng).connect(cockpitLP); n.start(tb, Math.random()); n.stop(tb + 2.3);
+    playSample(k > 1.0 ? 'f15AirExplode' : 'f15AimExplode', cockpitLP, Math.min(0.45, 0.28 * k), 1, Math.max(0, delay));
     N.blastCount = (N.blastCount || 0) + 1;
     N.lastBlast = { k: +k.toFixed(2), crackHz: [3000, 850], crackAt: +t.toFixed(3), subHz: [110, 36], boomAt: +tb.toFixed(3), delay: +(tb - t).toFixed(3), count: N.blastCount };
   }
@@ -763,6 +787,7 @@ export function createAudio() {
   }
   function gunhit() {
     if (!ready || !N.gunHitG) return;
+    playSample('f15Strike', cockpitLP, 0.32);
     const t = ctx.currentTime, g = N.gunHitG.gain;
     g.cancelScheduledValues(t); g.setValueAtTime(0.16, t);
     g.exponentialRampToValueAtTime(0.001, t + 0.09);
@@ -804,6 +829,7 @@ export function createAudio() {
   // Bomb detonation: long sub-bass rumble, crack and rolling brown-noise thunder.
   function bombDetonation(intensity = 1) {
     if (!ready) return;
+    playSample('f15AirExplode', cockpitLP, Math.min(0.5, 0.35 * intensity));
     const t = ctx.currentTime, k = Math.min(1.4, Math.max(0.05, intensity));
     const sub = ctx.createOscillator(); sub.type = 'sine';
     sub.frequency.setValueAtTime(48, t); sub.frequency.exponentialRampToValueAtTime(16, t + 3.2);
@@ -823,6 +849,7 @@ export function createAudio() {
     if (!ready) return;
     const t = ctx.currentTime, k = Math.min(1, Math.max(0.1, intensity));
     playSample('f15Flare', cockpitLP, 0.42 * k);
+    playSample('f15FlareOut', cockpitLP, 0.24 * k, 1, 0.35);
     for (let i = 0; i < 6; i++) {
       const at = t + i * 0.07;
       const o = ctx.createOscillator(); o.type = 'sine';
@@ -929,6 +956,7 @@ export function createAudio() {
       g.gain.exponentialRampToValueAtTime(0.001, t + dt + 0.055);
       o.connect(g).connect(master); o.start(t + dt); o.stop(t + dt + 0.06);
     }
+    if (hi) playSample('f15Tone115', master, 0.14);
   }
   // SAM salvo alert: a short rising RWR launch warble. Pitch climbs with the
   // number of live SAMs on the nose; the voice count is capped at four.
@@ -965,13 +993,13 @@ export function createAudio() {
   }
 
   // Sample voices are built lazily once both the context and the decoded buffer exist.
-  function playSample(key, dest, vol = 0.5, rate = 1) {
+  function playSample(key, dest, vol = 0.5, rate = 1, delay = 0) {
     if (!ready || !ctx || !samples[key] || !dest) return 0;
     const buf = samples[key], src = ctx.createBufferSource(), g = gain(vol);
     src.buffer = buf; src.playbackRate.value = rate;
     src.connect(g).connect(dest);
     src.onended = () => { try { src.disconnect(); g.disconnect(); } catch (e) {} };
-    src.start(ctx.currentTime);
+    src.start(ctx.currentTime + Math.max(0, delay));
     return buf.duration / Math.max(0.1, rate);
   }
   function loopVoice(buf) { const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true; s.start(0, Math.random() * Math.max(0.01, buf.duration - 0.05)); return s; }
@@ -1008,6 +1036,13 @@ export function createAudio() {
       N.f15Gun = loopVoice(samples.f15Gun); N.f15GunG = gain(0.65);
       N.f15Gun.connect(N.f15GunG).connect(N.gunBus);
     }
+    addF15Loop('f15Efflux', 'f15Efflux', 'f15EffluxG', cockpitLP);
+    addF15Loop('f15Intake', 'f15Intake', 'f15IntakeG', cockpitLP);
+    addF15Loop('f15Wind', 'f15Wind', 'f15WindG', N.windBus || master);
+    addF15Loop('f15GroundRattle', 'f15Rattle', 'f15RattleG', cockpitLP);
+    addF15Loop('f15JfsRun', 'f15JfsRun', 'f15JfsRunG', cockpitLP);
+    addF15Loop('f15GpuRun', 'f15GpuRun', 'f15GpuRunG', cockpitLP);
+    addF15Loop('f15GpuComp', 'f15GpuComp', 'f15GpuCompG', cockpitLP);
   }
   // ---- cockpit voice warning system -------------------------------------------
   const VWS_IDS = ['PULL_UP', 'ENGINE_FIRE', 'CHAFF_FLARE', 'OVER_G', 'ALTITUDE', 'BINGO_FUEL'];
@@ -1148,11 +1183,14 @@ export function createAudio() {
     g.gain.setValueAtTime(0.14, t); g.gain.exponentialRampToValueAtTime(0.001, t + 2.4);
     o.connect(lp).connect(g).connect(cockpitLP); o.start(t); o.stop(t + 2.5);
     explosion(0.35);
+    N.crankOn = false;
+    playSample('f15JfsStop', cockpitLP, 0.3);
   }
   /* ------------- engine fire / Halon bottle / windmill relight (cockpit cues) */
   // Fire-warning bell: three bright struck-bell rings (inharmonic partials 1 : 2.76 : 5.4).
   function fireBell() {
     if (!ready) return;
+    playSample('f15Tone115', N.body, 0.2);
     const t0 = ctx.currentTime;
     for (let i = 0; i < 3; i++) {
       const at = t0 + i * 0.32;
@@ -1183,7 +1221,9 @@ export function createAudio() {
     if (!ready) return;
     const t = ctx.currentTime;
     if (N.crank) { try { N.crank.g.gain.cancelScheduledValues(t); N.crank.g.gain.setTargetAtTime(0, t, 0.04); N.crank.o.stop(t + 0.2); for (const c of N.crank.clicks) c.stop(t + 0.01); } catch (e) { /* stopped */ } N.crank = null; }
+    N.crankOn = !!on;
     if (!on) return;
+    playSample('f15JfsStart', cockpitLP, 0.28);
     const o = osc('sawtooth', 90), lp = filt('lowpass', 900, 1.2), g = gain(0);
     o.frequency.setValueAtTime(90, t); o.frequency.linearRampToValueAtTime(420, t + 2.5);
     lp.frequency.setValueAtTime(500, t); lp.frequency.linearRampToValueAtTime(2200, t + 2.5);
@@ -1202,6 +1242,8 @@ export function createAudio() {
   // Relight: deep turbine boom + whoosh of the burner lighting.
   function relightBoom() {
     if (!ready) return;
+    N.crankOn = false;
+    playSample('f15JfsStop', cockpitLP, 0.25);
     explosion(0.55);
     const t = ctx.currentTime, src = ctx.createBufferSource(); src.buffer = N.whiteBuf;
     const lp = filt('lowpass', 300, 0.8), g = gain(0);
@@ -1384,6 +1426,7 @@ export function createAudio() {
     if (playSample('f15TyreSqueal', master, 0.45 * k)) {
       const th = ctx.createOscillator(); th.type = 'sine'; th.frequency.setValueAtTime(70, t0); th.frequency.exponentialRampToValueAtTime(35, t0 + 0.2);
       const tg = gain(0); tg.gain.setValueAtTime(0.4 * k, t0); tg.gain.exponentialRampToValueAtTime(0.001, t0 + 0.25);
+      if (k > 0.65) playSample('f15TyreSlip', master, 0.32 * k);
       th.connect(tg).connect(master); th.start(t0); th.stop(t0 + 0.27);
       return;
     }
@@ -2204,6 +2247,7 @@ export function createAudio() {
   let lastHit = 0;
   function hit(intensity = 1) {
     if (!ready) return;
+    playSample('f15Strike', cockpitLP, Math.min(0.45, 0.35 * intensity));
     const t = ctx.currentTime;
     if (t - lastHit < 0.03) return;                  // cap the rate at ~33 Hz
     lastHit = t;
@@ -2338,6 +2382,8 @@ export function createAudio() {
       set(N.f15AbOut.playbackRate, 0.92 + 0.2 * abK, 0.1);
       set(N.f15AbOutG.gain, live && !p.cockpit ? 0.38 * Math.pow(abK, 1.2) : 0, 0.12);
     }
+    if (N.f15Efflux) set(N.f15EffluxG.gain, live && !p.cockpit ? 0.24 * (0.3 + 0.7 * rpmL) * (0.4 + 0.6 * sm(p.mach || 0, 0.4, 1.2)) : 0, 0.12);
+    if (N.f15Intake) set(N.f15IntakeG.gain, live ? (p.cockpit ? 0.14 : 0.10) * (0.25 + 0.75 * rpmL) * (0.4 + 0.6 * sm(p.kts || 0, 80, 450)) : 0, 0.12);
     // View crossfade + run-state gate.
     set(E.ckMixG.gain, p.cockpit ? 1 : 0, 0.25);
     set(E.chMixG.gain, p.cockpit ? 0 : 1, 0.25);
@@ -2425,13 +2471,58 @@ export function createAudio() {
       set(N.f15Brake.playbackRate, 0.85 + 0.35 * sm(kts, 100, 500), 0.15);
     }
     if (N.f15StallB) set(N.f15StallBG.gain, live ? 0.26 * sm(aoa, 14, 24) : 0, 0.1);
+    if (N.f15Wind) {
+      set(N.f15WindG.gain, live ? 0.22 * sm(kts, 140, 580) : 0, 0.12);
+      set(N.f15Wind.playbackRate, 0.8 + 0.45 * sm(kts, 140, 600), 0.15);
+    }
+    if (N.f15Rattle) {
+      const r = p.rolling || 0;
+      set(N.f15RattleG.gain, live && r > 2 ? 0.28 * sm(r, 2, 70) : 0, 0.1);
+      set(N.f15Rattle.playbackRate, 0.8 + 0.5 * sm(r, 2, 90), 0.12);
+    }
+    if (N.f15JfsRun) set(N.f15JfsRunG.gain, live && (p.catHold || N.crankOn) ? 0.16 : 0, 0.15);
+    if (N.f15GpuRun) set(N.f15GpuRunG.gain, live && (p.pitActive || p.catHold) ? 0.14 : 0, 0.2);
+    if (N.f15GpuComp) set(N.f15GpuCompG.gain, live && (p.pitActive || p.catHold) ? 0.14 : 0, 0.2);
+    if (live && p.pitActive && !N.wasPit) playSample('f15GpuStart', cockpitLP, 0.25);
+    N.wasPit = !!(live && p.pitActive);
+    if (live && p.catHold && !N.wasCatHold) playSample('f15JfsStart', cockpitLP, 0.22);
+    N.wasCatHold = !!(live && p.catHold);
     if (live && gl >= 7.2 && gl < 9.0 && (!N.owsAt || ctx.currentTime - N.owsAt > 1.2)) {
       N.owsAt = ctx.currentTime;
-      playSample(gl >= 8.2 ? 'f15Ows96' : 'f15Ows85', N.vwsHP, 0.38);
+      playSample(gl >= 8.6 ? 'f15Ows96' : gl >= 8.0 ? 'f15Ows92' : 'f15Ows85', N.vwsHP, 0.38);
     }
     if (live && aoa >= 21 && kts < 280 && (!N.aoaWarnAt || ctx.currentTime - N.aoaWarnAt > 1.4)) {
       N.aoaWarnAt = ctx.currentTime;
       playSample('f15HighAoa', N.vwsHP, 0.38);
+    }
+    if (live && p.stalled && (!N.stallAt || ctx.currentTime - N.stallAt > 1.2)) {
+      N.stallAt = ctx.currentTime;
+      playSample('f15StallCont', N.vwsHP, 0.32);
+    } else if (live && (p.stallWarn || aoa >= 19) && (!N.stallAt || ctx.currentTime - N.stallAt > 1.2)) {
+      N.stallAt = ctx.currentTime;
+      playSample('f15StallChop', N.vwsHP, 0.3);
+    }
+    if (live && (p.gear || 0) > 0.5 && (aoa > 14 || (kts > 40 && kts < 130)) && (!N.gearAoaAt || ctx.currentTime - N.gearAoaAt > 1.6)) {
+      N.gearAoaAt = ctx.currentTime;
+      playSample('f15GearAoa', N.vwsHP, 0.34);
+    }
+    const yr = Math.abs(p.yawRate || 0);
+    if (live && (p.spin || yr > 0.9) && (!N.depAt || ctx.currentTime - N.depAt > 1.1)) {
+      N.depAt = ctx.currentTime;
+      playSample('f15Tone900Cont', N.vwsHP, 0.3);
+    } else if (live && yr > 0.52 && (!N.depAt || ctx.currentTime - N.depAt > 1.1)) {
+      N.depAt = ctx.currentTime;
+      playSample('f15Tone900Int', N.vwsHP, 0.28);
+    }
+    if (live && p.fuelFrac !== undefined && p.fuelFrac < 0.25 && p.fuelFrac >= 0.15 && !N.fuelLowSaid) {
+      N.fuelLowSaid = true;
+      playSample('f15BettyFuelLow', N.vwsHP, 0.5);
+    } else if (p.fuelFrac !== undefined && p.fuelFrac > 0.35) N.fuelLowSaid = false;
+    const flapsNow = live && !(p.rolling > 1) && kts < (N.flapsDown ? 265 : 250);
+    if (live && flapsNow !== !!N.flapsDown) { N.flapsDown = flapsNow; playSample('f15Flaps', cockpitLP, 0.28); }
+    if (live && (p.rolling || 0) > 25 && p.wheelBrake && (!N.slipAt || ctx.currentTime - N.slipAt > 1.5)) {
+      N.slipAt = ctx.currentTime;
+      playSample('f15TyreSlip', master, 0.34);
     }
     updateWind(p, kts, live);
     // ---- pilot G physiology mix -------------------------------------------------
@@ -2623,6 +2714,19 @@ export function createAudio() {
     tyreChirp, noseThump, shuttleClank,
     get feelCounts() { return { tyre: tyreCount, nose: noseCount, clank: clankCount }; },    get engine() { return N.engineDbg || null; },
     vws: { say: vwsSay }, get vwsLast() { return { ...vwsLast }; }, get sfx() { return { ...sfxState }; },
+    incomingMissile(clock) {
+      if (!ready || (N.inAt && ctx.currentTime - N.inAt < 3.0)) return false;
+      N.inAt = ctx.currentTime;
+      const c = Math.round(clock);
+      const k = c >= 1 && c <= 12 ? 'f15In' + String(c).padStart(2, '0') : 'f15Incoming';
+      return playSample(k, N.vwsHP, 0.52) > 0;
+    },
+    canopyClose() {
+      if (!ready) return false;
+      const d = playSample('f15CanopyTrans', cockpitLP, 0.22);
+      playSample('f15CanopyClose', cockpitLP, 0.3, 1, d > 0 ? Math.min(1.5, d * 0.2) : 0.25);
+      return true;
+    },
     get vwsState() { return { q: Array.from(vwsQ), cd: Array.from(vwsCd), playing: vwsPlaying, until: vwsUntil }; }, get hydWhine() { return N.hydG ? +N.hydG.gain.value.toFixed(4) : 0; },
     preloadVWS() { return Promise.resolve(); },            // voice-free: no VWS voice clips
     setVWS() { vwsSpeech = false; }, setVWSMuted(on) { vwsMuted = !!on; }, setVWSLog(on) { vwsDebug = !!on; },

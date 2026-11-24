@@ -736,7 +736,7 @@ import { createHUD } from './src/hud.js?v=s9di';
 import { createCockpit3D } from './src/cockpit3d.js?v=s9di';
 import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9dj';
 import { createEjection } from './src/eject.js?v=s9di';
-import { createAudio } from './src/audio.js?v=s9dl';
+import { createAudio } from './src/audio.js?v=s9dm';
 import { createRadio } from './src/radio.js?v=s9dd';
 import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9dd';
 import { createLivery } from './src/livery.js?v=s9dd';
@@ -751,7 +751,7 @@ import { createFreeLook } from './src/freelook.js?v=s9dd';
 import { createCanopyGlass } from './src/canopyglass.js?v=s9dd';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9dd';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9dd';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9dl';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9dm';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9de';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9dd';
 import { createRadioQueue } from './src/radioQueue.js?v=s9dj';
@@ -2353,6 +2353,7 @@ async function startSortie() {
   if (hintEl) hintEl.textContent = 'LOADING CARRIER…';
   await loadMissionScene(m);
   radioReset(); preloadRadioOnce();
+  audio.canopyClose();
   if (m.launch === 'CATAPULT' || m.launchType === 'CARRIER') await enterCarrierLaunch(m);
   else radioEvent('ON_TAKEOFF');
   if (hintEl) hintEl.textContent = oldHint;
@@ -4784,7 +4785,7 @@ window.__audioDebug = () => ({ state: audio.state, rms: +audio.rms.toFixed(4), m
   crtRadio: combat.radio ? { call: combat.radio.call, text: combat.radio.text, age: +combat.radio.age.toFixed(2) } : null,
   gLoad: +state.gLoad.toFixed(2), gStrain: +state.gStrain.toFixed(2), gmix: audio.gmix, audioDbg: audio.dbg, gState: { gloc: state.glocT, pilotK: state.pilotK, wake: state.glocWakeT, gPeak: state.gPeak }, throttle: +state.throttle.toFixed(2), afterburner: +state.afterburner.toFixed(2) });
 // Seeker / alert / gun state -> procedural audio mix, once per frame.
-const _audioFwd = new THREE.Vector3();
+const _audioFwd = new THREE.Vector3(), _audioRight = new THREE.Vector3();
 // Preallocated music context: one object, updated in place every frame (no allocations).
 const musicCtx = { debrief: false, landed: false, rtb: false, app: 'MENU', onGround: false, launched: false, pitstop: false,
   inCombat: false, dmg: 0, msl: 0, storm: false, rain: 0, night: false, nvg: false,
@@ -4872,6 +4873,14 @@ function updateAudio() {
     kts: state.speed * 1.94384,
     airbrake: flightMode === 'FLY' ? state.ctl.airbrake : 0, gear: flightMode === 'FLY' ? state.gear : 0,
     rolling: flightMode === 'FLY' && state.onGround ? state.groundSpeed : 0,
+    stalled: flightMode === 'FLY' && !!state.stalled,
+    stallWarn: flightMode === 'FLY' && (state.stallWarnT || 0) > 0,
+    spin: flightMode === 'FLY' ? state.spin || 0 : 0,
+    yawRate: flightMode === 'FLY' ? state.yawRate || 0 : 0,
+    fuelFrac: state.fuel / 13455,
+    wheelBrake: !!(state.onGround && state.wheelBrake),
+    pitActive: !!(state.pit && state.pit.active),
+    catHold: cat.ph === 'HOLD',
     // Feel pass: transonic shear / supersonic quiet / high-AoA wing-rock creak.
     transK, superK, wrK, wrPhase
   });
@@ -6180,7 +6189,23 @@ function stepSim(dt) {
     if (state.fuel / 13455 < 0.15 && !vwsState.fuelLatched) { vwsState.fuelLatched = true; vwsTrigger('BINGO_FUEL', 'BINGO FUEL'); }
     if (state.fuel / 13455 > 0.3) vwsState.fuelLatched = false;
     const incoming = (combat.incoming || 0) > 0 || combat.missileWarning > 0.35;
-    if (incoming && !vwsState.missilePrev) vwsTrigger('CHAFF_FLARE', '');
+    if (incoming && !vwsState.missilePrev) {
+      vwsTrigger('CHAFF_FLARE', '');
+      let mBest = null, md2 = Infinity;
+      for (const mm of combatSys.missiles) {
+        if (mm.active && mm.enemy && mm.target && mm.target.isPlayer && mm.pos) {
+          const d2 = mm.pos.distanceToSquared(state.position);
+          if (d2 < md2) { md2 = d2; mBest = mm; }
+        }
+      }
+      if (mBest) {
+        _audioFwd.set(0, 0, -1).applyQuaternion(state.quaternion);
+        const rx = _audioRight.set(1, 0, 0).applyQuaternion(state.quaternion);
+        const dx = mBest.pos.x - state.position.x, dz = mBest.pos.z - state.position.z;
+        const ang = Math.atan2(dx * rx.x + dz * rx.z, dx * _audioFwd.x + dz * _audioFwd.z) * 180 / Math.PI;
+        audio.incomingMissile((Math.round(((ang + 360) % 360) / 30) % 12) || 12);
+      } else audio.incomingMissile(0);
+    }
     vwsState.missilePrev = incoming;
     if (agl < 150 && state.gear < 0.5 && vs < -15 && missionId !== 'CANYON_RUN' && !vwsState.altLatched) {
       vwsState.altLatched = true; vwsTrigger('ALTITUDE', 'ALTITUDE');

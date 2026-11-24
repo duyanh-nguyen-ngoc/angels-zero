@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.53', title: 'COMPLETE 58-FILE F-15C AUDIO SUITE', bullets: [
+    'Compiled and integrated all 58 FlightGear F-15C sound files into src/audio.js (61 total SFX samples): added aft efflux, intake rush, slipstream wind, ground rattle, JFS/GPU ground power, and canopy close.',
+    'Added full 3-stage OWS overload tones (85/92/96%), 900 Hz departure/spin tones, chopped/continuous stall warnings, gear-AoA, Betty low-fuel, flaps transit, tyre sideslip, and 1-12 o\'clock incoming missile callouts.',
+    'Wired real AIM-9 explosion, aircraft explosion, fuselage strike, and flare-out samples into combat events with procedural fallback.'
+  ] },
   { version: 'v1.1.52', title: 'F-15C SOUND BANK & COCKPIT WARNING AUDIO', bullets: [
     'Compiled and integrated 19 FlightGear F-15C sound assets into src/audio.js, layering real F100 compressor whine, jet exhaust, internal/external afterburner, airbrake, and stall buffet over the procedural engine.',
     'Added real F-15C cockpit warning audio: Bitching Betty VMS alerts (Over-G, Bingo Fuel, Warning), progressive 900 Hz OWS overload tones, High-AoA warning, and Master Caution tone.',
