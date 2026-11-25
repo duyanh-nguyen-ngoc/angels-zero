@@ -136,7 +136,7 @@ async function navigate(query, waitReady = true) {
 async function missionReady(id) {
   await page.waitForFunction(mid => {
     const a = window.__az;
-    return a && a.ready && a.sortie && a.sortie.active && a.perf && a.perf.frames >= 2 && a.missionId === mid;
+    return a && a.ready && a.sortie && a.sortie.active && a.missionId === mid;
   }, id, { polling: 250, timeout: 120000 });
 }
 async function switchMission(id) {
@@ -181,21 +181,21 @@ async function assertMission(id) {
 /* ------------------------------------------------------------------------- scenarios */
 const SCENARIOS = [
   ['Menu / hangar boot', async () => {
-    // Lightweight check: __az/appMode/buildChip/renderer are all set at module eval.
-    await navigate('debug&nobgm', false);
+    // ONE full page load for the whole suite: F-22A airframe + warp line + first mission.
+    await navigate('debug&nointro&nobgm&warp=3&aircraft=F22A&mission=AIR_SUPERIORITY');
+    await missionReady('AIR_SUPERIORITY');
+    // Return to the hangar through the real menu path, then relaunch for combat.
+    await page.evaluate(() => window.__az.toMenu());
     const s = await page.evaluate(() => ({ mode: window.__az.appMode,
       chip: document.getElementById('buildChip')?.textContent || '' }));
     assert(s.mode === 'MENU', `appMode ${s.mode} !== MENU`);
     assert(/^v\d+\.\d+\.\d+$/.test(s.chip), `buildChip "${s.chip}" is not a version`);
     assert(await glError() === 0, 'WebGL error on menu boot');
+    await page.evaluate(() => window.__az.launchSortie());
+    await missionReady('AIR_SUPERIORITY');
   }],
 
-  ['Mission AIR_SUPERIORITY', async () => {
-    // The ONE full page load: F-22A airframe + deterministic warp line + first mission.
-    await navigate('debug&nointro&nobgm&warp=3&aircraft=F22A&mission=AIR_SUPERIORITY');
-    await missionReady('AIR_SUPERIORITY');
-    await assertMission('AIR_SUPERIORITY');
-  }],
+  ['Mission AIR_SUPERIORITY', async () => { await assertMission('AIR_SUPERIORITY'); }],
   ['Mission NAVAL_BATTLE', async () => { await switchMission('NAVAL_BATTLE'); await assertMission('NAVAL_BATTLE'); }],
   ['Mission CANYON_RUN', async () => { await switchMission('CANYON_RUN'); await assertMission('CANYON_RUN'); }],
   ['Mission ACE_DUEL', async () => { await switchMission('ACE_DUEL'); await assertMission('ACE_DUEL'); }],

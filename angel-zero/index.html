@@ -6550,6 +6550,7 @@ if (DEBUG) {
     get model() { return model; }, get ready() { return modelReady; },
     get missionId() { return missionId; }, get mission() { return mission(); }, cycleMission, loadMissionScene, startSortie, launchSortie,
     setMission: id => { if (!MISSIONS[id]) return false; flightMode = 'FLY'; combat.health = 100; resetAircraft(); missionId = id; return startSortie(); },
+    toMenu: () => { appMode = 'MENU'; showMenu('title'); },
     get surfaces() { return surfaces; }, get stormFx() { return stormFx; }, get wetDeck() { return wetDeck; }, get weatherSys() { return weather; }, get atmo() { return atmosphere; }, get nvgSys() { return nvg; },
     get aircraft() { return AC.id; }, get aircraftStats() { return AC; }, get gearPts() { return GEAR_PTS; },
     get reactive() { return { ...audio.reactive, log: RX_LOG ? RX_LOG.slice(-30) : [] }; }, rxFire, sayText, rxTelemetry,
