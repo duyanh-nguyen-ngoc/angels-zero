@@ -6,8 +6,7 @@
 // The sky's horizon colour IS `scene.fog.color` (same THREE.Color), so the sea
 // and islands always fade into exactly the colour the sky meets them with.
 //
-// Time of day: five random presets (DAWN, DAYLIGHT, GOLDEN_HOUR, DUSK, NIGHT) plus the
-// theatre / phase presets (CLOUD_SEA, STORM, STORM_OPS, SUNBREAK) drive
+// Time of day: five presets (DAWN, DAYLIGHT, GOLDEN_HOUR, DUSK, NIGHT) drive
 // the sky, the sun / moon direction (randomised azimuth), the directional,
 // hemisphere and ambient lights, exposure, fog, ocean glint + water level,
 // cloud top / belly colours, airframe env-map strength and NVG tube gain.
@@ -83,20 +82,6 @@ export const PRESETS = {
     oceanSun: 0x9aa6b0, oceanSunK: 0.55, oceanSky: 0x3b454f, oceanLevel: 0.55, glitter: 0.5,
     cloudTop: 0x4a525a, cloudBelly: 0x2c333a, env: 0.55, nvgGain: 4.2, nav: 0.35, exact: 1
   },
-  // STORM OPS (Storm Realism Pass, step 1): dark carrier-ops storm under a cool silver
-  // moon. Charcoal-indigo dome, a low (20 deg) moon key so airframe edges catch a silver
-  // rim while the faces stay dark, weak cold fill, a near-black sea whose specular is a
-  // narrow silver glint (low level / glitter, darker sky reflection) and shafts: 1 =
-  // full-strength additive god-ray shafts (src/stormfx.js). Paired with the STORM_OPS
-  // weather (slate deck, light rain, lightning, heavy chop). Auto in NAVAL phase 3.
-  STORM_OPS: {
-    label: 'STORM OPS', sunEl: 20, lightEl: 20, moon: true, window: [1 * 60 + 30, 3 * 60 + 30],
-    horizon: 0x2b333d, mid: 0x1c232d, zenith: 0x0b1017, mie: 0x8fa3ba, mieK: 0.9, disc: 0xdfe8f4, discK: 0.7, discSize: 0.99984,
-    light: 0xc9d7ea, lightI: 1.9, hemiSky: 0x2e3a4a, hemiGround: 0x07090c, hemiI: 0.42, amb: 0x1d2633, ambI: 0.08,
-    exposure: 1.0, fogK: 1.45, stars: 0, corona: 0.35,
-    oceanSun: 0xc4d4ea, oceanSunK: 0.95, oceanSky: 0x0d141c, oceanLevel: 0.22, glitter: 0.55,
-    cloudTop: 0x3a4452, cloudBelly: 0x12171e, env: 0.35, nvgGain: 6.0, nav: 0.85, exact: 1, shafts: 1
-  },
   // SUNBREAK: a hard low sun punching through thin high cloud (ACE_DUEL opening).
   SUNBREAK: {
     label: 'SUNBREAK', sunEl: 14, lightEl: 14, moon: false, window: [9 * 60, 11 * 60],
@@ -111,10 +96,7 @@ export const PRESETS = {
 export const PRESET_ORDER = ['DAWN', 'DAYLIGHT', 'GOLDEN_HOUR', 'DUSK', 'NIGHT'];
 const COLOR_KEYS = ['horizon', 'mid', 'zenith', 'mie', 'disc', 'light', 'hemiSky', 'hemiGround', 'amb', 'oceanSun', 'oceanSky', 'cloudTop', 'cloudBelly'];
 // exact: 1 = use the preset sky / horizon colours as authored (no colour-discipline desaturation).
-const NUM_KEYS = ['mieK', 'discK', 'discSize', 'lightI', 'hemiI', 'ambI', 'exposure', 'fogK', 'stars', 'corona', 'oceanSunK', 'oceanLevel', 'glitter', 'env', 'nvgGain', 'nav', 'exact', 'shafts'];
-// Global ACES exposure trim on top of every preset (Storm Realism Pass: ~1.05 with the
-// high-threshold bloom, so only HDR emissives bloom and the sky never washes out).
-const EXPOSURE_TRIM = 1.05;
+const NUM_KEYS = ['mieK', 'discK', 'discSize', 'lightI', 'hemiI', 'ambI', 'exposure', 'fogK', 'stars', 'corona', 'oceanSunK', 'oceanLevel', 'glitter', 'env', 'nvgGain', 'nav', 'exact'];
 
 export function createAtmosphere(THREE, env) {
   const { scene, camera, sunDir, terrainHeight } = env;    // sunDir: shared light direction (sun or moon)
@@ -360,8 +342,7 @@ export function createAtmosphere(THREE, env) {
     const fill = nvgOn ? 2.4 : 1;                        // NVG light intensification on top of the preset
     if (L.hemiLight) { L.hemiLight.color.copy(cur.hemiSky).lerp(slate, oc * 0.4); L.hemiLight.groundColor.copy(cur.hemiGround); L.hemiLight.intensity = cur.hemiI * fill * (1 - 0.3 * oc) + fl * 3.0; }
     if (L.ambLight) { L.ambLight.color.copy(cur.amb); L.ambLight.intensity = cur.ambI * fill; }
-    if (L.renderer) L.renderer.toneMappingExposure = cur.exposure * EXPOSURE_TRIM;
-    if (L.setShafts) L.setShafts(cur.shafts, oc);
+    if (L.renderer) L.renderer.toneMappingExposure = cur.exposure;
     if (L.ocean) {
       const u = L.ocean;
       u.uSunColor.value.set(cur.oceanSun.r, cur.oceanSun.g, cur.oceanSun.b).multiplyScalar(cur.oceanSunK * (1 - 0.85 * oc) + fl * 0.8);

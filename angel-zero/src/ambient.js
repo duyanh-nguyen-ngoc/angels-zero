@@ -21,11 +21,9 @@ const SEARCH_N = 12, GORGE_MIST_N = 10;
 const BEACON_N = 16, AMB_JET_N = 4, AMB_TRACER_RATE = 0.4;
 const WAKE_OWNER_N = 24;
 
-// The duel opens in hard sunlight. RTB is golden everywhere except AIR_SUPERIORITY
-// (handled in maybeBlend).
-// NAVAL phase 3 = STORM OPS (Storm Realism Pass): moonlit storm, god rays; index.html
-// pairs it with the STORM_OPS weather.
-const PHASE_SKY = { NAVAL_BATTLE: { 3: 'STORM_OPS' }, ACE_DUEL: { 0: 'SUNBREAK' } };
+// NAVAL phase 3 darkens the sky; the duel opens in hard sunlight. RTB is golden
+// everywhere except AIR_SUPERIORITY (handled in maybeBlend).
+const PHASE_SKY = { NAVAL_BATTLE: { 3: 'STORM' }, ACE_DUEL: { 0: 'SUNBREAK' } };
 const MISSION_PRESET = { NAVAL_BATTLE: 'DAYLIGHT', ACE_DUEL: 'CLOUD_SEA', CANYON_RUN: 'DAYLIGHT', AIR_SUPERIORITY: 'DAYLIGHT' };
 
 const LOG_V = '#include <common>\n#include <logdepthbuf_pars_vertex>';
