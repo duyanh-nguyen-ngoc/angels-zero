@@ -3,6 +3,10 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.68', title: 'NOSE CAMERA (HUD-ONLY VIEW)', bullets: [
+    'Added an Ace Combat-style HUD-only Nose Camera view: press Space to cycle Chase -> Cockpit -> Nose -> Chase (or boot directly with ?debug&nose).',
+    'Renders an unobstructed forward nose-mounted camera with centered pitch ladder, heading strip, and vertical speed/altitude tapes.'
+  ] },
   { version: 'v1.1.67', title: 'WORLD & THEATRE MAP OVERHAUL', bullets: [
     'Archipelago & Airbase overhaul: higher-resolution terrain mesh, alpine summit snow, Main Island river & island highway network with live traffic lights, glowing volcano caldera magma & rising steam plume, USAF/ICAO runway markings with PAPI lights & static aircraft, Port City skyline, container terminal, merchant shipping, canyon stone arch, and ridge observatory.',
     'Dedicated Naval Strait & Canyon Run theatres: Naval Battle now takes place inside a deep-water volcanic fjord strait with flanking cliffs, sea stacks, cape lighthouses, and coastal radar stations; Canyon Run adds a fortified Crater Citadel, high-span steel canyon bridges, braided riverbed streams, and clean canyon rock strata.',

@@ -734,7 +734,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createVFX } from './src/vfx.js?v=s9dt';
 import { createAmbient } from './src/ambient.js?v=s9dz';
 import { createBlastFX } from './src/blastfx.js?v=s9dd';
-import { createHUD } from './src/hud.js?v=s9dz';
+import { createHUD } from './src/hud.js?v=s9ea';
 import { createCockpit3D } from './src/cockpit3d.js?v=s9dr';
 import { createCockpitF22 } from './src/cockpit_f22.js?v=s9dy';
 import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9dz';
@@ -754,7 +754,7 @@ import { createFreeLook } from './src/freelook.js?v=s9dd';
 import { createCanopyGlass } from './src/canopyglass.js?v=s9dd';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9dd';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9dd';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9dz';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9ea';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9de';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9dd';
 import { createRadioQueue } from './src/radioQueue.js?v=s9dj';
@@ -818,7 +818,7 @@ window.__perfDebug = PERF_DEBUG;
 const scene = new THREE.Scene();
 const FOG_DENSITY = 0.000105;                       // scene.fog is created by src/atmosphere.js (horizon-synced)
 
-const CHASE_FOV = 62, COCKPIT_FOV = 74;
+const CHASE_FOV = 62, COCKPIT_FOV = 74, NOSE_FOV = 68;
 const camera = new THREE.PerspectiveCamera(CHASE_FOV, innerWidth / innerHeight, 0.05, 70000);
 
 const SUN_DIR = new THREE.Vector3(-0.35, 0.30, -0.89).normalize();
@@ -1259,7 +1259,8 @@ let iceCaution = false, iceCautionT = 0, iceCloudUntil = -1, iceForcedCloud = fa
 const mouse = { nx: 0, ny: 0 };
 const keys = { w: false, s: false, a: false, d: false, shift: false, fire: false, b: false,
   q: false, e: false, arrowup: false, arrowdown: false, ctrl: false };
-let uiModal = false, ctrlOpen = false, firstPerson = Q.has('cockpit');
+let camMode = Q.has('nose') ? 'NOSE' : Q.has('cockpit') ? 'COCKPIT' : 'CHASE';
+let uiModal = false, ctrlOpen = false, firstPerson = camMode === 'COCKPIT';
 if (Q.has('mouse')) { const [mx, my] = Q.get('mouse').split(',').map(Number); mouse.nx = mx || 0; mouse.ny = my || 0; }
 // Debug rudder hold (?rudder=a|d) for headless post-stall scenarios (A = left, D = right).
 
@@ -1579,15 +1580,18 @@ function rudderInput(dt) {
 }
 function startRoll(dir) { if (flightMode === 'FLY' && roll.left <= 0) { roll.left = 2 * Math.PI; roll.dir = dir; } }
 
-function setView(fp) {
+function setView(mode) {
+  camMode = mode === true ? 'COCKPIT' : mode === false ? 'CHASE' : (mode === 'NOSE' || mode === 'COCKPIT' ? mode : 'CHASE');
+  const fp = camMode === 'COCKPIT', nose = camMode === 'NOSE';
   firstPerson = fp;
-  mcam.active = false; mcam.m = null; mcam.held = false; mcam.k = 0;   // cockpit rig cannot host the missile cam
-  camera.fov = fp ? COCKPIT_FOV : CHASE_FOV;
+  mcam.active = false; mcam.m = null; mcam.held = false; mcam.k = 0;   // cockpit/nose rig cannot host the missile cam
+  camera.fov = fp ? COCKPIT_FOV : nose ? NOSE_FOV : CHASE_FOV;
   camera.updateProjectionMatrix();
-  for (const m of cockpitHidden) m.visible = !fp;
+  if (typeof jet !== 'undefined' && jet) jet.visible = !nose;
+  for (const m of cockpitHidden) m.visible = !fp && !nose;
   if (fp) updateCockpitClip(); else disableCockpitClip();
   cockpit.setActive(fp);
-  if (!fp) { camera.position.copy(CAM_OFFSET).applyQuaternion(state.quaternion).add(state.position); camVelocity.set(0, 0, 0); prevPlanePos.copy(state.position); }
+  if (camMode === 'CHASE') { camera.position.copy(CAM_OFFSET).applyQuaternion(state.quaternion).add(state.position); camVelocity.set(0, 0, 0); prevPlanePos.copy(state.position); }
 }
 
 /* ---- GPU warm-up: zero-freeze view / NVG toggles ----------------------------
@@ -1613,7 +1617,7 @@ function applyWarmState(fp, nv) {
 }
 function warmupGPUAsync() {
   if (gpuWarm.done || gpuWarm.pending || !renderer.compileAsync) return gpuWarm.pending;
-  const fp0 = firstPerson, nv0 = nvg.active, t0 = performance.now(), jobs = [];
+  const cm0 = camMode, nv0 = nvg.active, t0 = performance.now(), jobs = [];
   for (const [fp, nv] of WARM_STATES) {
     applyWarmState(fp, nv);
     renderer.setRenderTarget(nvg.target);              // every frame now renders into a half-float target (composer / NVG)
@@ -1623,18 +1627,18 @@ function warmupGPUAsync() {
   weather.rainMesh.visible = false;
   blast.warm(false);
   combatSys.warmVisuals(false);
-  setView(fp0); setNVG(nv0, true);
+  setView(cm0); setNVG(nv0, true);
   gpuWarm.pending = Promise.all(jobs).then(() => { gpuWarm.asyncMs = Math.round(performance.now() - t0); });
   return gpuWarm.pending;
 }
 function warmupGPUSync() {
   if (gpuWarm.done) return;
-  const fp0 = firstPerson, nv0 = nvg.active, t0 = performance.now();
+  const cm0 = camMode, nv0 = nvg.active, t0 = performance.now();
   for (const [fp, nv] of WARM_STATES) { applyWarmState(fp, nv); nvg.render(scene, camera, simTime, fp); }
   weather.rainMesh.visible = false;
   blast.warm(false);
   combatSys.warmVisuals(false);
-  setView(fp0); setNVG(nv0, true);
+  setView(cm0); setNVG(nv0, true);
   updateCameraAndVisuals(1 / 60, simTime);
   gpuWarm.done = true; gpuWarm.ms = Math.round(performance.now() - t0); gpuWarm.programs = renderer.info.programs.length;
   if (DEBUG) console.log('[ANGELS_ZERO] gpu warm-up', JSON.stringify(gpuWarm));
@@ -1748,7 +1752,7 @@ function launchSortie() {
   for (const k in keys) keys[k] = false;
   mouse.nx = 0; mouse.ny = 0;                          // centre the stick until the mouse moves
   resetAircraft();
-  setView(Q.has('cockpit') || menuPreviewCockpit);
+  setView(Q.has('nose') ? 'NOSE' : (Q.has('cockpit') || menuPreviewCockpit));
   hideMenu();
   if (!mission().freeFlight) {
     combatSys.say('ALPHA 1, CLEARED HOT — SPLASH THE BANDITS', 3);
@@ -3044,7 +3048,7 @@ addEventListener('keydown', e => {
     return;
   }
   if ((k === 'h' || k === 'escape') && !e.repeat) { pauseSim(); return; }
-  if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) setView(!firstPerson); return; }
+  if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) setView(camMode === 'CHASE' ? 'COCKPIT' : camMode === 'COCKPIT' ? 'NOSE' : 'CHASE'); return; }
   // WASD fly the jet; Q/E are rudder, Shift/Ctrl and arrows set throttle.
   if (['KeyW', 'KeyS', 'KeyA', 'KeyD', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
   if (e.code === 'ControlLeft' || e.code === 'ControlRight') e.preventDefault();
@@ -4253,7 +4257,7 @@ function updateWingmanFlight(dt) {
 }
 
 function updateCameraAndVisuals(dt, now) {
-  const wantNear = (freeFlight.active && !firstPerson) ? 0.8 : 0.05;
+  const wantNear = (camMode === 'NOSE' || (freeFlight.active && !firstPerson)) ? 0.8 : 0.05;
   if (camera.near !== wantNear) { camera.near = wantNear; camera.updateProjectionMatrix(); }
   const q = state.quaternion;
   freeLook.update(dt);
@@ -4326,6 +4330,23 @@ function updateCameraAndVisuals(dt, now) {
     updateCockpitClip();
     // 3D cockpit rig at the eye point; it owns the camera (head-turn lag, G slump, vibration).
     cockpit.update(dt, now, _cv.eye.copy(EYE).applyQuaternion(q).add(state.position), q);
+  } else if (camMode === 'NOSE') {
+    // Ace Combat-style HUD-only nose camera: unobstructed forward view bolted to nose.
+    const fl = freeLook.view;
+    _cv.eye.set(0, 0.15, -10.8).applyQuaternion(q).add(state.position);
+    camera.position.copy(_cv.eye);
+    if (state.afterburner > 0.02 || state.gLoad > 4) {
+      const vib = 0.015 * (state.afterburner * 0.4 + THREE.MathUtils.smoothstep(state.gLoad, 4, 10));
+      camera.position.x += (Math.random() - 0.5) * vib;
+      camera.position.y += (Math.random() - 0.5) * vib;
+    }
+    _cv.e = _cv.e || new THREE.Euler(0, 0, 0, 'YXZ');
+    _cv.nq = _cv.nq || new THREE.Quaternion();
+    _cv.e.set(fl ? fl.pitch : 0, fl ? fl.yaw : 0, 0);
+    _cv.nq.setFromEuler(_cv.e);
+    camera.quaternion.copy(q).multiply(_cv.nq);
+    const fovN = NOSE_FOV - THREE.MathUtils.smoothstep(state.gLoad, 3, 9) * 4;
+    if (Math.abs(camera.fov - fovN) > 0.05) { camera.fov += (fovN - camera.fov) * Math.min(1, 5 * dt); camera.updateProjectionMatrix(); }
   } else {
     // Spring-damped chase camera: translation tracked rigidly, offset lags in turns.
     // (scratch vectors in _cv: no per-frame allocations -> no GC micro-stutter)
@@ -5380,7 +5401,7 @@ const hud = createHUD(THREE, {
   sunAzimuth: SUN_AZIMUTH, callsign: 'ALPHA 1',
   terrain: { height: terrainHeight, getMode: () => world.mode, cx: TERRAIN_CENTER.x, cz: TERRAIN_CENTER.y, size: TERRAIN_SIZE, marks: world.marks },
   getEnemies: () => combatSys.enemies, getTargets: () => combatSys.lockables, getDrones: () => combatSys.drones, getWingmen: () => wingmen,
-  relightOdds: () => combatSys.relightOdds(), get relightHold() { return combatSys.relightHold; }, isFirstPerson: () => firstPerson, isModal: () => uiModal,
+  relightOdds: () => combatSys.relightOdds(), get relightHold() { return combatSys.relightHold; }, isFirstPerson: () => firstPerson, isNoseView: () => camMode === 'NOSE', isModal: () => uiModal,
   getSurface: () => combatSys.surface, runway: world.runway, gearH: GEAR_H, returnZ: combatSys.RETURN_Z,
   getWeather: () => ({ rain: weather.rainHere, label: weather.active.label, storm: weather.active.storm }),
   getMode: () => flightMode, isHidden: () => appMode === 'MENU' || appMode === 'DEBRIEF', isNVG: () => nvg.active,
@@ -5620,7 +5641,7 @@ loader.load(AC.glb, async gltf => {
   });
   combatSys.update(0, 0, { playerActive: false, firing: false });   // place the wave before the first frame
   modelReady = true;
-  setView(appMode === 'PLAY' ? firstPerson : menuPreviewCockpit);
+  setView(appMode === 'PLAY' ? camMode : menuPreviewCockpit);
   statusEl.remove();
   if (appMode === 'PLAY') {
     warmupGPUSync();             // briefing skipped (?nointro): warm up right now
@@ -6408,7 +6429,7 @@ addEventListener('resize', () => {
   hud.resize();
 });
 if (DEBUG) {
-  window.__az = { scene, camera, renderer, state, combat, combatSys, ambient, eject, audio, mouse, keys, vfx, blast, get blastShake() { return blastShake; }, flyShake, onFlyby, onWing, wingmen, hud, cockpit, perf, jet, cockpitHidden, terrainHeight, setView, freeLook, world, nvg, setNVG, gpuWarm, mcam, slowMo, get timeScale() { return timeScale; }, triggerSlowMo, get selectedSPW() { return selectedSPW; }, get selectedLivery() { return selectedLivery; }, loadSPW, loadLivery, saveSPW, saveLivery, SQUADRON, SPW, get firstPerson() { return firstPerson; },
+  window.__az = { scene, camera, renderer, state, combat, combatSys, ambient, eject, audio, mouse, keys, vfx, blast, get blastShake() { return blastShake; }, flyShake, onFlyby, onWing, wingmen, hud, cockpit, perf, jet, cockpitHidden, terrainHeight, setView, freeLook, world, nvg, setNVG, gpuWarm, mcam, slowMo, get timeScale() { return timeScale; }, triggerSlowMo, get selectedSPW() { return selectedSPW; }, get selectedLivery() { return selectedLivery; }, loadSPW, loadLivery, saveSPW, saveLivery, SQUADRON, SPW, get camMode() { return camMode; }, get firstPerson() { return firstPerson; },
     get appMode() { return appMode; },
     // Feel-pass scalars / test hooks (all reads are snapshot objects allocated on demand, never per frame).
     get dbgFeel() { return { spdHold, aoaHoldDeg, aoaHoldT, abatAt, abCD, transK, superK, wrK, wrPhase }; },

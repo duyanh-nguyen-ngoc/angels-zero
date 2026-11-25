@@ -46,7 +46,7 @@ export function createHUD(THREE, A) {
     ['X', 'Flares'], ['Z', 'Chaff'], ['J', 'ECM'], ['G', 'Wingmen'],
     ['L', 'Gear'], ['B', 'Brake'], ['V', 'Roll'], ['Q/E', 'Yaw'],
     ['SHIFT/CTRL/UP/DN/WHEEL', 'Throttle'],
-    ['SPACE', 'View'], ['[ ]', 'MFD'], ['ALT', 'Free look'],
+    ['SPACE', 'Chase / Pit / Nose'], ['[ ]', 'MFD'], ['ALT', 'Free look'],
     ['TABx2', 'Debrief'], ['F1', 'This sheet'],
     ['T (hold)', 'Padlock'], ['Y', 'Radar zoom'],
     [', . /', 'Music prev / next / AUTO'],
@@ -190,6 +190,18 @@ export function createHUD(THREE, A) {
       // Zones occupied by the SPEED / ALT boxes (used to keep secondary target cues clear of them).
       tapeL: cx - BOX_OFF + 33, tapeR: cx + BOX_OFF - 33,
       tapeTop: cy - 34, tapeBot: cy + 22
+    };
+  }
+  function noseLayout() {
+    const halfW = Math.min(230, HW * 0.18), halfH = Math.min(185, HH * 0.25);
+    const cx = HW / 2, cy = HH / 2;
+    return {
+      cx, cy,
+      minX: cx - halfW, maxX: cx + halfW,
+      minY: cy - halfH, maxY: cy + halfH,
+      boxW: halfW * 2, boxH: halfH * 2,
+      tapeL: cx - halfW + 68, tapeR: cx + halfW - 68,
+      tapeTop: cy - halfH + 72, tapeBot: cy + halfH - 30
     };
   }
 
@@ -2232,9 +2244,13 @@ export function createHUD(THREE, A) {
     }
 
     let g = null;
+    const nose = !!(A.isNoseView && A.isNoseView());
     if (fp) {
       g = combinerPath();
       if (g && !C.dead) drawCentralHUD(hctx, g, dt, true);
+    } else if (nose) {
+      g = noseLayout();
+      if (!C.dead) drawCentralHUD(hctx, g, dt, true);
     } else {
       g = chaseLayout();
       // Chase free-look orbit: the boresight reticle / SPEED / ALT boxes no longer sit
