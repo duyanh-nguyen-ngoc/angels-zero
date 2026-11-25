@@ -3,6 +3,10 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.72', title: 'BROWSER SHORTCUT LOCK & AUTO-FULLSCREEN', bullets: [
+    'Launching or resuming a sortie now automatically engages DOM Fullscreen + full navigator.keyboard.lock() so Ctrl+W, Ctrl+T, Ctrl+N, Ctrl+R, Alt+Left/Right, and Tab no longer trigger browser shortcuts while flying.',
+    'Added capture-phase shortcut blocking, F11 DOM-fullscreen shortcut-lock intercept, and a [ KEY LOCK: LOCKED / OFF ] toggle in Standby.'
+  ] },
   { version: 'v1.1.71', title: 'ACE COMBAT 7 DREAMY ATMOSPHERE, BLOOM & HOLOGRAPHIC HUD', bullets: [
     'Tuned HDR UnrealBloomPass for wide velvety halation on sunlit cloud crowns and solar glare, and added an AC7 filmic split-tone grade + soft lens vignette pass.',
     'Refined the volumetric cloud sea with 24-step silky raymarching, lower cloud-sea threshold for a continuous horizon-to-horizon cloud ocean, backlit sun-glow scattering, and softer cirrus + luminous horizon haze.',

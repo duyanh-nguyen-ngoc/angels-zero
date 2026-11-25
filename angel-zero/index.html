@@ -659,6 +659,7 @@
         <span class="keycap">←→</span><span>CYCLE</span>
         <span class="keycap">ENTER / CLICK</span><span>CONFIRM</span>
         <span id="camToggle">[ CAM: <button class="camOpt active" id="sbCamOrbit" type="button">ORBIT</button> / <button class="camOpt" id="sbCamCockpit" type="button">COCKPIT</button> ]</span>
+        <span style="margin-left:10px;white-space:nowrap">[ KEY LOCK: <button class="camOpt" id="sbKeyLock" type="button">OFF</button> ]</span>
       </div>
       <div class="hintRow" style="margin-top:6px"><span class="keycap">WASD</span><span>PITCH / ROLL</span><span class="keycap">Q/E</span><span>YAW</span><span class="keycap">SHIFT/CTRL</span><span>THROTTLE</span></div>
     </div>
@@ -754,7 +755,7 @@ import { createFreeLook } from './src/freelook.js?v=s9dd';
 import { createCanopyGlass } from './src/canopyglass.js?v=s9dd';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9dd';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9dd';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9ed';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9ee';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9de';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9dd';
 import { createRadioQueue } from './src/radioQueue.js?v=s9dj';
@@ -1745,6 +1746,7 @@ function launchSortie() {
   if (appMode !== 'MENU' || !modelReady) return;
   missionT = 0;
   audio.init();
+  if (!(DEBUG && Q.has('nointro'))) enterShortcutLock();
   if (!(DEBUG && Q.has('bgmtrack'))) audio.setAuto(true);                                        // AudioContext is created/resumed inside this user gesture
   warmupGPUSync();                                     // no-op once the briefing-time warm-up has finished
   appMode = 'PLAY';
@@ -2935,6 +2937,7 @@ function resumeSim() {
   lastTime = performance.now();
   audio.setBgmPause(false);
   audio.resume();
+  if (!(DEBUG && Q.has('nointro'))) enterShortcutLock();
   hideMenu();
 }
 function restartMission() {
@@ -2993,6 +2996,14 @@ const keyOf = e => ((e.altKey || e.ctrlKey || e.shiftKey)
     : e.code === 'BracketLeft' ? '[' : e.code === 'BracketRight' ? ']'
     : (e.key || '').toLowerCase())
   : (e.key || '').toLowerCase());
+addEventListener('keydown', e => {
+  if (e.code === 'F11' && !e.repeat) { e.preventDefault(); toggleShortcutLock(); return; }
+  if (appMode === 'PLAY' && !uiModal) {
+    if ((e.ctrlKey || e.altKey || e.metaKey) && e.code !== 'F12') e.preventDefault();
+    if (['Tab', 'Space', 'Backspace', 'Slash', 'Quote', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+      'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'AltLeft', 'AltRight', 'ControlLeft', 'ControlRight'].includes(e.code)) e.preventDefault();
+  }
+}, { capture: true });
 addEventListener('keydown', e => {
   if (freeLook.onKey(e, true)) return;
   const k = keyOf(e);
@@ -3156,15 +3167,32 @@ addEventListener('beforeunload', e => {
   if (appMode !== 'PLAY') return;
   e.preventDefault(); e.returnValue = ''; return '';
 });
-document.addEventListener('fullscreenchange', () => {
-  if (!navigator.keyboard) return;
-  if (document.fullscreenElement && navigator.keyboard.lock) {
-    navigator.keyboard.lock(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'KeyR', 'KeyF', 'KeyG', 'KeyH', 'KeyT',
-      'KeyJ', 'KeyK', 'KeyL', 'KeyN', 'KeyP', 'KeyB', 'KeyC', 'KeyV', 'KeyX', 'KeyY', 'KeyZ', 'Digit1', 'Digit2',
-      'Digit3', 'Tab']).catch(() => {});
-  } else if (navigator.keyboard.unlock) {
-    navigator.keyboard.unlock();
+const sbKeyLockBtn = document.getElementById('sbKeyLock');
+function syncKeyLockUI() {
+  if (!sbKeyLockBtn) return;
+  const on = !!document.fullscreenElement;
+  sbKeyLockBtn.textContent = on ? 'LOCKED' : 'OFF';
+  sbKeyLockBtn.classList.toggle('active', on);
+}
+function lockAllKeys() {
+  if (navigator.keyboard && navigator.keyboard.lock) navigator.keyboard.lock().catch(() => {});
+}
+function enterShortcutLock() {
+  if (document.fullscreenElement) { lockAllKeys(); syncKeyLockUI(); return; }
+  if (document.documentElement.requestFullscreen) {
+    document.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => { lockAllKeys(); syncKeyLockUI(); }).catch(() => {});
   }
+}
+function toggleShortcutLock() {
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  else enterShortcutLock();
+}
+if (sbKeyLockBtn) sbKeyLockBtn.addEventListener('click', e => { e.stopPropagation(); toggleShortcutLock(); });
+document.addEventListener('fullscreenchange', () => {
+  syncKeyLockUI();
+  if (!navigator.keyboard) return;
+  if (document.fullscreenElement) lockAllKeys();
+  else if (navigator.keyboard.unlock) navigator.keyboard.unlock();
 });
 
 const patchButton = document.getElementById('patchButton');
