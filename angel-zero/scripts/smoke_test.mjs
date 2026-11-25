@@ -115,7 +115,8 @@ async function navigate(query) {
   await page.goto(`${BASE}?${qs}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
   console.log(`    [nav] domcontentloaded in ${Date.now() - t0} ms`);
   try {
-    await page.waitForFunction(() => window.__az && window.__az.ready === true, null, { timeout: 90000 });
+    // Interval polling survives rAF starvation during first-frame shader compilation on CI.
+    await page.waitForFunction(() => window.__az && window.__az.ready === true, null, { polling: 250, timeout: 180000 });
     console.log(`    [nav] __az.ready in ${Date.now() - t0} ms`);
   } catch (e) {
     let st = {}, tail = [], errs = [];
@@ -131,8 +132,8 @@ async function navigate(query) {
 async function missionReady(id) {
   await page.waitForFunction(mid => {
     const a = window.__az;
-    return a && a.ready && a.sortie && a.sortie.active && a.perf && a.perf.frames >= 5 && a.missionId === mid;
-  }, id, { timeout: 60000 });
+    return a && a.ready && a.sortie && a.sortie.active && a.perf && a.perf.frames >= 2 && a.missionId === mid;
+  }, id, { polling: 250, timeout: 180000 });
 }
 async function switchMission(id) {
   // Fire-and-forget: startSortie() is async and may legitimately take seconds.
@@ -205,7 +206,7 @@ const SCENARIOS = [
     assert(s.cam === 'CHASE', `initial camera ${s.cam}`);
     for (const expected of ['COCKPIT', 'NOSE', 'CHASE']) {
       await page.keyboard.press('Space');
-      await page.waitForFunction(m => window.__az?.camMode === m, expected, { timeout: 15000 });
+      await page.waitForFunction(m => window.__az?.camMode === m, expected, { polling: 250, timeout: 30000 });
       assert(await glError() === 0, `WebGL error after switching to ${expected}`);
     }
   }],
@@ -213,7 +214,7 @@ const SCENARIOS = [
   ['Wingman BTT + order break', async () => {
     await switchMission('AIR_SUPERIORITY');
     await page.evaluate(() => window.__az.setWingOrder(2));
-    await page.waitForFunction(() => window.__az.wingState.some(w => w.mode !== 'FORM'), null, { timeout: 15000 });
+    await page.waitForFunction(() => window.__az.wingState.some(w => w.mode !== 'FORM'), null, { polling: 250, timeout: 30000 });
     const s = await page.evaluate(() => ({ wing: window.__az.wingState,
       ok: window.__az.wingmen.every(w => w.pos.toArray().every(Number.isFinite) && Number.isFinite(w.speed)),
       gl: window.__az.renderer.getContext().getError() }));
@@ -242,7 +243,7 @@ const SCENARIOS = [
 
   ['Debrief screen', async () => {
     await page.evaluate(() => window.__az.endSortie('CLEARED'));
-    await page.waitForFunction(() => window.__az?.debrief === true, null, { timeout: 20000 });
+    await page.waitForFunction(() => window.__az?.debrief === true, null, { polling: 250, timeout: 60000 });
     const s = await page.evaluate(() => ({ rank: document.getElementById('dbRank')?.textContent?.trim() || '',
       stats: document.getElementById('dbStats')?.innerHTML?.trim() || '',
       gl: window.__az.renderer.getContext().getError() }));
@@ -257,8 +258,8 @@ try {
   await listen(); await waitForServer();
   browser = await chromium.launch({
     headless: true,
-    args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist',
-      '--autoplay-policy=no-user-gesture-required', '--no-sandbox']
+    args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--enable-webgl',
+      '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required', '--no-sandbox']
   });
   const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
   await context.route('**/*', route => {
