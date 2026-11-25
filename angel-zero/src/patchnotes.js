@@ -3,6 +3,10 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.86', title: 'MODULAR ENGINE REFACTOR — OCEAN, WINGMEN, FLIGHT, DRONES & ACE BFM', bullets: [
+    'The two largest source files were split into focused single-responsibility ES modules with factory-wired dependencies. Flight physics, wingman BTT, the animated ocean, the drone swarm and the ace BFM state machine are now independent modules with the same zero-allocation behaviour.',
+    'No gameplay changes: every debug hook, telemetry field and HUD readout still reports the same values.'
+  ] },
   { version: 'v1.1.85', title: 'GAMEPAD API & MOBILE TOUCH CONTROLS', bullets: [
     'Standard Xbox / PlayStation / Switch Pro controllers now fly the jet: dual-stick pitch and roll with a smooth response curve, trigger throttle and afterburner, shoulder yaw, and face buttons for guns, missiles, lock, weapons, flares, camera and pause.',
     'Touch devices get an on-screen virtual stick, throttle slider and action cluster. Mouse and keyboard behaviour is unchanged when no controller or touch input is active.'

@@ -8,8 +8,8 @@
 // burning wrecks that splash, scoring, waves, lock-on and threat warnings.
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { createDroneSwarm } from './drones.js?v=s9eu';
-import { createAceBFM } from './ace_bfm.js?v=s9eu';
+import { createDroneSwarm } from './drones.js?v=s9ev';
+import { createAceBFM } from './ace_bfm.js?v=s9ev';
 import { DIFFICULTY_PRESETS } from './difficulty.js?v=s9c2';
 import { SPW } from './loadout.js?v=s9c2';
 import { missionConfig } from './missions.js?v=s9dz';

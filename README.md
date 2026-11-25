@@ -177,7 +177,7 @@ Built with **vanilla ES modules + Three.js r160**, a **Blender headless GLB pipe
 │   ├── smoke.yml                  # Headless Playwright smoke suite (push + PR to main)
 ├── angel-zero/                    # Deployable game root (angels-zero.pages.dev)
 │   ├── index.html                 # Orchestrator: WebGL2, 6-DOF + PSM physics, STANDBY & Debrief UI
-│   ├── src/                       # 31 vanilla ES modules (hud, cockpit3d, cockpit_f22, combat, ytmusic, freeflight, vfx, nvg, ...)
+│   ├── src/                       # 38 vanilla ES modules (hud, cockpit3d, combat, flight, ocean, wingmen, drones, ace_bfm, ...)
 │   ├── assets/
 │   │   ├── angels_zero_f22.glb    # F-22A Raptor airframe GLB
 │   │   ├── f22_cockpit.glb        # Blender-sculpted F-22A all-glass cockpit GLB
