@@ -196,14 +196,10 @@ const SCENARIOS = [
   }],
 
   ['Mission AIR_SUPERIORITY', async () => { await assertMission('AIR_SUPERIORITY'); }],
-  ['Mission NAVAL_BATTLE', async () => { await switchMission('NAVAL_BATTLE'); await assertMission('NAVAL_BATTLE'); }],
-  ['Mission CANYON_RUN', async () => { await switchMission('CANYON_RUN'); await assertMission('CANYON_RUN'); }],
-  ['Mission ACE_DUEL', async () => { await switchMission('ACE_DUEL'); await assertMission('ACE_DUEL'); }],
-  ['Mission FURBALL', async () => { await switchMission('FURBALL'); await assertMission('FURBALL'); }],
-  ['Mission FREE_FLIGHT', async () => { await switchMission('FREE_FLIGHT'); await assertMission('FREE_FLIGHT'); }],
 
+  // Keep the F-22A / AIR_SUPERIORITY page alive for the camera + wingman checks —
+  // switching away and back costs ~65 s on the GPU-less CI runner.
   ['F-22A + cockpit + nose camera cycle', async () => {
-    await switchMission('AIR_SUPERIORITY');
     await page.evaluate(() => window.__az.setView(false));   // normalise to CHASE
     let s = await page.evaluate(() => ({ ac: window.__az.aircraft, cam: window.__az.camMode }));
     assert(s.ac === 'F22A', `aircraft ${s.ac}`);
@@ -216,7 +212,6 @@ const SCENARIOS = [
   }],
 
   ['Wingman BTT + order break', async () => {
-    await switchMission('AIR_SUPERIORITY');
     await page.evaluate(() => window.__az.setWingOrder(2));
     await page.waitForFunction(() => window.__az.wingState.some(w => w.mode !== 'FORM'), null, { polling: 250, timeout: 30000 });
     const s = await page.evaluate(() => ({ wing: window.__az.wingState,
@@ -227,8 +222,12 @@ const SCENARIOS = [
     assert(s.wing.some(w => w.mode === 'BREAK' || w.mode === 'FOCUS'), 'no BREAK/FOCUS wingman mode');
   }],
 
+  ['Mission NAVAL_BATTLE', async () => { await switchMission('NAVAL_BATTLE'); await assertMission('NAVAL_BATTLE'); }],
+  ['Mission CANYON_RUN', async () => { await switchMission('CANYON_RUN'); await assertMission('CANYON_RUN'); }],
+  ['Mission ACE_DUEL', async () => { await switchMission('ACE_DUEL'); await assertMission('ACE_DUEL'); }],
+
   ['Ace BFM + countermeasure states', async () => {
-    await switchMission('ACE_DUEL');
+    // Already on ACE_DUEL — no switch needed.
     await page.evaluate(() => {
       const a = window.__az, e = a.enemies.find(x => x.alive && (x.aceFlight || x.ace));
       if (e) { a.state.position.copy(e.pos).addScaledVector(e.fwd, -800); a.state.velocity.copy(e.vel); a.state.quaternion.copy(e.quat); }
@@ -239,6 +238,9 @@ const SCENARIOS = [
     assert(s.ok, 'non-finite enemy state');
     assert(s.gl === 0, 'WebGL error');
   }],
+
+  ['Mission FURBALL', async () => { await switchMission('FURBALL'); await assertMission('FURBALL'); }],
+  ['Mission FREE_FLIGHT', async () => { await switchMission('FREE_FLIGHT'); await assertMission('FREE_FLIGHT'); }],
 
   ['Deterministic warp telemetry audit', async () => {
     assert(warpLogLine.startsWith('[ANGELS_ZERO] warp'), 'no [ANGELS_ZERO] warp log line');
