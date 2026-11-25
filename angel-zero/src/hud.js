@@ -193,7 +193,7 @@ export function createHUD(THREE, A) {
     };
   }
   function noseLayout() {
-    const halfW = Math.min(230, HW * 0.18), halfH = Math.min(185, HH * 0.25);
+    const halfW = Math.min(220, HW * 0.155), halfH = Math.min(185, HH * 0.255);
     const cx = HW / 2, cy = HH / 2;
     return {
       cx, cy,
@@ -1947,6 +1947,193 @@ export function createHUD(THREE, A) {
     ctx.restore();
   }
 
+  function drawNoseAC7HUD(ctx, g, dt) {
+    if (spdPrev !== null && dt > 0) spdAcc += (((S.speed - spdPrev) / dt) - spdAcc) * Math.min(1, dt * 2.5);
+    spdPrev = S.speed;
+
+    const AC7 = '#68f7cc';
+    const hudCol = (alertOn() || pullUpOn() || stallOn()) ? WARN : AC7;
+    const spdCol = stallOn() ? WARN : hudCol;
+    const altCol = pullUpOn() ? WARN : hudCol;
+    const kts = S.speed * 1.94384;
+    const altFt = S.position.y * 3.28084;
+    const raltFt = Math.max(0, Math.round(S.radalt * 3.28084));
+    const raltCol = raltFt < 1000 && !C.dead ? (pullUpOn() ? WARN : AMBER) : GD;
+
+    const xL = g.minX, xR = g.maxX;
+    const railTop = g.minY + 14, railBot = g.maxY - 6, cy = g.cy;
+    const tickHalf = (railBot - railTop) * 0.28;
+    const tickTop = cy - tickHalf, tickBot = cy + tickHalf;
+
+    ctx.save();
+
+    // 1. Vertical bracket rails [ and ] with 10 px inward top/bottom caps.
+    glow(ctx, hudCol, 4);
+    ctx.strokeStyle = hudCol;
+    ctx.lineWidth = 1.35;
+    ctx.beginPath();
+    ctx.moveTo(xL + 10, railTop); ctx.lineTo(xL, railTop); ctx.lineTo(xL, railBot); ctx.lineTo(xL + 10, railBot);
+    ctx.moveTo(xR - 10, railTop); ctx.lineTo(xR, railTop); ctx.lineTo(xR, railBot); ctx.lineTo(xR - 10, railBot);
+    ctx.stroke();
+
+    // 2. Fine scrolling tick marks along outer sides of left (SPEED) and right (ALT) rails.
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(xL - 16, tickTop, 20, tickBot - tickTop);
+    ctx.rect(xR - 4, tickTop, 20, tickBot - tickTop);
+    ctx.clip();
+    glow(ctx, hudCol, 2);
+    ctx.lineWidth = 1;
+    const spdPpu = 1.15, spdStep = 10;
+    const sFirst = Math.floor((kts - tickHalf / spdPpu) / spdStep) * spdStep - spdStep;
+    ctx.strokeStyle = spdCol;
+    ctx.beginPath();
+    for (let v = sFirst; v <= kts + tickHalf / spdPpu + spdStep; v += spdStep) {
+      if (v < 0) continue;
+      const y = cy - (v - kts) * spdPpu;
+      const major = Math.round(v) % 50 === 0;
+      ctx.moveTo(xL, y);
+      ctx.lineTo(xL - (major ? 9 : 5), y);
+    }
+    ctx.stroke();
+
+    const altPpu = 0.115, altStep = 100;
+    const aFirst = Math.floor((altFt - tickHalf / altPpu) / altStep) * altStep - altStep;
+    ctx.strokeStyle = altCol;
+    ctx.beginPath();
+    for (let v = aFirst; v <= altFt + tickHalf / altPpu + altStep; v += altStep) {
+      const y = cy - (v - altFt) * altPpu;
+      const major = Math.round(v) % 500 === 0;
+      ctx.moveTo(xR, y);
+      ctx.lineTo(xR + (major ? 9 : 5), y);
+    }
+    ctx.stroke();
+    ctx.restore();
+
+    // 3. Boxed SPEED & ALT readouts with pointer tips + inner-left throttle bar + [A/B] badge.
+    const boxW = 56, boxH = 21;
+    const sBoxX = xL - 14 - boxW, sBoxY = cy - boxH / 2;
+    ctx.save();
+    glow(ctx, spdCol, 4); ctx.strokeStyle = spdCol; ctx.lineWidth = 1.25;
+    noGlow(ctx); ctx.fillStyle = 'rgba(2, 14, 12, 0.34)';
+    ctx.fillRect(sBoxX, sBoxY, boxW, boxH);
+    glow(ctx, spdCol, 4);
+    ctx.strokeRect(sBoxX, sBoxY, boxW, boxH);
+    ctx.beginPath();
+    ctx.moveTo(xL - 10, cy - 3.5); ctx.lineTo(xL - 4, cy); ctx.lineTo(xL - 10, cy + 3.5);
+    ctx.closePath(); ctx.fillStyle = spdCol; ctx.fill();
+    ctx.font = f(11, true); ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    labelText(ctx, 'SPEED', sBoxX + boxW / 2, sBoxY - 3, spdCol, 3);
+    ctx.font = f(15, true); ctx.textBaseline = 'middle';
+    labelText(ctx, String(Math.round(kts)), sBoxX + boxW / 2, cy + 1, spdCol, 3);
+    ctx.restore();
+
+    const thr = clamp(S.throttle || 0, 0, 1);
+    const barMaxH = Math.max(40, railBot - 16 - (cy + 14));
+    const barH = barMaxH * thr;
+    if (barH > 1) {
+      ctx.save();
+      const ab = S.afterburner > 0.3;
+      glow(ctx, ab ? '#a6ffea' : spdCol, ab ? 6 : 3);
+      ctx.fillStyle = ab ? '#a6ffea' : spdCol;
+      ctx.fillRect(xL + 3, railBot - 16 - barH, 2.5, barH);
+      ctx.restore();
+    }
+
+    if (S.afterburner > 0.3) {
+      const abX = xL + 10, abY = railTop + 6, abW = 28, abH = 15;
+      ctx.save();
+      noGlow(ctx); ctx.fillStyle = 'rgba(2, 14, 12, 0.36)';
+      ctx.fillRect(abX, abY, abW, abH);
+      glow(ctx, hudCol, 4); ctx.strokeStyle = hudCol; ctx.lineWidth = 1.1;
+      ctx.strokeRect(abX, abY, abW, abH);
+      ctx.font = f(10, true); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      labelText(ctx, 'A/B', abX + abW / 2, abY + abH / 2 + 0.5, hudCol, 3);
+      ctx.restore();
+    }
+
+    const aBoxX = xR + 14, aBoxY = cy - boxH / 2;
+    ctx.save();
+    glow(ctx, altCol, 4); ctx.strokeStyle = altCol; ctx.lineWidth = 1.25;
+    noGlow(ctx); ctx.fillStyle = 'rgba(2, 14, 12, 0.34)';
+    ctx.fillRect(aBoxX, aBoxY, boxW, boxH);
+    glow(ctx, altCol, 4);
+    ctx.strokeRect(aBoxX, aBoxY, boxW, boxH);
+    ctx.beginPath();
+    ctx.moveTo(xR + 10, cy - 3.5); ctx.lineTo(xR + 4, cy); ctx.lineTo(xR + 10, cy + 3.5);
+    ctx.closePath(); ctx.fillStyle = altCol; ctx.fill();
+    ctx.font = f(11, true); ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    labelText(ctx, 'ALT', aBoxX + boxW / 2, aBoxY - 3, altCol, 3);
+    ctx.font = f(15, true); ctx.textBaseline = 'middle';
+    labelText(ctx, String(Math.round(altFt)), aBoxX + boxW / 2, cy + 1, altCol, 3);
+    if (raltFt < 1000 && !C.dead) {
+      ctx.font = f(10, true); ctx.textBaseline = 'top';
+      labelText(ctx, `RALT ${raltFt}`, aBoxX + boxW / 2, aBoxY + boxH + 5, raltCol, 3);
+    }
+    ctx.restore();
+
+    // 4. Top dotted compass heading strip + centered heading readout + downward caret.
+    const hdgW = g.boxW * 0.56, hdgY = railTop - 4, ppd = hdgW / 86;
+    const CARD = { 0: 'N', 45: 'NE', 90: 'E', 135: 'SE', 180: 'S', 225: 'SW', 270: 'W', 315: 'NW' };
+    ctx.save();
+    ctx.beginPath(); ctx.rect(g.cx - hdgW / 2, hdgY - 26, hdgW, 34); ctx.clip();
+    glow(ctx, hudCol, 3);
+    ctx.fillStyle = hudCol;
+    ctx.font = f(11, true); ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    for (let hd = Math.floor((S.heading - 46) / 10) * 10; hd <= S.heading + 46; hd += 10) {
+      const x = g.cx + (hd - S.heading) * ppd;
+      const n = ((hd % 360) + 360) % 360;
+      if (n % 30 === 0) {
+        ctx.fillRect(x - 1, hdgY - 3, 2, 4);
+      } else {
+        ctx.beginPath(); ctx.arc(x, hdgY - 1, 1.35, 0, Math.PI * 2); ctx.fill();
+      }
+      if (CARD[n] && Math.abs(x - g.cx) > 26) {
+        labelText(ctx, CARD[n], x, hdgY - 8, hudCol, 3);
+      }
+    }
+    ctx.restore();
+    const hdgTxt = String(Math.round(S.heading) % 360).padStart(3, '0');
+    ctx.save();
+    ctx.font = f(13, true); ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    labelText(ctx, hdgTxt, g.cx, hdgY - 8, hudCol, 3);
+    glow(ctx, hudCol, 3); ctx.fillStyle = hudCol;
+    ctx.beginPath();
+    ctx.moveTo(g.cx, hdgY - 1); ctx.lineTo(g.cx - 3.5, hdgY - 6); ctx.lineTo(g.cx + 3.5, hdgY - 6);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+
+    // 5. Center conformal pitch ladder, AC7 gull-wing boresight, FPV, and gun funnel.
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(xL + 12, railTop + 8, (xR - xL) - 24, (railBot - railTop) - 16);
+    ctx.clip();
+    drawConformalLadder(ctx, g, hudCol, true);
+    const fwd = _chFwd.set(0, 0, -1).applyQuaternion(S.quaternion);
+    const bore = toScreen(_tp.copy(cam.position).addScaledVector(fwd, 5000));
+    if (bore.ok) {
+      ctx.save();
+      glow(ctx, hudCol, 5); ctx.strokeStyle = hudCol; ctx.lineWidth = 1.55;
+      ctx.beginPath();
+      ctx.arc(bore.x, bore.y, 3.5, 0, Math.PI * 2);
+      ctx.moveTo(bore.x, bore.y - 3.5); ctx.lineTo(bore.x, bore.y - 8);
+      ctx.moveTo(bore.x - 18, bore.y - 1); ctx.lineTo(bore.x - 9, bore.y - 1);
+      ctx.lineTo(bore.x - 5, bore.y + 4); ctx.lineTo(bore.x - 3.2, bore.y);
+      ctx.moveTo(bore.x + 18, bore.y - 1); ctx.lineTo(bore.x + 9, bore.y - 1);
+      ctx.lineTo(bore.x + 5, bore.y + 4); ctx.lineTo(bore.x + 3.2, bore.y);
+      ctx.stroke();
+      ctx.restore();
+      if (!(C.mcfg && C.mcfg.freeFlight) && (C.gunHeat || 0) > 0.01) {
+        heatArc(ctx, bore.x, bore.y, 26, C.gunHeat, 0.85);
+      }
+    }
+    drawFPV(ctx, { cx: g.cx, minY: railTop + 14, maxY: railBot - 14, boxW: g.boxW - 40 }, dt, hudCol);
+    if (!(C.mcfg && C.mcfg.freeFlight)) drawGunFunnel(ctx, hudCol);
+    ctx.restore();
+
+    ctx.restore();
+  }
+
   let lastT = performance.now();
   let hudOrderName = '', hudOrderTag = '';
   function drawWingmen(ctx) {
@@ -2250,7 +2437,7 @@ export function createHUD(THREE, A) {
       if (g && !C.dead) drawCentralHUD(hctx, g, dt, true);
     } else if (nose) {
       g = noseLayout();
-      if (!C.dead) drawCentralHUD(hctx, g, dt, true);
+      if (!C.dead) drawNoseAC7HUD(hctx, g, dt);
     } else {
       g = chaseLayout();
       // Chase free-look orbit: the boresight reticle / SPEED / ALT boxes no longer sit

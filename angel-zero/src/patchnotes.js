@@ -3,6 +3,10 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.69', title: 'ACE COMBAT 7 NOSE CAMERA HUD', bullets: [
+    'Redesigned the Nose Camera HUD to match the Ace Combat 7 HUD-only nose view: cyan-mint vertical bracket rails with inward end caps, fine scrolling speed and altitude tick marks, boxed SPEED and ALT readouts, an inner-left vertical throttle/AB bar, and a top-left [A/B] indicator.',
+    'Added the centered dotted compass heading strip with cardinal markers and downward caret, plus a gull-wing boresight symbol and conformal pitch ladder.'
+  ] },
   { version: 'v1.1.68', title: 'NOSE CAMERA (HUD-ONLY VIEW)', bullets: [
     'Added an Ace Combat-style HUD-only Nose Camera view: press Space to cycle Chase -> Cockpit -> Nose -> Chase (or boot directly with ?debug&nose).',
     'Renders an unobstructed forward nose-mounted camera with centered pitch ladder, heading strip, and vertical speed/altitude tapes.'
