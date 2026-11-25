@@ -1,4 +1,4 @@
-// ANGELS ZERO — wet flight deck for CVN-ALLY "OVERLORD" (Storm Realism Pass, step 2).
+// ANGELS ZERO â€” wet flight deck for CVN-ALLY "OVERLORD" (Storm Realism Pass, step 2).
 //
 // Wetness 0..1 (index.html: NAVAL ops ~0.55, rain / STORM OPS up to 1) drives:
 //   * the deck material(s): roughness drops toward 0.3 (damp specular sheen that
@@ -106,7 +106,9 @@ export function createWetDeck(THREE, env) {
   }
   function addSource(x, y, z, hex, pow, w) {
     if (nStatic >= MAX - 2) return;
-    y = Math.max(surfaceAt(x, z, y), deckY) + 0.15;      // never below the flight-deck plane (edge catwalks probe ~1 m low)
+    // Never below the flight-deck plane: edge catwalks probe ~1 m low, while the deck near
+    // the edges sits ~0.3 m above the centreline median (the edge-light domes are half sunk).
+    y = Math.max(surfaceAt(x, z, y), deckY + 0.35) + 0.1;
     srcPos[nStatic * 3] = x; srcPos[nStatic * 3 + 1] = y; srcPos[nStatic * 3 + 2] = z;
     _col.setHex(hex);
     srcCol[nStatic * 3] = _col.r; srcCol[nStatic * 3 + 1] = _col.g; srcCol[nStatic * 3 + 2] = _col.b;
@@ -136,7 +138,7 @@ export function createWetDeck(THREE, env) {
         o.material.color.setHex(EDGE_COLOR);
         for (let i = 0; i < o.count; i++) {
           o.getMatrixAt(i, m4); p.setFromMatrixPosition(m4).applyMatrix4(o.matrixWorld).applyMatrix4(inv);
-          addSource(p.x, deckY, p.z, EDGE_COLOR, 0.55, 1.5);
+          addSource(p.x, deckY, p.z, EDGE_COLOR, 0.95, 2.6);
         }
         return;
       }
@@ -159,9 +161,9 @@ export function createWetDeck(THREE, env) {
       const cx = (isl.x0 + isl.x1) / 2, cz = (isl.z0 + isl.z1) / 2;
       p.set(cx, isl.y1 - 2, cz).applyMatrix4(inv); beacons[0].position.copy(p);
       p.set(isl.x0 + 1, deckWorldY + 2.2, isl.z0 + 2).applyMatrix4(inv); beacons[1].position.copy(p);
-      addSource(p.x, deckY, p.z, BEACON_COLOR, 1.15, 2.4);
+      addSource(p.x, deckY, p.z, BEACON_COLOR, 1.6, 3.2);
       p.set(isl.x0 + 1, deckWorldY + 2.2, isl.z1 - 2).applyMatrix4(inv); beacons[2].position.copy(p);
-      addSource(p.x, deckY, p.z, BEACON_COLOR, 1.15, 2.4);
+      addSource(p.x, deckY, p.z, BEACON_COLOR, 1.6, 3.2);
       for (const b of beacons) b.visible = true;
     } else for (const b of beacons) b.visible = false;
     bound = true;

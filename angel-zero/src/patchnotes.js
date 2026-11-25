@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.76', title: 'STORM REALISM PASS 2 // WET DECK & COCKPIT GLOW', bullets: [
+    'OVERLORD\'s flight deck now gets wet in naval ops and storms: a damp sheen that catches the moon, with amber deck-edge lights, new orange island beacons and your afterburner glow smearing across it during the catapult hold and the RTB approach.',
+    'Fixed the carrier\'s deck-edge lights, which were floating over the sea beside the ship; they now run along both edges of the flight deck.',
+    'F-15C cockpit instruments, displays, the UFC and the caution panel are brighter and crisper, with a soft glow against a dark storm cockpit, and the HUD glass reads as a lit optic.'
+  ] },
   { version: 'v1.1.75', title: 'STORM OPS // STORM REALISM PASS 1', bullets: [
     'New STORM OPS conditions: a dark, moody storm deck under a cool silver moon that rim-lights the jets, a near-black sea with a narrow moonlit glint, light rain, lightning and heavy chop.',
     'Moonlight now breaks through the storm in soft god-ray shafts falling to the sea.',
