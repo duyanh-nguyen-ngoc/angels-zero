@@ -59,6 +59,7 @@
   #statusBarFill { width:0%; height:100%; background:#52ff9c; box-shadow:0 0 12px rgba(82,255,156,.65); transition:width 120ms linear; }
   #status.failed #statusBarFill { background:#ff2e43; box-shadow:0 0 12px rgba(255,46,67,.7); }
   #status.failed #statusTitle { color:#ff2e43; }
+  #lbOverlay[hidden] { display:none !important; }
 
   /* AC7 Tactical OS Briefing & Pause HUD */
   #menu {
@@ -695,11 +696,17 @@
       <div class="db-flags" id="dbFlags"></div>
       <div class="db-stats" id="dbStats"></div>
       <div class="db-trace">
-        <div class="db-trace-head"><span>TACTICAL TRACE // 15 MIN LOOP</span><button id="dbTrace" type="button">[ R ] REPLAY TRACE</button></div>
+        <div class="db-trace-head"><span>TACTICAL TRACE // 15 MIN LOOP</span><span style="display:flex;gap:6px"><button id="dbTrace" type="button">[ R ] REPLAY TRACE</button><button id="dbShareBtn" type="button">[ SHARE REPLAY ]</button></span></div>
         <canvas id="dbMap" width="360" height="360"></canvas>
         <div class="db-legend"><span class="k">KILL</span><span class="a">ACE</span><span class="s">STRIKE</span><span class="c">TRAP</span><span class="n">NEAR MISS</span></div>
       </div>
       <div class="db-unlocks" id="dbUnlocks"></div>
+      <div class="db-social" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;margin:6px 0;font-size:11px;letter-spacing:1px">
+        <label for="dbCallsign">CALLSIGN</label><input id="dbCallsign" type="text" maxlength="14" placeholder="WARDEN-1" style="width:120px;padding:3px 6px;background:#010a05;border:1px solid rgba(82,255,156,.45);color:#7cdcb0;font:inherit;text-transform:uppercase" />
+        <button id="dbSubmitScore" type="button">[ SUBMIT SCORE ]</button>
+        <button id="dbBoardBtn" type="button">[ LEADERBOARD ]</button>
+        <span id="dbSocialMsg" style="color:#7cdcb0"></span>
+      </div>
       <div class="db-btns">
         <button id="dbBrief" type="button">[ BRIEFING / ESC ]</button>
         <button id="dbReplay" class="primary" type="button">[ SORTIE AGAIN ]</button>
@@ -748,6 +755,13 @@
     </div>
   </div>
 
+  <div id="lbOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="lbTitle" style="position:fixed;inset:0;z-index:102;display:flex;align-items:center;justify-content:center;background:rgba(4,8,12,.92);font-family:'Rajdhani','Share Tech Mono',monospace;color:#F2F5F8">
+    <div style="width:min(560px,94vw);max-height:80vh;overflow:auto;padding:16px;background:rgba(4,8,12,.85);border:1px solid rgba(82,255,156,.5)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 id="lbTitle" style="margin:0;font-size:16px">[ MISSION LEADERBOARD ]</h2><button id="lbClose" type="button">[ CLOSE ]</button></div>
+      <div id="lbRows" style="font-size:12px;line-height:1.6"></div>
+    </div>
+  </div>
+
 <script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -760,40 +774,42 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s9eo';
-import { createAmbient } from './src/ambient.js?v=s9eo';
-import { createStormFX } from './src/stormfx.js?v=s9eo';
-import { createWetDeck } from './src/wetdeck.js?v=s9eo';
-import { createBlastFX } from './src/blastfx.js?v=s9eo';
-import { createHUD } from './src/hud.js?v=s9eo';
-import { createCockpit3D } from './src/cockpit3d.js?v=s9eo';
-import { createCockpitF22 } from './src/cockpit_f22.js?v=s9eo';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9eo';
-import { createEjection } from './src/eject.js?v=s9eo';
-import { createAudio } from './src/audio.js?v=s9eo';
-import { createYouTubeMusic } from './src/ytmusic.js?v=s9eo';
-import { createRadio } from './src/radio.js?v=s9eo';
-import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9eo';
-import { createLivery } from './src/livery.js?v=s9eo';
-import { createGear, GEAR_H, GEAR_PTS, GEAR_UNITS, setGearPoints } from './src/gear.js?v=s9eo';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9eo';
-import { createCanopyFX } from './src/canopy.js?v=s9eo';
-import { createNVG } from './src/nvg.js?v=s9eo';
-import { createWorld, WORLD } from './src/world.js?v=s9eo';
-import { createSurfaces } from './src/surfaces.js?v=s9eo';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9eo';
-import { createFreeLook } from './src/freelook.js?v=s9eo';
-import { createCanopyGlass } from './src/canopyglass.js?v=s9eo';
-import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9eo';
-import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9eo';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9eo';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9eo';
-import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9eo';
-import { createRadioQueue } from './src/radioQueue.js?v=s9eo';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9eo';
+import { createVFX } from './src/vfx.js?v=s9ep';
+import { createAmbient } from './src/ambient.js?v=s9ep';
+import { createStormFX } from './src/stormfx.js?v=s9ep';
+import { createWetDeck } from './src/wetdeck.js?v=s9ep';
+import { createBlastFX } from './src/blastfx.js?v=s9ep';
+import { createHUD } from './src/hud.js?v=s9ep';
+import { createCockpit3D } from './src/cockpit3d.js?v=s9ep';
+import { createCockpitF22 } from './src/cockpit_f22.js?v=s9ep';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9ep';
+import { createEjection } from './src/eject.js?v=s9ep';
+import { createAudio } from './src/audio.js?v=s9ep';
+import { createYouTubeMusic } from './src/ytmusic.js?v=s9ep';
+import { createRadio } from './src/radio.js?v=s9ep';
+import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9ep';
+import { createLivery } from './src/livery.js?v=s9ep';
+import { createGear, GEAR_H, GEAR_PTS, GEAR_UNITS, setGearPoints } from './src/gear.js?v=s9ep';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9ep';
+import { createCanopyFX } from './src/canopy.js?v=s9ep';
+import { createNVG } from './src/nvg.js?v=s9ep';
+import { createWorld, WORLD } from './src/world.js?v=s9ep';
+import { createSurfaces } from './src/surfaces.js?v=s9ep';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9ep';
+import { createFreeLook } from './src/freelook.js?v=s9ep';
+import { createCanopyGlass } from './src/canopyglass.js?v=s9ep';
+import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9ep';
+import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9ep';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9ep';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9ep';
+import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9ep';
+import { createRadioQueue } from './src/radioQueue.js?v=s9ep';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9ep';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
-  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9eo';
-import { createFreeFlight, FREE_FLIGHT_PRESETS, loadFreeFlightCity, saveFreeFlightCity } from './src/freeflight.js?v=s9eo';
+  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9ep';
+import { createFreeFlight, FREE_FLIGHT_PRESETS, loadFreeFlightCity, saveFreeFlightCity } from './src/freeflight.js?v=s9ep';
+import { encodeReplay, decodeReplay, buildReplayUrl } from './src/replay_share.js?v=s9ep';
+import { fetchLeaderboard, submitScore } from './src/leaderboard.js?v=s9ep';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -2806,6 +2822,10 @@ function startDebriefMap() {
   dbRAF = requestAnimationFrame(drawDebriefMap);
 }
 function showDebrief(outcome, st, res) {
+  if (!sharedReplay) {
+    document.getElementById('dbSubmitScore').hidden = false;
+    dbReplay.textContent = '[ SORTIE AGAIN ]';
+  }
   const cleared = outcome === 'CLEARED' || (outcome === 'FURBALL' && (st.kills || 0) >= 1);
   const fur = combat.mode === 'FURBALL';
   debriefEl.classList.toggle('failed', !cleared);
@@ -2898,10 +2918,96 @@ function debriefToBriefing() {
   setView(menuPreviewCockpit);
 }
 document.getElementById('dbTrace').addEventListener('click', e => { e.stopPropagation(); startDebriefMap(); });
-dbReplay.addEventListener('click', e => { e.stopPropagation(); replaySortie(); });
+dbReplay.addEventListener('click', e => {
+  e.stopPropagation();
+  if (sharedReplay) { missionId = sharedReplay.meta.mission; saveMission(missionId); sharedReplay = null; debriefToBriefing(); }
+  else replaySortie();
+});
 dbEquip.addEventListener('click', e => { e.stopPropagation(); replaySortie(dbEquipId); });
-dbBrief.addEventListener('click', e => { e.stopPropagation(); debriefToBriefing(); });
+dbBrief.addEventListener('click', e => { e.stopPropagation(); sharedReplay = null; debriefToBriefing(); });
 debriefEl.addEventListener('mousedown', e => e.stopPropagation());
+
+/* ---- Social loop: shareable replay links + local/global leaderboard ---- */
+const dbCallsign = document.getElementById('dbCallsign');
+const dbSocialMsg = document.getElementById('dbSocialMsg');
+const lbOverlay = document.getElementById('lbOverlay');
+let sharedReplay = null;
+try { dbCallsign.value = localStorage.getItem('az_callsign') || 'WARDEN-1'; } catch (e) { dbCallsign.value = 'WARDEN-1'; }
+dbCallsign.addEventListener('change', () => {
+  dbCallsign.value = (dbCallsign.value.toUpperCase().replace(/[^A-Z0-9\-_]/g, '') || 'WARDEN-1').slice(0, 14);
+  try { localStorage.setItem('az_callsign', dbCallsign.value); } catch (e) { /* storage unavailable */ }
+});
+async function flashSocial(text) {
+  dbSocialMsg.textContent = text;
+  await new Promise(r => setTimeout(r, 2500));
+  if (dbSocialMsg.textContent === text) dbSocialMsg.textContent = '';
+}
+document.getElementById('dbShareBtn').addEventListener('click', async e => {
+  e.stopPropagation();
+  try {
+    const st = sortieStats();
+    const pts = [];
+    for (let i = 0; i < tele.n; i++) pts.push({ x: tele.samples[i * 4], z: tele.samples[i * 4 + 1] });
+    const evs = [];
+    for (let i = 0; i < tele.ne; i++) {
+      const o = i * 4;
+      const kind = ['KILL', 'ACE', 'STRIKE', 'TRAP', 'MISS'][Math.max(0, Math.min(4, Math.round(tele.events[o + 3]) - 1))] || 'KILL';
+      evs.push({ kind, x: tele.events[o], z: tele.events[o + 1], t: tele.events[o + 2] });
+    }
+    const token = await encodeReplay({ callsign: dbCallsign.value || 'WARDEN-1', mission: missionId, aircraft: AC.id,
+      rank: document.getElementById('dbRank').textContent, score: st.score, kills: st.kills, timeS: st.time, outcome: combat.mode === 'FURBALL' ? 'FURBALL' : 'CLEARED' }, pts, evs);
+    const url = buildReplayUrl(token);
+    try { await navigator.clipboard.writeText(url); flashSocial('COPIED REPLAY LINK!'); }
+    catch (err) { window.prompt('COPY REPLAY LINK:', url); }
+    if (DEBUG) console.log('[ANGELS_ZERO] replay link', url);
+  } catch (err) { flashSocial('SHARE FAILED'); }
+});
+document.getElementById('dbSubmitScore').addEventListener('click', async e => {
+  e.stopPropagation();
+  if (!sortie.active && !sharedReplay) { flashSocial('NO SORTIE TO SUBMIT'); return; }
+  const st = sortieStats();
+  const res = await submitScore({ callsign: dbCallsign.value || 'WARDEN-1', mission: missionId, aircraft: AC.id,
+    rank: document.getElementById('dbRank').textContent, score: st.score, kills: st.kills, timeS: st.time, replay: '' });
+  flashSocial(res.ok ? 'SCORE SUBMITTED!' : 'SAVED TO LOCAL BOARD');
+});
+function closeBoard() { lbOverlay.hidden = true; }
+document.getElementById('lbClose').addEventListener('click', e => { e.stopPropagation(); closeBoard(); });
+lbOverlay.addEventListener('click', e => { if (e.target === lbOverlay) closeBoard(); });
+document.getElementById('dbBoardBtn').addEventListener('click', async e => {
+  e.stopPropagation();
+  lbOverlay.hidden = false;
+  document.getElementById('lbTitle').textContent = '[ LEADERBOARD // ' + missionId + ' ]';
+  const rows = document.getElementById('lbRows');
+  rows.textContent = 'LOADING…';
+  const list = await fetchLeaderboard(missionId);
+  rows.innerHTML = list.length
+    ? list.map((r, i) => `<div style="display:flex;gap:10px;border-bottom:1px solid rgba(82,255,156,.18);padding:3px 0"><span>${String(i + 1).padStart(2, '0')}</span><span style="flex:1">${r.callsign}</span><span>${r.aircraft === 'F22A' ? 'F-22A' : 'F-15C'}</span><span>${r.rank}</span><span>${r.score}</span><span>${r.kills} K</span>${r.replay ? `<button type="button" class="lbWatch" data-token="${r.replay}">WATCH</button>` : ''}</div>`).join('')
+    : '<div>NO SCORES YET — BE THE FIRST.</div>';
+  for (const b of rows.querySelectorAll('.lbWatch')) b.addEventListener('click', async () => {
+    const decoded = await decodeReplay(b.dataset.token);
+    if (decoded) { lbOverlay.hidden = true; openSharedReplay(decoded); }
+  });
+});
+
+/** Open a decoded shared replay directly into the debrief trace map. */
+function openSharedReplay(r) {
+  if (!r || !r.meta) return;
+  sharedReplay = r;
+  const m = r.meta;
+  if (MISSIONS[m.mission]) missionId = m.mission;
+  const evs = r.events.map(ev => ({ x: ev.x, z: ev.z, t: ev.t,
+    type: ({ KILL: EV.KILL, ACE: EV.ACE_KILL, STRIKE: EV.STRIKE_KILL, TRAP: EV.CARRIER_TRAP, MISS: EV.NEAR_MISS })[ev.kind] || EV.KILL }));
+  tele.load(r.trace, evs);
+  const st = { score: m.score, kills: m.kills, gunsKills: 0, wingsSevered: 0, bridges: 0, aceDown: false,
+    peak: 1, time: m.timeS, phase: 1, brokenWing: false, rankInfo: computeRank({ score: m.score, kills: m.kills, time: m.timeS }, m.outcome) };
+  const res = { rank: m.rank, unlocked: [], newBest: false, newBestRank: false };
+  appMode = 'DEBRIEF';
+  showDebrief(m.outcome === 'FAILED' ? 'FAILED' : 'CLEARED', st, res);
+  document.getElementById('dbTitle').textContent = 'SHARED REPLAY // ' + m.callsign;
+  document.getElementById('dbSub').textContent = `${m.mission} // ${m.aircraft === 'F22A' ? 'F-22A RAPTOR' : 'F-15C EAGLE'} // ${m.score} PTS // ${m.kills} KILLS`;
+  dbReplay.textContent = '[ FLY THIS MISSION ]';
+  dbSubmitScore.hidden = true;
+}
 
 /* Hangar: PILOT RECORD strip + AIRFRAME LIVERY selector ---------------------- */
 const liveryRow = document.getElementById('liveryRow');
@@ -6607,6 +6713,7 @@ if (DEBUG) {
     get aircraft() { return AC.id; }, get aircraftStats() { return AC; }, get gearPts() { return GEAR_PTS; },
     get reactive() { return { ...audio.reactive, log: RX_LOG ? RX_LOG.slice(-30) : [] }; }, rxFire, sayText, rxTelemetry,
     get autoland() { return autoland; }, autolandPrompt, engageAutoland, finishCarrierTrap, getMusicCtx, get hudPrompt() { return hud.promptText; }, get debrief() { return !debriefEl.hidden; },
+    encodeReplay, decodeReplay, buildReplayUrl, fetchLeaderboard, submitScore, get sharedReplay() { return sharedReplay; },
     get cat() { return cat; }, get skimK() { return skimK; }, catEnter, catTick, catFire, catSnapAll, carrierDiag, enterCarrierLaunch, carrierReady,
     get scramble() { return scramble; }, get bw() { return combat.bw; }, get intrusion() { return combat.intr; },
     get inESM() { return combatSys.inESM; }, get esm() { return combatSys.esm; }, get cloudIce() { return state.cloudIce; },
@@ -6773,6 +6880,8 @@ if (Q.has('nointro')) { appMode = 'PLAY'; menuEl.hidden = true; document.getElem
 else { showMenu('title'); launchBtn.disabled = true; document.getElementById('menuHint').textContent = 'LOADING ' + AC.short + '...'; }
 // Debug: ?debrief=CLEARED|FAILED[,score] ends the sortie at load + 3 s with that outcome (debrief / unlock checks).
 if (DEBUG && Q.has('debrief')) setTimeout(() => { const [o, s] = Q.get('debrief').split(','); if (s) combat.score = Number(s); endSortie((o || 'CLEARED').toUpperCase() === 'FAILED' ? 'FAILED' : 'CLEARED'); }, 3000);
+// Shared replay link: decode strictly and open the debrief trace without touching the profile.
+if (Q.has('replay')) setTimeout(async () => { const r = await decodeReplay(Q.get('replay')); if (r) openSharedReplay(r); else if (DEBUG) console.warn('[ANGELS_ZERO] invalid replay link'); }, 0);
 if (document.fonts && document.fonts.load) {
   document.fonts.load("600 16px 'Rajdhani'").catch(() => {});
   document.fonts.load("16px 'Share Tech Mono'").catch(() => {});

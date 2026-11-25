@@ -23,8 +23,38 @@ export function createTelemetry() {
     events[o] = x; events[o + 1] = z; events[o + 2] = t; events[o + 3] = type;
     ne++;
   }
+  // Load an externally decoded trace (shared replay). Bounds are enforced so a
+  // malformed URL can never overflow either fixed buffer.
+  function load(points, evs) {
+    n = 0; ne = 0; acc = 0;
+    if (Array.isArray(points)) {
+      for (let i = 0; i < points.length && n < TELE_MAX; i++) {
+        const p = points[i];
+        if (!p) continue;
+        const o = n * 4;
+        const x = p.x !== undefined ? p.x : p[0], z = p.z !== undefined ? p.z : p[1];
+        const y = p.y !== undefined ? p.y : (p.alt !== undefined ? p.alt : 0);
+        const t = p.t || 0;
+        if (!Number.isFinite(x) || !Number.isFinite(z)) continue;
+        samples[o] = x; samples[o + 1] = z; samples[o + 2] = y; samples[o + 3] = t;
+        n++;
+      }
+    }
+    if (Array.isArray(evs)) {
+      for (let i = 0; i < evs.length && ne < EV_MAX; i++) {
+        const e = evs[i];
+        if (!e) continue;
+        const o = ne * 4;
+        const x = e.x !== undefined ? e.x : e[0], z = e.z !== undefined ? e.z : e[1];
+        const t = e.t || 0, type = e.type || e.kind || 1;
+        if (!Number.isFinite(x) || !Number.isFinite(z)) continue;
+        events[o] = x; events[o + 1] = z; events[o + 2] = t; events[o + 3] = type;
+        ne++;
+      }
+    }
+  }
   return {
-    samples, events, reset, tick, event,
+    samples, events, reset, tick, event, load,
     get n() { return n; }, get ne() { return ne; }
   };
 }

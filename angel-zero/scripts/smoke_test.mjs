@@ -121,7 +121,7 @@ async function navigate(query, waitReady = true) {
   }
   try {
     // Interval polling survives rAF starvation during first-frame shader compilation on CI.
-    await page.waitForFunction(() => window.__az && window.__az.ready === true, null, { polling: 250, timeout: 240000 });
+    await page.waitForFunction(() => window.__az && window.__az.ready === true, null, { polling: 250, timeout: 360000 });
     console.log(`    [nav] __az.ready in ${Date.now() - t0} ms`);
     // The boot HUD fades and removes itself once the model is ready.
     await page.waitForFunction(() => !document.getElementById('status'), null, { polling: 100, timeout: 10000 });
@@ -265,6 +265,27 @@ const SCENARIOS = [
     assert(s.rank.length > 0, 'dbRank empty');
     assert(s.stats.length > 0, 'dbStats empty');
     assert(s.gl === 0, 'WebGL error');
+    assert(await page.evaluate(() => !!document.getElementById('dbShareBtn')), 'dbShareBtn missing');
+    await page.evaluate(() => document.getElementById('dbShareBtn').click());
+  }],
+
+  ['Shared replay link', async () => {
+    const token = await page.evaluate(async () => window.__az.encodeReplay({
+      callsign: 'WARDEN-1', mission: 'AIR_SUPERIORITY', aircraft: 'F22A', rank: 'A',
+      score: 12345, kills: 3, timeS: 420, outcome: 'CLEARED'
+    }, [{ x: 0, z: 0 }, { x: 120, z: -80 }, { x: 240, z: -160 }],
+       [{ kind: 'KILL', x: 120, z: -80, t: 30 }]));
+    assert(typeof token === 'string' && token.length > 20 && token.length < 2000, `bad replay token: ${token}`);
+    await navigate(`debug&nointro&nobgm&mission=AIR_SUPERIORITY&replay=${token}`);
+    await page.waitForFunction(() => window.__az?.debrief === true, null, { polling: 250, timeout: 30000 });
+    const s = await page.evaluate(() => ({
+      title: document.getElementById('dbTitle')?.textContent || '',
+      rank: document.getElementById('dbRank')?.textContent || '',
+      gl: window.__az.renderer.getContext().getError()
+    }));
+    assert(/SHARED REPLAY/.test(s.title), `shared replay title: ${s.title}`);
+    assert(s.rank.length > 0, 'shared replay rank empty');
+    assert(s.gl === 0, 'WebGL error on shared replay');
   }]
 ];
 

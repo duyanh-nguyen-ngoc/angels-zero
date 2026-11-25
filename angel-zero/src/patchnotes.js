@@ -3,6 +3,10 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.80', title: 'SHAREABLE DEBRIEF REPLAYS & GLOBAL LEADERBOARD', bullets: [
+    'Copy a compact replay link from the debrief screen and let friends watch your exact flight trace, kills, rank, aircraft and score — no account or backend required.',
+    'Submit your score to the global mission leaderboard, or fall back to a clean local personal board when the API is unavailable. Watch any leaderboard entry\'s trace directly from the board.'
+  ] },
   { version: 'v1.1.77', title: 'BOOT PROGRESS HUD & ASSET LOADING OPTIMIZATION', bullets: [
     'A tactical boot HUD now shows live percentage, downloaded MB and the current stage (AIRFRAME / COCKPIT / CARRIER / SFX / SHADERS) instead of a bare LOADING F-15... label, with the correct aircraft name for the F-22A Raptor.',
     'Sound effects now preload in small batches with the active airframe\'s engine, weapon and RWR clips first, so the GLB downloads keep their HTTP connections. Boot time is measured and exposed as __az.bootMs.'
