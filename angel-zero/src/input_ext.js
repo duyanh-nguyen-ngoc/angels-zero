@@ -70,6 +70,20 @@ export function createInputExt(THREE, env) {
 
   /* ---------------- mobile touch HUD ---------------- */
   let root = null, stickEl = null, knob = null, thrEl = null;
+  const touchBtns = [];                                   // preallocated: one record per action button
+  function releaseButton(b) {
+    if (!b || !b._active) return;
+    b._active = false; b._pid = -1;
+    const act = b.dataset.act;
+    if (act === 'Fire') { _st.fire = false; press('FireUp'); }
+    else if (act === 'Missile') press('MissileUp');
+  }
+  function releaseAllTouch() {
+    for (let i = 0; i < touchBtns.length; i++) releaseButton(touchBtns[i]);
+    stickPointer = -1; thrPointer = -1;
+    _st.pitch = 0; _st.roll = 0;
+    if (knob) { knob.style.left = '46px'; knob.style.top = '46px'; }
+  }
   function el(tag, css, parent) {
     const n = document.createElement(tag);
     n.style.cssText = css;
@@ -88,8 +102,12 @@ export function createInputExt(THREE, env) {
     for (let i = 0; i < actions.length; i++) {
       const b = el('button', 'position:absolute;right:' + (16 + (i % 3) * 60) + 'px;bottom:' + (18 + Math.floor(i / 3) * 60) + 'px;width:52px;height:52px;border:1px solid rgba(104,247,204,.8);background:rgba(0,20,14,.6);color:#9dffe0;font:600 11px monospace;pointer-events:auto;touch-action:none', root);
       b.textContent = actions[i][0]; b.dataset.act = actions[i][1];
+      b._active = false; b._pid = -1;
+      touchBtns.push(b);
       b.addEventListener('pointerdown', e => {
-        e.preventDefault(); e.stopPropagation(); root.setPointerCapture && root.setPointerCapture(e.pointerId);
+        e.preventDefault(); e.stopPropagation();
+        try { b.setPointerCapture(e.pointerId); } catch (_) { /* capture optional */ }
+        b._active = true; b._pid = e.pointerId;
         if (b.dataset.act === 'Fire') { _st.fire = true; press('FireDown'); }
         else if (b.dataset.act === 'Missile') press('MissileDown');
         else if (b.dataset.act === 'Lock') press('Lock');
@@ -97,12 +115,20 @@ export function createInputExt(THREE, env) {
         else if (b.dataset.act === 'Flare') { press('Flare'); press('Chaff'); }
         else if (b.dataset.act === 'Camera') press('Camera');
       });
-      b.addEventListener('pointerup', e => {
-        e.preventDefault(); e.stopPropagation();
-        if (b.dataset.act === 'Fire') { _st.fire = false; press('FireUp'); }
-        if (b.dataset.act === 'Missile') press('MissileUp');
-      });
+      b.addEventListener('pointerup', e => { e.preventDefault(); e.stopPropagation(); releaseButton(b); });
+      b.addEventListener('pointercancel', e => { e.preventDefault(); e.stopPropagation(); releaseButton(b); });
+      b.addEventListener('lostpointercapture', () => releaseButton(b));
     }
+    // Safety net: if capture is lost or the finger leaves the button, still release.
+    function releaseByPointer(e) {
+      for (let i = 0; i < touchBtns.length; i++) {
+        const b = touchBtns[i];
+        if (b._active && b._pid === e.pointerId) releaseButton(b);
+      }
+    }
+    window.addEventListener('pointerup', releaseByPointer, true);
+    window.addEventListener('pointercancel', releaseByPointer, true);
+    window.addEventListener('blur', releaseAllTouch);
     const pause = el('button', 'position:absolute;right:18px;top:18px;padding:6px 12px;border:1px solid rgba(104,247,204,.8);background:rgba(0,20,14,.6);color:#9dffe0;font:600 11px monospace;pointer-events:auto;touch-action:none', root);
     pause.textContent = 'PAUSE';
     pause.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); press('Pause'); });
@@ -115,11 +141,13 @@ export function createInputExt(THREE, env) {
     const endStick = e => { if (e.pointerId !== stickPointer) return; stickPointer = -1; _st.pitch = 0; _st.roll = 0; knob.style.left = '46px'; knob.style.top = '46px'; };
     stickEl.addEventListener('pointerup', endStick);
     stickEl.addEventListener('pointercancel', endStick);
+    stickEl.addEventListener('lostpointercapture', () => { stickPointer = -1; _st.pitch = 0; _st.roll = 0; knob.style.left = '46px'; knob.style.top = '46px'; });
     thrEl.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); thrPointer = e.pointerId; thrEl.setPointerCapture && thrEl.setPointerCapture(e.pointerId); moveThr(e); });
     thrEl.addEventListener('pointermove', e => { if (e.pointerId === thrPointer) { e.preventDefault(); moveThr(e); } });
     const endThr = e => { if (e.pointerId === thrPointer) thrPointer = -1; };
     thrEl.addEventListener('pointerup', endThr);
     thrEl.addEventListener('pointercancel', endThr);
+    thrEl.addEventListener('lostpointercapture', () => { thrPointer = -1; });
   }
   function moveStick(e) {
     const r = stickEl.getBoundingClientRect();
@@ -141,6 +169,7 @@ export function createInputExt(THREE, env) {
     const playing = env.getAppMode && env.getAppMode() === 'PLAY';
     const show = !!root && playing && (env.isTouchDevice || touchTest);
     if (root) root.style.display = show ? 'block' : 'none';
+    if (!show) { releaseAllTouch(); _st.fire = false; if (env.keys) env.keys.fire = false; }
     if (!show && !hasGamepad) { _st.active = false; return; }
     if (show) {
       if (env.keys) {

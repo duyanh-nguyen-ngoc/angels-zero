@@ -3,6 +3,9 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.87', title: 'MOBILE CONTROL RELEASE FIX', bullets: [
+    'Touch action buttons now release correctly when you lift your finger, even if the browser moves the pointer off the button or cancels the gesture. Guns, missiles and the virtual stick no longer stay stuck down.'
+  ] },
   { version: 'v1.1.86', title: 'MODULAR ENGINE REFACTOR — OCEAN, WINGMEN, FLIGHT, DRONES & ACE BFM', bullets: [
     'The two largest source files were split into focused single-responsibility ES modules with factory-wired dependencies. Flight physics, wingman BTT, the animated ocean, the drone swarm and the ace BFM state machine are now independent modules with the same zero-allocation behaviour.',
     'No gameplay changes: every debug hook, telemetry field and HUD readout still reports the same values.'

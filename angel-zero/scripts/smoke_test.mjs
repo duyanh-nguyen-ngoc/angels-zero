@@ -289,6 +289,17 @@ const SCENARIOS = [
     assert(s.vis === 'block', `touch HUD hidden: ${s.vis}`);
     assert(s.active === true, 'inputExt not active with touch enabled');
     assert(s.gl === 0, 'WebGL error with touch HUD');
+    const press = await page.evaluate(() => {
+      const b = document.querySelector('#touchHUD button[data-act="Fire"]');
+      b.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 77, bubbles: true, cancelable: true }));
+      return window.__az.keys.fire;
+    });
+    const release = await page.evaluate(() => {
+      window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 77, bubbles: true, cancelable: true }));
+      return window.__az.keys.fire;
+    });
+    assert(press === true, 'touch GUN button did not press');
+    assert(release === false, 'touch GUN button stuck after release');
     await page.evaluate(() => window.__az.inputExt.setTouchTest(false));
   }],
 
