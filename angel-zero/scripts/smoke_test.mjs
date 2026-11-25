@@ -258,6 +258,20 @@ const SCENARIOS = [
   ['Mission FURBALL', async () => { await switchMission('FURBALL'); await assertMission('FURBALL'); }],
   ['Mission FREE_FLIGHT', async () => { await switchMission('FREE_FLIGHT'); await assertMission('FREE_FLIGHT'); }],
 
+  ['Training sortie boot', async () => {
+    await switchMission('TRAINING');
+    const s = await page.evaluate(() => ({ active: window.__az.training.active, step: window.__az.training.step,
+      total: window.__az.training.total, mcfg: !!window.__az.combatSys, gl: window.__az.renderer.getContext().getError() }));
+    assert(s.active === true && s.step === 1 && s.total === 6, `training boot: ${JSON.stringify(s)}`);
+    assert(s.gl === 0, 'WebGL error on training boot');
+    await page.evaluate(() => window.__az.jumpTraining(3));
+    await page.keyboard.press('Space');
+    await page.waitForFunction(() => window.__az.training.step >= 4, null, { polling: 250, timeout: 60000 });
+    const t = await page.evaluate(() => ({ step: window.__az.training.step, gl: window.__az.renderer.getContext().getError() }));
+    assert(t.step === 4, `camera step did not advance: ${t.step}`);
+    assert(t.gl === 0, 'WebGL error during training camera step');
+  }],
+
   ['Deterministic warp telemetry audit', async () => {
     assert(warpLogLine.startsWith('[ANGELS_ZERO] warp'), 'no [ANGELS_ZERO] warp log line');
     assert(!/NaN|undefined/i.test(warpLogLine), `warp line has NaN/undefined: ${warpLogLine.slice(0, 240)}`);

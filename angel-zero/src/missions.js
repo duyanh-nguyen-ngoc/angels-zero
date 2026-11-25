@@ -71,10 +71,19 @@ export const MISSIONS = {
     weapons: { gun: false, msl: false, spw: false }, enemyMsl: false,
     spawn: { pos: [0, 5500, 0], hdg: 0.15, spd: 175, onDeck: false },
     waves: [], targets: [], ceilingFt: null
+  },
+  TRAINING: {
+    id: 'TRAINING', title: 'TRAINING SORTIE',
+    brief: 'Guided 6-step flight & weapons qualification over Archipelago: afterburner, banking, target lock, missile kill, flare defense, and cannon pass.',
+    mapTag: 'ARCHIPELAGO', launch: 'AIRBORNE', rtbType: null, bgmScenario: '03_air_superiority', wxOverride: true,
+    training: true, noShips: true, wingmen: 'NONE',
+    weapons: { gun: true, msl: true, spw: false }, enemyMsl: false,
+    spawn: { pos: [0, 1400, 3200], hdg: 0, spd: 210, onDeck: false },
+    waves: [], targets: [], ceilingFt: null
   }
 };
 
-export const MISSION_ORDER = ['AIR_SUPERIORITY', 'NAVAL_BATTLE', 'CANYON_RUN', 'ACE_DUEL', 'FURBALL', 'FREE_FLIGHT'];
+export const MISSION_ORDER = ['AIR_SUPERIORITY', 'NAVAL_BATTLE', 'CANYON_RUN', 'ACE_DUEL', 'FURBALL', 'FREE_FLIGHT', 'TRAINING'];
 
 // Normalised per-sortie configuration. Missions without the new fields (AIR_SUPERIORITY
 // and FURBALL) get defaults that reproduce their existing behaviour exactly.
@@ -89,6 +98,7 @@ export function missionConfig(m) {
     gunsOnly: !!m.gunsOnly,                                // hard block on every missile / rocket (ACE_DUEL)
     noShips: !!m.noShips,                                  // no surface ships may exist (ACE_DUEL)
     freeFlight: !!m.freeFlight,
+    training: !!m.training,                                // guided qualification sortie
     stages: m.stages || null                               // null = legacy PHASE 1..4 flow
   };
 }

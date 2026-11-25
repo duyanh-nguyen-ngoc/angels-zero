@@ -2115,7 +2115,7 @@ export function createCombat(THREE, env) {
     const aligned = e.fwd.dot(toPdir);
     const pFwd = _pFwd.set(0, 0, -1).applyQuaternion(S.quaternion);
     const onSix = pFwd.dot(toPdir) > 0;                              // bandit is behind the player
-    const engaging = e.tac === 'ENGAGE' && playerActive;
+    const engaging = e.tac === 'ENGAGE' && playerActive && !e.noWeapons;
     const inCone = engaging && dist < B_LOCK_RANGE * STEALTH_K && Math.acos(clamp(aligned, -1, 1)) < B_CONE && onSix;
     // Player inside thick cloud: the bandit's seeker loses the picture (-1.5/s).
     const hidden = C.playerCloud > CLOUD_T;
@@ -2128,7 +2128,7 @@ export function createCombat(THREE, env) {
     if (e.maskT <= 0) { e.maskT = 0.15; e.masked = playerActive && dist < B_LOCK_RANGE * 1.6 && occluded(e.pos, S.position); }
     if (e.masked && e.bLock >= B_SOFT) terrainMaskBreak(e.type || e.label);
     e.bLock = e.masked ? 0 : clamp(e.bLock + (hidden ? -1.5 * dt : inCone ? dt / lockTime : -LOCK_DECAY * dt), 0, 1);
-    const gunsOnly = C.mcfg.enemyMsl === false || e.noMsl;
+    const gunsOnly = C.mcfg.enemyMsl === false || e.noMsl || e.noWeapons;
     // Duel: fire on the gun solution (nose on the lead point), not on the raw line of sight.
     let gunAligned = aligned;
     if (e.duel) {
@@ -2139,11 +2139,11 @@ export function createCombat(THREE, env) {
       _eDir.subVectors(_eLead, e.pos).normalize();
       gunAligned = e.fwd.dot(_eDir);
     }
-    if (gunsOnly && !e.duel && engaging && !e.masked && e.burst <= 0 && e.burstCD <= 0 && dist < ENEMY_GUN.range && gunAligned > ENEMY_GUN.cone) {
+    if (gunsOnly && !e.noWeapons && !e.duel && engaging && !e.masked && e.burst <= 0 && e.burstCD <= 0 && dist < ENEMY_GUN.range && gunAligned > ENEMY_GUN.cone) {
       e.burst = ENEMY_GUN.burst; e.burstCD = ENEMY_GUN.cd;
       if (env.onSfx) env.onSfx('egun', e.pos, 0.6);
     }
-    if (engaging && !e.masked && !gunsOnly) {
+    if (engaging && !e.masked && !gunsOnly && !e.noWeapons) {
       if (e.burst <= 0 && e.burstCD <= 0 && aligned > Math.cos(4 * D2R) && dist < 1300 && dist > 150) { e.burst = 0.7; e.burstCD = 2.2 + rand() * 1.5; }
       const target = { pos: S.position, vel: S.velocity, alive: true, isPlayer: true };
       if (e.bLock >= 1 && e.mslCD <= 0 && dist > 700) {
@@ -2655,6 +2655,29 @@ export function createCombat(THREE, env) {
     if (glowMesh) glowMesh.visible = anyVisible;
     if (flameOuter) flameOuter.visible = anyVisible;
     if (flameCore) flameCore.visible = anyVisible;
+  }
+  // Guided training target: a benign, slow, low-HP bandit that never shoots back.
+  function spawnTrainingDrone(pos, spd, hp) {
+    for (let i = 0; i < enemies.length; i++) {
+      const e = enemies[i];
+      if (e.alive || e.ace || e.bomber || e.aceFlight || e.scripted) continue;
+      resetAI(e); clearAce(e);
+      e.pos.copy(pos);
+      e.pos.y = Math.max(groundLevel(e.pos.x, e.pos.z) + 260, e.pos.y);
+      e.fwd.set(0, 0, -1).applyQuaternion(S.quaternion);
+      e.speed = e.cruise = spd || 115;
+      e.vel.copy(e.fwd).multiplyScalar(e.speed); e.prev.copy(e.pos);
+      e.hp = e.hpMax = hp || 100;
+      e.alive = true; e.wreck = null; e.tac = e.mode = 'PATROL';
+      e.mslCD = 999; e.burstCD = 999; e.burst = 0; e.bLock = 0; e.flaresLeft = 0;
+      e.radius = 4000; e.dir = 1; e.center.copy(e.pos); e.alt = e.pos.y;
+      e.nonHostile = true; e.noWeapons = true; e.noMsl = true;
+      e.label = 'TRAINING DRONE';
+      orient(e); writeFleet();
+      if (env.debug) console.log('[ANGELS_ZERO] training drone spawned hp=' + e.hp);
+      return e;
+    }
+    return null;
   }
   function writeFleet() {
     if (!fleet.length) return;
@@ -6537,6 +6560,7 @@ export function createCombat(THREE, env) {
     setESMDisabled(on) { C.esmDisabled = !!on; return C.esmDisabled; },
     get sc() { return C.sc; },
     spawnDroneSwarm(n = SWARM_MAX, anchor = 'PLAYER') { return spawnSwarm(n, anchor); },
+    spawnTrainingDrone(pos, spd, hp) { return spawnTrainingDrone(pos, spd, hp); },
     killDrone(i, how = 'GUN') { return killDrone(i, how); },
     get drones() { return DRONE_TGT; },
     repairEngines() { resetEngines(); return C.engState; },

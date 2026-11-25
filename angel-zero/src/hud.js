@@ -1023,7 +1023,8 @@ export function createHUD(THREE, A) {
     const alive = A.getEnemies().filter(e => e.alive).length;
     ctx.font = f(12, true);
     const ph = C.phase ? `PHASE ${C.phase}  ` : '';
-    if (C.mcfg && C.mcfg.freeFlight) labelText(ctx, 'FREE FLIGHT', x, y + 40 + comboH, '#5eead4', 3);
+    if (C.training && C.training.active) labelText(ctx, 'TRAINING // ' + C.training.id, x, y + 40 + comboH, '#5eead4', 3);
+    else if (C.mcfg && C.mcfg.freeFlight) labelText(ctx, 'FREE FLIGHT', x, y + 40 + comboH, '#5eead4', 3);
     else labelText(ctx, ph + 'BANDITS ' + alive, x, y + 40 + comboH, C.phase === 3 ? BLAZE : G, 3);
     // PHASE 3: Ace structural integrity bar.
     if (C.ace && C.ace.alive) {
@@ -2186,8 +2187,29 @@ export function createHUD(THREE, A) {
       }
     }
   }
+  function drawTrainingObjective(ctx, g) {
+    const T = C.training;
+    if (!T || !T.active) return;
+    const cx = g ? g.cx : HW / 2;
+    const y = Math.max(HH * 0.16, radioBottom ? radioBottom + 12 : 0);
+    const line = 'STEP ' + T.step + '/' + T.total + ' — ' + T.title;
+    const hint = T.hint;
+    ctx.save();
+    ctx.font = f(13, true); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const w = Math.max(ctx.measureText(line).width, ctx.measureText(hint).width) + 40;
+    numBack(ctx, cx - w / 2, y - 24, w, 58, 'rgba(0,20,10,0.62)');
+    glow(ctx, G, 5); ctx.lineWidth = 1.2;
+    ctx.strokeRect(cx - w / 2 + 0.5, y - 23.5, w - 1, 57);
+    labelText(ctx, 'TRAINING QUALIFICATION // ' + line, cx, y - 10, G, 5);
+    ctx.font = f(11, true);
+    labelText(ctx, hint, cx, y + 11, GB, 4);
+    const bw = w - 30, bx = cx - bw / 2;
+    noGlow(ctx); ctx.fillStyle = 'rgba(88,255,154,0.16)'; ctx.fillRect(bx, y + 22, bw, 4);
+    glow(ctx, G, 6); ctx.fillStyle = G; ctx.fillRect(bx, y + 22, bw * clamp(T.progress || 0, 0, 1), 4);
+    ctx.restore();
+  }
   function drawObjective(ctx) {
-    if (C.mcfg && C.mcfg.freeFlight) return;
+    if (C.mcfg && (C.mcfg.freeFlight || C.mcfg.training)) return;
     const cat = A.getCat && A.getCat();
     if (cat && (cat.ph === 'HOLD' || cat.ph === 'LAUNCH')) return;
     ctx.save();
@@ -2457,6 +2479,7 @@ export function createHUD(THREE, A) {
     if (!C.dead && !ff) { drawTargets(hctx); drawWingmen(hctx); }
     if (!ff) { drawStrikeTargets(hctx); drawWeakTargets(hctx); }
     drawRadio(hctx);
+    if (C.training) drawTrainingObjective(hctx, g);
     drawTopLeft(hctx);
     if (!C.dead && !ff) drawKillFlash(hctx, g);
     drawStamps(hctx, dt); radarPulseT += dt;

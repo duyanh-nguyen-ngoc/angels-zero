@@ -3,6 +3,10 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.83', title: 'GUIDED TRAINING SORTIE', bullets: [
+    'A new TRAINING mission in Standby walks new pilots through afterburner, banking, the three-way camera cycle, missile lock and kill, flare defence and a cannon pass in a safe, step-by-step live flight.',
+    'Each step is announced by Overlord with an on-screen objective card; completing all six qualifies you for combat sorties.'
+  ] },
   { version: 'v1.1.82', title: 'RUNWAY LANDING, TAXI & MID-SORTIE REARM/REPAIR', bullets: [
     'Complete the Archipelago AFB recovery loop: fly the ILS 3-degree glideslope, touch down, brake and taxi into the rearm apron, then get a full 4-second rearm, repair and refuel without ending the sortie.',
     'The pit-stop now smoothly restores airframe and fuel during servicing, announces over the radio, and leaves you cleared for a fresh takeoff.'
