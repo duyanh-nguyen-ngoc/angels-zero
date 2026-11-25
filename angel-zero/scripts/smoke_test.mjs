@@ -258,6 +258,15 @@ const SCENARIOS = [
   ['Mission FURBALL', async () => { await switchMission('FURBALL'); await assertMission('FURBALL'); }],
   ['Mission FREE_FLIGHT', async () => { await switchMission('FREE_FLIGHT'); await assertMission('FREE_FLIGHT'); }],
 
+  ['Free Flight attribution', async () => {
+    await page.waitForFunction(() => { const e = document.getElementById('ffAttrib'); return e && !e.hidden; }, null, { polling: 250, timeout: 60000 });
+    const on = await page.evaluate(() => ({ text: document.getElementById('ffAttrib').textContent, gl: window.__az.renderer.getContext().getError() }));
+    assert(/OpenStreetMap/.test(on.text) && /Esri/.test(on.text), `attribution text: ${on.text}`);
+    assert(on.gl === 0, 'WebGL error with attribution badge');
+    await switchMission('AIR_SUPERIORITY');
+    await page.waitForFunction(() => document.getElementById('ffAttrib').hidden, null, { polling: 250, timeout: 60000 });
+  }],
+
   ['Training sortie boot', async () => {
     await switchMission('TRAINING');
     const s = await page.evaluate(() => ({ active: window.__az.training.active, step: window.__az.training.step,

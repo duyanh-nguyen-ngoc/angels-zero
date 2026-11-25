@@ -3,6 +3,10 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.84', title: 'FREE FLIGHT ANY-CITY SEARCH, OSM RUNWAYS & ATTRIBUTION', bullets: [
+    'Search any city, airport code or raw lat,lon from the Free Flight Standby row and fly there instantly, with the required OpenStreetMap, Esri and AWS Terrarium attribution shown while in Free Flight.',
+    'OpenFreeMap vector tiles now render real airport runways and taxiways alongside buildings.'
+  ] },
   { version: 'v1.1.83', title: 'GUIDED TRAINING SORTIE', bullets: [
     'A new TRAINING mission in Standby walks new pilots through afterburner, banking, the three-way camera cycle, missile lock and kill, flare defence and a cannon pass in a safe, step-by-step live flight.',
     'Each step is announced by Overlord with an on-screen objective card; completing all six qualifies you for combat sorties.'

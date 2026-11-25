@@ -19,7 +19,43 @@ export function loadFreeFlightCity() {
   return 'TORONTO';
 }
 export function saveFreeFlightCity(id) {
-  try { if (FREE_FLIGHT_PRESETS[id]) localStorage.setItem(FF_CITY_KEY, id); } catch (_) {}
+  try { if (FREE_FLIGHT_PRESETS[id] || id === 'CUSTOM') localStorage.setItem(FF_CITY_KEY, id); } catch (_) {}
+}
+
+const CUSTOM_KEY = 'az_ff_custom';
+const NOMINATIM = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=';
+let lastGeoAt = 0;
+/** Resolve a city/airport name or raw "lat,lon" to {lat,lon,name,desc}. Never throws. */
+export async function geocodePlace(query) {
+  const q = String(query || '').trim();
+  if (!q) return null;
+  const xy = q.split(/[,;\s]+/).map(Number);
+  if (xy.length >= 2 && xy.every(Number.isFinite) && Math.abs(xy[0]) <= 90 && Math.abs(xy[1]) <= 180) {
+    return { lat: xy[0], lon: xy[1], name: 'CUSTOM', desc: 'Custom location — ' + q };
+  }
+  const wait = 1000 - (Date.now() - lastGeoAt);          // Nominatim policy: max 1 req/s
+  if (wait > 0) await new Promise(r => setTimeout(r, wait));
+  lastGeoAt = Date.now();
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 5000);
+  try {
+    const res = await fetch(NOMINATIM + encodeURIComponent(q), { signal: ctrl.signal });
+    if (!res.ok) return null;
+    const list = await res.json();
+    if (!Array.isArray(list) || !list.length) return null;
+    const hit = list[0], lat = Number(hit.lat), lon = Number(hit.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    const name = String(hit.name || '').slice(0, 24).toUpperCase() || 'CUSTOM';
+    return { lat, lon, name, desc: 'Custom location — ' + String(hit.display_name || q).slice(0, 90) };
+  } catch (e) { return null; }
+  finally { clearTimeout(timer); }
+}
+export function loadCustomPlace() {
+  try { const v = JSON.parse(localStorage.getItem(CUSTOM_KEY) || 'null'); return v && Number.isFinite(v.lat) && Number.isFinite(v.lon) ? v : null; }
+  catch (e) { return null; }
+}
+export function saveCustomPlace(loc) {
+  try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(loc)); } catch (e) { /* storage unavailable */ }
 }
 
 const ZOOM = 13;
@@ -255,6 +291,61 @@ function decodeBuildingLayer(arrayBuffer) {
     }
   }
   return buildings;
+}
+
+// ─── AEROWAY (OSM RUNWAYS / TAXIWAYS) FROM MVT ─────────────────────────────
+function decodeMvtLine(geom) {
+  if (!geom || !geom.length) return [];
+  const lines = [];
+  let line = null, x = 0, y = 0, i = 0;
+  while (i < geom.length) {
+    const cmdInt = geom[i++], cmd = cmdInt & 0x7, count = cmdInt >>> 3;
+    if (cmd === 1) {
+      if (line && line.length >= 4) lines.push(line);
+      line = [];
+      for (let k = 0; k < count && i + 1 < geom.length; k++) {
+        x += (geom[i++] >>> 1) ^ -(geom[i++] & 1);
+        line.push(x, y);
+      }
+    } else if (cmd === 2 && line) {
+      for (let k = 0; k < count && i + 1 < geom.length; k++) {
+        x += (geom[i++] >>> 1) ^ -(geom[i++] & 1);
+        line.push(x, y);
+      }
+    } else break;
+  }
+  if (line && line.length >= 4) lines.push(line);
+  return lines;
+}
+function decodeAerowayLayer(arrayBuffer) {
+  const pbf = new PbfReader(arrayBuffer);
+  const out = [];
+  while (pbf.pos < pbf.len) {
+    const tag = pbf.readVarint(), field = tag >>> 3, wt = tag & 7;
+    if (field !== 3 || wt !== 2) { pbf.skip(wt); continue; }
+    const layerEnd = pbf.pos + pbf.readVarint();
+    let name = '', extent = 4096;
+    const keys = [], values = [], raw = [];
+    while (pbf.pos < layerEnd) {
+      const lt = pbf.readVarint(), lf = lt >>> 3, lwt = lt & 7;
+      if (lf === 1 && lwt === 2) { const l = pbf.readVarint(); name = pbf.readString(pbf.pos + l); }
+      else if (lf === 2 && lwt === 2) { const l = pbf.readVarint(); raw.push(decodeMvtFeature(pbf, pbf.pos + l)); }
+      else if (lf === 3 && lwt === 2) { const l = pbf.readVarint(); keys.push(pbf.readString(pbf.pos + l)); }
+      else if (lf === 4 && lwt === 2) { const l = pbf.readVarint(); values.push(decodeMvtValue(pbf, pbf.pos + l)); }
+      else if (lf === 5 && lwt === 0) extent = pbf.readVarint() || 4096;
+      else pbf.skip(lwt);
+    }
+    if (name !== 'aeroway') continue;
+    for (const f of raw) {
+      let cls = '';
+      if (f.tags) for (let t = 0; t + 1 < f.tags.length; t += 2) if (keys[f.tags[t]] === 'class') cls = String(values[f.tags[t + 1]] || '');
+      if (cls !== 'runway' && cls !== 'taxiway' && cls !== 'apron') continue;
+      const lines = decodeMvtLine(f.geom);
+      for (const line of lines) out.push({ cls, line, extent });
+    }
+    return out;
+  }
+  return out;
 }
 
 // ─── FAST 2D EAR-CLIPPING POLYGON TRIANGULATOR ──────────────────────────────
@@ -515,6 +606,8 @@ export function createFreeFlight(THREE, scene, envTex = null) {
   });
 
   let active = false;
+  let currentPreset = FREE_FLIGHT_PRESETS.TORONTO;
+  let aerowayCount = 0;
   let cityId = 'TORONTO';
   let originLat = FREE_FLIGHT_PRESETS.TORONTO.lat;
   let originLon = FREE_FLIGHT_PRESETS.TORONTO.lon;
@@ -635,6 +728,50 @@ export function createFreeFlight(THREE, scene, envTex = null) {
     }
   }
 
+  const aerowayMat = new THREE.MeshStandardMaterial({
+    color: 0x30353c, roughness: 0.86, metalness: 0.05, vertexColors: true,
+    polygonOffset: true, polygonOffsetFactor: 3, polygonOffsetUnits: 3, side: THREE.DoubleSide
+  });
+  const MAX_AEROWAY_TRIS = 4000;
+  function buildAerowayMesh(tile, features) {
+    if (!features || !features.length || tile.disposed) return;
+    const pos = [], col = [];
+    let tris = 0;
+    for (let f = 0; f < features.length && tris < MAX_AEROWAY_TRIS; f++) {
+      const feat = features[f], line = feat.line, ext = feat.extent || 4096;
+      const qx = feat.qx || 0, qy = feat.qy || 0, qs = feat.qs || 1;
+      const width = feat.cls === 'runway' ? 45 : 18;
+      const n = line.length >> 1;
+      if (n < 2) continue;
+      for (let i = 0; i < n - 1 && tris < MAX_AEROWAY_TRIS; i++) {
+        const ax = tile.x0 + (qx + (line[i * 2] / ext) * qs) * tile.w;
+        const az = tile.z0 + (qy + (line[i * 2 + 1] / ext) * qs) * tile.d;
+        const bx = tile.x0 + (qx + (line[(i + 1) * 2] / ext) * qs) * tile.w;
+        const bz = tile.z0 + (qy + (line[(i + 1) * 2 + 1] / ext) * qs) * tile.d;
+        const dx = bx - ax, dz = bz - az, len = Math.hypot(dx, dz);
+        if (len < 0.5 || len > 4000) continue;
+        const nx = -dz / len * width * 0.5, nz = dx / len * width * 0.5;
+        const y0 = sampleTileHeight(tile, ax, az) + 1.2, y1 = sampleTileHeight(tile, bx, bz) + 1.2;
+        if (tris + 2 > MAX_AEROWAY_TRIS) break;
+        pos.push(ax + nx, y0, az + nz, ax - nx, y0, az - nz, bx - nx, y1, bz - nz,
+          ax + nx, y0, az + nz, bx - nx, y1, bz - nz, bx + nx, y1, bz + nz);
+        col.push(0.78, 0.80, 0.82, 0.62, 0.64, 0.66, 0.62, 0.64, 0.66,
+          0.78, 0.80, 0.82, 0.62, 0.64, 0.66, 0.78, 0.80, 0.82);
+        tris += 2;
+      }
+    }
+    if (!pos.length) return;
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geom.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    geom.computeBoundingSphere();
+    const mesh = new THREE.Mesh(geom, aerowayMat);
+    mesh.name = `aeroway_${tile.key}`;
+    tile.aerowayMesh = mesh;
+    tile.aerowayTris = tris;
+    aerowayCount += tris;
+    tile.group.add(mesh);
+  }
   function buildBuildingsMesh(tile, features) {
     if (!features || features.length === 0 || tile.disposed) return;
 
@@ -853,10 +990,14 @@ export function createFreeFlight(THREE, scene, envTex = null) {
           .then((buf) => {
             if (!buf || tile.disposed) return [];
             const feats = decodeBuildingLayer(buf);
+            const air = decodeAerowayLayer(buf);
             for (let i = 0; i < feats.length; i++) {
               feats[i].qx = qx; feats[i].qy = qy; feats[i].qs = qs;
             }
-            return feats;
+            for (let i = 0; i < air.length; i++) {
+              air[i].qx = qx; air[i].qy = qy; air[i].qs = qs; air[i].aeroway = true;
+            }
+            return feats.concat(air);
           })
           .catch(() => []);
       };
@@ -873,7 +1014,10 @@ export function createFreeFlight(THREE, scene, envTex = null) {
       const [, , features] = await Promise.all([satPromise, terrPromise, mvtPromise]);
       if (tile.disposed) return;
       if (features && features.length > 0) {
-        buildBuildingsMesh(tile, features);
+        const bldg = [], air = [];
+        for (const f of features) (f.aeroway ? air : bldg).push(f);
+        if (bldg.length) buildBuildingsMesh(tile, bldg);
+        if (air.length) buildAerowayMesh(tile, air);
       }
       tile.loaded = true;
     } finally {
@@ -899,6 +1043,8 @@ export function createFreeFlight(THREE, scene, envTex = null) {
       groundMesh: null,
       bldgMesh: null,
       bldgCount: 0,
+      aerowayMesh: null,
+      aerowayTris: 0,
       satTex: null,
       satMat: null,
       loaded: false,
@@ -924,6 +1070,11 @@ export function createFreeFlight(THREE, scene, envTex = null) {
       tile.bldgMesh.geometry.dispose();
       buildingsTotal = Math.max(0, buildingsTotal - tile.bldgCount);
       tile.bldgMesh = null;
+    }
+    if (tile.aerowayMesh) {
+      tile.aerowayMesh.geometry.dispose();
+      aerowayCount = Math.max(0, aerowayCount - (tile.aerowayTris || 0));
+      tile.aerowayMesh = null;
     }
     if (tile.satTex) { tile.satTex.dispose(); tile.satTex = null; }
     if (tile.satMat) { tile.satMat.dispose(); tile.satMat = null; }
@@ -1134,10 +1285,14 @@ export function createFreeFlight(THREE, scene, envTex = null) {
     clearAll();
     active = true;
     root.visible = true;
-    const p = FREE_FLIGHT_PRESETS[presetId] || FREE_FLIGHT_PRESETS.TORONTO;
-    cityId = p.id;
-    originLat = customLatLon && Number.isFinite(customLatLon.lat) ? customLatLon.lat : p.lat;
-    originLon = customLatLon && Number.isFinite(customLatLon.lon) ? customLatLon.lon : p.lon;
+    const base = FREE_FLIGHT_PRESETS[presetId] || FREE_FLIGHT_PRESETS.TORONTO;
+    const custom = customLatLon && Number.isFinite(customLatLon.lat) && Number.isFinite(customLatLon.lon) ? customLatLon : null;
+    const p = custom ? { ...base, id: 'CUSTOM', name: custom.name || 'CUSTOM', desc: custom.desc || 'Custom location',
+      lat: custom.lat, lon: custom.lon, alt: custom.alt || base.alt, hdg: custom.hdg || base.hdg, spd: custom.spd || base.spd } : base;
+    currentPreset = p;
+    cityId = custom ? 'CUSTOM' : p.id;
+    originLat = p.lat;
+    originLon = p.lon;
     mPerDegLon = 111320 * Math.cos(originLat * Math.PI / 180);
     buildLandmarks();
     update(0, 0);
@@ -1148,7 +1303,7 @@ export function createFreeFlight(THREE, scene, envTex = null) {
     for (const tile of Array.from(tiles.values())) disposeTile(tile);
     tiles.clear();
     clearLandmarks();
-    buildingsTotal = 0;
+    buildingsTotal = 0; aerowayCount = 0;
     active = false;
     root.visible = false;
   }
@@ -1220,6 +1375,8 @@ export function createFreeFlight(THREE, scene, envTex = null) {
       inFlight: inFlightCount,
       buildingsTotal,
       buildingMeshes,
+      aerowayCount,
+      currentPreset: currentPreset.name,
       landmarksCount: landmarksGroup.children.length,
       originLat,
       originLon,
@@ -1232,6 +1389,7 @@ export function createFreeFlight(THREE, scene, envTex = null) {
     update,
     heightAt,
     getStats,
+    get currentPreset() { return currentPreset; },
     get active() { return active; },
   };
 }

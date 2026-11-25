@@ -60,6 +60,12 @@
   #status.failed #statusBarFill { background:#ff2e43; box-shadow:0 0 12px rgba(255,46,67,.7); }
   #status.failed #statusTitle { color:#ff2e43; }
   #lbOverlay[hidden] { display:none !important; }
+  #ffAttrib { position:fixed; right:14px; bottom:10px; z-index:12; pointer-events:none; font:600 10px 'Share Tech Mono',monospace; letter-spacing:.4px;
+    color:rgba(210,240,230,0.72); text-shadow:0 1px 3px #000, 0 0 8px #000; }
+  #ffAttrib[hidden] { display:none; }
+  #ffSearchRow { pointer-events:auto; display:flex; gap:6px; align-items:center; margin:2px 0 6px; }
+  #ffCityInput { pointer-events:auto; min-width:0; flex:1; padding:3px 6px; background:rgba(0,10,6,.7); border:1px solid rgba(82,255,156,.5); color:#d8ffe8; font:600 11px 'Rajdhani',sans-serif; letter-spacing:.5px; }
+  #ffCityInput::placeholder { color:rgba(210,240,230,.45); }
 
   /* AC7 Tactical OS Briefing & Pause HUD */
   #menu {
@@ -512,6 +518,7 @@
     <div class="crt-scanline"></div>
   </div>
   <div id="flybyPulse"></div>
+  <div id="ffAttrib" hidden>Map data © OpenStreetMap contributors · Imagery © Esri · Elevation AWS Terrarium</div>
   <div id="status">
     <div id="statusTitle">LOADING AIRCRAFT // 0%</div>
     <div id="statusStage">AIRFRAME</div>
@@ -654,6 +661,7 @@
       <button class="sbRow" data-k="mission" type="button"><span class="sbLabel">MISSION</span><span class="sbValue" id="sbMissionVal"></span></button>
       <button class="sbRow" data-k="aircraft" type="button"><span class="sbLabel">AIRCRAFT</span><span class="sbValue" id="sbAircraftVal"></span></button>
       <button class="sbRow" data-k="ffcity" type="button" id="sbFfCityRow" hidden><span class="sbLabel">LOCATION</span><span class="sbValue" id="sbFfCityVal"></span></button>
+      <div id="ffSearchRow" hidden><input id="ffCityInput" type="text" placeholder="SEARCH ANY CITY OR AIRPORT (e.g. PARIS, RJTT, DUBAI)..." autocomplete="off" spellcheck="false" /><button id="ffCityGo" type="button">[ FLY HERE ]</button></div>
        <button class="sbRow" data-k="role" type="button"><span class="sbLabel">WINGMAN ROLES</span><span class="sbValue" id="sbRoleVal"></span></button>
       <button class="sbRow" data-k="diff" type="button"><span class="sbLabel">DIFFICULTY</span><span class="sbValue" id="sbDiffVal"></span></button>
       <button class="sbRow" data-k="spw" type="button"><span class="sbLabel">SPECIAL WEAPON</span><span class="sbValue" id="sbSpwVal"></span></button>
@@ -793,44 +801,44 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s9es';
-import { createAmbient } from './src/ambient.js?v=s9es';
-import { createStormFX } from './src/stormfx.js?v=s9es';
-import { createWetDeck } from './src/wetdeck.js?v=s9es';
-import { createBlastFX } from './src/blastfx.js?v=s9es';
-import { createHUD } from './src/hud.js?v=s9es';
-import { createCockpit3D } from './src/cockpit3d.js?v=s9es';
-import { createCockpitF22 } from './src/cockpit_f22.js?v=s9es';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9es';
-import { createEjection } from './src/eject.js?v=s9es';
-import { createAudio } from './src/audio.js?v=s9es';
-import { createYouTubeMusic } from './src/ytmusic.js?v=s9es';
-import { createRadio } from './src/radio.js?v=s9es';
-import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9es';
-import { createLivery } from './src/livery.js?v=s9es';
-import { createGear, GEAR_H, GEAR_PTS, GEAR_UNITS, setGearPoints } from './src/gear.js?v=s9es';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9es';
-import { createCanopyFX } from './src/canopy.js?v=s9es';
-import { createNVG } from './src/nvg.js?v=s9es';
-import { createWorld, WORLD } from './src/world.js?v=s9es';
-import { createSurfaces } from './src/surfaces.js?v=s9es';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9es';
-import { createFreeLook } from './src/freelook.js?v=s9es';
-import { createCanopyGlass } from './src/canopyglass.js?v=s9es';
-import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9es';
-import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9es';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9es';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9es';
-import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9es';
-import { createRadioQueue } from './src/radioQueue.js?v=s9es';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9es';
+import { createVFX } from './src/vfx.js?v=s9et';
+import { createAmbient } from './src/ambient.js?v=s9et';
+import { createStormFX } from './src/stormfx.js?v=s9et';
+import { createWetDeck } from './src/wetdeck.js?v=s9et';
+import { createBlastFX } from './src/blastfx.js?v=s9et';
+import { createHUD } from './src/hud.js?v=s9et';
+import { createCockpit3D } from './src/cockpit3d.js?v=s9et';
+import { createCockpitF22 } from './src/cockpit_f22.js?v=s9et';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9et';
+import { createEjection } from './src/eject.js?v=s9et';
+import { createAudio } from './src/audio.js?v=s9et';
+import { createYouTubeMusic } from './src/ytmusic.js?v=s9et';
+import { createRadio } from './src/radio.js?v=s9et';
+import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9et';
+import { createLivery } from './src/livery.js?v=s9et';
+import { createGear, GEAR_H, GEAR_PTS, GEAR_UNITS, setGearPoints } from './src/gear.js?v=s9et';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9et';
+import { createCanopyFX } from './src/canopy.js?v=s9et';
+import { createNVG } from './src/nvg.js?v=s9et';
+import { createWorld, WORLD } from './src/world.js?v=s9et';
+import { createSurfaces } from './src/surfaces.js?v=s9et';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9et';
+import { createFreeLook } from './src/freelook.js?v=s9et';
+import { createCanopyGlass } from './src/canopyglass.js?v=s9et';
+import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9et';
+import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9et';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9et';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9et';
+import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9et';
+import { createRadioQueue } from './src/radioQueue.js?v=s9et';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9et';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
-  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9es';
-import { createFreeFlight, FREE_FLIGHT_PRESETS, loadFreeFlightCity, saveFreeFlightCity } from './src/freeflight.js?v=s9es';
-import { encodeReplay, decodeReplay, buildReplayUrl } from './src/replay_share.js?v=s9es';
-import { fetchLeaderboard, submitScore } from './src/leaderboard.js?v=s9es';
-import { collectPilotSnapshot, applyPilotSnapshot, exportPilotCode, importPilotCode, generateSyncId, getSyncId, setSyncId, isSyncEnabled, setSyncEnabled, pushCloudProfile, pullCloudProfile, syncNow, setRefreshCallback } from './src/profile_sync.js?v=s9es';
-import { createTraining } from './src/training.js?v=s9es';
+  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9et';
+import { createFreeFlight, FREE_FLIGHT_PRESETS, loadFreeFlightCity, saveFreeFlightCity, geocodePlace, loadCustomPlace, saveCustomPlace } from './src/freeflight.js?v=s9et';
+import { encodeReplay, decodeReplay, buildReplayUrl } from './src/replay_share.js?v=s9et';
+import { fetchLeaderboard, submitScore } from './src/leaderboard.js?v=s9et';
+import { collectPilotSnapshot, applyPilotSnapshot, exportPilotCode, importPilotCode, generateSyncId, getSyncId, setSyncId, isSyncEnabled, setSyncEnabled, pushCloudProfile, pullCloudProfile, syncNow, setRefreshCallback } from './src/profile_sync.js?v=s9et';
+import { createTraining } from './src/training.js?v=s9et';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -842,6 +850,7 @@ const DEBUG = Q.has('debug');
 const bootT0 = performance.now();
 let bootMs = 0, bootPct = 0, sfxDone = 0, sfxTotal = 0;
 const statusEl = document.getElementById('status');
+const ffAttribEl = document.getElementById('ffAttrib');
 const statusTitleEl = document.getElementById('statusTitle');
 const statusStageEl = document.getElementById('statusStage');
 const statusBarEl = document.getElementById('statusBarFill');
@@ -1924,7 +1933,9 @@ function loadMissionScene(m) {
     if (!(DEBUG && Q.has('tod'))) atmosphere.applyTimeOfDay('CLOUD_SEA', { instant: true });
     const clat = Q.has('lat') ? Number(Q.get('lat')) : NaN;
     const clon = Q.has('lon') ? Number(Q.get('lon')) : NaN;
-    freeFlight.start(selectedFfCity, Number.isFinite(clat) && Number.isFinite(clon) ? { lat: clat, lon: clon } : null);
+    const custom = Number.isFinite(clat) && Number.isFinite(clon) ? { lat: clat, lon: clon, name: Q.get('city') || 'CUSTOM' }
+      : selectedFfCity === 'CUSTOM' ? loadCustomPlace() : null;
+    freeFlight.start(selectedFfCity, custom);
   } else if (m.training) {
     if (!WX_FORCED) { weather.set('CLEAR', { instant: true }); vfx.setCloudSea(false); }
     if (!(DEBUG && Q.has('tod'))) atmosphere.applyTimeOfDay('DAYLIGHT', { instant: true });
@@ -2657,7 +2668,7 @@ async function startSortie() {
     for (const w of wingmen) { w.pos.copy(state.position).addScaledVector(a.fwd, -3000); w.alive = false; }
   }
   if (m.freeFlight) {
-    const p = FREE_FLIGHT_PRESETS[selectedFfCity] || FREE_FLIGHT_PRESETS.TORONTO;
+    const p = freeFlight.currentPreset || FREE_FLIGHT_PRESETS[selectedFfCity] || FREE_FLIGHT_PRESETS.TORONTO;
     state.position.set(0, p.alt, 0);
     state.quaternion.setFromAxisAngle(AX_Y, p.hdg);
     state.pitchRate = state.rollRate = state.yawRate = 0;
@@ -6710,6 +6721,7 @@ function stepSim(dt) {
   updateBuzz(dt);
   combatSys.update(dt, simTime, { playerActive: flightMode === 'FLY', firing: !freeFlight.active && (keys.fire || DEBUG_FIRE) });
   if (combat.training) training.update(dt);
+  if (ffAttribEl) ffAttribEl.hidden = !freeFlight.active || appMode === 'DEBRIEF';
   if (freeFlight.active) {
     const rebase = freeFlight.update(state.position.x, state.position.z);
     if (rebase) {
@@ -6836,7 +6848,7 @@ if (DEBUG) {
     get autoland() { return autoland; }, autolandPrompt, engageAutoland, finishCarrierTrap, getMusicCtx, get hudPrompt() { return hud.promptText; }, get debrief() { return !debriefEl.hidden; },
     encodeReplay, decodeReplay, buildReplayUrl, fetchLeaderboard, submitScore, get sharedReplay() { return sharedReplay; },
     get profileSync() { return { collectPilotSnapshot, applyPilotSnapshot, exportPilotCode, importPilotCode, getSyncId, setSyncId, syncNow, pushCloudProfile, pullCloudProfile }; },
-    get training() { return training.state; }, jumpTraining: n => training.jump(n),
+    get training() { return training.state; }, jumpTraining: n => training.jump(n), geocodePlace,
     get cat() { return cat; }, get skimK() { return skimK; }, catEnter, catTick, catFire, catSnapAll, carrierDiag, enterCarrierLaunch, carrierReady,
     get scramble() { return scramble; }, get bw() { return combat.bw; }, get intrusion() { return combat.intr; },
     get inESM() { return combatSys.inESM; }, get esm() { return combatSys.esm; }, get cloudIce() { return state.cloudIce; },
@@ -6921,6 +6933,7 @@ function syncSBMenu(paused) {
     ffRow.hidden = !mission().freeFlight;
     const p = FREE_FLIGHT_PRESETS[selectedFfCity] || FREE_FLIGHT_PRESETS.TORONTO;
     document.getElementById('sbFfCityVal').textContent = p.name;
+    if (ffSearchRow) ffSearchRow.hidden = !mission().freeFlight;
   }
   document.getElementById('sbRoleVal').innerHTML = 'W2 <span class="rolePill' + (selectedRoles.w2 === 'CAP' ? ' on' : '') + '">CAP</span>' +
     '<span class="rolePill' + (selectedRoles.w2 === 'STRIKE' ? ' on' : '') + '">STRIKE</span>' +
@@ -6992,6 +7005,27 @@ for (const r of sbRows) {
   r.addEventListener('mouseenter', () => sbSetActive(sbVisibleRows().indexOf(r)));
   r.addEventListener('click', e => { e.stopPropagation(); sbSetActive(sbVisibleRows().indexOf(r)); sbConfirm(); });
 }
+
+/* ---- Free Flight: any-city / airport search ---- */
+const ffSearchRow = document.getElementById('ffSearchRow');
+const ffCityInput = document.getElementById('ffCityInput');
+for (const ev of ['mousedown', 'keydown', 'keyup', 'wheel']) ffCityInput.addEventListener(ev, e => e.stopPropagation());
+ffCityInput.addEventListener('focus', () => { uiModal = true; });
+ffCityInput.addEventListener('blur', () => { uiModal = ctrlOpen || document.getElementById('patchOverlay').classList.contains('open'); });
+async function runFfSearch() {
+  const q = ffCityInput.value.trim();
+  if (!q) return;
+  document.getElementById('sbDesc').textContent = 'LOCATING ' + q.toUpperCase() + '…';
+  const hit = await geocodePlace(q);
+  if (!hit) { document.getElementById('sbDesc').textContent = 'LOCATION NOT FOUND — TRY CITY NAME OR LAT,LON'; return; }
+  saveCustomPlace(hit);
+  selectedFfCity = 'CUSTOM';
+  const desc = document.getElementById('sbDesc');
+  desc.textContent = hit.desc;
+  if (DEBUG) console.log('[ANGELS_ZERO] geocode', q, hit.lat, hit.lon, hit.name);
+}
+document.getElementById('ffCityGo').addEventListener('click', e => { e.stopPropagation(); runFfSearch(); });
+ffCityInput.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); runFfSearch(); } });
 for (const [id, legacy] of [['sbCamOrbit', camOrbitBtn], ['sbCamCockpit', camCockpitBtn]]) {
   document.getElementById(id).addEventListener('click', e => { e.stopPropagation(); legacy.click(); syncSBCam(); });
 }
