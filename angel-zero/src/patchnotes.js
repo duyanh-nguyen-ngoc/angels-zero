@@ -3,6 +3,10 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.74', title: 'HEADLESS CI SMOKE TESTS', bullets: [
+    'A zero-dependency Playwright smoke suite now boots the real game in headless Chromium and checks menu boot, every mission, the F-22A camera cycle, wingman physics, ace BFM, warp telemetry and the debrief screen before each deploy.',
+    'Every push and pull request to main runs the suite as a GitHub Action, catching JS exceptions, failed asset requests, WebGL errors and NaN flight state automatically.'
+  ] },
   { version: 'v1.1.73', title: 'YOUTUBE MUSIC PLAYER', bullets: [
     'The bundled scenario soundtrack is gone. Music now streams from a YouTube / YouTube Music playlist you pick, so the game ships ~10 MB smaller and the score is always yours to choose.',
     'Paste any playlist or video URL into the new [▾] playlist panel, or use the quick presets and RESET DEFAULT. Your choice is remembered between sessions.',

@@ -148,6 +148,17 @@ No build step or dependencies needed—just serve `angel-zero/` over HTTP:
 - **macOS / Linux:** `chmod +x launch.sh && ./launch.sh`
 - **Manual (Python 3):** `python server.py` → opens at `http://127.0.0.1:8090/`
 
+## Testing / CI
+
+A zero-dependency Playwright smoke suite boots the real game in headless Chromium (SwiftShader) and checks menu boot, all six missions, the F-22A 3-way camera cycle, wingman BTT, ace BFM, warp telemetry and the debrief screen for JS exceptions, 4xx/failed local asset requests, WebGL errors and `NaN` state:
+
+```sh
+npm i --no-save playwright && npx playwright install chromium
+node angel-zero/scripts/smoke_test.mjs
+```
+
+The same suite runs automatically as the **Smoke Test** GitHub Action on every push and pull request to `main`, alongside **Deploy to Cloudflare Pages**.
+
 <details>
 <summary><strong>Repository Structure &amp; Tech Stack</strong></summary>
 
@@ -156,6 +167,7 @@ Built with **vanilla ES modules + Three.js r160**, a **Blender headless GLB pipe
 ```text
 .
 ├── .github/workflows/deploy.yml   # Cloudflare Pages deployment from angel-zero/
+│   ├── smoke.yml                  # Headless Playwright smoke suite (push + PR to main)
 ├── angel-zero/                    # Deployable game root (angels-zero.pages.dev)
 │   ├── index.html                 # Orchestrator: WebGL2, 6-DOF + PSM physics, STANDBY & Debrief UI
 │   ├── src/                       # 31 vanilla ES modules (hud, cockpit3d, cockpit_f22, combat, ytmusic, freeflight, vfx, nvg, ...)

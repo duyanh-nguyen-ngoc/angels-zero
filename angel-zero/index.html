@@ -746,38 +746,38 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s9ei';
-import { createAmbient } from './src/ambient.js?v=s9ei';
-import { createBlastFX } from './src/blastfx.js?v=s9ei';
-import { createHUD } from './src/hud.js?v=s9ei';
-import { createCockpit3D } from './src/cockpit3d.js?v=s9ei';
-import { createCockpitF22 } from './src/cockpit_f22.js?v=s9ei';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9ei';
-import { createEjection } from './src/eject.js?v=s9ei';
-import { createAudio } from './src/audio.js?v=s9ei';
-import { createYouTubeMusic } from './src/ytmusic.js?v=s9ei';
-import { createRadio } from './src/radio.js?v=s9ei';
-import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9ei';
-import { createLivery } from './src/livery.js?v=s9ei';
-import { createGear, GEAR_H, GEAR_PTS, GEAR_UNITS, setGearPoints } from './src/gear.js?v=s9ei';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9ei';
-import { createCanopyFX } from './src/canopy.js?v=s9ei';
-import { createNVG } from './src/nvg.js?v=s9ei';
-import { createWorld, WORLD } from './src/world.js?v=s9ei';
-import { createSurfaces } from './src/surfaces.js?v=s9ei';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9ei';
-import { createFreeLook } from './src/freelook.js?v=s9ei';
-import { createCanopyGlass } from './src/canopyglass.js?v=s9ei';
-import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9ei';
-import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9ei';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9ei';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9ei';
-import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9ei';
-import { createRadioQueue } from './src/radioQueue.js?v=s9ei';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9ei';
+import { createVFX } from './src/vfx.js?v=s9ej';
+import { createAmbient } from './src/ambient.js?v=s9ej';
+import { createBlastFX } from './src/blastfx.js?v=s9ej';
+import { createHUD } from './src/hud.js?v=s9ej';
+import { createCockpit3D } from './src/cockpit3d.js?v=s9ej';
+import { createCockpitF22 } from './src/cockpit_f22.js?v=s9ej';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9ej';
+import { createEjection } from './src/eject.js?v=s9ej';
+import { createAudio } from './src/audio.js?v=s9ej';
+import { createYouTubeMusic } from './src/ytmusic.js?v=s9ej';
+import { createRadio } from './src/radio.js?v=s9ej';
+import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9ej';
+import { createLivery } from './src/livery.js?v=s9ej';
+import { createGear, GEAR_H, GEAR_PTS, GEAR_UNITS, setGearPoints } from './src/gear.js?v=s9ej';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9ej';
+import { createCanopyFX } from './src/canopy.js?v=s9ej';
+import { createNVG } from './src/nvg.js?v=s9ej';
+import { createWorld, WORLD } from './src/world.js?v=s9ej';
+import { createSurfaces } from './src/surfaces.js?v=s9ej';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9ej';
+import { createFreeLook } from './src/freelook.js?v=s9ej';
+import { createCanopyGlass } from './src/canopyglass.js?v=s9ej';
+import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9ej';
+import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9ej';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9ej';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9ej';
+import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9ej';
+import { createRadioQueue } from './src/radioQueue.js?v=s9ej';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9ej';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
-  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9ei';
-import { createFreeFlight, FREE_FLIGHT_PRESETS, loadFreeFlightCity, saveFreeFlightCity } from './src/freeflight.js?v=s9ei';
+  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9ej';
+import { createFreeFlight, FREE_FLIGHT_PRESETS, loadFreeFlightCity, saveFreeFlightCity } from './src/freeflight.js?v=s9ej';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -1615,6 +1615,8 @@ function setView(mode) {
    cockpit x screen vs the NVG half-float target. Step 1 hands all unique states
    to renderer.compileAsync; step 2 renders each state once without gl.finish(). */
 const gpuWarm = { done: false, pending: null, ms: 0, programs: 0 };
+// Headless smoke tests skip the multi-second software-GL shader recompile on every load.
+const NO_WARM = DEBUG && Q.has('nowarm');
 let carrierLoadPromise = Promise.resolve();       // started after shader warmup so it never contends with compile
 const WARM_STATES = [[false, false], [true, false], [true, true]];
 const _warmEye = new THREE.Vector3();
@@ -1632,6 +1634,7 @@ function applyWarmState(fp, nv) {
   blast.warm(true);                                    // detonation pools (fire / smoke / sparks / debris / foam)
 }
 function warmupGPUAsync() {
+  if (NO_WARM) { gpuWarm.done = true; gpuWarm.pending = Promise.resolve(); return gpuWarm.pending; }
   if (gpuWarm.done || gpuWarm.pending || !renderer.compileAsync) return gpuWarm.pending;
   const cm0 = camMode, nv0 = nvg.active, t0 = performance.now(), jobs = [];
   for (const [fp, nv] of WARM_STATES) {
@@ -1648,6 +1651,7 @@ function warmupGPUAsync() {
   return gpuWarm.pending;
 }
 function warmupGPUSync() {
+  if (NO_WARM) { gpuWarm.done = true; gpuWarm.pending = Promise.resolve(); return; }
   if (gpuWarm.done) return;
   const cm0 = camMode, nv0 = nvg.active, t0 = performance.now();
   for (const [fp, nv] of WARM_STATES) { applyWarmState(fp, nv); nvg.render(scene, camera, simTime, fp); }
@@ -6513,6 +6517,7 @@ if (DEBUG) {
     killDrone: (i, how) => combatSys.killDrone(i, how), get swarm() { return combat.swarm; },
     get model() { return model; }, get ready() { return modelReady; },
     get missionId() { return missionId; }, get mission() { return mission(); }, cycleMission, loadMissionScene, startSortie, launchSortie,
+    setMission: id => { if (!MISSIONS[id]) return false; missionId = id; return startSortie(); },
     get surfaces() { return surfaces; }, get aircraft() { return AC.id; }, get aircraftStats() { return AC; }, get gearPts() { return GEAR_PTS; },
     get reactive() { return { ...audio.reactive, log: RX_LOG ? RX_LOG.slice(-30) : [] }; }, rxFire, sayText, rxTelemetry,
     get autoland() { return autoland; }, autolandPrompt, engageAutoland, finishCarrierTrap, getMusicCtx, get hudPrompt() { return hud.promptText; }, get debrief() { return !debriefEl.hidden; },
