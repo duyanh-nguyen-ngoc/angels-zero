@@ -5400,7 +5400,10 @@ export function createCombat(THREE, env) {
       a.len = CARRIER_LEN; a.glb = true; a.glbMounted = true; a.spin = null;
       root.updateMatrixWorld(true);                         // final ready condition
       mountJbd(a);
-      placeAllyLights(glb, glb.scale.y, a.deckLocalY);
+      // Deck-edge lights live in root space (bow -Z, beam X, sea-level origin): the GLB
+      // is rotated 90 deg at mount, so GLB-local coordinates would put them across the
+      // beam over the sea.
+      placeAllyLights(root, 1, CARRIER_DECK_ASL);
       if (old) {
         old.traverse(o => { if (o.isMesh) o.visible = false; });  // procedural hull hidden forever
         scene.remove(old);

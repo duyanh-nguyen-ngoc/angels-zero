@@ -19,6 +19,8 @@ export function createCockpit3D(THREE, env) {
   const FONT = "'Share Tech Mono', 'Consolas', monospace";
   const STENCIL = "'Arial Narrow', 'Arial', sans-serif";
   const PITCH_BASE = -15 * D2R;                      // eye line over the nose; frames the main panel and the HOTAS grips
+  const EMISSIVE_LIFT = 1.35;                        // HDR gain on unlit instrument / CRT / UFC / caution faces (storm pass 2)
+  const HUD_GLASS_GLOW = 0.22;                       // combiner self-glow (0 under NVG)
   const MFD_PAGES = ['TACTICAL RADAR', 'STORES & DMG', 'RWR THREAT SCOPE'];
   const MFD_PLANFORM = [
     [0, -1], [0.05, -0.86], [0.09, -0.62], [0.11, -0.42], [0.20, -0.30], [0.21, -0.08],
@@ -405,8 +407,13 @@ export function createCockpit3D(THREE, env) {
     for (let i = 0; i < uv.count; i++) uv.setXY(i, (col + uv.getX(i)) / n, 1 - (row + 1 - uv.getY(i)) / n);
     return geo;
   };
+  // Storm Realism Pass 2: instrument faces / CRTs are lifted into HDR (x EMISSIVE_LIFT) so
+  // white needles, numerals and MFD symbology cross the 0.88 bloom knee and glow softly
+  // against a dark storm cockpit, while the black dial faces stay black (pure contrast).
+  gaugeAtlas.t.anisotropy = 8; dispAtlas.t.anisotropy = 8;
   const gaugeMat = new THREE.MeshBasicMaterial({ map: gaugeAtlas.t, toneMapped: false });
   const dispMat = new THREE.MeshBasicMaterial({ map: dispAtlas.t, toneMapped: false });
+  gaugeMat.color.setScalar(EMISSIVE_LIFT); dispMat.color.setScalar(EMISSIVE_LIFT * 1.1);
   const bezelRing = (x, y, r, depth = 0.012) => {
     const ring = new THREE.Mesh(new THREE.TorusGeometry(r * 1.05, r * 0.08 + 0.002, 8, 40), bezelMat2); onFace(ring, x, y, 0.004);
     const sheen = new THREE.Mesh(new THREE.CircleGeometry(r, 32), glassSheen); onFace(sheen, x, y, 0.006);
@@ -451,7 +458,7 @@ export function createCockpit3D(THREE, env) {
   });
   const adiOuter = new THREE.Group(), adiInner = new THREE.Group();
   adiOuter.position.set(ADI[0], ADI[1], FACE_Z - 0.026); panel.add(adiOuter); adiOuter.add(adiInner);
-  const adiMat = new THREE.MeshStandardMaterial({ map: adiTex.t, roughness: 0.35, metalness: 0.05, emissive: 0xffffff, emissiveMap: adiTex.t, emissiveIntensity: 0.45 });   // internally lit ball
+  const adiMat = new THREE.MeshStandardMaterial({ map: adiTex.t, roughness: 0.35, metalness: 0.05, emissive: 0xffffff, emissiveMap: adiTex.t, emissiveIntensity: 0.6 });   // internally lit ball (0.45 -> 0.6, storm pass 2)
   adiInner.add(new THREE.Mesh(new THREE.SphereGeometry(ADI[2] * 1.12, 48, 24), adiMat));
   bezelRing(ADI[0], ADI[1], ADI[2]);
   { // fixed orange aircraft symbol + bank pointer over the ball
@@ -513,6 +520,7 @@ export function createCockpit3D(THREE, env) {
   // UFC live digits (channel / mission clock) on a small LED strip.
   const ufcLED = screenTex(512, 64);
   const ufcMat = new THREE.MeshBasicMaterial({ map: ufcLED.t, toneMapped: false });
+  ufcMat.color.setScalar(EMISSIVE_LIFT);
   onFace(new THREE.Mesh(new THREE.PlaneGeometry(0.12, 0.015), ufcMat), 0.07, 0.164, 0.001);
 
   /* =================================================================
@@ -524,6 +532,7 @@ export function createCockpit3D(THREE, env) {
     'R FUEL\nPRESS', 'STORES\nCONFIG', 'DC\nOVERLOAD', 'HOOK', 'OVERHEAT', 'NUCLEAR', 'OXY\nLOW', 'EEC', 'FWD\nFUEL LOW', 'CABIN\nPRESS', 'BUC', 'AFT\nFUEL LOW', 'ATF NOT\nENGAGED', 'OVER G', 'LOW\nALT'];
   const caution = screenTex(384, 1024);
   const cautionMat2 = new THREE.MeshBasicMaterial({ map: caution.t, toneMapped: false });
+  cautionMat2.color.setScalar(EMISSIVE_LIFT);
   { const g = new THREE.Group(); g.position.set(0.535, -0.5, -0.47); g.rotation.set(0.25, -0.62, 0); rig.add(g);
     add(new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.32, 0.03), consoleMat), g);
     const m = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 0.30), cautionMat2); m.position.z = 0.0155; g.add(m);
@@ -596,10 +605,14 @@ export function createCockpit3D(THREE, env) {
   {
     const p = glassGeo.attributes.position; for (let i = 0; i < p.count; i++) p.setZ(i, bendZ(p.getX(i))); glassGeo.computeVertexNormals();
   }
-  const glass = new THREE.Mesh(glassGeo, new THREE.MeshPhysicalMaterial({
-    color: 0x9fffe4, transparent: true, opacity: 0.14, roughness: 0.04, metalness: 0, clearcoat: 0.4, clearcoatRoughness: 0.04,
-    envMap: envTex, envMapIntensity: 0.18, side: THREE.DoubleSide, depthWrite: false
-  }));
+  // Combiner: slightly thinner tint (0.14 -> 0.11) so the symbology behind it stays crisp,
+  // plus a faint green self-glow so the glass reads as a lit optic in a dark storm cockpit.
+  const hudGlassMat = new THREE.MeshPhysicalMaterial({
+    color: 0x9fffe4, transparent: true, opacity: 0.11, roughness: 0.04, metalness: 0, clearcoat: 0.4, clearcoatRoughness: 0.04,
+    envMap: envTex, envMapIntensity: 0.18, side: THREE.DoubleSide, depthWrite: false,
+    emissive: 0x0b3324, emissiveIntensity: HUD_GLASS_GLOW
+  });
+  const glass = new THREE.Mesh(glassGeo, hudGlassMat);
   glass.renderOrder = 6; rig.add(glass);
   // Faint view-angle Fresnel sheen only (no edge glow).
   const rim = new THREE.Mesh(glassGeo, new THREE.ShaderMaterial({
@@ -618,7 +631,7 @@ export function createCockpit3D(THREE, env) {
       void main() {
         #include <logdepthbuf_fragment>
         float fres = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 4.0);
-        gl_FragColor = vec4(uCol, clamp(fres * 0.10, 0.0, 1.0));
+        gl_FragColor = vec4(uCol, clamp(fres * 0.16, 0.0, 1.0));
       }`,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide
   }));
@@ -1154,10 +1167,13 @@ export function createCockpit3D(THREE, env) {
   let nvgDim = 1;
   function setNVG(on) {
     nvgDim = on ? 0.16 : 1;
-    for (const m of [gaugeMat, dispMat, ufcMat, cautionMat2, adiMat]) m.color.setScalar(on ? 0.16 : 1);
+    for (const m of [gaugeMat, ufcMat, cautionMat2]) m.color.setScalar(on ? 0.16 : EMISSIVE_LIFT);
+    dispMat.color.setScalar(on ? 0.16 : EMISSIVE_LIFT * 1.1);
+    adiMat.color.setScalar(on ? 0.16 : 1);
+    hudGlassMat.emissiveIntensity = on ? 0 : HUD_GLASS_GLOW;
     knobMat.color.set(on ? 0x39424a : 0xa9bccb); toggleMat.color.set(on ? 0x555a5f : 0xd6dadf);
     glassSheen.visible = !on;                         // env-map glints would bloom under the tube gain
-    adiMat.emissiveIntensity = on ? 0.06 : 0.45;
+    adiMat.emissiveIntensity = on ? 0.06 : 0.6;
   }
   function updateLamps(now) {
     const flash = Math.floor(now * 2.5) % 2 === 0, set = (m, on, k = 2.4) => { m.emissiveIntensity = on ? k * nvgDim : 0; };
