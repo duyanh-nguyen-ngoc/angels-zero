@@ -23,7 +23,7 @@ export function saveFreeFlightCity(id) {
 }
 
 const ZOOM = 13;
-const GRID_N = 33;          // 33x33 elevation samples per z=13 tile
+const GRID_N = 49;          // 49x49 elevation samples per z=13 tile for crisp alpine/coastal relief
 const RING_RADIUS = 2;      // 5x5 tile ring around player
 const REBASE_DIST = 25000;  // rebase local tangent origin when > 25km from (0,0)
 const MAX_BLDG_TRIS = 60000;
@@ -335,16 +335,32 @@ function triangulate2D(flatXZ) {
 }
 
 // ─── COLOR & FACADE TEXTURE HELPERS ─────────────────────────────────────────
-const PALETTE = [
-  [0.72, 0.74, 0.78],
-  [0.62, 0.68, 0.76],
-  [0.78, 0.75, 0.70],
-  [0.54, 0.60, 0.68],
-  [0.82, 0.80, 0.76],
-  [0.58, 0.62, 0.66],
+const HIGHRISE_PALETTE = [
+  [0.58, 0.72, 0.86], // ice-blue curtain glass
+  [0.48, 0.61, 0.76], // sapphire steel tower
+  [0.75, 0.80, 0.86], // silver-platinum glass
+  [0.77, 0.73, 0.66], // champagne-bronze tower
+  [0.50, 0.67, 0.72], // seafoam-teal skyscraper
+  [0.64, 0.69, 0.76], // cool slate corporate
+];
+const MIDRISE_PALETTE = [
+  [0.80, 0.77, 0.71], // limestone
+  [0.68, 0.71, 0.76], // architectural concrete
+  [0.75, 0.67, 0.60], // warm sandstone
+  [0.61, 0.66, 0.71], // blue-slate midrise
+  [0.83, 0.80, 0.75], // cream precast
+  [0.69, 0.64, 0.61], // taupe masonry
+];
+const LOWRISE_PALETTE = [
+  [0.82, 0.79, 0.74], // warm stucco
+  [0.75, 0.63, 0.56], // brick / terracotta
+  [0.71, 0.73, 0.75], // light urban grey
+  [0.78, 0.73, 0.66], // sandstone rowhouse
+  [0.66, 0.68, 0.70], // slate residential
+  [0.85, 0.82, 0.77], // chalk limestone
 ];
 
-function parseColorRGB(hex, seed) {
+function parseColorRGB(hex, seed, height = 20) {
   if (hex && hex[0] === '#' && hex.length === 7) {
     const r = parseInt(hex.slice(1, 3), 16);
     const g = parseInt(hex.slice(3, 5), 16);
@@ -353,54 +369,146 @@ function parseColorRGB(hex, seed) {
       return [r / 255, g / 255, b / 255];
     }
   }
-  return PALETTE[Math.abs(Math.floor(seed)) % PALETTE.length];
+  const idx = Math.abs(Math.floor(seed * 97.31)) % 6;
+  if (height >= 72) return HIGHRISE_PALETTE[idx];
+  if (height >= 26) return MIDRISE_PALETTE[idx];
+  return LOWRISE_PALETTE[idx];
 }
 
 function createFacadeTexture(THREE) {
   const c = document.createElement('canvas');
-  c.width = 256;
-  c.height = 256;
+  c.width = 512;
+  c.height = 512;
   const ctx = c.getContext('2d');
-  // Base wall grey
-  ctx.fillStyle = '#c8cdd4';
-  ctx.fillRect(0, 0, 256, 224);
-  // Window grid (top 7/8 of texture)
-  const cols = 8, rows = 7;
-  const cw = 256 / cols, rh = 224 / rows;
+
+  // Seamless 16-floor x 16-bay architectural curtain-wall & masonry grid
+  ctx.fillStyle = '#bcc3cc';
+  ctx.fillRect(0, 0, 512, 512);
+
+  const cols = 16, rows = 16;
+  const cw = 512 / cols, rh = 512 / rows;
   for (let r = 0; r < rows; r++) {
+    const y0 = r * rh;
+    // Spandrel floor slab + subtle lintel shadow
+    ctx.fillStyle = (r % 4 === 0) ? '#8e97a3' : '#9da6b2';
+    ctx.fillRect(0, y0, 512, 6);
+    ctx.fillStyle = '#cdd3db';
+    ctx.fillRect(0, y0 + 6, 512, 2);
+
+    // Coherent lit-office floor streaks mixed with individual rooms
+    const floorBand = ((r * 37 + 11) % 17) < 5;
     for (let col = 0; col < cols; col++) {
-      const lit = ((r * 7 + col * 13) % 11) < 3;
-      ctx.fillStyle = lit ? '#e9d8a6' : '#435060';
-      ctx.fillRect(col * cw + 5, r * rh + 5, cw - 10, rh - 10);
+      const x0 = col * cw;
+      // Vertical mullion / pilaster highlight
+      ctx.fillStyle = (col % 4 === 0) ? '#aeb6c1' : '#c0c7d0';
+      ctx.fillRect(x0, y0 + 6, cw, rh - 6);
+
+      const h = (r * 31 + col * 17 + ((r ^ col) * 13)) % 29;
+      const warmLit = (floorBand && h < 14) || h < 5;
+      const coolLit = !warmLit && h >= 5 && h < 8;
+
+      if (warmLit) {
+        const g = ctx.createLinearGradient(0, y0 + 8, 0, y0 + rh - 3);
+        g.addColorStop(0, '#fff0c2');
+        g.addColorStop(1, '#e6be74');
+        ctx.fillStyle = g;
+      } else if (coolLit) {
+        ctx.fillStyle = '#9ec0d8';
+      } else {
+        const g = ctx.createLinearGradient(0, y0 + 8, 0, y0 + rh - 3);
+        g.addColorStop(0, '#3a4b5e');
+        g.addColorStop(0.55, '#283646');
+        g.addColorStop(1, '#44576c');
+        ctx.fillStyle = g;
+      }
+      ctx.fillRect(x0 + 3, y0 + 8, cw - 6, rh - 10);
+
+      // Subtle interior blind / mullion split
+      ctx.fillStyle = 'rgba(18, 26, 36, 0.28)';
+      ctx.fillRect(x0 + (cw >> 1), y0 + 8, 1, rh - 10);
     }
   }
-  // Solid roof band (bottom 1/8 of texture, v = 0.0..0.125 in Three.js bottom-up)
-  ctx.fillStyle = '#aeb4bc';
-  ctx.fillRect(0, 224, 256, 32);
 
   const tex = new THREE.CanvasTexture(c);
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
+  tex.anisotropy = 8;
   return tex;
 }
 
 // ─── MAIN FREE FLIGHT SYSTEM ────────────────────────────────────────────────
-export function createFreeFlight(THREE, scene) {
+export function createFreeFlight(THREE, scene, envTex = null) {
   const root = new THREE.Group();
   root.name = 'freeFlightRoot';
   root.visible = false;
   scene.add(root);
 
   const facadeTex = createFacadeTexture(THREE);
-  const bldgMat = new THREE.MeshLambertMaterial({
+  const bldgMat = new THREE.MeshStandardMaterial({
     map: facadeTex,
     vertexColors: true,
+    roughness: 0.44,
+    metalness: 0.22,
+    envMap: envTex,
+    envMapIntensity: 0.85,
     side: THREE.FrontSide,
   });
-  const placeholderGroundMat = new THREE.MeshLambertMaterial({
+  bldgMat.customProgramCacheKey = () => 'az-ff-bldg-v2';
+  bldgMat.onBeforeCompile = (sh) => {
+    sh.fragmentShader = sh.fragmentShader.replace(
+      '#include <map_fragment>',
+      `
+      float azIsRoof = step(vMapUv.x, -0.5);
+      float azWindowGlow = 0.0;
+      float azGlassPane = 0.0;
+      if (azIsRoof > 0.5) {
+        diffuseColor.rgb *= 0.88;
+      } else {
+        vec4 sampledDiffuseColor = texture2D( map, vMapUv );
+        diffuseColor *= sampledDiffuseColor;
+        azWindowGlow = smoothstep(0.62, 0.88, sampledDiffuseColor.r) * step(sampledDiffuseColor.b * 1.06, sampledDiffuseColor.r);
+        azGlassPane = step(sampledDiffuseColor.r * 1.08, sampledDiffuseColor.b) * (1.0 - smoothstep(0.18, 0.42, sampledDiffuseColor.g));
+      }
+      `
+    ).replace(
+      '#include <roughnessmap_fragment>',
+      `
+      #include <roughnessmap_fragment>
+      roughnessFactor = azIsRoof > 0.5 ? 0.86 : mix(0.68, 0.16, azGlassPane);
+      `
+    ).replace(
+      '#include <emissivemap_fragment>',
+      `
+      #include <emissivemap_fragment>
+      totalEmissiveRadiance += vec3(1.0, 0.82, 0.48) * (azWindowGlow * 0.34);
+      `
+    );
+  };
+
+  const applySatWaterShader = (mat) => {
+    mat.customProgramCacheKey = () => 'az-ff-sat-v2';
+    mat.onBeforeCompile = (sh) => {
+      sh.fragmentShader = sh.fragmentShader.replace(
+        '#include <roughnessmap_fragment>',
+        `
+        #include <roughnessmap_fragment>
+        float azLuma = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+        float azBlueDom = smoothstep(0.004, 0.032, diffuseColor.b - diffuseColor.r * 1.04)
+                        * smoothstep(-0.008, 0.022, diffuseColor.g - diffuseColor.r * 0.92);
+        float azWaterK = azBlueDom * (1.0 - smoothstep(0.14, 0.28, azLuma));
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.84, 1.02, 1.18) + vec3(0.003, 0.012, 0.024), azWaterK * 0.75);
+        roughnessFactor = mix(roughnessFactor, 0.17, azWaterK);
+        `
+      );
+    };
+    return mat;
+  };
+
+  const placeholderGroundMat = new THREE.MeshStandardMaterial({
     color: 0x3b4840,
+    roughness: 0.9,
+    metalness: 0.02,
     polygonOffset: true,
     polygonOffsetFactor: 2,
     polygonOffsetUnits: 2,
@@ -580,11 +688,19 @@ export function createFreeFlight(THREE, scene) {
         const wallH = yTop - yBot;
         if (wallH < 1) continue;
 
-        const [cr, cg, cb] = parseColorRGB(feat.colour, cx * 0.13 + cz * 0.07);
+        const [cr, cg, cb] = parseColorRGB(feat.colour, cx * 0.13 + cz * 0.07, feat.height);
         const roofTris = triangulate2D(flatXZ);
         const wallTrisNeeded = nPts * 2;
         const roofTrisNeeded = (roofTris.length / 3) | 0;
         if (triCount + wallTrisNeeded + roofTrisNeeded > MAX_BLDG_TRIS) continue;
+
+        const bayW = feat.height >= 72 ? 64 : 52;
+        const bayH = feat.height >= 72 ? 58 : 54;
+        const uOff = ((Math.abs(Math.floor(cx * 3.7 + cz * 2.3)) % 16) / 16);
+        const vOff = ((Math.abs(Math.floor(cx * 1.9 - cz * 4.1)) % 16) / 16);
+        const botAO = 0.66, topAO = 1.04;
+        const br = cr * botAO, bg = cg * botAO, bb = cb * botAO;
+        const tr = Math.min(1, cr * topAO), tg = Math.min(1, cg * topAO), tb = Math.min(1, cb * topAO);
 
       // Walls
       for (let i = 0; i < nPts; i++) {
@@ -601,29 +717,25 @@ export function createFreeFlight(THREE, scene) {
         const nl = Math.hypot(nx, nz) || 1;
         nx /= nl; nz /= nl;
 
-        const u1 = edgeLen / 18;
-        const vTop = 0.14 + Math.max(0.125, Math.min(3.5, wallH / 16)) * 0.85;
-        const vBot = 0.14;
+        const u0 = uOff, u1 = uOff + Math.max(0.125, edgeLen / bayW);
+        const vBot = vOff, vTop = vOff + Math.max(0.0625, wallH / bayH);
 
-        // Two triangles (CCW outward)
+        // Two triangles (CCW outward) with street-level AO gradient
         if (!flip) {
           pos.push(ax, yBot, az, bx, yBot, bz, bx, yTop, bz);
           pos.push(ax, yBot, az, bx, yTop, bz, ax, yTop, az);
-          uv.push(0, vBot, u1, vBot, u1, vTop, 0, vBot, u1, vTop, 0, vTop);
         } else {
           pos.push(bx, yBot, bz, ax, yBot, az, ax, yTop, az);
           pos.push(bx, yBot, bz, ax, yTop, az, bx, yTop, bz);
-          uv.push(0, vBot, u1, vBot, u1, vTop, 0, vBot, u1, vTop, 0, vTop);
         }
-        for (let k = 0; k < 6; k++) {
-          norm.push(nx, 0, nz);
-          col.push(cr, cg, cb);
-        }
+        uv.push(u0, vBot, u1, vBot, u1, vTop, u0, vBot, u1, vTop, u0, vTop);
+        col.push(br, bg, bb, br, bg, bb, tr, tg, tb, br, bg, bb, tr, tg, tb, tr, tg, tb);
+        for (let k = 0; k < 6; k++) norm.push(nx, 0, nz);
         triCount += 2;
       }
 
       // Roof (triangulate2D returns CCW in (x, z); in Three.js +Y up, (a, c, b) faces +Y)
-      const rShade = 0.92;
+      const rShade = feat.height >= 72 ? 0.84 : 0.90;
       for (let t = 0; t + 2 < roofTris.length; t += 3) {
         const i0 = roofTris[t], i1 = roofTris[t + 1], i2 = roofTris[t + 2];
         pos.push(
@@ -633,7 +745,7 @@ export function createFreeFlight(THREE, scene) {
         );
         for (let k = 0; k < 3; k++) {
           norm.push(0, 1, 0);
-          uv.push(0.05, 0.05); // solid roof band at bottom of texture
+          uv.push(-1, -1); // sentinel for matte gravel/concrete rooftop in bldgMat shader
           col.push(cr * rShade, cg * rShade, cb * rShade);
         }
         triCount += 1;
@@ -706,12 +818,16 @@ export function createFreeFlight(THREE, scene) {
           tex.wrapT = THREE.ClampToEdgeWrapping;
           tex.needsUpdate = true;
           tile.satTex = tex;
-          tile.satMat = new THREE.MeshLambertMaterial({
+          tile.satMat = applySatWaterShader(new THREE.MeshStandardMaterial({
             map: tex,
+            roughness: 0.88,
+            metalness: 0.04,
+            envMap: envTex,
+            envMapIntensity: 0.48,
             polygonOffset: true,
             polygonOffsetFactor: 2,
             polygonOffsetUnits: 2,
-          });
+          }));
           if (tile.groundMesh) tile.groundMesh.material = tile.satMat;
         })
         .catch(() => {});
@@ -816,7 +932,11 @@ export function createFreeFlight(THREE, scene) {
   }
 
   // ─── PARAMETRIC 3D LANDMARKS ──────────────────────────────────────────────
+  const landmarkAnchors = [];
+
   function clearLandmarks() {
+    landmarkAnchors.length = 0;
+    landmarksGroup.position.set(0, 0, 0);
     while (landmarksGroup.children.length > 0) {
       const ch = landmarksGroup.children[0];
       ch.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
@@ -824,72 +944,189 @@ export function createFreeFlight(THREE, scene) {
     }
   }
 
+  function syncLandmarkElevations() {
+    for (let i = 0; i < landmarkAnchors.length; i++) {
+      const lm = landmarkAnchors[i];
+      if (lm.snapped || lm.seaLevel) continue;
+      const wx = landmarksGroup.position.x + lm.group.position.x;
+      const wz = landmarksGroup.position.z + lm.group.position.z;
+      const { lat, lon } = xzToLatLon(wx, wz);
+      const { tx, ty } = latLonToTileF(lat, lon, ZOOM);
+      const tile = tiles.get(`${Math.floor(tx)},${Math.floor(ty)}`);
+      if (tile && tile.elevGrid) {
+        const lx = wx - tile.group.position.x;
+        const lz = wz - tile.group.position.z;
+        lm.group.position.y = Math.max(0, sampleTileHeight(tile, lx, lz) - 2);
+        lm.snapped = true;
+      }
+    }
+  }
+
   function buildLandmarks() {
     clearLandmarks();
-    const concreteMat = new THREE.MeshLambertMaterial({ color: 0xd0d4dc });
-    const glassMat = new THREE.MeshLambertMaterial({ color: 0x7da4c4 });
-    const spireMat = new THREE.MeshLambertMaterial({ color: 0xe8ecf0 });
+    const concreteMat = new THREE.MeshStandardMaterial({ color: 0xd4d8e0, roughness: 0.72, metalness: 0.08, envMap: envTex, envMapIntensity: 0.5 });
+    const limestoneMat = new THREE.MeshStandardMaterial({ color: 0xdad2c4, roughness: 0.76, metalness: 0.06, envMap: envTex, envMapIntensity: 0.45 });
+    const glassMat = new THREE.MeshStandardMaterial({ color: 0x6f9ec4, roughness: 0.18, metalness: 0.55, envMap: envTex, envMapIntensity: 1.1 });
+    const spireMat = new THREE.MeshStandardMaterial({ color: 0xeaeef4, roughness: 0.35, metalness: 0.45, envMap: envTex, envMapIntensity: 0.9 });
+    const ggOrangeMat = new THREE.MeshStandardMaterial({ color: 0xc0362c, roughness: 0.52, metalness: 0.28, envMap: envTex, envMapIntensity: 0.65 });
+    const tokyoRedMat = new THREE.MeshStandardMaterial({ color: 0xd93829, roughness: 0.48, metalness: 0.30, envMap: envTex, envMapIntensity: 0.65 });
+    const darkDeckMat = new THREE.MeshStandardMaterial({ color: 0x383e46, roughness: 0.82, metalness: 0.15 });
+    const beaconMat = new THREE.MeshBasicMaterial({ color: 0xff3b30 });
 
-    const placeLandmark = (lat, lon, builder) => {
+    const placeLandmark = (lat, lon, baseElev, seaLevel, builder) => {
       const { x, z } = latLonToXZ(lat, lon);
       if (Math.hypot(x, z) > 35000) return;
       const g = new THREE.Group();
-      g.position.set(x, 0, z);
+      g.position.set(x, seaLevel ? 0 : baseElev, z);
       builder(g);
       landmarksGroup.add(g);
+      landmarkAnchors.push({ group: g, seaLevel: !!seaLevel, snapped: false });
     };
 
-    // CN Tower (Toronto) — 553m
-    placeLandmark(43.642566, -79.387057, (g) => {
-      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(7, 22, 345, 9), concreteMat);
-      shaft.position.y = 172.5;
-      g.add(shaft);
-      const pod = new THREE.Mesh(new THREE.CylinderGeometry(24, 20, 26, 16), glassMat);
-      pod.position.y = 352;
-      g.add(pod);
-      const upper = new THREE.Mesh(new THREE.CylinderGeometry(3.5, 8, 90, 8), concreteMat);
-      upper.position.y = 410;
-      g.add(upper);
-      const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 2.5, 102, 6), spireMat);
-      spire.position.y = 502;
-      g.add(spire);
+    const addPart = (g, geom, mat, x, y, z, rx = 0, ry = 0, rz = 0) => {
+      const m = new THREE.Mesh(geom, mat);
+      m.position.set(x, y, z);
+      if (rx || ry || rz) m.rotation.set(rx, ry, rz);
+      g.add(m);
+      return m;
+    };
+
+    // 1. CN Tower (Toronto) — 553 m with 3 flared support fins, SkyPod & SpaceDeck
+    placeLandmark(43.642566, -79.387057, 76, false, (g) => {
+      addPart(g, new THREE.CylinderGeometry(6.5, 16, 342, 12), concreteMat, 0, 171, 0);
+      for (let k = 0; k < 3; k++) {
+        const a = (k * Math.PI * 2) / 3;
+        const fin = addPart(g, new THREE.BoxGeometry(5.5, 270, 22), concreteMat, Math.sin(a) * 10, 135, Math.cos(a) * 10, 0, a, 0);
+        fin.geometry.translate(0, 0, 4);
+      }
+      addPart(g, new THREE.CylinderGeometry(24, 15, 11, 20), concreteMat, 0, 340, 0);
+      addPart(g, new THREE.CylinderGeometry(25.5, 24, 15, 20), glassMat, 0, 353, 0);
+      addPart(g, new THREE.CylinderGeometry(18, 25.5, 9, 20), concreteMat, 0, 365, 0);
+      addPart(g, new THREE.CylinderGeometry(3.8, 7.6, 88, 10), concreteMat, 0, 412, 0);
+      addPart(g, new THREE.CylinderGeometry(7.2, 6.4, 9, 14), glassMat, 0, 447, 0);
+      addPart(g, new THREE.CylinderGeometry(0.6, 2.8, 102, 8), spireMat, 0, 502, 0);
+      addPart(g, new THREE.SphereGeometry(2.2, 8, 8), beaconMat, 0, 554, 0);
     });
 
-    // Tokyo Skytree — 634m
-    placeLandmark(35.710063, 139.810700, (g) => {
-      const base = new THREE.Mesh(new THREE.CylinderGeometry(11, 34, 350, 6), spireMat);
-      base.position.y = 175;
-      g.add(base);
-      const deck1 = new THREE.Mesh(new THREE.CylinderGeometry(20, 18, 18, 12), glassMat);
-      deck1.position.y = 350;
-      g.add(deck1);
-      const mid = new THREE.Mesh(new THREE.CylinderGeometry(6, 11, 130, 8), spireMat);
-      mid.position.y = 420;
-      g.add(mid);
-      const deck2 = new THREE.Mesh(new THREE.CylinderGeometry(13, 12, 12, 12), glassMat);
-      deck2.position.y = 450;
-      g.add(deck2);
-      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 4.5, 145, 6), spireMat);
-      mast.position.y = 561;
-      g.add(mast);
+    // 2. Rogers Centre / SkyDome (Toronto) — stadium drum + white dome adjacent to CN Tower
+    placeLandmark(43.641438, -79.389353, 76, false, (g) => {
+      addPart(g, new THREE.CylinderGeometry(104, 108, 36, 28), concreteMat, 0, 18, 0);
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(102, 28, 14, 0, Math.PI * 2, 0, Math.PI * 0.42), spireMat);
+      dome.scale.set(1, 0.52, 1);
+      dome.position.y = 34;
+      g.add(dome);
     });
 
-    // One World Trade Center (NYC) — 541m
-    placeLandmark(40.712743, -74.013379, (g) => {
-      const tower = new THREE.Mesh(new THREE.CylinderGeometry(24, 34, 417, 8), glassMat);
-      tower.position.y = 208.5;
-      g.add(tower);
-      const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 3, 124, 6), spireMat);
-      spire.position.y = 479;
-      g.add(spire);
+    // 3. Tokyo Skytree — 634 m neo-futuristic lattice silhouette
+    placeLandmark(35.710063, 139.810700, 4, false, (g) => {
+      addPart(g, new THREE.CylinderGeometry(13, 36, 346, 6), spireMat, 0, 173, 0);
+      addPart(g, new THREE.CylinderGeometry(22, 19, 20, 18), glassMat, 0, 352, 0);
+      addPart(g, new THREE.CylinderGeometry(7, 13, 96, 12), spireMat, 0, 408, 0);
+      addPart(g, new THREE.CylinderGeometry(14.5, 13.5, 13, 18), glassMat, 0, 452, 0);
+      addPart(g, new THREE.CylinderGeometry(0.9, 5.2, 176, 8), spireMat, 0, 546, 0);
+      addPart(g, new THREE.SphereGeometry(2.4, 8, 8), beaconMat, 0, 635, 0);
     });
 
-    // Transamerica Pyramid (San Francisco) — 260m
-    placeLandmark(37.795182, -122.402778, (g) => {
-      const pyr = new THREE.Mesh(new THREE.ConeGeometry(28, 260, 4), concreteMat);
-      pyr.rotation.y = Math.PI / 4;
-      pyr.position.y = 130;
-      g.add(pyr);
+    // 4. Tokyo Tower — 333 m International Orange & white lattice landmark
+    placeLandmark(35.658581, 139.745433, 18, false, (g) => {
+      const bands = [
+        [34, 46, 48, tokyoRedMat], [24, 34, 48, spireMat], [17, 24, 48, tokyoRedMat],
+        [13, 17, 46, spireMat], [9.5, 13, 46, tokyoRedMat], [5.5, 9.5, 44, spireMat], [1.2, 5.5, 53, tokyoRedMat],
+      ];
+      let y = 0;
+      for (let i = 0; i < bands.length; i++) {
+        const [rt, rb, h, mat] = bands[i];
+        addPart(g, new THREE.CylinderGeometry(rt, rb, h, 4), mat, 0, y + h * 0.5, 0, 0, Math.PI * 0.25, 0);
+        y += h;
+      }
+      addPart(g, new THREE.BoxGeometry(44, 14, 44), spireMat, 0, 125, 0);
+      addPart(g, new THREE.BoxGeometry(46, 8, 46), glassMat, 0, 126, 0);
+      addPart(g, new THREE.CylinderGeometry(13, 13, 10, 12), glassMat, 0, 225, 0);
+      addPart(g, new THREE.SphereGeometry(2.0, 8, 8), beaconMat, 0, 334, 0);
+    });
+
+    // 5. One World Trade Center (NYC) — 541 m chamfered glass tower & podium
+    placeLandmark(40.712743, -74.013379, 8, false, (g) => {
+      addPart(g, new THREE.BoxGeometry(61, 56, 61), concreteMat, 0, 28, 0);
+      addPart(g, new THREE.CylinderGeometry(23, 35, 361, 8), glassMat, 0, 236.5, 0, 0, Math.PI * 0.125, 0);
+      addPart(g, new THREE.CylinderGeometry(18, 18, 9, 16), spireMat, 0, 421, 0);
+      addPart(g, new THREE.CylinderGeometry(0.7, 3.2, 118, 8), spireMat, 0, 483, 0);
+      addPart(g, new THREE.SphereGeometry(2.2, 8, 8), beaconMat, 0, 542, 0);
+    });
+
+    // 6. Empire State Building (NYC) — 443 m Art Deco limestone setbacks & spire
+    placeLandmark(40.748441, -73.985664, 14, false, (g) => {
+      addPart(g, new THREE.BoxGeometry(118, 68, 58), limestoneMat, 0, 34, 0);
+      addPart(g, new THREE.BoxGeometry(88, 56, 48), limestoneMat, 0, 96, 0);
+      addPart(g, new THREE.BoxGeometry(62, 185, 40), limestoneMat, 0, 216.5, 0);
+      addPart(g, new THREE.BoxGeometry(46, 48, 32), limestoneMat, 0, 333, 0);
+      addPart(g, new THREE.CylinderGeometry(11, 16, 26, 12), spireMat, 0, 370, 0);
+      addPart(g, new THREE.CylinderGeometry(0.7, 3.4, 60, 8), spireMat, 0, 413, 0);
+    });
+
+    // 7. Transamerica Pyramid (San Francisco) — 260 m quartz pyramid + elevator wing shafts
+    placeLandmark(37.795182, -122.402778, 8, false, (g) => {
+      addPart(g, new THREE.ConeGeometry(31, 260, 4), spireMat, 0, 130, 0, 0, Math.PI * 0.25, 0);
+      addPart(g, new THREE.BoxGeometry(10, 155, 16), concreteMat, 15, 108, 0);
+      addPart(g, new THREE.BoxGeometry(10, 155, 16), concreteMat, -15, 108, 0);
+      addPart(g, new THREE.ConeGeometry(6.5, 36, 4), glassMat, 0, 242, 0, 0, Math.PI * 0.25, 0);
+    });
+
+    // 8. Salesforce Tower (San Francisco) — 326 m tapered glass obelisk
+    placeLandmark(37.789744, -122.397234, 7, false, (g) => {
+      addPart(g, new THREE.CylinderGeometry(20, 29, 292, 16), glassMat, 0, 146, 0);
+      addPart(g, new THREE.CylinderGeometry(16, 20, 34, 16), spireMat, 0, 309, 0);
+    });
+
+    // 9. Golden Gate Bridge (San Francisco) — 2,737 m span, twin 227 m Art Deco towers
+    placeLandmark(37.819929, -122.478255, 0, true, (g) => {
+      const bridge = new THREE.Group();
+      bridge.rotation.y = -0.14; // NNW alignment across the Golden Gate strait
+      g.add(bridge);
+      // Orthotropic roadway deck + side stiffening trusses (y = 67 m above water)
+      addPart(bridge, new THREE.BoxGeometry(28, 5.5, 2460), darkDeckMat, 0, 66, 0);
+      addPart(bridge, new THREE.BoxGeometry(30.5, 6.5, 2460), ggOrangeMat, 0, 67.5, 0);
+      // Concrete shore anchorages
+      addPart(bridge, new THREE.BoxGeometry(38, 58, 72), concreteMat, 0, 29, -1210);
+      addPart(bridge, new THREE.BoxGeometry(38, 58, 72), concreteMat, 0, 29, 1210);
+      // Twin 227 m stepped Art Deco towers at z = +/- 640 m (1,280 m main span)
+      for (const tz of [-640, 640]) {
+        addPart(bridge, new THREE.BoxGeometry(42, 18, 26), concreteMat, 0, 9, tz);
+        for (const lx of [-13.2, 13.2]) {
+          addPart(bridge, new THREE.BoxGeometry(7.2, 218, 10.5), ggOrangeMat, lx, 118, tz);
+        }
+        for (const sy of [68, 114, 158, 198, 222]) {
+          addPart(bridge, new THREE.BoxGeometry(33, 6.5, 8.5), ggOrangeMat, 0, sy, tz);
+        }
+        addPart(bridge, new THREE.SphereGeometry(2.0, 8, 8), beaconMat, -13.2, 229, tz);
+        addPart(bridge, new THREE.SphereGeometry(2.0, 8, 8), beaconMat, 13.2, 229, tz);
+      }
+      // Parabolic main suspension cables + vertical suspender ropes
+      const zPts = [];
+      for (let s = -24; s <= 24; s++) zPts.push((s / 24) * 1210);
+      for (let i = 0; i < zPts.length - 1; i++) {
+        const z0 = zPts[i], z1 = zPts[i + 1];
+        const cableY = (z) => {
+          const az = Math.abs(z);
+          if (az <= 640) {
+            const u = z / 640;
+            return 74 + 151 * u * u;
+          }
+          const u = (az - 640) / 570;
+          return 225 - 167 * Math.pow(u, 0.88);
+        };
+        const y0 = cableY(z0), y1 = cableY(z1);
+        const dz = z1 - z0, dy = y1 - y0, len = Math.hypot(dz, dy);
+        const rx = Math.atan2(dy, dz);
+        for (const cx of [-13.2, 13.2]) {
+          const seg = addPart(bridge, new THREE.BoxGeometry(1.4, 1.4, len + 1.2), ggOrangeMat, cx, (y0 + y1) * 0.5, (z0 + z1) * 0.5, -rx, 0, 0);
+          if (i % 2 === 0 && (y0 + y1) * 0.5 > 73) {
+            const hH = (y0 + y1) * 0.5 - 69;
+            addPart(bridge, new THREE.BoxGeometry(0.55, hH, 0.55), ggOrangeMat, cx, 69 + hH * 0.5, (z0 + z1) * 0.5);
+          }
+          void seg;
+        }
+      }
     });
   }
 
@@ -963,6 +1200,7 @@ export function createFreeFlight(THREE, scene) {
     for (let i = 0; i < wanted.length && inFlightCount < MAX_CONCURRENT_TILES; i++) {
       spawnTile(wanted[i].tx, wanted[i].ty, wanted[i].isInner);
     }
+    syncLandmarkElevations();
 
     return rebaseDelta;
   }

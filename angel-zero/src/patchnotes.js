@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.67', title: 'WORLD & THEATRE MAP OVERHAUL', bullets: [
+    'Archipelago & Airbase overhaul: higher-resolution terrain mesh, alpine summit snow, Main Island river & island highway network with live traffic lights, glowing volcano caldera magma & rising steam plume, USAF/ICAO runway markings with PAPI lights & static aircraft, Port City skyline, container terminal, merchant shipping, canyon stone arch, and ridge observatory.',
+    'Dedicated Naval Strait & Canyon Run theatres: Naval Battle now takes place inside a deep-water volcanic fjord strait with flanking cliffs, sea stacks, cape lighthouses, and coastal radar stations; Canyon Run adds a fortified Crater Citadel, high-span steel canyon bridges, braided riverbed streams, and clean canyon rock strata.',
+    'Upgraded Ocean, Radar & Free Flight cities: backlit wave-crest subsurface scattering, turquoise coral lagoons, dynamic per-theatre ocean depth & HUD/debrief topography maps, PBR skyscraper facades with lit golden-hour windows, specular bay/lake water, and new 3D landmarks including the Golden Gate Bridge, Empire State Building, Salesforce Tower, Tokyo Tower, and Rogers Centre.'
+  ] },
   { version: 'v1.1.66', title: 'F-22A DISPLAY ORIENTATION FIX', bullets: [
     'Fixed the F-22A cockpit displays drawing upside-down; all six screens now read the right way up.'
   ] },

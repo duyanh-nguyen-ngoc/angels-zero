@@ -10,11 +10,11 @@
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { DIFFICULTY_PRESETS } from './difficulty.js?v=s9c2';
 import { SPW } from './loadout.js?v=s9c2';
-import { missionConfig } from './missions.js?v=s9dq';
+import { missionConfig } from './missions.js?v=s9dz';
 import { gorgeCentreX, gorgeSlope, gorgeHeading, gorgeDist, GORGE_GATE_Z, GORGE_GATE_N, GORGE_FLOOR_Y, GORGE_RIM_Y,
   GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_FORT, GORGE_ARC_M, GORGE_SPAWN_Z, CEIL_M,
   GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_ZB, GORGE_SC_HALF_W, GORGE_SC_ARCH_Z, GORGE_SC_ARCH_Y0,
-  GORGE_SC_ARCH_W, GORGE_SC_SKIP, GORGE_SC_SAVE_M } from './maps.js?v=s9dq';
+  GORGE_SC_ARCH_W, GORGE_SC_SKIP, GORGE_SC_SAVE_M } from './maps.js?v=s9dz';
 
 const NM = 1852, FT = 0.3048, G0 = 9.81;
 // Allied CVN model: same 360 m deck as the procedural ship, re-anchored to the GLB.
@@ -5820,7 +5820,8 @@ export function createCombat(THREE, env) {
         }
       }
     }
-    // Friendly base air defence.
+    // Friendly base air defence (only on maps that host ARCHIPELAGO AFB).
+    if (mp && !mp.baseBldg) { if (baseTracers.list.length) baseTracers.clear(); return; }
     BASE.samCD -= dt; BASE.ciwsT -= dt;
     for (const s of BASE.sams) {
       if (BASE.samCD > 0) break;

@@ -7,7 +7,7 @@
 // list + F-15C silhouette with per-pylon AIM-9 reload icons (bottom-right),
 // open-corner target brackets, edge pointers, minimal top-left telemetry.
 import { SPW } from './loadout.js?v=s9c2';
-import { GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_FLOOR_Y } from './maps.js?v=s9c2';
+import { GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_FLOOR_Y } from './maps.js?v=s9dz';
 
 export function createHUD(THREE, A) {
   const canvas = A.canvas;
@@ -1042,35 +1042,54 @@ export function createHUD(THREE, A) {
     ctx.restore();
   }
 
-  // Island topography contour sheet, world-aligned, built once.
-  const topo = (() => {
-    const N = 384, T = A.terrain, cv = document.createElement('canvas');
+  // Theatre-aware topography contour sheet, world-aligned and lazily cached per map mode
+  // ('archipelago', 'gorge', 'strait', 'ocean') so radar & debrief match the active map.
+  const topoCache = Object.create(null);
+  function getTopo() {
+    const T = A.terrain, mode = T.getMode ? T.getMode() : 'archipelago';
+    if (topoCache[mode]) return topoCache[mode];
+    const N = 384, cv = document.createElement('canvas');
     cv.width = cv.height = N;
+    const entry = { cv, x0: T.cx - T.size / 2, z0: T.cz - T.size / 2, size: T.size };
+    if (mode === 'ocean') { topoCache[mode] = entry; return entry; }
     const h = new Float32Array(N * N);
     for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
       h[j * N + i] = T.height(T.cx + ((i + 0.5) / N - 0.5) * T.size, T.cz + ((j + 0.5) / N - 0.5) * T.size);
     }
     const ctx = cv.getContext('2d'), img = ctx.createImageData(N, N);
-    // Crisp coastline (0 m) + faint contours at 100 / 250 / 500 / 750 m.
-    const levels = [[0, 255], [100, 80], [250, 100], [500, 120], [750, 140]];
+    const levels = mode === 'gorge'
+      ? [[0, 220], [78, 235], [190, 105], [364, 255], [520, 95], [720, 145]]
+      : mode === 'strait'
+      ? [[0, 255], [120, 95], [280, 115], [460, 135], [640, 155]]
+      : [[0, 255], [100, 80], [250, 100], [500, 120], [750, 140]];
     for (let j = 0; j < N - 1; j++) for (let i = 0; i < N - 1; i++) {
       const a = h[j * N + i], b = h[j * N + i + 1], c = h[(j + 1) * N + i];
       let alpha = 0;
       for (const [lv, al] of levels) if ((a >= lv) !== (b >= lv) || (a >= lv) !== (c >= lv)) alpha = Math.max(alpha, al);
-      if (a > 0 && alpha < 26) alpha = 26;                // subtle land fill so straits / canyons read clearly
+      if (mode === 'gorge') {
+        if (a >= 364 && alpha < 34) alpha = 34;          // radar-swept plateau fill
+        else if (a > 0 && a < 110 && alpha < 10) alpha = 10; // low canyon corridor
+        else if (a >= 110 && alpha < 22) alpha = 22;
+      } else if (a > 0 && alpha < 26) {
+        alpha = 26;                                      // subtle land fill so straits / islands read clearly
+      }
       const k = (j * N + i) * 4;
       img.data[k] = 82; img.data[k + 1] = 255; img.data[k + 2] = 156; img.data[k + 3] = alpha;
     }
     ctx.putImageData(img, 0, 0);
-    // Runway + bridge spans as bright strokes (navigation references at night / in cloud).
-    const toPx = ([wx, wz]) => [((wx - (T.cx - T.size / 2)) / T.size) * N, ((wz - (T.cz - T.size / 2)) / T.size) * N];
-    for (const m of T.marks || []) {
-      ctx.strokeStyle = m.kind === 'runway' ? 'rgba(220,255,235,1)' : 'rgba(88,255,154,0.95)';
-      ctx.lineWidth = m.kind === 'runway' ? 2.2 : 1.6;
-      ctx.beginPath(); m.pts.map(toPx).forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke();
+    // Runway + bridge spans as bright strokes (only where those structures exist on the active map).
+    if (mode === 'archipelago' || mode === 'gorge') {
+      const toPx = ([wx, wz]) => [((wx - (T.cx - T.size / 2)) / T.size) * N, ((wz - (T.cz - T.size / 2)) / T.size) * N];
+      for (const m of T.marks || []) {
+        if (mode === 'gorge' && m.kind === 'bridge' && m.pts[0][0] < 0) continue; // west bridge omitted inside gorge bbox
+        ctx.strokeStyle = m.kind === 'runway' ? 'rgba(220,255,235,1)' : 'rgba(88,255,154,0.95)';
+        ctx.lineWidth = m.kind === 'runway' ? 2.2 : 1.6;
+        ctx.beginPath(); m.pts.map(toPx).forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke();
+      }
     }
-    return { cv, x0: T.cx - T.size / 2, z0: T.cz - T.size / 2, size: T.size };
-  })();
+    topoCache[mode] = entry;
+    return entry;
+  }
 
   function drawSquareRadar(ctx) {
     const s = Math.round(Math.min(216, HH * 0.30, HW * 0.22)), x0 = 20, y0 = HH - s - 20;
@@ -1087,8 +1106,9 @@ export function createHUD(THREE, A) {
     ctx.save();
     ctx.clip(frame);
 
-    // Island contours (heading-up).
+    // Theatre contours (heading-up).
     if (!(C.mcfg && C.mcfg.freeFlight)) {
+      const topo = getTopo();
       ctx.save();
       ctx.translate(cx, cy); ctx.rotate(-hRad); ctx.scale(k, k); ctx.translate(-S.position.x, -S.position.z);
       ctx.globalAlpha = 0.6; ctx.drawImage(topo.cv, topo.x0, topo.z0, topo.size, topo.size);
@@ -2642,7 +2662,7 @@ export function createHUD(THREE, A) {
     resize,
     resetMaxG() { maxG = 1; },
     get maxG() { return maxG; },
-    get topoCanvas() { return topo; },
+    get topoCanvas() { return getTopo(); },
     get inertia() { return { x: inertia.x, y: inertia.y }; },
     get stallWarn() { return stallOn(); },
     get hudAlertState() { return alertState; },

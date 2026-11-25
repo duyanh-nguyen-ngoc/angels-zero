@@ -732,14 +732,14 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
 import { createVFX } from './src/vfx.js?v=s9dt';
-import { createAmbient } from './src/ambient.js?v=s9dd';
+import { createAmbient } from './src/ambient.js?v=s9dz';
 import { createBlastFX } from './src/blastfx.js?v=s9dd';
-import { createHUD } from './src/hud.js?v=s9dr';
+import { createHUD } from './src/hud.js?v=s9dz';
 import { createCockpit3D } from './src/cockpit3d.js?v=s9dr';
 import { createCockpitF22 } from './src/cockpit_f22.js?v=s9dy';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9dw';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9dz';
 import { createEjection } from './src/eject.js?v=s9di';
-import { createAudio } from './src/audio.js?v=s9du';
+import { createAudio } from './src/audio.js?v=s9dz';
 import { createRadio } from './src/radio.js?v=s9dd';
 import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9dd';
 import { createLivery } from './src/livery.js?v=s9dd';
@@ -747,21 +747,21 @@ import { createGear, GEAR_H, GEAR_PTS, GEAR_UNITS, setGearPoints } from './src/g
 import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9dd';
 import { createCanopyFX } from './src/canopy.js?v=s9dd';
 import { createNVG } from './src/nvg.js?v=s9dd';
-import { createWorld, WORLD } from './src/world.js?v=s9dd';
+import { createWorld, WORLD } from './src/world.js?v=s9dz';
 import { createSurfaces } from './src/surfaces.js?v=s9dd';
 import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9dd';
 import { createFreeLook } from './src/freelook.js?v=s9dd';
 import { createCanopyGlass } from './src/canopyglass.js?v=s9dd';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9dd';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9dd';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9dy';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9dz';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9de';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9dd';
 import { createRadioQueue } from './src/radioQueue.js?v=s9dj';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9dq';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9dz';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
-  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9dq';
-import { createFreeFlight, FREE_FLIGHT_PRESETS, loadFreeFlightCity, saveFreeFlightCity } from './src/freeflight.js?v=s9dq';
+  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9dz';
+import { createFreeFlight, FREE_FLIGHT_PRESETS, loadFreeFlightCity, saveFreeFlightCity } from './src/freeflight.js?v=s9dz';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -887,28 +887,50 @@ const TERRAIN_SIZE = WORLD.SIZE;
 const TERRAIN_CENTER = new THREE.Vector2(WORLD.CX, WORLD.CZ);
 const _wt0 = performance.now();
 const world = createWorld(THREE, { scene, createNoise2D, fbm, mulberry32 });
-const freeFlight = createFreeFlight(THREE, scene);
+const freeFlight = createFreeFlight(THREE, scene, envTex);
 if (DEBUG) console.log('[ANGELS_ZERO] world built in', Math.round(performance.now() - _wt0), 'ms; obstacles', world.obstacleCount());
 function terrainHeight(x, z) { return freeFlight.active ? freeFlight.heightAt(x, z) : world.heightAt(x, z); }
 function groundLevel(x, z) { return Math.max(0, terrainHeight(x, z)); }
 
-
-
-// Water-depth texture for turquoise shallows / surf in the ocean shader.
-function buildDepthTexture(n) {
-  const data = new Uint8Array(n * n * 4);
-  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
-    const x = TERRAIN_CENTER.x + ((i + 0.5) / n - 0.5) * TERRAIN_SIZE;
-    const z = TERRAIN_CENTER.y + ((j + 0.5) / n - 0.5) * TERRAIN_SIZE;
-    const h = terrainHeight(x, z);
-    const k = (j * n + i) * 4;
-    data[k] = Math.round(THREE.MathUtils.clamp(-h / 60, 0, 1) * 255);   // metres below sea level / 60
-    data[k + 1] = h > 0 ? 255 : 0; data[k + 2] = 0; data[k + 3] = 255;
+// Water-depth texture for turquoise shallows / coral lagoons / surf in the ocean shader.
+// Cached per map mode and copied into a single DataTexture so mission switches allocate 0 GPU textures.
+const DEPTH_N = 512;
+const depthBufCache = Object.create(null);
+function getDepthBytes(mode) {
+  if (depthBufCache[mode]) return depthBufCache[mode];
+  const data = new Uint8Array(DEPTH_N * DEPTH_N * 4);
+  if (mode === 'ocean') {
+    for (let p = 0; p < data.length; p += 4) { data[p] = 255; data[p + 3] = 255; }
+  } else {
+    for (let j = 0; j < DEPTH_N; j++) for (let i = 0; i < DEPTH_N; i++) {
+      const x = TERRAIN_CENTER.x + ((i + 0.5) / DEPTH_N - 0.5) * TERRAIN_SIZE;
+      const z = TERRAIN_CENTER.y + ((j + 0.5) / DEPTH_N - 0.5) * TERRAIN_SIZE;
+      const h = world.heightAt(x, z);
+      const k = (j * DEPTH_N + i) * 4;
+      data[k] = Math.round(THREE.MathUtils.clamp(-h / 60, 0, 1) * 255);               // metres below sea level / 60
+      data[k + 1] = h > 0 ? 255 : Math.round(THREE.MathUtils.clamp(1 + h / 16, 0, 1) * 200); // coastal reef / shoal mask
+      data[k + 2] = 0; data[k + 3] = 255;
+    }
   }
+  depthBufCache[mode] = data;
+  return data;
+}
+let depthTexMode = world.mode || 'archipelago';
+function buildDepthTexture(n = DEPTH_N) {
+  const data = new Uint8Array(n * n * 4);
+  data.set(getDepthBytes(depthTexMode));
   const tex = new THREE.DataTexture(data, n, n, THREE.RGBAFormat);
   tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearFilter;
   tex.needsUpdate = true;
   return tex;
+}
+function syncOceanDepthTexture() {
+  const m = world.mode || 'archipelago';
+  if (m === depthTexMode) return;
+  depthTexMode = m;
+  const tex = oceanUniforms.uDepth.value;
+  tex.image.data.set(getDepthBytes(m));
+  tex.needsUpdate = true;
 }
 
 /* ============================================================================
@@ -1025,23 +1047,34 @@ const ocean = new THREE.Mesh(new THREE.PlaneGeometry(OCEAN_SPAN, OCEAN_SPAN, 1, 
       vec3 H = normalize(L + V);
       float NdV = max(dot(N, V), 0.0), NdH = max(dot(N, H), 0.0), NdL = max(dot(N, L), 0.0);
 
-      // Water depth under this fragment (metres), from the terrain grid.
+      // Water depth + coastal coral/shoal mask under this fragment, from the active theatre height grid.
       vec2 tuv = (p - uTerr.xy) / uTerr.z + 0.5;
       float dm = 200.0;
-      if (tuv.x > 0.0 && tuv.x < 1.0 && tuv.y > 0.0 && tuv.y < 1.0) dm = texture2D(uDepth, tuv).r * 60.0;
+      float shoalMask = 0.0;
+      if (tuv.x > 0.0 && tuv.x < 1.0 && tuv.y > 0.0 && tuv.y < 1.0) {
+        vec4 dTex = texture2D(uDepth, tuv);
+        dm = dTex.r * 60.0;
+        shoalMask = dTex.g;
+      }
 
-      // Body colour: deep slate-navy, a touch of light through swell crests, subtle
-      // dark-teal over shelves near the coasts, muted sandbars, shoreline surf.
-      vec3 deepC = uDeep * (0.85 + 0.3 * NdV) + vec3(0.0, 0.025, 0.03) * max(0.0, slope.x + slope.y) * NdL;
-      float shallow = 1.0 - smoothstep(3.0, 40.0, dm);
-      vec3 body = mix(deepC, uShallow * (0.8 + 0.2 * n2.x), shallow * shallow * (3.0 - 2.0 * shallow) * 0.85);
-      body = mix(body, uShallow * 1.5 + vec3(0.05, 0.05, 0.04), (1.0 - smoothstep(0.0, 3.0, dm)) * 0.45);
-      float shore = 1.0 - smoothstep(0.0, 5.0, dm);
-      float bands = 0.5 + 0.5 * sin(dm * 2.1 + uTime * 1.6 + n3.x * 3.0 + n1.y * 2.0);
-      float surf = shore * smoothstep(0.5, 0.95, bands) + (1.0 - smoothstep(0.0, 1.2, dm)) * 0.85;
-      surf *= 0.7 + 0.3 * sin(uTime * 0.9 + (p.x + p.y) * 0.004);
-      float caps = uChop * smoothstep(0.78, 1.05, n2.x * 0.5 + 0.5 + n1.x * 0.35) * (1.0 - shore) * 0.32 * midK;
-      body = (body + vec3(0.62) * surf * 0.5 + vec3(0.7, 0.74, 0.77) * caps) * uLevel;
+      // Body colour: abyssal sapphire-navy, emerald subsurface scattering through backlit
+      // wave crests, luminous turquoise coral/shelf lagoons, multi-band coastal surf & cloud dappling.
+      float cShad = 1.0 - 0.13 * smoothstep(0.02, 0.62, nB.x * 0.65 + nB.y * 0.45) * (1.0 - smoothstep(14000.0, 38000.0, dist));
+      vec3 deepC = uDeep * (0.84 + 0.32 * NdV) * cShad + vec3(0.0, 0.028, 0.036) * max(0.0, slope.x + slope.y) * NdL;
+      float crestK = clamp(length(g) * 5.2 + max(0.0, slope.x * L.x + slope.y * L.z) * 1.9, 0.0, 1.0);
+      float backLit = pow(max(dot(V, -normalize(vec3(L.x, L.y * 0.32, L.z))), 0.0), 3.2) * step(0.0, L.y);
+      vec3 sss = vec3(0.035, 0.25, 0.24) * crestK * (0.28 + 0.92 * backLit) * (0.35 + 0.65 * midK);
+      deepC += sss;
+      float shallow = 1.0 - smoothstep(2.5, 42.0, dm);
+      vec3 lagoonC = mix(uShallow, vec3(0.11, 0.48, 0.49), clamp(shoalMask * 0.65 + n2.y * 0.15, 0.0, 1.0));
+      vec3 body = mix(deepC, lagoonC * (0.84 + 0.20 * n2.x) * cShad, shallow * shallow * (3.0 - 2.0 * shallow) * 0.88);
+      body = mix(body, lagoonC * 1.48 + vec3(0.06, 0.06, 0.045), (1.0 - smoothstep(0.0, 3.2, dm)) * 0.50);
+      float shore = 1.0 - smoothstep(0.0, 5.8, dm);
+      float bands = 0.5 + 0.5 * sin(dm * 2.25 + uTime * 1.65 + n3.x * 3.1 + n1.y * 2.1);
+      float surf = shore * smoothstep(0.46, 0.94, bands) + (1.0 - smoothstep(0.0, 1.35, dm)) * 0.90;
+      surf *= 0.72 + 0.28 * sin(uTime * 0.92 + (p.x + p.y) * 0.004);
+      float caps = (0.12 + 0.88 * uChop) * smoothstep(0.80 - 0.06 * uChop, 1.06, n2.x * 0.5 + 0.5 + n1.x * 0.36) * (1.0 - shore) * 0.34 * midK;
+      body = (body + vec3(0.68, 0.71, 0.73) * surf * 0.52 + vec3(0.72, 0.76, 0.80) * caps) * uLevel;
 
       // Fresnel sky reflection: navy looking straight down -> the sky / horizon at
       // grazing angles (reflected ray low = horizon haze, high = preset sky colour).
@@ -1737,7 +1770,7 @@ const sortie = { active: false, t0: 0, ace0: 0, endAt: null, failReason: '' };
 // Switch AFB / island / foliage props by map. Only .visible is written; nothing
 // is disposed, and InstancedMesh counts stay untouched. Zero per-frame work.
 function applyMapProps(mapDef) {
-  const p = mapDef.props || { terrain: true, islands: true, runway: true, baseBldg: true, radar: true, foliage: true };
+  const p = mapDef.props || { terrain: true, islands: true, runway: true, baseBldg: true, radar: true, foliage: true, gorge: false, strait: false };
   const e = world.envProps;
   // GORGE: island props inside the trench bbox (+600 m) would float over or sink
   // into the plateau, so they are hidden; the AFB and everything else stay.
@@ -1750,14 +1783,17 @@ function applyMapProps(mapDef) {
   for (const o of e.baseBldg) o.visible = !!p.islands && !!p.baseBldg && keep(o);
   for (const o of e.radar) o.visible = !!p.islands && !!p.radar && keep(o);
   for (const o of e.foliage) o.visible = !!p.islands && !!p.foliage;
-  // Every runway edge / threshold / ALSF / PAPI-style approach strobe and island light
-  // lives in one Points object: off on open-ocean maps (NAVAL_BATTLE / ACE_DUEL).
-  for (const o of e.lights || []) o.visible = !!p.islands && !!p.runway;
+  for (const o of e.gorge || []) o.visible = !!p.gorge;
+  for (const o of e.strait || []) o.visible = !!p.strait;
+  // Every runway / approach / bridge / fortress / strait-lighthouse beacon lives in lightPts
+  // (filtered per theatre by aMap in world.update): off on open-ocean / Free Flight maps.
+  for (const o of e.lights || []) o.visible = !!(p.runway || p.gorge || p.strait);
   combatSys.setBaseDefencesVisible(!!p.islands && !!p.baseBldg);
   if (DEBUG) console.log('[ANGELS_ZERO] mapprops map=' + (mapDef.heightFn || 'archipelago') +
     ' terrain=' + !!p.terrain + ' islands=' + e.islands.filter(o => o.visible).length +
     ' runway=' + e.runway.filter(o => o.visible).length + ' bldg=' + e.baseBldg.filter(o => o.visible).length +
     ' radar=' + e.radar.filter(o => o.visible).length + ' foliage=' + !!p.foliage +
+    ' gorge=' + (e.gorge || []).filter(o => o.visible).length + ' strait=' + (e.strait || []).filter(o => o.visible).length +
     ' lights=' + (e.lights || []).filter(o => o.visible).length +
     ' collide=' + world.obstacleCount());
 }
@@ -1772,6 +1808,7 @@ function loadMissionScene(m) {
   Object.assign(vwsState, { fuelLatched: false, missilePrev: false, overGT: 0, altLatched: false, alertT: 0 });
   if (hud.setAlertState) hud.setAlertState('');
   world.rebuild(MAPS[m.mapTag] || MAPS.ARCHIPELAGO);
+  syncOceanDepthTexture();
   applyMapProps(MAPS[m.mapTag] || MAPS.ARCHIPELAGO);
   ocean.visible = !m.freeFlight;
   if (m.freeFlight) {
@@ -5341,7 +5378,7 @@ if (window.__fuelInit !== undefined) state.fuel = 13455 * window.__fuelInit;
 const hud = createHUD(THREE, {
   canvas: document.getElementById('hud'), state, combat, camera, missiles, mouse, EYE, STALL_AOA,
   sunAzimuth: SUN_AZIMUTH, callsign: 'ALPHA 1',
-  terrain: { height: terrainHeight, cx: TERRAIN_CENTER.x, cz: TERRAIN_CENTER.y, size: TERRAIN_SIZE, marks: world.marks },
+  terrain: { height: terrainHeight, getMode: () => world.mode, cx: TERRAIN_CENTER.x, cz: TERRAIN_CENTER.y, size: TERRAIN_SIZE, marks: world.marks },
   getEnemies: () => combatSys.enemies, getTargets: () => combatSys.lockables, getDrones: () => combatSys.drones, getWingmen: () => wingmen,
   relightOdds: () => combatSys.relightOdds(), get relightHold() { return combatSys.relightHold; }, isFirstPerson: () => firstPerson, isModal: () => uiModal,
   getSurface: () => combatSys.surface, runway: world.runway, gearH: GEAR_H, returnZ: combatSys.RETURN_Z,

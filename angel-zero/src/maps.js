@@ -80,35 +80,35 @@ export const MAPS = {
   ARCHIPELAGO: {
     heightFn: 'archipelago', islands: [], canyonAmp: 1, runway: true,
     carrier: null, fleet: [], cloudSea: null, fogFar: 62000,
-    props: { terrain: true, islands: true, runway: true, baseBldg: true, radar: true, foliage: true }
+    props: { terrain: true, islands: true, runway: true, baseBldg: true, radar: true, foliage: true, gorge: false, strait: false }
   },
   STRAIT: {
-    heightFn: 'ocean', islands: [], canyonAmp: 1, runway: false,
+    heightFn: 'strait', islands: [], canyonAmp: 1, runway: false,
     carrier: { pos: [0, 0, 9000], hdg: 0, spd: 4.1 },
     fleet: [{ kind: 'DDG', pos: [-1200, 0, 5200] }, { kind: 'DDG', pos: [1300, 0, 5600] }, { kind: 'CG', pos: [0, 0, 6400] }],
     cloudSea: null, fogFar: 58000,
-    props: { terrain: false, islands: false, runway: false, baseBldg: false, radar: false, foliage: false }
+    props: { terrain: true, islands: false, runway: false, baseBldg: false, radar: false, foliage: false, gorge: false, strait: true }
   },
   GORGE: {
     heightFn: 'gorge', islands: [], canyonAmp: 1, runway: true,
-    carrier: null, fleet: [], cloudSea: null, fogFar: 42000,
+    carrier: null, fleet: [], cloudSea: null, fogFar: 44000,
     ceiling: { m: CEIL_M }, cell: 16,
     bbox: GORGE_BBOX,
     crater: { z: GORGE_CRATER_Z, r: GORGE_CRATER_R, wallY: GORGE_CRATER_WALL_Y, floorY: 20 },
     // Trees are one InstancedMesh over the whole island, so they are hidden here;
-    // island props / lights inside the trench bbox are masked by applyMapProps.
-    props: { terrain: true, islands: true, runway: true, baseBldg: true, radar: true, foliage: false }
+    // island props / lights inside the trench bbox are masked by applyMapProps, while gorge fortress/bridges show.
+    props: { terrain: true, islands: true, runway: true, baseBldg: true, radar: true, foliage: false, gorge: true, strait: false }
   },
   CLOUD_ARENA: {
     heightFn: 'ocean', islands: [], canyonAmp: 1, runway: false,
     carrier: { pos: [0, 0, 9000], hdg: 0, spd: 4.1 }, fleet: [],
     cloudSea: { base: 3000, top: 3600 }, fogFar: 52000,
-    props: { terrain: false, islands: false, runway: false, baseBldg: false, radar: false, foliage: false }
+    props: { terrain: false, islands: false, runway: false, baseBldg: false, radar: false, foliage: false, gorge: false, strait: false }
   },
   REAL_WORLD: {
     heightFn: 'ocean', islands: [], canyonAmp: 1, runway: false,
     carrier: null, fleet: [],
     cloudSea: { base: 1067, top: 1768 }, fogFar: 60000,
-    props: { terrain: false, islands: false, runway: false, baseBldg: false, radar: false, foliage: false }
+    props: { terrain: false, islands: false, runway: false, baseBldg: false, radar: false, foliage: false, gorge: false, strait: false }
   }
 };
