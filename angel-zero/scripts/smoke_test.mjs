@@ -281,6 +281,17 @@ const SCENARIOS = [
     assert(t.gl === 0, 'WebGL error during training camera step');
   }],
 
+  ['Gamepad / touch controls', async () => {
+    await page.evaluate(() => window.__az.inputExt.setTouchTest(true));
+    await page.waitForFunction(() => { const e = document.getElementById('touchHUD'); return e && e.style.display === 'block'; }, null, { polling: 250, timeout: 30000 });
+    const s = await page.evaluate(() => ({ vis: document.getElementById('touchHUD').style.display,
+      active: window.__az.inputExt.active, gl: window.__az.renderer.getContext().getError() }));
+    assert(s.vis === 'block', `touch HUD hidden: ${s.vis}`);
+    assert(s.active === true, 'inputExt not active with touch enabled');
+    assert(s.gl === 0, 'WebGL error with touch HUD');
+    await page.evaluate(() => window.__az.inputExt.setTouchTest(false));
+  }],
+
   ['Deterministic warp telemetry audit', async () => {
     assert(warpLogLine.startsWith('[ANGELS_ZERO] warp'), 'no [ANGELS_ZERO] warp log line');
     assert(!/NaN|undefined/i.test(warpLogLine), `warp line has NaN/undefined: ${warpLogLine.slice(0, 240)}`);

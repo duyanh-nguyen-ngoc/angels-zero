@@ -3,6 +3,10 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.85', title: 'GAMEPAD API & MOBILE TOUCH CONTROLS', bullets: [
+    'Standard Xbox / PlayStation / Switch Pro controllers now fly the jet: dual-stick pitch and roll with a smooth response curve, trigger throttle and afterburner, shoulder yaw, and face buttons for guns, missiles, lock, weapons, flares, camera and pause.',
+    'Touch devices get an on-screen virtual stick, throttle slider and action cluster. Mouse and keyboard behaviour is unchanged when no controller or touch input is active.'
+  ] },
   { version: 'v1.1.84', title: 'FREE FLIGHT ANY-CITY SEARCH, OSM RUNWAYS & ATTRIBUTION', bullets: [
     'Search any city, airport code or raw lat,lon from the Free Flight Standby row and fly there instantly, with the required OpenStreetMap, Esri and AWS Terrarium attribution shown while in Free Flight.',
     'OpenFreeMap vector tiles now render real airport runways and taxiways alongside buildings.'

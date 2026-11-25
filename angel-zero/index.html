@@ -2,14 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>ANGELS ZERO</title>
 <link rel="icon" href="data:,">  <!-- no favicon request: keeps the console at zero 404s -->
 
 
 <style>
   html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#05080c; font-family:'Rajdhani','Share Tech Mono',monospace; }
-  #gl { position:fixed; inset:0; width:100vw; height:100vh; display:block; }
+  #gl { position:fixed; inset:0; width:100vw; height:100vh; display:block; touch-action:none; user-select:none; -webkit-user-select:none; }
+  #hud { touch-action:none; }
   #hud { position:fixed; inset:0; width:100vw; height:100vh; display:block; pointer-events:none; z-index:10; filter: drop-shadow(0 0 2.5px rgba(96, 255, 205, 0.52)) drop-shadow(0 0 7px rgba(72, 230, 190, 0.24)); }
   #flybyPulse { position:fixed; inset:0; pointer-events:none; z-index:11; opacity:0; }
   /* Tactical Voice Box: CSS scanlines + a live analyser canvas, no per-frame DOM churn. */
@@ -776,6 +777,10 @@
             <button id="psLinkId" type="button">[ LINK ID ]</button>
             <label style="display:flex;align-items:center;gap:4px"><input id="psSyncEnabled" type="checkbox" /> AUTO SYNC</label>
           </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px">
+            <span id="gpStatus">GAMEPAD: NONE</span>
+            <label style="display:flex;align-items:center;gap:4px"><input id="gpInvert" type="checkbox" checked /> INVERT GAMEPAD PITCH</label>
+          </div>
         </div>
       </div>
       <div class="ctrlFoot">[ ESC / CLICK OUTSIDE ] CLOSE</div>
@@ -801,44 +806,45 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s9et';
-import { createAmbient } from './src/ambient.js?v=s9et';
-import { createStormFX } from './src/stormfx.js?v=s9et';
-import { createWetDeck } from './src/wetdeck.js?v=s9et';
-import { createBlastFX } from './src/blastfx.js?v=s9et';
-import { createHUD } from './src/hud.js?v=s9et';
-import { createCockpit3D } from './src/cockpit3d.js?v=s9et';
-import { createCockpitF22 } from './src/cockpit_f22.js?v=s9et';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9et';
-import { createEjection } from './src/eject.js?v=s9et';
-import { createAudio } from './src/audio.js?v=s9et';
-import { createYouTubeMusic } from './src/ytmusic.js?v=s9et';
-import { createRadio } from './src/radio.js?v=s9et';
-import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9et';
-import { createLivery } from './src/livery.js?v=s9et';
-import { createGear, GEAR_H, GEAR_PTS, GEAR_UNITS, setGearPoints } from './src/gear.js?v=s9et';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9et';
-import { createCanopyFX } from './src/canopy.js?v=s9et';
-import { createNVG } from './src/nvg.js?v=s9et';
-import { createWorld, WORLD } from './src/world.js?v=s9et';
-import { createSurfaces } from './src/surfaces.js?v=s9et';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9et';
-import { createFreeLook } from './src/freelook.js?v=s9et';
-import { createCanopyGlass } from './src/canopyglass.js?v=s9et';
-import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9et';
-import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9et';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9et';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9et';
-import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9et';
-import { createRadioQueue } from './src/radioQueue.js?v=s9et';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9et';
+import { createVFX } from './src/vfx.js?v=s9eu';
+import { createAmbient } from './src/ambient.js?v=s9eu';
+import { createStormFX } from './src/stormfx.js?v=s9eu';
+import { createWetDeck } from './src/wetdeck.js?v=s9eu';
+import { createBlastFX } from './src/blastfx.js?v=s9eu';
+import { createHUD } from './src/hud.js?v=s9eu';
+import { createCockpit3D } from './src/cockpit3d.js?v=s9eu';
+import { createCockpitF22 } from './src/cockpit_f22.js?v=s9eu';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9eu';
+import { createEjection } from './src/eject.js?v=s9eu';
+import { createAudio } from './src/audio.js?v=s9eu';
+import { createYouTubeMusic } from './src/ytmusic.js?v=s9eu';
+import { createRadio } from './src/radio.js?v=s9eu';
+import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9eu';
+import { createLivery } from './src/livery.js?v=s9eu';
+import { createGear, GEAR_H, GEAR_PTS, GEAR_UNITS, setGearPoints } from './src/gear.js?v=s9eu';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9eu';
+import { createCanopyFX } from './src/canopy.js?v=s9eu';
+import { createNVG } from './src/nvg.js?v=s9eu';
+import { createWorld, WORLD } from './src/world.js?v=s9eu';
+import { createSurfaces } from './src/surfaces.js?v=s9eu';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9eu';
+import { createFreeLook } from './src/freelook.js?v=s9eu';
+import { createCanopyGlass } from './src/canopyglass.js?v=s9eu';
+import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9eu';
+import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9eu';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9eu';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9eu';
+import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9eu';
+import { createRadioQueue } from './src/radioQueue.js?v=s9eu';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9eu';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
-  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9et';
-import { createFreeFlight, FREE_FLIGHT_PRESETS, loadFreeFlightCity, saveFreeFlightCity, geocodePlace, loadCustomPlace, saveCustomPlace } from './src/freeflight.js?v=s9et';
-import { encodeReplay, decodeReplay, buildReplayUrl } from './src/replay_share.js?v=s9et';
-import { fetchLeaderboard, submitScore } from './src/leaderboard.js?v=s9et';
-import { collectPilotSnapshot, applyPilotSnapshot, exportPilotCode, importPilotCode, generateSyncId, getSyncId, setSyncId, isSyncEnabled, setSyncEnabled, pushCloudProfile, pullCloudProfile, syncNow, setRefreshCallback } from './src/profile_sync.js?v=s9et';
-import { createTraining } from './src/training.js?v=s9et';
+  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9eu';
+import { createFreeFlight, FREE_FLIGHT_PRESETS, loadFreeFlightCity, saveFreeFlightCity, geocodePlace, loadCustomPlace, saveCustomPlace } from './src/freeflight.js?v=s9eu';
+import { encodeReplay, decodeReplay, buildReplayUrl } from './src/replay_share.js?v=s9eu';
+import { fetchLeaderboard, submitScore } from './src/leaderboard.js?v=s9eu';
+import { collectPilotSnapshot, applyPilotSnapshot, exportPilotCode, importPilotCode, generateSyncId, getSyncId, setSyncId, isSyncEnabled, setSyncEnabled, pushCloudProfile, pullCloudProfile, syncNow, setRefreshCallback } from './src/profile_sync.js?v=s9eu';
+import { createTraining } from './src/training.js?v=s9eu';
+import { createInputExt } from './src/input_ext.js?v=s9eu';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -3454,8 +3460,14 @@ const sbMusicSlider = document.getElementById('sbMusicVol');
 function syncCtrlUI() {
   sbMusicSlider.value = String(Math.round(audio.musicVolume * 100));
   document.getElementById('sbMusicVolVal').textContent = sbMusicSlider.value;
+  const gi = document.getElementById('gpInvert');
+  if (gi && inputExt) gi.checked = inputExt.invert;
+  const gs = document.getElementById('gpStatus');
+  if (gs && inputExt) gs.textContent = inputExt.hasGamepad ? 'GAMEPAD: CONNECTED' : 'GAMEPAD: NONE';
   syncAudioUI();
 }
+const gpInvertEl = document.getElementById('gpInvert');
+if (gpInvertEl) gpInvertEl.addEventListener('change', e => { if (inputExt) inputExt.setInvert(e.target.checked); });
 sbMusicSlider.addEventListener('input', () => { audio.setMusicVolume(Number(sbMusicSlider.value) / 100); syncCtrlUI(); });
 
 /* ---- Pilot Save & Cloud Sync ---- */
@@ -4258,8 +4270,15 @@ function updateStickAxes(dt) {
   kbAxis.roll += clamp(tR - kbAxis.roll, -KB_RATE * dt, KB_RATE * dt);
   // While keys are held the mouse aim stays centred on the nose; no auto-leveler chase.
   if (kbActive) { mouse.nx = 0; mouse.ny = 0; }
-  _stickOut.pitch = clamp(clamp(shaped(mouse.ny) * mouseW, -1, 1) - kbAxis.pitch, -1, 1);
-  _stickOut.roll = shaped(mouse.nx) * mouseW + kbAxis.roll;
+  if (inputExt && inputExt.active) {
+    const ip = inputExt.state.pitch, ir = inputExt.state.roll;
+    _stickOut.pitch = clamp(ip - kbAxis.pitch, -1, 1);
+    _stickOut.roll = clamp(ir + kbAxis.roll, -1, 1);
+    if (ip || ir) { mouse.nx = 0; mouse.ny = 0; }
+  } else {
+    _stickOut.pitch = clamp(clamp(shaped(mouse.ny) * mouseW, -1, 1) - kbAxis.pitch, -1, 1);
+    _stickOut.roll = shaped(mouse.nx) * mouseW + kbAxis.roll;
+  }
   return _stickOut;
 }
 let rotateCueAt = -99;
@@ -5541,6 +5560,21 @@ const combatSys = createCombat(THREE, { scene, camera, renderer, state, combat, 
 const training = createTraining(THREE, { state, combat, combatSys, rq, audio,
   getCamMode: () => camMode, onComplete: () => { if (missionId === 'TRAINING') missionComplete('BASE'); } });
 if (DEBUG && Q.has('trainingstep')) training.jump(Number(Q.get('trainingstep')) || 1);
+const inputExt = createInputExt(THREE, {
+  keys, mouse, freeLook,
+  getAppMode: () => appMode, getFlightMode: () => flightMode,
+  isTouchDevice: (window.matchMedia && matchMedia('(pointer: coarse)').matches) || ('ontouchstart' in window),
+  onToast: t => hud.setMusicToast(t),
+  onFireDown: () => { keys.fire = true; }, onFireUp: () => { keys.fire = false; },
+  onMissileDown: () => { if (!freeFlight.active) { combatSys.fireSelected(); mcam.held = true; } },
+  onMissileUp: () => { combatSys.pickleUp(); mcam.held = false; },
+  onLock: () => { if (!freeFlight.active) combatSys.designateInSight(); },
+  onWeapon: () => combatSys.toggleWeapon(),
+  onFlare: () => combatSys.dispenseFlares(), onChaff: () => combatSys.dispenseChaff(),
+  onCamera: () => setView(camMode === 'CHASE' ? 'COCKPIT' : camMode === 'COCKPIT' ? 'NOSE' : 'CHASE'),
+  onPause: () => { if (appMode === 'PLAY') pauseSim(); else if (appMode === 'PAUSED') resumeSim(); }
+});
+if (DEBUG && Q.has('touch')) inputExt.setTouchTest(true);
 // Living-world layer: all pools built once here; per-mission flags in configure().
 ambient = createAmbient(THREE, { scene, camera, renderer, state, combat, world, vfx, maps: MAPS, atmo: atmosphere,
   combatSys, ocean: oceanUniforms, debug: DEBUG, ambientOff: DEBUG && Q.has('ambient') && Q.get('ambient') === '0',
@@ -6721,6 +6755,7 @@ function stepSim(dt) {
   updateBuzz(dt);
   combatSys.update(dt, simTime, { playerActive: flightMode === 'FLY', firing: !freeFlight.active && (keys.fire || DEBUG_FIRE) });
   if (combat.training) training.update(dt);
+  if (inputExt) inputExt.update(dt);
   if (ffAttribEl) ffAttribEl.hidden = !freeFlight.active || appMode === 'DEBRIEF';
   if (freeFlight.active) {
     const rebase = freeFlight.update(state.position.x, state.position.z);
@@ -6849,6 +6884,7 @@ if (DEBUG) {
     encodeReplay, decodeReplay, buildReplayUrl, fetchLeaderboard, submitScore, get sharedReplay() { return sharedReplay; },
     get profileSync() { return { collectPilotSnapshot, applyPilotSnapshot, exportPilotCode, importPilotCode, getSyncId, setSyncId, syncNow, pushCloudProfile, pullCloudProfile }; },
     get training() { return training.state; }, jumpTraining: n => training.jump(n), geocodePlace,
+    get inputExt() { return inputExt; },
     get cat() { return cat; }, get skimK() { return skimK; }, catEnter, catTick, catFire, catSnapAll, carrierDiag, enterCarrierLaunch, carrierReady,
     get scramble() { return scramble; }, get bw() { return combat.bw; }, get intrusion() { return combat.intr; },
     get inESM() { return combatSys.inESM; }, get esm() { return combatSys.esm; }, get cloudIce() { return state.cloudIce; },
