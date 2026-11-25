@@ -2015,7 +2015,7 @@ export function createHUD(THREE, A) {
     const sBoxX = xL - 14 - boxW, sBoxY = cy - boxH / 2;
     ctx.save();
     glow(ctx, spdCol, 4); ctx.strokeStyle = spdCol; ctx.lineWidth = 1.25;
-    noGlow(ctx); ctx.fillStyle = 'rgba(2, 14, 12, 0.34)';
+    noGlow(ctx); ctx.fillStyle = 'rgba(104, 247, 204, 0.08)';
     ctx.fillRect(sBoxX, sBoxY, boxW, boxH);
     glow(ctx, spdCol, 4);
     ctx.strokeRect(sBoxX, sBoxY, boxW, boxH);
@@ -2043,7 +2043,7 @@ export function createHUD(THREE, A) {
     if (S.afterburner > 0.3) {
       const abX = xL + 10, abY = railTop + 6, abW = 28, abH = 15;
       ctx.save();
-      noGlow(ctx); ctx.fillStyle = 'rgba(2, 14, 12, 0.36)';
+      noGlow(ctx); ctx.fillStyle = 'rgba(104, 247, 204, 0.08)';
       ctx.fillRect(abX, abY, abW, abH);
       glow(ctx, hudCol, 4); ctx.strokeStyle = hudCol; ctx.lineWidth = 1.1;
       ctx.strokeRect(abX, abY, abW, abH);
@@ -2055,7 +2055,7 @@ export function createHUD(THREE, A) {
     const aBoxX = xR + 14, aBoxY = cy - boxH / 2;
     ctx.save();
     glow(ctx, altCol, 4); ctx.strokeStyle = altCol; ctx.lineWidth = 1.25;
-    noGlow(ctx); ctx.fillStyle = 'rgba(2, 14, 12, 0.34)';
+    noGlow(ctx); ctx.fillStyle = 'rgba(104, 247, 204, 0.08)';
     ctx.fillRect(aBoxX, aBoxY, boxW, boxH);
     glow(ctx, altCol, 4);
     ctx.strokeRect(aBoxX, aBoxY, boxW, boxH);

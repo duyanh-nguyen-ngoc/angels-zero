@@ -10,7 +10,7 @@
 <style>
   html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#05080c; font-family:'Rajdhani','Share Tech Mono',monospace; }
   #gl { position:fixed; inset:0; width:100vw; height:100vh; display:block; }
-  #hud { position:fixed; inset:0; width:100vw; height:100vh; display:block; pointer-events:none; z-index:10; }
+  #hud { position:fixed; inset:0; width:100vw; height:100vh; display:block; pointer-events:none; z-index:10; filter: drop-shadow(0 0 2.5px rgba(96, 255, 205, 0.52)) drop-shadow(0 0 7px rgba(72, 230, 190, 0.24)); }
   #flybyPulse { position:fixed; inset:0; pointer-events:none; z-index:11; opacity:0; }
   /* Tactical Voice Box: CSS scanlines + a live analyser canvas, no per-frame DOM churn. */
   #crtBox { --rxCol:#00ff66; position:fixed; left:18px; top:150px; width:196px; height:188px; z-index:11; pointer-events:none;
@@ -731,10 +731,10 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s9ec';
+import { createVFX } from './src/vfx.js?v=s9ed';
 import { createAmbient } from './src/ambient.js?v=s9dz';
 import { createBlastFX } from './src/blastfx.js?v=s9dd';
-import { createHUD } from './src/hud.js?v=s9eb';
+import { createHUD } from './src/hud.js?v=s9ed';
 import { createCockpit3D } from './src/cockpit3d.js?v=s9dr';
 import { createCockpitF22 } from './src/cockpit_f22.js?v=s9dy';
 import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9dz';
@@ -744,9 +744,9 @@ import { createRadio } from './src/radio.js?v=s9dd';
 import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9dd';
 import { createLivery } from './src/livery.js?v=s9dd';
 import { createGear, GEAR_H, GEAR_PTS, GEAR_UNITS, setGearPoints } from './src/gear.js?v=s9dl';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9ec';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9ed';
 import { createCanopyFX } from './src/canopy.js?v=s9dd';
-import { createNVG } from './src/nvg.js?v=s9dd';
+import { createNVG } from './src/nvg.js?v=s9ed';
 import { createWorld, WORLD } from './src/world.js?v=s9dz';
 import { createSurfaces } from './src/surfaces.js?v=s9dd';
 import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9dd';
@@ -754,7 +754,7 @@ import { createFreeLook } from './src/freelook.js?v=s9dd';
 import { createCanopyGlass } from './src/canopyglass.js?v=s9dd';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9dd';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9dd';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9ec';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9ed';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9de';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9dd';
 import { createRadioQueue } from './src/radioQueue.js?v=s9dj';

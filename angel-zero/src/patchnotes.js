@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.71', title: 'ACE COMBAT 7 DREAMY ATMOSPHERE, BLOOM & HOLOGRAPHIC HUD', bullets: [
+    'Tuned HDR UnrealBloomPass for wide velvety halation on sunlit cloud crowns and solar glare, and added an AC7 filmic split-tone grade + soft lens vignette pass.',
+    'Refined the volumetric cloud sea with 24-step silky raymarching, lower cloud-sea threshold for a continuous horizon-to-horizon cloud ocean, backlit sun-glow scattering, and softer cirrus + luminous horizon haze.',
+    'Added GPU-composited phosphor bloom to the HUD canvas and translucent holographic glass boxes on the Nose Camera readout.'
+  ] },
   { version: 'v1.1.70', title: 'ACE COMBAT 7 VOLUMETRIC CUMULUS CLOUDS & CIRRUS SKY', bullets: [
     'Upgraded the volumetric cloud deck with a 20-step Beer-Powder light marcher, two-tier cumulus congestus turrets rising up to 7,500 ft, and crisper sunlit tops vs deep slate-blue shadowed bellies.',
     'Added procedural 3D cauliflower lobe normals and crevice ambient occlusion to the 3D cumulus puff atlas and shader, plus towering congestus turret banks.',

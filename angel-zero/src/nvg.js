@@ -27,9 +27,27 @@ export function createNVG(THREE, renderer, post) {
     const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 0 });
     composer = new post.EffectComposer(renderer, rt);
     renderPass = new post.RenderPass(new THREE.Scene(), new THREE.PerspectiveCamera());
-    bloom = new post.UnrealBloomPass(new THREE.Vector2(Math.max(1, Math.floor(size.x * 0.25)), Math.max(1, Math.floor(size.y * 0.25))), 0.48, 0.32, 0.92);
+    bloom = new post.UnrealBloomPass(new THREE.Vector2(Math.max(1, Math.floor(size.x * 0.25)), Math.max(1, Math.floor(size.y * 0.25))), 0.42, 0.68, 0.78);
     composer.addPass(renderPass); composer.addPass(bloom); composer.addPass(new post.OutputPass());
     if (post.ShaderPass) {
+      const gradePass = new post.ShaderPass({
+        uniforms: { tDiffuse: { value: null } },
+        vertexShader: gVert(),
+        fragmentShader: `
+          uniform sampler2D tDiffuse;
+          varying vec2 vUv;
+          void main() {
+            vec4 s = texture2D(tDiffuse, vUv);
+            vec3 c = s.rgb;
+            float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+            c = mix(vec3(l), c, 1.08);
+            vec3 tint = mix(vec3(0.95, 0.98, 1.05), vec3(1.03, 1.01, 0.97), smoothstep(0.15, 0.85, l));
+            c *= tint;
+            float v = 1.0 - smoothstep(0.58, 1.42, length((vUv - 0.5) * vec2(1.15, 1.0))) * 0.16;
+            gl_FragColor = vec4(max(c * v, 0.0), s.a);
+          }`
+      });
+      composer.addPass(gradePass);
       gPass = new post.ShaderPass({ uniforms: gUniforms(), vertexShader: gVert(), fragmentShader: gFrag() });
       gPass.enabled = false; composer.addPass(gPass);
     }

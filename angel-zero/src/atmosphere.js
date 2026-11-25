@@ -198,11 +198,14 @@ export function createAtmosphere(THREE, env) {
           vec2 cp = d.xz / (d.y + 0.14) * 1.45 + vec2(uTime * 0.0022, -uTime * 0.0010);
           vec2 wq = vec2(cirrusFbm(cp * 0.9), cirrusFbm(cp * 0.9 + vec2(4.2, 1.7)));
           float c1 = cirrusFbm((cp + wq * 0.45) * vec2(0.55, 1.85));
-          float cirrus = smoothstep(0.50, 0.80, c1) * smoothstep(0.03, 0.24, d.y) * smoothstep(0.95, 0.40, d.y)
-            * (1.0 - uStars * 0.85) * 0.34;
+          float cirrus = smoothstep(0.45, 0.85, c1) * smoothstep(0.03, 0.24, d.y) * smoothstep(0.95, 0.40, d.y)
+            * (1.0 - uStars * 0.85) * 0.28;
           vec3 cirCol = mix(uHorizon * 1.08, uSunColor * 1.15, 0.35 + 0.45 * pow(mup, 4.0));
           col = mix(col, cirCol, cirrus);
         }
+        // Luminous horizon atmospheric band where the cloud sea meets the sky.
+        float hGlow = exp(-abs(d.y) * 14.0) * (0.14 + 0.14 * pow(mup, 3.0)) * (1.0 - uStars * 0.85);
+        col += mix(uHorizon, uSunColor, 0.35) * hGlow;
         // Below the horizon: pure horizon haze (the ocean fog fades into it).
         col = mix(col, uHorizon, smoothstep(0.015, -0.06, d.y));
         col = mix(col, uHorizon, uWhite);

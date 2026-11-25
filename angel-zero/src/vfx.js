@@ -1266,7 +1266,7 @@ export function createVFX(THREE, env) {
     const cov = ss(lift, lift + 0.16, s);
     if (cov <= 0) return 0;
     let d = cov * ss(0, 0.16, h) * ss(1.0, 0.78, h);
-    d -= slice3(nB, u * 11.5, v * 11.5, h * 9.5) * 0.34 * (1 - 0.25 * h);
+    d -= slice3(nB, u * 8.5, v * 8.5, h * 7.5) * 0.24 * (1 - 0.25 * h);
     return Math.min(1, Math.max(0, d * 1.75)) * hole;
   }
   // Pseudo-3-D noise: blend two 2-D slices (hashed offsets) by the fractional depth z.
@@ -1311,7 +1311,7 @@ export function createVFX(THREE, env) {
       float cov = ssf(lift, lift + 0.16, s);
       if (cov <= 0.0) return 0.0;
       float d = cov * ssf(0.0, 0.16, h) * ssf(1.0, 0.78, h);
-      d -= slice3(uv * 11.5, h * 9.5).b * 0.34 * (1.0 - 0.25 * h);
+      d -= slice3(uv * 8.5, h * 7.5).b * 0.24 * (1.0 - 0.25 * h);
       return clamp(d * 1.75, 0.0, 1.0) * hole;
     }`;
 
@@ -1360,10 +1360,10 @@ export function createVFX(THREE, env) {
         }
         if (t1 <= t0) discard;
         float len = min(t1 - t0, 11000.0);
-        const int STEPS = 20;
+        const int STEPS = 24;
         // Geometric steps: fine where the ray enters the cloud skin, growing
-        // 16 % per step to cover the whole span cleanly at lower fragment cost.
-        const float GROW = 1.16;
+        // 12 % per step for silky close-up billows with zero hatching.
+        const float GROW = 1.12;
         float stepL = len * (GROW - 1.0) / (pow(GROW, float(STEPS)) - 1.0);
         // Interleaved gradient noise ray-offset dither (no row-correlated streaks), rotated per frame.
         vec2 fc = gl_FragCoord.xy + vec2(5.588238, 5.588238) * uFrame;
@@ -1410,6 +1410,8 @@ export function createVFX(THREE, env) {
         float alpha = 1.0 - T;
         if (alpha < 0.04) discard;
         col = col / alpha * uGain;
+        float sunGlow = pow(max(cosT, 0.0), 6.0) * 0.28 * (1.0 - T);
+        col += uSunCol * sunGlow;
         float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
         if (lum > uCap) col *= uCap / lum;                               // tops never reach the bloom threshold
         float dist = tHit > 0.0 ? tHit : t0;
@@ -1558,7 +1560,7 @@ export function createVFX(THREE, env) {
         const nx = Math.max(-1, Math.min(1, -hx * 9.5)), ny = Math.max(-1, Math.min(1, -hy * 9.5));
         const ao = Math.max(0, Math.min(1, 0.42 + 0.72 * c.h));
         const edge = r + (0.5 - c.bil) * 0.62 + (0.5 - c.fb) * 0.25 + (0.5 - c.hi) * 0.12;
-        let a = ss(1.0, 0.52, edge) * (0.82 + 0.32 * c.bil);
+        let a = ss(1.0, 0.44, edge) * (0.82 + 0.32 * c.bil);
         a *= ss(1.0, 0.88, Math.max(Math.abs(u), Math.abs(v)));                 // feather before the tile edge
         const k = ((oy + j) * N + ox + i) * 4;
         d[k] = Math.round((nx * 0.5 + 0.5) * 255);
@@ -1693,7 +1695,7 @@ export function createVFX(THREE, env) {
       b.on = cloudSea ? !!b.sea : !b.sea && b.rank < 0.5 + 0.5 * k;    // CLEAR ~65 %, SCATTERED ~86 %, overcast all
     }
     // Sea mode: the deck drops to 3,500-5,800 ft beyond the arena with a broken-cumulus threshold.
-    deckThr = cloudSea ? 0.36 : 0.6 - 0.4 * k;                          // CLEAR 0.48 / SCATTERED 0.31 / OVERCAST 0.20
+    deckThr = cloudSea ? 0.28 : 0.6 - 0.4 * k;                          // CLEAR 0.48 / SCATTERED 0.31 / OVERCAST 0.20
     [deckBase, deckThick] = cloudSea ? DECK_SEA : DECK_HI;
     deckWin.k = cloudSea ? 1 : 0;
     const u = deckMat.uniforms;
