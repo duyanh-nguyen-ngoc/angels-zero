@@ -160,6 +160,8 @@ node angel-zero/scripts/smoke_test.mjs
 
 The same suite runs automatically as the **Smoke Test** GitHub Action on every push and pull request to `main`, alongside **Deploy to Cloudflare Pages**. For determinism, the suite fulfills three.js r160 from the repo-root `smoke_vendor/` directory instead of hitting unpkg, and blocks YouTube/font/tile CDNs — so CI never stalls on third-party networks. The job allows 15 minutes because software-GL shader compilation on a GPU-less runner can take several minutes per cold boot. Boot loading is reported by a tactical progress HUD (percentage, MB, stage) and measured as `window.__az.bootMs`; the suite prints both F-22A and F-15C boot times locally and asserts the loading overlay is removed once the model is ready.
 
+Damaged or Winchester? Fly the ILS back to Archipelago AFB, touch down, brake to a stop on the apron and a 4-second pit stop restores fuel, airframe and stores without ending the sortie — then take off again.
+
 Your pilot record travels with you: **Controls & Audio → PILOT SAVE & CLOUD SYNC** can copy an `AZP1:` code, export/import a JSON file, or link an anonymous `AZ-XXXX-XXXX` Sync ID for optional cloud backup. Merging never lowers your progress.
 
 After a sortie, use **[ SHARE REPLAY ]** on the debrief to copy a compact link that lets friends watch your exact flight trace, kills and score. **[ SUBMIT SCORE ]** posts to the global leaderboard (when the Cloudflare KV binding is configured) and always saves a local personal board otherwise.

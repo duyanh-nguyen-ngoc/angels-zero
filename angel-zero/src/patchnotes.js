@@ -3,6 +3,10 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.82', title: 'RUNWAY LANDING, TAXI & MID-SORTIE REARM/REPAIR', bullets: [
+    'Complete the Archipelago AFB recovery loop: fly the ILS 3-degree glideslope, touch down, brake and taxi into the rearm apron, then get a full 4-second rearm, repair and refuel without ending the sortie.',
+    'The pit-stop now smoothly restores airframe and fuel during servicing, announces over the radio, and leaves you cleared for a fresh takeoff.'
+  ] },
   { version: 'v1.1.81', title: 'PILOT PROFILE CLOUD SYNC & SAVE EXPORT/IMPORT', bullets: [
     'Your rank, kills, unlocked liveries and loadout preferences can now be copied as a compact AZP1 pilot code or exported as a JSON file — no account needed.',
     'Optional Cloud Sync links that record to an anonymous AZ-XXXX-XXXX Pilot Sync ID, with automatic non-destructive merging so progress is never lost when moving between browsers or devices.'

@@ -116,7 +116,7 @@ async function navigate(query, waitReady = true) {
   resetCollectors();
   const qs = query.includes('nowarm') ? query : `${query}&nowarm`;
   const t0 = Date.now();
-  await page.goto(`${BASE}?${qs}`, { waitUntil: 'domcontentloaded', timeout: 90000 });
+  await page.goto(`${BASE}?${qs}`, { waitUntil: 'domcontentloaded', timeout: 240000 });
   console.log(`    [nav] domcontentloaded in ${Date.now() - t0} ms`);
   // Menu-boot checks only need the debug object (set during module evaluation),
   // not the full GLB/WebGL boot — navigating away immediately saves a cold boot.
@@ -261,6 +261,26 @@ const SCENARIOS = [
   ['Deterministic warp telemetry audit', async () => {
     assert(warpLogLine.startsWith('[ANGELS_ZERO] warp'), 'no [ANGELS_ZERO] warp log line');
     assert(!/NaN|undefined/i.test(warpLogLine), `warp line has NaN/undefined: ${warpLogLine.slice(0, 240)}`);
+  }],
+
+  ['Pit stop rearm / repair', async () => {
+    await switchMission('AIR_SUPERIORITY');
+    await page.evaluate(() => {
+      const a = window.__az;
+      a.placeOnRunway(1400);
+      a.state.groundSpeed = 8 / 1.94384; a.state.speed = a.state.groundSpeed;
+      a.state.velocity.set(0, 0, 0); a.state.throttle = 0;
+      a.combat.health = 45; a.combat.missiles = 0; a.state.fuel = 4000;
+    });
+    await page.evaluate(() => { for (let i = 0; i < 320; i++) window.__az.stepSim(1 / 60); });
+    const s = await page.evaluate(() => ({ done: window.__az.state.pit.done, active: window.__az.state.pit.active,
+      health: window.__az.combat.health, msl: window.__az.combat.missiles, fuel: window.__az.state.fuel,
+      gl: window.__az.renderer.getContext().getError() }));
+    assert(s.done === true && s.active === false, `pit not completed: ${JSON.stringify(s)}`);
+    assert(s.health === 100, `health ${s.health} !== 100`);
+    assert(s.msl > 0, `missiles ${s.msl} not rearmed`);
+    assert(s.fuel > 13000, `fuel ${s.fuel} not refilled`);
+    assert(s.gl === 0, 'WebGL error during pit stop');
   }],
 
   ['Debrief screen', async () => {
