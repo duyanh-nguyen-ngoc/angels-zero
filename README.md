@@ -157,7 +157,7 @@ npm i --no-save playwright && npx playwright install chromium
 node angel-zero/scripts/smoke_test.mjs
 ```
 
-The same suite runs automatically as the **Smoke Test** GitHub Action on every push and pull request to `main`, alongside **Deploy to Cloudflare Pages**. For determinism, the suite fulfills three.js r160 from the repo-root `smoke_vendor/` directory instead of hitting unpkg, and blocks YouTube/font/tile CDNs — so CI never stalls on third-party networks.
+The same suite runs automatically as the **Smoke Test** GitHub Action on every push and pull request to `main`, alongside **Deploy to Cloudflare Pages**. For determinism, the suite fulfills three.js r160 from the repo-root `smoke_vendor/` directory instead of hitting unpkg, and blocks YouTube/font/tile CDNs — so CI never stalls on third-party networks. The job allows 15 minutes because software-GL shader compilation on a GPU-less runner can take several minutes per cold boot.
 
 <details>
 <summary><strong>Repository Structure &amp; Tech Stack</strong></summary>
