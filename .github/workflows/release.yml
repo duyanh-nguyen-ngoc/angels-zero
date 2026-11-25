@@ -1,0 +1,28 @@
+name: GitHub Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Generate release notes from patchnotes.js
+        run: node angel-zero/scripts/extract_release_notes.mjs "${GITHUB_REF_NAME}" > RELEASE_NOTES.md
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "ANGELS ZERO ${GITHUB_REF_NAME}" \
+            --notes-file RELEASE_NOTES.md \
+            --latest

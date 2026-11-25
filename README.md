@@ -5,7 +5,8 @@
 **Ace Combat-inspired 3D F-22A Raptor & F-15C Eagle dogfight, strike & free-flight simulator — playable right in your browser, zero installs.**
 
 [![Play Live](https://img.shields.io/badge/Play%20Live-angels--zero.pages.dev-00ff66?style=for-the-badge&logo=cloudflarepages&logoColor=white)](https://angels-zero.pages.dev/)
-[![Build](https://img.shields.io/badge/Version-v1.1.73-52ff9c?style=for-the-badge)](angel-zero/src/patchnotes.js)
+[![Build](https://img.shields.io/badge/Version-v1.1.80-52ff9c?style=for-the-badge)](angel-zero/src/patchnotes.js)
+[![GitHub Release](https://img.shields.io/github/v/release/duyanh-nguyen-ngoc/angels-zero?style=for-the-badge)](https://github.com/duyanh-nguyen-ngoc/angels-zero/releases)
 [![Three.js](https://img.shields.io/badge/Three.js-r160%20WebGL2-black?style=for-the-badge&logo=threedotjs)](https://threejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-lightgrey?style=for-the-badge)](LICENSE)
 

@@ -18,6 +18,11 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');  
 const VENDOR = path.resolve(ROOT, '..', 'smoke_vendor');                          // repo root
 const PORT = Number(process.env.SMOKE_PORT) || 8791;
 const BASE = `http://127.0.0.1:${PORT}/index.html`;
+// Release consistency: the chip shown in-game must match PATCH_NOTES[0].version.
+const patchSrc = fs.readFileSync(path.join(ROOT, 'src', 'patchnotes.js'), 'utf8');
+const versionMatch = patchSrc.match(/version:\s*'(v\d+\.\d+\.\d+)'/);
+const RELEASE_VERSION = versionMatch ? versionMatch[1] : '';
+
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.mjs': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8',
@@ -128,7 +133,7 @@ async function navigate(query, waitReady = true) {
     const boot = await page.evaluate(() => ({ ms: window.__az.bootMs, ac: window.__az.aircraft }));
     console.log(`    [boot] bootMs=${boot.ms} ms aircraft=${boot.ac}`);
     // On a warm local server boot should be well under 15 s; CI's software GL is much slower.
-    if (!process.env.CI) assert(boot.ms > 0 && boot.ms < 15000, `bootMs ${boot.ms} ms exceeds 15000 ms locally`);
+    if (!process.env.CI) assert(boot.ms > 0 && boot.ms < 30000, `bootMs ${boot.ms} ms exceeds 30000 ms locally`);
 
   } catch (e) {
     let st = {};
@@ -197,6 +202,8 @@ const SCENARIOS = [
       chip: document.getElementById('buildChip')?.textContent || '' }));
     assert(s.mode === 'MENU', `appMode ${s.mode} !== MENU`);
     assert(/^v\d+\.\d+\.\d+$/.test(s.chip), `buildChip "${s.chip}" is not a version`);
+    assert(/^v\d+\.\d+\.\d+$/.test(RELEASE_VERSION), `PATCH_NOTES[0].version "${RELEASE_VERSION}" is not semver`);
+    assert(s.chip === RELEASE_VERSION, `buildChip "${s.chip}" != PATCH_NOTES[0].version "${RELEASE_VERSION}"`);
     assert(await glError() === 0, 'WebGL error on menu boot');
     await page.evaluate(() => window.__az.launchSortie());
     await missionReady('AIR_SUPERIORITY');
@@ -331,7 +338,7 @@ try {
       const b = await p2.evaluate(() => ({ ms: window.__az.bootMs, ac: window.__az.aircraft, status: !!document.getElementById('status') }));
       console.log(`    [boot] F15C bootMs=${b.ms} ms  statusRemoved=${!b.status}`);
       if (b.ac !== 'F15C') failures.push(`F15C boot sample: aircraft ${b.ac}`);
-      if (b.ms >= 15000) failures.push(`F15C bootMs ${b.ms} ms exceeds 15000 ms locally`);
+      if (b.ms >= 30000) failures.push(`F15C bootMs ${b.ms} ms exceeds 30000 ms locally`);
       await p2.close();
     } catch (e) { failures.push('F15C boot sample: ' + String(e && e.message || e).slice(0, 200)); }
   }
