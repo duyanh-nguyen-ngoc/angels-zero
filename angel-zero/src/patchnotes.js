@@ -3,6 +3,10 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.81', title: 'PILOT PROFILE CLOUD SYNC & SAVE EXPORT/IMPORT', bullets: [
+    'Your rank, kills, unlocked liveries and loadout preferences can now be copied as a compact AZP1 pilot code or exported as a JSON file — no account needed.',
+    'Optional Cloud Sync links that record to an anonymous AZ-XXXX-XXXX Pilot Sync ID, with automatic non-destructive merging so progress is never lost when moving between browsers or devices.'
+  ] },
   { version: 'v1.1.80', title: 'SHAREABLE DEBRIEF REPLAYS & GLOBAL LEADERBOARD', bullets: [
     'Copy a compact replay link from the debrief screen and let friends watch your exact flight trace, kills, rank, aircraft and score — no account or backend required.',
     'Submit your score to the global mission leaderboard, or fall back to a clean local personal board when the API is unavailable. Watch any leaderboard entry\'s trace directly from the board.'

@@ -750,6 +750,25 @@
           <input type="range" id="sbMusicVol" min="0" max="100" step="1" />
           <span id="sbMusicVolVal">100</span>
         </div>
+        <div class="ctrlSliderRow" style="display:block;margin-top:12px;border-top:1px solid rgba(255,255,255,.18);padding-top:10px">
+          <div style="font-size:13px;margin-bottom:6px">[ PILOT SAVE &amp; CLOUD SYNC ]</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+            <button id="psCopyCode" type="button">[ COPY PILOT CODE ]</button>
+            <button id="psExportJson" type="button">[ EXPORT .JSON ]</button>
+            <button id="psImportJson" type="button">[ IMPORT .JSON ]</button>
+            <span id="psMsg" style="color:#7cdcb0"></span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px">
+            <input id="psCodeInput" type="text" placeholder="PASTE AZP1: PILOT CODE" style="flex:1;min-width:180px;padding:3px 6px;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.35);color:#fff;font:inherit;text-transform:none" />
+            <button id="psRestoreCode" type="button">[ RESTORE ]</button>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px">
+            <span id="psSyncId">SYNC ID: —</span>
+            <button id="psSyncNow" type="button">[ SYNC NOW ]</button>
+            <button id="psLinkId" type="button">[ LINK ID ]</button>
+            <label style="display:flex;align-items:center;gap:4px"><input id="psSyncEnabled" type="checkbox" /> AUTO SYNC</label>
+          </div>
+        </div>
       </div>
       <div class="ctrlFoot">[ ESC / CLICK OUTSIDE ] CLOSE</div>
     </div>
@@ -774,42 +793,43 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s9ep';
-import { createAmbient } from './src/ambient.js?v=s9ep';
-import { createStormFX } from './src/stormfx.js?v=s9ep';
-import { createWetDeck } from './src/wetdeck.js?v=s9ep';
-import { createBlastFX } from './src/blastfx.js?v=s9ep';
-import { createHUD } from './src/hud.js?v=s9ep';
-import { createCockpit3D } from './src/cockpit3d.js?v=s9ep';
-import { createCockpitF22 } from './src/cockpit_f22.js?v=s9ep';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9ep';
-import { createEjection } from './src/eject.js?v=s9ep';
-import { createAudio } from './src/audio.js?v=s9ep';
-import { createYouTubeMusic } from './src/ytmusic.js?v=s9ep';
-import { createRadio } from './src/radio.js?v=s9ep';
-import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9ep';
-import { createLivery } from './src/livery.js?v=s9ep';
-import { createGear, GEAR_H, GEAR_PTS, GEAR_UNITS, setGearPoints } from './src/gear.js?v=s9ep';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9ep';
-import { createCanopyFX } from './src/canopy.js?v=s9ep';
-import { createNVG } from './src/nvg.js?v=s9ep';
-import { createWorld, WORLD } from './src/world.js?v=s9ep';
-import { createSurfaces } from './src/surfaces.js?v=s9ep';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9ep';
-import { createFreeLook } from './src/freelook.js?v=s9ep';
-import { createCanopyGlass } from './src/canopyglass.js?v=s9ep';
-import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9ep';
-import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9ep';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9ep';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9ep';
-import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9ep';
-import { createRadioQueue } from './src/radioQueue.js?v=s9ep';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9ep';
+import { createVFX } from './src/vfx.js?v=s9eq';
+import { createAmbient } from './src/ambient.js?v=s9eq';
+import { createStormFX } from './src/stormfx.js?v=s9eq';
+import { createWetDeck } from './src/wetdeck.js?v=s9eq';
+import { createBlastFX } from './src/blastfx.js?v=s9eq';
+import { createHUD } from './src/hud.js?v=s9eq';
+import { createCockpit3D } from './src/cockpit3d.js?v=s9eq';
+import { createCockpitF22 } from './src/cockpit_f22.js?v=s9eq';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9eq';
+import { createEjection } from './src/eject.js?v=s9eq';
+import { createAudio } from './src/audio.js?v=s9eq';
+import { createYouTubeMusic } from './src/ytmusic.js?v=s9eq';
+import { createRadio } from './src/radio.js?v=s9eq';
+import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9eq';
+import { createLivery } from './src/livery.js?v=s9eq';
+import { createGear, GEAR_H, GEAR_PTS, GEAR_UNITS, setGearPoints } from './src/gear.js?v=s9eq';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9eq';
+import { createCanopyFX } from './src/canopy.js?v=s9eq';
+import { createNVG } from './src/nvg.js?v=s9eq';
+import { createWorld, WORLD } from './src/world.js?v=s9eq';
+import { createSurfaces } from './src/surfaces.js?v=s9eq';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9eq';
+import { createFreeLook } from './src/freelook.js?v=s9eq';
+import { createCanopyGlass } from './src/canopyglass.js?v=s9eq';
+import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9eq';
+import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9eq';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9eq';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9eq';
+import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9eq';
+import { createRadioQueue } from './src/radioQueue.js?v=s9eq';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9eq';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
-  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9ep';
-import { createFreeFlight, FREE_FLIGHT_PRESETS, loadFreeFlightCity, saveFreeFlightCity } from './src/freeflight.js?v=s9ep';
-import { encodeReplay, decodeReplay, buildReplayUrl } from './src/replay_share.js?v=s9ep';
-import { fetchLeaderboard, submitScore } from './src/leaderboard.js?v=s9ep';
+  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9eq';
+import { createFreeFlight, FREE_FLIGHT_PRESETS, loadFreeFlightCity, saveFreeFlightCity } from './src/freeflight.js?v=s9eq';
+import { encodeReplay, decodeReplay, buildReplayUrl } from './src/replay_share.js?v=s9eq';
+import { fetchLeaderboard, submitScore } from './src/leaderboard.js?v=s9eq';
+import { collectPilotSnapshot, applyPilotSnapshot, exportPilotCode, importPilotCode, generateSyncId, getSyncId, setSyncId, isSyncEnabled, setSyncEnabled, pushCloudProfile, pullCloudProfile, syncNow, setRefreshCallback } from './src/profile_sync.js?v=s9eq';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -2683,6 +2703,7 @@ function endSortie(outcome) {
   const st = sortieStats();
   st.rankInfo = computeRank(st, outcome);
   const res = profile.recordSortie({ outcome, ...st, rankOverride: st.rankInfo.rank });
+  if (isSyncEnabled()) { pushCloudProfile().catch(() => {}); }   // opt-in, never blocks the debrief
   appMode = 'DEBRIEF';
   audio.silenceFlight();
   audio.resume();
@@ -3415,6 +3436,77 @@ function syncCtrlUI() {
   syncAudioUI();
 }
 sbMusicSlider.addEventListener('input', () => { audio.setMusicVolume(Number(sbMusicSlider.value) / 100); syncCtrlUI(); });
+
+/* ---- Pilot Save & Cloud Sync ---- */
+setRefreshCallback(() => {
+  try { renderHangar(); } catch (e) { /* not ready yet */ }
+  if (typeof syncSBMenu === 'function') syncSBMenu();
+  if (typeof syncAudioUI === 'function') syncAudioUI();
+  if (typeof syncLoadoutUI === 'function') syncLoadoutUI();
+});
+const psMsg = document.getElementById('psMsg');
+function psFlash(text) {
+  psMsg.textContent = text;
+  setTimeout(() => { if (psMsg.textContent === text) psMsg.textContent = ''; }, 2500);
+}
+for (const el of [document.getElementById('psCodeInput')]) {
+  el.addEventListener('mousedown', e => e.stopPropagation());
+  el.addEventListener('keydown', e => e.stopPropagation());
+  el.addEventListener('keyup', e => e.stopPropagation());
+}
+document.getElementById('psSyncId').textContent = 'SYNC ID: ' + getSyncId();
+document.getElementById('psSyncEnabled').checked = isSyncEnabled();
+document.getElementById('psSyncEnabled').addEventListener('change', e => {
+  setSyncEnabled(e.target.checked);
+  psFlash(e.target.checked ? 'AUTO SYNC ON' : 'AUTO SYNC OFF');
+});
+document.getElementById('psCopyCode').addEventListener('click', async e => {
+  e.stopPropagation();
+  const code = await exportPilotCode();
+  try { await navigator.clipboard.writeText(code); psFlash('COPIED!'); }
+  catch (err) { window.prompt('COPY PILOT CODE:', code); }
+});
+document.getElementById('psRestoreCode').addEventListener('click', async e => {
+  e.stopPropagation();
+  const res = await importPilotCode(document.getElementById('psCodeInput').value);
+  psFlash(res.ok ? 'RESTORED ' + res.keys + ' KEYS' : 'FAILED: ' + (res.reason || 'invalid'));
+});
+document.getElementById('psExportJson').addEventListener('click', e => {
+  e.stopPropagation();
+  const blob = new Blob([JSON.stringify(collectPilotSnapshot(), null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = 'angels-zero-pilot.json'; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  psFlash('EXPORTED .JSON');
+});
+const psFile = document.createElement('input');
+psFile.type = 'file'; psFile.accept = '.json,application/json'; psFile.style.display = 'none';
+document.body.appendChild(psFile);
+psFile.addEventListener('change', async () => {
+  const f = psFile.files && psFile.files[0];
+  if (!f) return;
+  try {
+    const res = applyPilotSnapshot(JSON.parse(await f.text()));
+    psFlash(res.ok ? 'IMPORTED ' + res.keys + ' KEYS' : 'FAILED: ' + (res.reason || 'invalid'));
+  } catch (err) { psFlash('INVALID FILE'); }
+  psFile.value = '';
+});
+document.getElementById('psImportJson').addEventListener('click', e => { e.stopPropagation(); psFile.click(); });
+document.getElementById('psSyncNow').addEventListener('click', async e => {
+  e.stopPropagation();
+  psFlash('SYNCING…');
+  const res = await syncNow();
+  document.getElementById('psSyncId').textContent = 'SYNC ID: ' + getSyncId();
+  psFlash(res.ok ? 'SYNC COMPLETE' : (res.offline ? 'OFFLINE — LOCAL ONLY' : 'SYNC UNAVAILABLE'));
+});
+document.getElementById('psLinkId').addEventListener('click', e => {
+  e.stopPropagation();
+  const id = window.prompt('ENTER PILOT SYNC ID (AZ-XXXX-XXXX):', getSyncId());
+  if (id && setSyncId(id)) {
+    document.getElementById('psSyncId').textContent = 'SYNC ID: ' + getSyncId();
+    psFlash('ID LINKED');
+  } else if (id) psFlash('INVALID ID');
+});
 
 const AX_X = new THREE.Vector3(1, 0, 0), AX_Y = new THREE.Vector3(0, 1, 0), AX_Z = new THREE.Vector3(0, 0, 1);
 const _dq = new THREE.Quaternion(), _fwd = new THREE.Vector3(), _up = new THREE.Vector3(), _right = new THREE.Vector3();
@@ -6714,6 +6806,7 @@ if (DEBUG) {
     get reactive() { return { ...audio.reactive, log: RX_LOG ? RX_LOG.slice(-30) : [] }; }, rxFire, sayText, rxTelemetry,
     get autoland() { return autoland; }, autolandPrompt, engageAutoland, finishCarrierTrap, getMusicCtx, get hudPrompt() { return hud.promptText; }, get debrief() { return !debriefEl.hidden; },
     encodeReplay, decodeReplay, buildReplayUrl, fetchLeaderboard, submitScore, get sharedReplay() { return sharedReplay; },
+    get profileSync() { return { collectPilotSnapshot, applyPilotSnapshot, exportPilotCode, importPilotCode, getSyncId, setSyncId, syncNow, pushCloudProfile, pullCloudProfile }; },
     get cat() { return cat; }, get skimK() { return skimK; }, catEnter, catTick, catFire, catSnapAll, carrierDiag, enterCarrierLaunch, carrierReady,
     get scramble() { return scramble; }, get bw() { return combat.bw; }, get intrusion() { return combat.intr; },
     get inESM() { return combatSys.inESM; }, get esm() { return combatSys.esm; }, get cloudIce() { return state.cloudIce; },

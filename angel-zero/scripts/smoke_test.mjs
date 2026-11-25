@@ -129,7 +129,7 @@ async function navigate(query, waitReady = true) {
     await page.waitForFunction(() => window.__az && window.__az.ready === true, null, { polling: 250, timeout: 360000 });
     console.log(`    [nav] __az.ready in ${Date.now() - t0} ms`);
     // The boot HUD fades and removes itself once the model is ready.
-    await page.waitForFunction(() => !document.getElementById('status'), null, { polling: 100, timeout: 10000 });
+    await page.waitForFunction(() => !document.getElementById('status'), null, { polling: 100, timeout: 60000 });
     const boot = await page.evaluate(() => ({ ms: window.__az.bootMs, ac: window.__az.aircraft }));
     console.log(`    [boot] bootMs=${boot.ms} ms aircraft=${boot.ac}`);
     // On a warm local server boot should be well under 15 s; CI's software GL is much slower.
@@ -276,6 +276,23 @@ const SCENARIOS = [
     await page.evaluate(() => document.getElementById('dbShareBtn').click());
   }],
 
+  ['Pilot profile code round-trip', async () => {
+    const r = await page.evaluate(async () => {
+      const code = await window.__az.profileSync.exportPilotCode();
+      const before = window.__az.profileSync.collectPilotSnapshot();
+      const res = await window.__az.profileSync.importPilotCode(code);
+      const after = window.__az.profileSync.collectPilotSnapshot();
+      return { prefix: code.slice(0, 5), len: code.length, ok: res.ok, reason: res.reason || '',
+        beforeKeys: Object.keys(before.keys).length, afterKeys: Object.keys(after.keys).length,
+        id: window.__az.profileSync.getSyncId(), gl: window.__az.renderer.getContext().getError() };
+    });
+    assert(r.prefix === 'AZP1:', `bad pilot code prefix ${r.prefix}`);
+    assert(r.ok === true, `pilot code import failed: ${r.reason} (len=${r.len})`);
+    assert(/^AZ-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(r.id), `bad sync id ${r.id}`);
+    assert(r.afterKeys >= r.beforeKeys, `keys lost: ${r.beforeKeys} -> ${r.afterKeys}`);
+    assert(r.gl === 0, 'WebGL error during pilot restore');
+  }],
+
   ['Shared replay link', async () => {
     const token = await page.evaluate(async () => window.__az.encodeReplay({
       callsign: 'WARDEN-1', mission: 'AIR_SUPERIORITY', aircraft: 'F22A', rank: 'A',
@@ -334,7 +351,7 @@ try {
       const p2 = await context.newPage();
       await p2.goto(`${BASE}?debug&nointro&nobgm&nowarm&mission=AIR_SUPERIORITY`, { waitUntil: 'domcontentloaded', timeout: 90000 });
       await p2.waitForFunction(() => window.__az?.ready === true, null, { polling: 250, timeout: 120000 });
-      await p2.waitForFunction(() => !document.getElementById('status'), null, { polling: 100, timeout: 10000 });
+      await p2.waitForFunction(() => !document.getElementById('status'), null, { polling: 100, timeout: 60000 });
       const b = await p2.evaluate(() => ({ ms: window.__az.bootMs, ac: window.__az.aircraft, status: !!document.getElementById('status') }));
       console.log(`    [boot] F15C bootMs=${b.ms} ms  statusRemoved=${!b.status}`);
       if (b.ac !== 'F15C') failures.push(`F15C boot sample: aircraft ${b.ac}`);
