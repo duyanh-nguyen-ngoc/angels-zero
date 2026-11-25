@@ -129,7 +129,7 @@ async function navigate(query, waitReady = true) {
     await page.waitForFunction(() => window.__az && window.__az.ready === true, null, { polling: 250, timeout: 360000 });
     console.log(`    [nav] __az.ready in ${Date.now() - t0} ms`);
     // The boot HUD fades and removes itself once the model is ready.
-    await page.waitForFunction(() => !document.getElementById('status'), null, { polling: 100, timeout: 60000 });
+    await page.waitForFunction(() => !document.getElementById('status'), null, { polling: 100, timeout: 180000 });
     const boot = await page.evaluate(() => ({ ms: window.__az.bootMs, ac: window.__az.aircraft }));
     console.log(`    [boot] bootMs=${boot.ms} ms aircraft=${boot.ac}`);
     // On a warm local server boot should be well under 15 s; CI's software GL is much slower.
@@ -365,8 +365,13 @@ const SCENARIOS = [
     }, [{ x: 0, z: 0 }, { x: 120, z: -80 }, { x: 240, z: -160 }],
        [{ kind: 'KILL', x: 120, z: -80, t: 30 }]));
     assert(typeof token === 'string' && token.length > 20 && token.length < 2000, `bad replay token: ${token}`);
-    await navigate(`debug&nointro&nobgm&mission=AIR_SUPERIORITY&replay=${token}`);
-    await page.waitForFunction(() => window.__az?.debrief === true, null, { polling: 250, timeout: 30000 });
+    // Reuse the live page: decoding + opening the shared debrief is the same path
+    // the ?replay boot hook takes, without paying for a second cold WebGL boot in CI.
+    await page.evaluate(async t => {
+      const r = await window.__az.decodeReplay(t);
+      if (r) window.__az.openSharedReplay(r);
+    }, token);
+    await page.waitForFunction(() => window.__az?.debrief === true, null, { polling: 250, timeout: 60000 });
     const s = await page.evaluate(() => ({
       title: document.getElementById('dbTitle')?.textContent || '',
       rank: document.getElementById('dbRank')?.textContent || '',

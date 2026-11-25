@@ -806,48 +806,48 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s9ew';
-import { createAmbient } from './src/ambient.js?v=s9ew';
-import { createStormFX } from './src/stormfx.js?v=s9ew';
-import { createWetDeck } from './src/wetdeck.js?v=s9ew';
-import { createBlastFX } from './src/blastfx.js?v=s9ew';
-import { createHUD } from './src/hud.js?v=s9ew';
-import { createCockpit3D } from './src/cockpit3d.js?v=s9ew';
-import { createCockpitF22 } from './src/cockpit_f22.js?v=s9ew';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9ew';
-import { createEjection } from './src/eject.js?v=s9ew';
-import { createAudio } from './src/audio.js?v=s9ew';
-import { createYouTubeMusic } from './src/ytmusic.js?v=s9ew';
-import { createRadio } from './src/radio.js?v=s9ew';
-import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9ew';
-import { createLivery } from './src/livery.js?v=s9ew';
-import { createGear, GEAR_H, GEAR_PTS, GEAR_UNITS, setGearPoints } from './src/gear.js?v=s9ew';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9ew';
-import { createCanopyFX } from './src/canopy.js?v=s9ew';
-import { createNVG } from './src/nvg.js?v=s9ew';
-import { createWorld, WORLD } from './src/world.js?v=s9ew';
-import { createSurfaces } from './src/surfaces.js?v=s9ew';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9ew';
-import { createFreeLook } from './src/freelook.js?v=s9ew';
-import { createCanopyGlass } from './src/canopyglass.js?v=s9ew';
-import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9ew';
-import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9ew';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9ew';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9ew';
-import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9ew';
-import { createRadioQueue } from './src/radioQueue.js?v=s9ew';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9ew';
+import { createVFX } from './src/vfx.js?v=s9ex';
+import { createAmbient } from './src/ambient.js?v=s9ex';
+import { createStormFX } from './src/stormfx.js?v=s9ex';
+import { createWetDeck } from './src/wetdeck.js?v=s9ex';
+import { createBlastFX } from './src/blastfx.js?v=s9ex';
+import { createHUD } from './src/hud.js?v=s9ex';
+import { createCockpit3D } from './src/cockpit3d.js?v=s9ex';
+import { createCockpitF22 } from './src/cockpit_f22.js?v=s9ex';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9ex';
+import { createEjection } from './src/eject.js?v=s9ex';
+import { createAudio } from './src/audio.js?v=s9ex';
+import { createYouTubeMusic } from './src/ytmusic.js?v=s9ex';
+import { createRadio } from './src/radio.js?v=s9ex';
+import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9ex';
+import { createLivery } from './src/livery.js?v=s9ex';
+import { createGear, GEAR_H, GEAR_PTS, GEAR_UNITS, setGearPoints } from './src/gear.js?v=s9ex';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9ex';
+import { createCanopyFX } from './src/canopy.js?v=s9ex';
+import { createNVG } from './src/nvg.js?v=s9ex';
+import { createWorld, WORLD } from './src/world.js?v=s9ex';
+import { createSurfaces } from './src/surfaces.js?v=s9ex';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9ex';
+import { createFreeLook } from './src/freelook.js?v=s9ex';
+import { createCanopyGlass } from './src/canopyglass.js?v=s9ex';
+import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9ex';
+import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9ex';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9ex';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9ex';
+import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9ex';
+import { createRadioQueue } from './src/radioQueue.js?v=s9ex';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9ex';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
-  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9ew';
-import { createFreeFlight, FREE_FLIGHT_PRESETS, loadFreeFlightCity, saveFreeFlightCity, geocodePlace, loadCustomPlace, saveCustomPlace } from './src/freeflight.js?v=s9ew';
-import { encodeReplay, decodeReplay, buildReplayUrl } from './src/replay_share.js?v=s9ew';
-import { fetchLeaderboard, submitScore } from './src/leaderboard.js?v=s9ew';
-import { collectPilotSnapshot, applyPilotSnapshot, exportPilotCode, importPilotCode, generateSyncId, getSyncId, setSyncId, isSyncEnabled, setSyncEnabled, pushCloudProfile, pullCloudProfile, syncNow, setRefreshCallback } from './src/profile_sync.js?v=s9ew';
-import { createTraining } from './src/training.js?v=s9ew';
-import { createInputExt } from './src/input_ext.js?v=s9ew';
-import { createOcean } from './src/ocean.js?v=s9ew';
-import { createWingmenFlight } from './src/wingmen.js?v=s9ew';
-import { createFlightPhysics } from './src/flight.js?v=s9ew';
+  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9ex';
+import { createFreeFlight, FREE_FLIGHT_PRESETS, loadFreeFlightCity, saveFreeFlightCity, geocodePlace, loadCustomPlace, saveCustomPlace } from './src/freeflight.js?v=s9ex';
+import { encodeReplay, decodeReplay, buildReplayUrl } from './src/replay_share.js?v=s9ex';
+import { fetchLeaderboard, submitScore } from './src/leaderboard.js?v=s9ex';
+import { collectPilotSnapshot, applyPilotSnapshot, exportPilotCode, importPilotCode, generateSyncId, getSyncId, setSyncId, isSyncEnabled, setSyncEnabled, pushCloudProfile, pullCloudProfile, syncNow, setRefreshCallback } from './src/profile_sync.js?v=s9ex';
+import { createTraining } from './src/training.js?v=s9ex';
+import { createInputExt } from './src/input_ext.js?v=s9ex';
+import { createOcean } from './src/ocean.js?v=s9ex';
+import { createWingmenFlight } from './src/wingmen.js?v=s9ex';
+import { createFlightPhysics } from './src/flight.js?v=s9ex';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -6108,7 +6108,7 @@ if (DEBUG) {
     encodeReplay, decodeReplay, buildReplayUrl, fetchLeaderboard, submitScore, get sharedReplay() { return sharedReplay; },
     get profileSync() { return { collectPilotSnapshot, applyPilotSnapshot, exportPilotCode, importPilotCode, getSyncId, setSyncId, syncNow, pushCloudProfile, pullCloudProfile }; },
     get training() { return training.state; }, jumpTraining: n => training.jump(n), geocodePlace,
-    get inputExt() { return inputExt; },
+    get inputExt() { return inputExt; }, openSharedReplay,
     get cat() { return cat; }, get skimK() { return skimK; }, catEnter, catTick, catFire, catSnapAll, carrierDiag, enterCarrierLaunch, carrierReady,
     get scramble() { return scramble; }, get bw() { return combat.bw; }, get intrusion() { return combat.intr; },
     get inESM() { return combatSys.inESM; }, get esm() { return combatSys.esm; }, get cloudIce() { return state.cloudIce; },
