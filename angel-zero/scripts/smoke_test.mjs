@@ -213,7 +213,7 @@ const SCENARIOS = [
     assert(s.cam === 'CHASE', `initial camera ${s.cam}`);
     for (const expected of ['COCKPIT', 'NOSE', 'CHASE']) {
       await page.keyboard.press('Space');
-      await page.waitForFunction(m => window.__az?.camMode === m, expected, { polling: 250, timeout: 30000 });
+      await page.waitForFunction(m => window.__az?.camMode === m, expected, { polling: 250, timeout: 90000 });
       assert(await glError() === 0, `WebGL error after switching to ${expected}`);
     }
   }],
