@@ -731,7 +731,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s9dt';
+import { createVFX } from './src/vfx.js?v=s9ec';
 import { createAmbient } from './src/ambient.js?v=s9dz';
 import { createBlastFX } from './src/blastfx.js?v=s9dd';
 import { createHUD } from './src/hud.js?v=s9eb';
@@ -744,7 +744,7 @@ import { createRadio } from './src/radio.js?v=s9dd';
 import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9dd';
 import { createLivery } from './src/livery.js?v=s9dd';
 import { createGear, GEAR_H, GEAR_PTS, GEAR_UNITS, setGearPoints } from './src/gear.js?v=s9dl';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9dd';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9ec';
 import { createCanopyFX } from './src/canopy.js?v=s9dd';
 import { createNVG } from './src/nvg.js?v=s9dd';
 import { createWorld, WORLD } from './src/world.js?v=s9dz';
@@ -754,7 +754,7 @@ import { createFreeLook } from './src/freelook.js?v=s9dd';
 import { createCanopyGlass } from './src/canopyglass.js?v=s9dd';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9dd';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9dd';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9eb';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9ec';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9de';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9dd';
 import { createRadioQueue } from './src/radioQueue.js?v=s9dj';
@@ -1818,7 +1818,7 @@ function loadMissionScene(m) {
   if (m.freeFlight) {
     if (typeof radioReset === 'function') radioReset(0);
     if (!WX_FORCED) { weather.set('CLOUD_SEA', { instant: true }); vfx.setCloudSea(true); }
-    if (!(DEBUG && Q.has('tod'))) atmosphere.applyTimeOfDay('GOLDEN_HOUR', { instant: true });
+    if (!(DEBUG && Q.has('tod'))) atmosphere.applyTimeOfDay('CLOUD_SEA', { instant: true });
     const clat = Q.has('lat') ? Number(Q.get('lat')) : NaN;
     const clon = Q.has('lon') ? Number(Q.get('lon')) : NaN;
     freeFlight.start(selectedFfCity, Number.isFinite(clat) && Number.isFinite(clon) ? { lat: clat, lon: clon } : null);

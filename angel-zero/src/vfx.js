@@ -1185,7 +1185,7 @@ export function createVFX(THREE, env) {
   // Deck slab: 9,000-13,000 ft normally; in DAYLIGHT // CLOUD SEA it drops to the
   // 3,500-5,800 ft cloud-sea band and opens a soft hole over the arena (where the
   // instanced cloud-sea banks take over), so the sea runs on to the horizon haze.
-  const DECK_HI = [9000 * FT, 4000 * FT], DECK_SEA = [3500 * FT, 2300 * FT];
+  const DECK_HI = [9000 * FT, 4000 * FT], DECK_SEA = [3300 * FT, 4200 * FT];
   let deckBase = DECK_HI[0], deckThick = DECK_HI[1];
   const DECK_SCALE = 9000;
   // Sea mode: the deck fills the whole band, with feathered sky windows (list set below).
@@ -1257,17 +1257,17 @@ export function createVFX(THREE, env) {
     if (deckWin.k > 0) for (const w of deckWin.list) hole = Math.min(hole, ss(w.r - 700, w.r + 1400, Math.hypot(x - w.x, z - w.z)));
     if (hole <= 0) return 0;
     const u = (x + windOff.x) / DECK_SCALE, v = (z + windOff.z) / DECK_SCALE;
-    // Coverage field + pseudo-3-D billows / erosion (2-D slices blended by height:
-    // features change with altitude in no fixed direction -> no extruded columns,
-    // no radial streaks), and a threshold that rises with height -> rounded tops.
-    const s = 0.55 * samp(nR, u, v) + 0.3 * slice3(nG, u * 2.7 + 0.37, v * 2.7 + 0.61, h * 3.6)
-      + 0.15 * (slice3(nG, u * 6.1, v * 6.1, h * 6.5) - 0.5);
-    const lift = deckThr + 0.2 * h * h;
+    // Coverage field + two-tier cumulus turret mask + pseudo-3-D billows / erosion.
+    const s = 0.56 * samp(nR, u, v) + 0.30 * slice3(nG, u * 2.6 + 0.37, v * 2.6 + 0.61, h * 3.8)
+      + 0.14 * (slice3(nG, u * 5.9, v * 5.9, h * 6.8) - 0.5);
+    const tRaw = Math.min(1, Math.max(0, 0.65 * samp(nR, u * 1.35 + 0.21, v * 1.35 + 0.73) + 0.35 * samp(nG, u * 2.1, v * 2.1)));
+    const turret = Math.pow(tRaw, 1.85);
+    const lift = deckThr + 0.28 * h * h - 0.24 * turret * ss(0.15, 0.85, h);
     const cov = ss(lift, lift + 0.16, s);
     if (cov <= 0) return 0;
-    let d = cov * ss(0, 0.2, h);
-    d -= slice3(nB, u * 13, v * 13, h * 9.0) * 0.3 * (1 - 0.4 * h);
-    return Math.min(1, Math.max(0, d * 1.6)) * hole;
+    let d = cov * ss(0, 0.16, h) * ss(1.0, 0.78, h);
+    d -= slice3(nB, u * 11.5, v * 11.5, h * 9.5) * 0.34 * (1 - 0.25 * h);
+    return Math.min(1, Math.max(0, d * 1.75)) * hole;
   }
   // Pseudo-3-D noise: blend two 2-D slices (hashed offsets) by the fractional depth z.
   function slice3(arr, u, v, z) {
@@ -1304,14 +1304,15 @@ export function createVFX(THREE, env) {
       if (uHoleK > 0.0) for (int i = 0; i < 3; i++) hole = min(hole, ssf(uWin[i].z - 700.0, uWin[i].z + 1400.0, length(p.xz - uWin[i].xy)));
       if (hole <= 0.0) return 0.0;
       vec2 uv = (p.xz + uWind.xz) / ${DECK_SCALE.toFixed(1)};
-      float s = 0.55 * NOISE(uv).r + 0.3 * slice3(uv * 2.7 + vec2(0.37, 0.61), h * 3.6).g
-        + 0.15 * (slice3(uv * 6.1, h * 6.5).g - 0.5);
-      float lift = uThr + 0.2 * h * h;
+      float s = 0.56 * NOISE(uv).r + 0.30 * slice3(uv * 2.6 + vec2(0.37, 0.61), h * 3.8).g
+        + 0.14 * (slice3(uv * 5.9, h * 6.8).g - 0.5);
+      float turret = pow(clamp(0.65 * NOISE(uv * 1.35 + vec2(0.21, 0.73)).r + 0.35 * NOISE(uv * 2.1).g, 0.0, 1.0), 1.85);
+      float lift = uThr + 0.28 * h * h - 0.24 * turret * ssf(0.15, 0.85, h);
       float cov = ssf(lift, lift + 0.16, s);
       if (cov <= 0.0) return 0.0;
-      float d = cov * ssf(0.0, 0.2, h);
-      d -= slice3(uv * 13.0, h * 9.0).b * 0.3 * (1.0 - 0.4 * h);
-      return clamp(d * 1.6, 0.0, 1.0) * hole;
+      float d = cov * ssf(0.0, 0.16, h) * ssf(1.0, 0.78, h);
+      d -= slice3(uv * 11.5, h * 9.5).b * 0.34 * (1.0 - 0.25 * h);
+      return clamp(d * 1.75, 0.0, 1.0) * hole;
     }`;
 
   // --- (1) raymarched sky deck -------------------------------------------
@@ -1358,11 +1359,11 @@ export function createVFX(THREE, env) {
           t0 = max(min(ta, tb), 0.0); t1 = min(max(ta, tb), 40000.0);
         }
         if (t1 <= t0) discard;
-        float len = min(t1 - t0, 8000.0);
-        const int STEPS = 12;
+        float len = min(t1 - t0, 11000.0);
+        const int STEPS = 20;
         // Geometric steps: fine where the ray enters the cloud skin, growing
-        // 24 % per step to cover the whole span cleanly at lower fragment cost.
-        const float GROW = 1.24;
+        // 16 % per step to cover the whole span cleanly at lower fragment cost.
+        const float GROW = 1.16;
         float stepL = len * (GROW - 1.0) / (pow(GROW, float(STEPS)) - 1.0);
         // Interleaved gradient noise ray-offset dither (no row-correlated streaks), rotated per frame.
         vec2 fc = gl_FragCoord.xy + vec2(5.588238, 5.588238) * uFrame;
@@ -1373,7 +1374,7 @@ export function createVFX(THREE, env) {
         float T = 1.0, tHit = -1.0;
         vec3 col = vec3(0.0);
         float cosT = dot(rd, uSun);
-        float phase = mix(hg(cosT, 0.62), hg(cosT, -0.25), 0.3) * 4.0;     // forward silver rim + soft back lobe
+        float phase = mix(hg(cosT, 0.72), hg(cosT, -0.32), 0.34) * 3.8;     // forward silver rim + soft back lobe
         vec3 sunL = uSun.y > -0.05 ? uSun : vec3(0.0, 1.0, 0.0);
         for (int i = 0; i < STEPS; i++) {
           vec3 p = ro + rd * t;
@@ -1382,19 +1383,23 @@ export function createVFX(THREE, env) {
           float d = deckDensity(p) * near;
           if (d > 0.01) {
             if (tHit < 0.0) tHit = t;
-            // Single jittered light march tap on coarse mip for smooth self-shadowing (skip when nearly opaque).
-            float Tl = 0.35;
-            if (T > 0.08) {
+            // 2-tap sun light march + Beer-Powder self-shadowing (skip when nearly opaque).
+            float Tl = 0.28;
+            if (T > 0.06) {
               float lodV = gLod;
-              gLod = lodV + 2.5;
-              float od = deckDensity(p + sunL * (180.0 + 120.0 * jit)) * 420.0;
+              gLod = lodV + 1.2;
+              float od = deckDensity(p + sunL * (135.0 + 85.0 * jit)) * 240.0;
+              gLod = lodV + 2.4;
+              od += deckDensity(p + sunL * (480.0 + 160.0 * jit)) * 460.0;
               gLod = lodV;
-              Tl = exp(-od * 0.0055);                                  // Beer-Lambert toward the sun
+              float beer = exp(-od * 0.0068);
+              float powder = 1.0 - exp(-od * 0.018);
+              Tl = beer * mix(1.0, 0.45 + 1.15 * powder, 0.55);
             }
             float h = clamp((p.y - y0) / (y1 - y0), 0.0, 1.0);
-            vec3 amb = mix(uBelly * 0.75, uTop * 0.9, smoothstep(0.0, 0.85, h));
-            vec3 S = amb * 0.62 + uSunCol * Tl * (0.38 + phase) * 0.9 + vec3(0.75, 0.8, 1.0) * uFlash * 0.6;
-            float a = 1.0 - exp(-d * 0.0055 * stepL);                      // Beer-Lambert extinction
+            vec3 amb = mix(uBelly * 0.62, uTop * 1.05, smoothstep(0.05, 0.82, h));
+            vec3 S = amb * 0.56 + uSunCol * Tl * (0.48 + phase) * 1.08 + vec3(0.75, 0.8, 1.0) * uFlash * 0.6;
+            float a = 1.0 - exp(-d * 0.0062 * stepL);                      // Beer-Lambert extinction
             col += T * a * S;
             T *= 1.0 - a;
             if (T < 0.02) break;
@@ -1409,7 +1414,7 @@ export function createVFX(THREE, env) {
         if (lum > uCap) col *= uCap / lum;                               // tops never reach the bloom threshold
         float dist = tHit > 0.0 ? tHit : t0;
         #ifdef USE_FOG
-          float af = 1.0 - exp(-fogDensity * fogDensity * dist * dist * 0.55);   // aerial perspective
+          float af = 1.0 - exp(-fogDensity * fogDensity * dist * dist * 0.22);   // crisp distant cumulus towers
           col = mix(col, fogColor, af);
         #endif
         alpha *= 1.0 - smoothstep(26000.0, 38000.0, dist);                  // soft far edge, no hard cutoff
@@ -1487,13 +1492,14 @@ export function createVFX(THREE, env) {
       const x = f.x + u * Math.cos(f.yaw) - v * Math.sin(f.yaw), z = f.z + u * Math.sin(f.yaw) + v * Math.cos(f.yaw);
       if (Math.hypot(x - ARENA.x, z - ARENA.z) > ARENA.r) continue;
       const W = 1400 + sr() * 1800;
-      const H = Math.min(680, Math.max(380, W / (3 + sr() * 2)));              // 3-5x wider than tall
+      const tower = (sea.length % 3) === 0;
+      const H = tower ? 720 + sr() * 520 : Math.min(680, Math.max(380, W / (3 + sr() * 2)));   // ~30% tall cumulus turrets
       const D = W * (0.5 + sr() * 0.35);
       if (SEA_WINDOWS.some(w => Math.hypot(x - w.x, z - w.z) < w.r + W * 0.5)) continue;
       if (sea.some(b => Math.hypot(b.x - x, b.z - z) < (b.W + W) * 0.28)) continue;   // overlap, but no stacking
-      const base = SEA_LO + sr() * Math.max(0, SEA_HI - SEA_LO - H);
+      const base = SEA_LO + sr() * Math.max(0, SEA_HI - SEA_LO - Math.min(H, 680));
       const yaw = f.yaw + (sr() - 0.5) * 0.9;
-      sea.push({ x, z, W, D, H, base, yaw, c: Math.cos(yaw), s: Math.sin(yaw), rank: sr(), on: false, sea: true });
+      sea.push({ x, z, W, D, H, base, yaw, c: Math.cos(yaw), s: Math.sin(yaw), rank: sr(), on: false, sea: true, tower });
     }
     for (const b of sea) {
       banks.push(b);
@@ -1502,14 +1508,14 @@ export function createVFX(THREE, env) {
       for (let i = 0; i < n; i++) {
         // 45 % flat base sheet, the rest billowing crowns pulled inward as they rise.
         const low = i < n * 0.45;
-        const h = low ? 0.1 + sr() * 0.25 : 0.38 + Math.pow(sr(), 0.85) * 0.5;
-        const shrink = low ? 0.95 : 1 - 0.5 * (h - 0.3);
+        const h = low ? 0.1 + sr() * 0.25 : 0.38 + Math.pow(sr(), 0.85) * 0.55;
+        const shrink = low ? 0.95 : (b.tower ? 1 - 0.65 * (h - 0.25) : 1 - 0.5 * (h - 0.3));
         const ang = sr() * Math.PI * 2, rad = Math.sqrt(sr()) * shrink;
         const lx = Math.cos(ang) * rad * b.W * 0.44, lz = Math.sin(ang) * rad * b.D * 0.44;
-        const size = b.H * (low ? 0.95 + sr() * 0.35 : 0.7 + sr() * 0.4) + 140;
+        const size = (b.tower ? b.H * 0.72 : b.H) * (low ? 0.95 + sr() * 0.35 : 0.7 + sr() * 0.4) + 140;
         // Keep the visible card (~0.36 x size below centre) above the deck base: flat bellies, open air below.
         const y = Math.max(b.base + h * b.H, b.base + size * 0.36);
-        puffs.push({ x: b.x + lx * b.c - lz * b.s, y: Math.min(y, SEA_HI + 120), z: b.z + lx * b.s + lz * b.c, s: size, h,
+        puffs.push({ x: b.x + lx * b.c - lz * b.s, y: Math.min(y, SEA_HI + (b.tower ? 480 : 140)), z: b.z + lx * b.s + lz * b.c, s: size, h,
           rot: sr() * Math.PI * 2, tile: Math.floor(sr() * 4), str: low ? 1.5 + sr() * 0.4 : 1.1 + sr() * 0.25, al: 1, bi });
       }
     }
@@ -1530,22 +1536,35 @@ export function createVFX(THREE, env) {
     sortClouds(0, true);
   }
 
-  // Cauliflower Worley-FBM puff atlas (2x2 tiles, 512 px), alpha only, feathered.
+  // Cauliflower Worley-FBM puff atlas (2x2 tiles, 512 px): RG = lobe normal, B = crevice AO, A = feathered alpha.
   const atlasTex = (() => {
-    const N = 512, T = 256, cv = document.createElement('canvas'); cv.width = cv.height = N;
+    const N = 512, T = 256, eps = 2 / T, cv = document.createElement('canvas'); cv.width = cv.height = N;
     const ctx = cv.getContext('2d', { willReadFrequently: true });
     const img = ctx.createImageData(N, N), d = img.data;
+    const hVal = (u, v, so) => {
+      const bil = samp(nG, u * 0.33 + so, v * 0.33 + so * 1.7);
+      const fb = samp(nR, u * 0.5 + so, v * 0.5 - so);
+      const hi = samp(nB, u * 0.9 + so, v * 0.9);
+      return { bil, fb, hi, h: bil * 0.60 + fb * 0.26 + hi * 0.14 };
+    };
     for (let tile = 0; tile < 4; tile++) {
       const ox = (tile % 2) * T, oy = Math.floor(tile / 2) * T, so = tile * 0.23 + 0.07;
       for (let j = 0; j < T; j++) for (let i = 0; i < T; i++) {
         const u = i / T * 2 - 1, v = j / T * 2 - 1;
         const r = Math.hypot(u, v * (v > 0 ? 1.15 : 0.95));
-        const bil = samp(nG, u * 0.33 + so, v * 0.33 + so * 1.7), fb = samp(nR, u * 0.5 + so, v * 0.5 - so), hi = samp(nB, u * 0.9 + so, v * 0.9);
-        const edge = r + (0.5 - bil) * 0.62 + (0.5 - fb) * 0.25 + (0.5 - hi) * 0.12;
-        let a = ss(1.0, 0.42, edge) * (0.78 + 0.35 * bil);
+        const c = hVal(u, v, so);
+        const hx = hVal(u + eps, v, so).h - hVal(u - eps, v, so).h;
+        const hy = hVal(u, v + eps, so).h - hVal(u, v - eps, so).h;
+        const nx = Math.max(-1, Math.min(1, -hx * 9.5)), ny = Math.max(-1, Math.min(1, -hy * 9.5));
+        const ao = Math.max(0, Math.min(1, 0.42 + 0.72 * c.h));
+        const edge = r + (0.5 - c.bil) * 0.62 + (0.5 - c.fb) * 0.25 + (0.5 - c.hi) * 0.12;
+        let a = ss(1.0, 0.52, edge) * (0.82 + 0.32 * c.bil);
         a *= ss(1.0, 0.88, Math.max(Math.abs(u), Math.abs(v)));                 // feather before the tile edge
         const k = ((oy + j) * N + ox + i) * 4;
-        d[k] = d[k + 1] = d[k + 2] = 255; d[k + 3] = Math.round(Math.max(0, Math.min(1, a)) * 255);
+        d[k] = Math.round((nx * 0.5 + 0.5) * 255);
+        d[k + 1] = Math.round((ny * 0.5 + 0.5) * 255);
+        d[k + 2] = Math.round(ao * 255);
+        d[k + 3] = Math.round(Math.max(0, Math.min(1, a)) * 255);
       }
     }
     ctx.putImageData(img, 0, 0);
@@ -1604,22 +1623,25 @@ export function createVFX(THREE, env) {
       float hg(float c, float g) { float g2 = g * g; return (1.0 - g2) / (12.566 * pow(1.0 + g2 - 2.0 * g * c, 1.5)); }
       void main() {
         #include <logdepthbuf_fragment>
-        float a = texture2D(uAtlas, vUv).a;
+        vec4 tex = texture2D(uAtlas, vUv);
+        float a = tex.a;
         if (a < 0.04) discard;
         float d = length(vView);
         float near = smoothstep(uNear.x, uNear.y, d);                    // 180 -> 40 m: fade into the vapour
         if (near < 0.002) discard;
-        // Fake spherical normal (view space) across the puff: the card shades like a ball.
+        // Sculpted cauliflower normal (view space) + crevice AO from the atlas.
+        vec2 lobeN = (tex.rg * 2.0 - 1.0) * 0.95;
+        float crevice = tex.b;
         float r2 = min(dot(vQ, vQ), 1.0);
-        vec3 n = normalize(vec3(vQ * 0.85, sqrt(1.0 - r2) + 0.25));
-        float wrap = clamp((dot(n, uSunV) + 0.55) / 1.55, 0.0, 1.0);    // wrap-lit sun term
-        float bankShade = mix(0.55, 1.0, smoothstep(0.05, 0.85, vH));     // bellies sit in the bank's own shadow
-        vec3 amb = mix(uBelly * 0.85, uTop * 0.82, smoothstep(0.0, 0.9, vH));
-        vec3 sun = uSunCol * wrap * bankShade;
+        vec3 n = normalize(vec3(vQ * 0.78 + lobeN, sqrt(1.0 - r2) + 0.32));
+        float wrap = smoothstep(-0.35, 0.95, dot(n, uSunV));              // crisp sunlit-vs-shadowed lobes
+        float bankShade = mix(0.32, 1.08, smoothstep(0.04, 0.86, vH));    // bellies sit in the bank's own shadow
+        vec3 amb = mix(uBelly * 0.68, uTop * 0.96, smoothstep(0.0, 0.88, vH)) * mix(0.68, 1.06, crevice);
+        vec3 sun = uSunCol * wrap * bankShade * mix(0.75, 1.12, crevice);
         // Henyey-Greenstein silver lining on thin edges when looking toward the sun.
         float cosT = dot(normalize(vView), uSunV);
-        float rim = hg(cosT, 0.6) * 4.0 * (1.0 - smoothstep(0.12, 0.6, a)) * (0.5 + 0.5 * vH);
-        vec3 col = (amb * 0.6 + sun * 0.62 + uSunCol * rim * 0.9) * mix(1.06, 0.92, smoothstep(0.3, 0.95, a));
+        float rim = hg(cosT, 0.68) * 4.2 * (1.0 - smoothstep(0.10, 0.58, a)) * (0.45 + 0.55 * vH);
+        vec3 col = (amb * 0.58 + sun * 0.78 + uSunCol * rim * 0.95) * mix(1.08, 0.92, smoothstep(0.32, 0.95, a));
         col = col * uGain + vec3(0.75, 0.8, 1.0) * uFlash * (0.45 + 0.55 * (1.0 - vH));
         float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
         if (lum > uCap) col *= uCap / lum;                               // crisp white, never blooms
@@ -1627,7 +1649,7 @@ export function createVFX(THREE, env) {
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
         #ifdef USE_FOG
-          float cfog = 1.0 - exp(-fogDensity * fogDensity * vFogDepth * vFogDepth * 0.5);   // banks keep ~half the haze
+          float cfog = 1.0 - exp(-fogDensity * fogDensity * vFogDepth * vFogDepth * 0.26);   // keep crisp contrast at range
           gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, cfog);
         #endif
       }`,
@@ -1677,7 +1699,7 @@ export function createVFX(THREE, env) {
     const u = deckMat.uniforms;
     u.uThr.value = deckThr; u.uDeckY.value.set(deckBase, deckThick); u.uHoleK.value = deckWin.k;
     deckWin.list.forEach((w, i) => u.uWin.value[i].set(w.x, w.z, w.r));
-    u.uCap.value = cloudMat.uniforms.uCap.value = cloudSea ? 0.86 : 8;
+    u.uCap.value = cloudMat.uniforms.uCap.value = cloudSea ? 1.12 : 8;
     sortClouds(0, true);
   }
   function setCloudSea(on) {

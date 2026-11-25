@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.70', title: 'ACE COMBAT 7 VOLUMETRIC CUMULUS CLOUDS & CIRRUS SKY', bullets: [
+    'Upgraded the volumetric cloud deck with a 20-step Beer-Powder light marcher, two-tier cumulus congestus turrets rising up to 7,500 ft, and crisper sunlit tops vs deep slate-blue shadowed bellies.',
+    'Added procedural 3D cauliflower lobe normals and crevice ambient occlusion to the 3D cumulus puff atlas and shader, plus towering congestus turret banks.',
+    'Added high-altitude wispy cirrus streaks and deeper AC7 cobalt-azure sky gradients to the sky dome, and switched Free Flight default lighting to DAYLIGHT // CLOUD SEA.'
+  ] },
   { version: 'v1.1.69', title: 'ACE COMBAT 7 NOSE CAMERA HUD', bullets: [
     'Redesigned the Nose Camera HUD to match the Ace Combat 7 HUD-only nose view: cyan-mint vertical bracket rails with inward end caps, fine scrolling speed and altitude tick marks, boxed SPEED and ALT readouts, an inner-left vertical throttle/AB bar, and a top-left [A/B] indicator.',
     'Added the centered dotted compass heading strip with cardinal markers and downward caret, plus a gull-wing boresight symbol and conformal pitch ladder.'

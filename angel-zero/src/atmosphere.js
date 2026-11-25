@@ -25,11 +25,11 @@ export const PRESETS = {
   // Warm-white key below the bloom threshold, cool low fill so undersides stay shadowed.
   CLOUD_SEA: {
     label: 'DAYLIGHT // CLOUD SEA', sunEl: 48, lightEl: 48, az: 332, moon: false, window: [10 * 60 + 30, 13 * 60 + 30],
-    horizon: 0x95b1cc, mid: 0x5180b3, zenith: 0x2f5b8f, mie: 0xffe6c2, mieK: 0.55, disc: 0xfff6e6, discK: 1.0, discSize: 0.99990,
+    horizon: 0x9ec2e2, mid: 0x3b72b5, zenith: 0x1a4480, mie: 0xffe6c2, mieK: 0.55, disc: 0xfff6e6, discK: 1.0, discSize: 0.99990,
     light: 0xfff6e6, lightI: 2.85, hemiSky: 0x6f94bc, hemiGround: 0x2a343b, hemiI: 1.05, amb: 0x7f95ad, ambI: 0.2,
-    exposure: 1.0, fogK: 0.92, stars: 0, corona: 1.0,
+    exposure: 1.0, fogK: 0.72, stars: 0, corona: 1.0,
     oceanSun: 0xffe8c4, oceanSunK: 1.0, oceanSky: 0x4f74a0, oceanLevel: 1.0, glitter: 1.0,
-    cloudTop: 0xe6ebf0, cloudBelly: 0x64778c, env: 1.0, nvgGain: 2.1, nav: 0.0, exact: 1
+    cloudTop: 0xf7faff, cloudBelly: 0x4b6482, env: 1.0, nvgGain: 2.1, nav: 0.0, exact: 1
   },
   DAWN: {
     label: 'DAWN BREAK', sunEl: 6, lightEl: 6, moon: false, window: [5 * 60 + 35, 6 * 60 + 25],
@@ -45,7 +45,7 @@ export const PRESETS = {
     light: 0xfff0d6, lightI: 3.4, hemiSky: 0xbdd6ee, hemiGround: 0x3b4a40, hemiI: 1.5, amb: 0xa8bdd0, ambI: 0.35,
     exposure: 1.0, fogK: 1.0, stars: 0, corona: 1.0,
     oceanSun: 0xffe0b3, oceanSunK: 1.0, oceanSky: 0x4d70a0, oceanLevel: 1.0, glitter: 1.0,
-    cloudTop: 0xffffff, cloudBelly: 0x6b88ab, env: 1.1, nvgGain: 2.1, nav: 0.0
+    cloudTop: 0xffffff, cloudBelly: 0x567396, env: 1.1, nvgGain: 2.1, nav: 0.0
   },
   GOLDEN_HOUR: {
     label: 'GOLDEN HOUR', sunEl: 9, lightEl: 9, moon: false, window: [17 * 60, 17 * 60 + 55],
@@ -148,6 +148,15 @@ export function createAtmosphere(THREE, env) {
       uniform vec3 uSunColor; uniform vec3 uMie; uniform float uMieK; uniform float uDiscK; uniform float uDiscSize;
       uniform float uStars; uniform float uTime; uniform float uMoon; uniform float uWhite;
       float hash3(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+      float cHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float cNoise(vec2 p) {
+        vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(cHash(i), cHash(i + vec2(1.0, 0.0)), f.x),
+                   mix(cHash(i + vec2(0.0, 1.0)), cHash(i + vec2(1.0, 1.0)), f.x), f.y);
+      }
+      float cirrusFbm(vec2 p) {
+        return 0.55 * cNoise(p) + 0.30 * cNoise(p * 2.13 + vec2(3.1, 1.7)) + 0.15 * cNoise(p * 4.47 + vec2(7.3, 5.2));
+      }
       void main() {
         #include <logdepthbuf_fragment>
         vec3 d = normalize(vDir);
@@ -183,6 +192,16 @@ export function createAtmosphere(THREE, env) {
             float mag = 0.45 + 2.6 * (hs - 0.9962) / 0.0038;
             col += vec3(0.82, 0.88, 1.0) * core * tw * mag * uStars * smoothstep(0.02, 0.28, d.y) * (1.0 - disc);
           }
+        }
+        // High-altitude wispy cirrus streaks across the upper troposphere.
+        if (d.y > 0.025) {
+          vec2 cp = d.xz / (d.y + 0.14) * 1.45 + vec2(uTime * 0.0022, -uTime * 0.0010);
+          vec2 wq = vec2(cirrusFbm(cp * 0.9), cirrusFbm(cp * 0.9 + vec2(4.2, 1.7)));
+          float c1 = cirrusFbm((cp + wq * 0.45) * vec2(0.55, 1.85));
+          float cirrus = smoothstep(0.50, 0.80, c1) * smoothstep(0.03, 0.24, d.y) * smoothstep(0.95, 0.40, d.y)
+            * (1.0 - uStars * 0.85) * 0.34;
+          vec3 cirCol = mix(uHorizon * 1.08, uSunColor * 1.15, 0.35 + 0.45 * pow(mup, 4.0));
+          col = mix(col, cirCol, cirrus);
         }
         // Below the horizon: pure horizon haze (the ocean fog fades into it).
         col = mix(col, uHorizon, smoothstep(0.015, -0.06, d.y));
