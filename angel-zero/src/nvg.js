@@ -12,14 +12,16 @@
 //      (dual-tube binocular mask in the cockpit view).
 // The 2D HUD canvas sits above the WebGL canvas, so symbology stays razor-sharp.
 
+export const BLOOM_THRESHOLD = 0.88;
+
 export function createNVG(THREE, renderer, post) {
   const size = new THREE.Vector2();
   renderer.getDrawingBufferSize(size);
 
   // Normal (non-NVG) frames: selective HDR bloom pipeline (Visual Pass 1).
   //   RenderPass -> half-float target, no MSAA (linear HDR, no tone mapping in the
-  //   materials), UnrealBloomPass at 0.35 resolution (threshold 0.92, strength
-  //   0.48, radius 0.32: only HDR emissives > 1 -- tracers, muzzle flash,
+  //   materials), UnrealBloomPass at 0.25 resolution (threshold BLOOM_THRESHOLD,
+  //   strength 0.40, radius 0.6: only HDR emissives -- tracers, muzzle flash,
   //   afterburner cores, the sun -- cross it), OutputPass applies ACES Filmic +
   //   sRGB exactly once. The 2D HUD canvas sits above WebGL, so it never blurs.
   let composer = null, renderPass = null, bloom = null, gPass = null;
@@ -27,7 +29,10 @@ export function createNVG(THREE, renderer, post) {
     const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 0 });
     composer = new post.EffectComposer(renderer, rt);
     renderPass = new post.RenderPass(new THREE.Scene(), new THREE.PerspectiveCamera());
-    bloom = new post.UnrealBloomPass(new THREE.Vector2(Math.max(1, Math.floor(size.x * 0.25)), Math.max(1, Math.floor(size.y * 0.25))), 0.42, 0.68, 0.78);
+    // Storm Realism Pass: threshold 0.88 (>= 0.85) so sunlit cloud crowns and the sky
+    // stay below the knee; afterburners, explosions, deck beacons, tracers and cockpit
+    // emissives (all HDR > 1 after the 1.05 exposure trim) are what bloom.
+    bloom = new post.UnrealBloomPass(new THREE.Vector2(Math.max(1, Math.floor(size.x * 0.25)), Math.max(1, Math.floor(size.y * 0.25))), 0.40, 0.6, BLOOM_THRESHOLD);
     composer.addPass(renderPass); composer.addPass(bloom); composer.addPass(new post.OutputPass());
     if (post.ShaderPass) {
       const gradePass = new post.ShaderPass({

@@ -104,6 +104,7 @@ export function createCockpitF22(THREE, env) {
     tex.anisotropy = 4;
     tex.flipY = false;   // glTF UVs are top-left origin (the exporter flips V)
     const mat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
+    mat.color.setScalar(1.4);   // HDR lift: white text / bright symbology crosses the 0.88 bloom knee, dark glass stays dark
     return { cv, ctx, tex, mat };
   }
   // UFDs are 84 x 66 mm landscape panes; the canvases keep that aspect.
