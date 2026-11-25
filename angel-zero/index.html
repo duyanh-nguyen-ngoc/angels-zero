@@ -747,11 +747,12 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
 import { createVFX } from './src/vfx.js?v=s9ej';
-import { createAmbient } from './src/ambient.js?v=s9ej';
+import { createAmbient } from './src/ambient.js?v=s9ek';
+import { createStormFX } from './src/stormfx.js?v=s9ek';
 import { createBlastFX } from './src/blastfx.js?v=s9ej';
 import { createHUD } from './src/hud.js?v=s9ej';
 import { createCockpit3D } from './src/cockpit3d.js?v=s9ej';
-import { createCockpitF22 } from './src/cockpit_f22.js?v=s9ej';
+import { createCockpitF22 } from './src/cockpit_f22.js?v=s9ek';
 import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9ej';
 import { createEjection } from './src/eject.js?v=s9ej';
 import { createAudio } from './src/audio.js?v=s9ej';
@@ -760,17 +761,17 @@ import { createRadio } from './src/radio.js?v=s9ej';
 import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9ej';
 import { createLivery } from './src/livery.js?v=s9ej';
 import { createGear, GEAR_H, GEAR_PTS, GEAR_UNITS, setGearPoints } from './src/gear.js?v=s9ej';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9ej';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9ek';
 import { createCanopyFX } from './src/canopy.js?v=s9ej';
-import { createNVG } from './src/nvg.js?v=s9ej';
+import { createNVG } from './src/nvg.js?v=s9ek';
 import { createWorld, WORLD } from './src/world.js?v=s9ej';
 import { createSurfaces } from './src/surfaces.js?v=s9ej';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9ej';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9ek';
 import { createFreeLook } from './src/freelook.js?v=s9ej';
 import { createCanopyGlass } from './src/canopyglass.js?v=s9ej';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9ej';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9ej';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9ej';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9ek';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9ej';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9ej';
 import { createRadioQueue } from './src/radioQueue.js?v=s9ej';
@@ -956,6 +957,8 @@ function syncOceanDepthTexture() {
 const atmosphere = createAtmosphere(THREE, { scene, camera, sunDir: SUN_DIR, fogDensity: FOG_DENSITY,
   terrainHeight: (x, z) => terrainHeight(x, z) });
 const sky = atmosphere.sky;
+const stormFx = createStormFX(THREE, { scene, camera });   // STORM OPS god-ray shafts (strength from the preset)
+let stormOpsAuto = false, stormOpsPrev = 'CLEAR';          // NAVAL phase-3 STORM OPS weather (see the frame loop)
 
 function makeNormalMap(size, seed, scale) {
   const noise = createNoise2D(seed);
@@ -4607,11 +4610,19 @@ function updateCameraAndVisuals(dt, now) {
   }
   // Weather: rain volume, lightning, gusts; overcast / haze / flash feed the atmosphere, clouds and sea.
   weather.update(dt, state.velocity, Math.min(1, navLevel), firstPerson && flightMode === 'FLY');
+  // NAVAL_BATTLE phase 3 brings the STORM OPS weather with ambient's STORM_OPS sky;
+  // the previous weather returns on RTB / restart (phase drops back below 3).
+  {
+    const stormOps = appMode === 'PLAY' && missionId === 'NAVAL_BATTLE' && (combat.missionPhase | 0) >= 3 && !combat.rtb;
+    if (stormOps && !stormOpsAuto && weather.active.name !== 'STORM_OPS') { stormOpsPrev = weather.active.name; stormOpsAuto = true; weather.set('STORM_OPS'); }
+    else if (!stormOps && stormOpsAuto && appMode === 'PLAY') { stormOpsAuto = false; weather.set(stormOpsPrev); }
+  }
   atmosphere.setWeather({ overcast: weather.current.overcast, fogMul: weather.current.fogMul, flash: weather.flash });
   vfx.setCloudFlash(weather.flash);
   oceanUniforms.uChop.value = weather.current.chop;
   // Cloud fly-through: white-out fog + sky horizon around the camera (src/atmosphere.js).
   atmosphere.update(dt, vfx.mist, nvg.active);
+  stormFx.update(dt, SUN_DIR);
   // 3D bubble canopy glass: glare / sheen lighting + water driven by rain, cloud and airspeed.
   canopyGlass.update({ dt, time: simTime, rain: flightMode === 'FLY' ? Math.max(weather.rainHere, cloudWet, ambient.rain) : 0,
     cloud: flightMode === 'FLY' ? Math.max(combat.playerCloud || 0, vfx.mist) : 0, kts: state.speed * 1.94384, rollRate: state.rollRate,
@@ -5314,6 +5325,7 @@ atmosphere.bind({
   setEnv: k => { for (const m of airframeMats) m.envMapIntensity = k; },
   setNavLights: k => { navLevel = k; },
   setNvgGain: k => nvg.setGain(k),
+  setShafts: (k, oc) => stormFx.setStrength(k, oc),
   onChange: a => syncTimeUI(a)
 });
 /* ---- weather: CLEAR / SCATTERED / OVERCAST_RAIN / THUNDERSTORM, rolled every sortie ---- */
@@ -5322,15 +5334,20 @@ const wxChip = document.getElementById('wxChip'), wxBtn = document.getElementByI
 // are selected together (first entry of both cycles, and the opening default).
 let wxMode = 'CLOUD_SEA';
 let todMode = 'CLOUD SEA';
-const TOD_MODES = [['RANDOM', null], ['CLOUD SEA', 'CLOUD_SEA'], ['DAWN', 'DAWN'], ['DAY', 'DAYLIGHT'], ['SUNSET', 'GOLDEN_HOUR'], ['DUSK', 'DUSK'], ['NIGHT', 'NIGHT']];
+const TOD_MODES = [['RANDOM', null], ['CLOUD SEA', 'CLOUD_SEA'], ['DAWN', 'DAWN'], ['DAY', 'DAYLIGHT'], ['SUNSET', 'GOLDEN_HOUR'], ['DUSK', 'DUSK'], ['NIGHT', 'NIGHT'], ['STORM OPS', 'STORM_OPS']];
+// Theatres pair a weather with a lighting preset: picking either side selects both,
+// and leaving one side drops the other back to RANDOM.
+const THEATRES = { CLOUD_SEA: 'CLOUD SEA', STORM_OPS: 'STORM OPS' };
+const THEATRE_TODS = Object.values(THEATRES);
 function theatreFromWx() {
-  if (wxMode === 'CLOUD_SEA') { if (todMode !== 'CLOUD SEA') { todMode = 'CLOUD SEA'; return true; } }
-  else if (todMode === 'CLOUD SEA') { todMode = 'RANDOM'; return true; }
+  if (THEATRES[wxMode]) { if (todMode !== THEATRES[wxMode]) { todMode = THEATRES[wxMode]; return true; } }
+  else if (THEATRE_TODS.includes(todMode)) { todMode = 'RANDOM'; return true; }
   return false;
 }
 function theatreFromTod() {
-  if (todMode === 'CLOUD SEA') { if (wxMode !== 'CLOUD_SEA') { wxMode = 'CLOUD_SEA'; return true; } }
-  else if (wxMode === 'CLOUD_SEA') { wxMode = 'RANDOM'; return true; }
+  const wx = Object.keys(THEATRES).find(k => THEATRES[k] === todMode);
+  if (wx) { if (wxMode !== wx) { wxMode = wx; return true; } }
+  else if (THEATRES[wxMode]) { wxMode = 'RANDOM'; return true; }
   return false;
 }
 function applyTod(instant) {
@@ -5368,6 +5385,7 @@ function syncTimeUI(a) {
 }
 // New sortie conditions: random roll in RANDOM mode, otherwise the chosen preset at a fresh azimuth.
 function rollSortieConditions(instant) {
+  stormOpsAuto = false;                               // a fresh roll replaces any phase-3 storm weather
   vfx.reseedClouds();
   rollWeather(instant);
   return applyTod(instant);
@@ -6517,8 +6535,10 @@ if (DEBUG) {
     killDrone: (i, how) => combatSys.killDrone(i, how), get swarm() { return combat.swarm; },
     get model() { return model; }, get ready() { return modelReady; },
     get missionId() { return missionId; }, get mission() { return mission(); }, cycleMission, loadMissionScene, startSortie, launchSortie,
-    setMission: id => { if (!MISSIONS[id]) return false; missionId = id; return startSortie(); },
-    get surfaces() { return surfaces; }, get aircraft() { return AC.id; }, get aircraftStats() { return AC; }, get gearPts() { return GEAR_PTS; },
+    setMission: id => { if (!MISSIONS[id]) return false; flightMode = 'FLY'; combat.health = 100; resetAircraft(); missionId = id; return startSortie(); },
+    toMenu: () => { appMode = 'MENU'; showMenu('title'); },
+    get surfaces() { return surfaces; }, get stormFx() { return stormFx; }, get weatherSys() { return weather; }, get atmo() { return atmosphere; }, get nvgSys() { return nvg; },
+    get aircraft() { return AC.id; }, get aircraftStats() { return AC; }, get gearPts() { return GEAR_PTS; },
     get reactive() { return { ...audio.reactive, log: RX_LOG ? RX_LOG.slice(-30) : [] }; }, rxFire, sayText, rxTelemetry,
     get autoland() { return autoland; }, autolandPrompt, engageAutoland, finishCarrierTrap, getMusicCtx, get hudPrompt() { return hud.promptText; }, get debrief() { return !debriefEl.hidden; },
     get cat() { return cat; }, get skimK() { return skimK; }, catEnter, catTick, catFire, catSnapAll, carrierDiag, enterCarrierLaunch, carrierReady,

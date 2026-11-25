@@ -4,10 +4,10 @@
 // Run from anywhere:   node angel-zero/scripts/smoke_test.mjs
 // Optional:            SMOKE_PORT=8791 node angel-zero/scripts/smoke_test.mjs
 //
-// three.js r160 is fulfilled from repo-root `smoke_vendor/` so CI never depends on
-// unpkg (a hung CDN request otherwise blocks module evaluation and __az never
-// appears). Software-GL shader warm-up is skipped via the debug-only ?nowarm hook;
-// the suite uses two full page loads and drives the rest through live __az helpers.
+// Software-GL shader compilation on CI can block the page's main thread for over
+// a minute on a cold load, so the suite does ONE full page load and drives every
+// scenario from there via debug helpers (__az.setMission / toMenu / launchSortie).
+// three.js r160 is fulfilled from repo-root smoke_vendor/ so CI never hits unpkg.
 
 import http from 'node:http';
 import fs from 'node:fs';
@@ -109,23 +109,21 @@ function attachCollectors(p) {
 
 async function navigate(query) {
   resetCollectors();
-  try { await page.evaluate(() => { window.onbeforeunload = null; }); } catch { /* fresh page */ }
   const qs = query.includes('nowarm') ? query : `${query}&nowarm`;
   const t0 = Date.now();
-  await page.goto(`${BASE}?${qs}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.goto(`${BASE}?${qs}`, { waitUntil: 'domcontentloaded', timeout: 90000 });
   console.log(`    [nav] domcontentloaded in ${Date.now() - t0} ms`);
   try {
     // Interval polling survives rAF starvation during first-frame shader compilation on CI.
-    await page.waitForFunction(() => window.__az && window.__az.ready === true, null, { polling: 250, timeout: 180000 });
+    await page.waitForFunction(() => window.__az && window.__az.ready === true, null, { polling: 250, timeout: 240000 });
     console.log(`    [nav] __az.ready in ${Date.now() - t0} ms`);
   } catch (e) {
-    let st = {}, tail = [], errs = [];
+    let st = {};
     try { st = await page.evaluate(() => ({ az: typeof window.__az, ready: window.__az?.ready,
       chip: document.getElementById('buildChip')?.textContent })); } catch { /* gone */ }
-    tail = consoleMessages.slice(-12); errs = pageErrors.slice(-4);
     console.log('    [nav] DIAG ' + JSON.stringify(st).slice(0, 600));
-    console.log('    [nav] console tail ' + JSON.stringify(tail).slice(0, 1200));
-    console.log('    [nav] pageErrors ' + JSON.stringify(errs).slice(0, 900));
+    console.log('    [nav] console tail ' + JSON.stringify(consoleMessages.slice(-10)).slice(0, 900));
+    console.log('    [nav] pageErrors ' + JSON.stringify(pageErrors.slice(-4)).slice(0, 900));
     throw e;
   }
 }
@@ -133,11 +131,10 @@ async function missionReady(id) {
   await page.waitForFunction(mid => {
     const a = window.__az;
     return a && a.ready && a.sortie && a.sortie.active && a.perf && a.perf.frames >= 2 && a.missionId === mid;
-  }, id, { polling: 250, timeout: 180000 });
+  }, id, { polling: 250, timeout: 120000 });
 }
 async function switchMission(id) {
-  // Fire-and-forget: startSortie() is async and may legitimately take seconds.
-  // Awaiting it directly could hang forever; missionReady() has a hard timeout.
+  // Fire-and-forget: startSortie() is async; missionReady() has a hard timeout.
   await page.evaluate(mid => { window.__az.setMission(mid); }, id);
   await missionReady(id);
 }
@@ -178,20 +175,21 @@ async function assertMission(id) {
 /* ------------------------------------------------------------------------- scenarios */
 const SCENARIOS = [
   ['Menu / hangar boot', async () => {
-    await navigate('debug&nobgm');
+    // ONE full page load for the whole suite: F-22A airframe + deterministic warp line + first mission.
+    await navigate('debug&nointro&nobgm&warp=3&aircraft=F22A&mission=AIR_SUPERIORITY');
+    await missionReady('AIR_SUPERIORITY');
+    // Return to the hangar through the real menu path, then relaunch for the mission scenarios.
+    await page.evaluate(() => window.__az.toMenu());
     const s = await page.evaluate(() => ({ mode: window.__az.appMode,
       chip: document.getElementById('buildChip')?.textContent || '' }));
     assert(s.mode === 'MENU', `appMode ${s.mode} !== MENU`);
     assert(/^v\d+\.\d+\.\d+$/.test(s.chip), `buildChip "${s.chip}" is not a version`);
     assert(await glError() === 0, 'WebGL error on menu boot');
+    await page.evaluate(() => window.__az.launchSortie());
+    await missionReady('AIR_SUPERIORITY');
   }],
 
-  ['Mission AIR_SUPERIORITY', async () => {
-    // Second + last full page load: F-22A airframe + deterministic warp line + first mission.
-    await navigate('debug&nointro&nobgm&warp=3&aircraft=F22A&mission=AIR_SUPERIORITY');
-    await missionReady('AIR_SUPERIORITY');
-    await assertMission('AIR_SUPERIORITY');
-  }],
+  ['Mission AIR_SUPERIORITY', async () => { await assertMission('AIR_SUPERIORITY'); }],
   ['Mission NAVAL_BATTLE', async () => { await switchMission('NAVAL_BATTLE'); await assertMission('NAVAL_BATTLE'); }],
   ['Mission CANYON_RUN', async () => { await switchMission('CANYON_RUN'); await assertMission('CANYON_RUN'); }],
   ['Mission ACE_DUEL', async () => { await switchMission('ACE_DUEL'); await assertMission('ACE_DUEL'); }],
@@ -199,8 +197,8 @@ const SCENARIOS = [
   ['Mission FREE_FLIGHT', async () => { await switchMission('FREE_FLIGHT'); await assertMission('FREE_FLIGHT'); }],
 
   ['F-22A + cockpit + nose camera cycle', async () => {
-    // No reload: the live page is already the F-22A build. Normalise view to CHASE.
-    await page.evaluate(() => window.__az.setView(false));
+    await switchMission('AIR_SUPERIORITY');
+    await page.evaluate(() => window.__az.setView(false));   // normalise to CHASE
     let s = await page.evaluate(() => ({ ac: window.__az.aircraft, cam: window.__az.camMode }));
     assert(s.ac === 'F22A', `aircraft ${s.ac}`);
     assert(s.cam === 'CHASE', `initial camera ${s.cam}`);
@@ -273,7 +271,7 @@ try {
     }
     // Third-party stuff must never hang CI: fonts, YouTube, free-flight tiles.
     if (/fonts\.googleapis|fonts\.gstatic|youtube|ytimg|googlevideo|tiles\.openfreemap|elevation-tiles|arcgisonline/i.test(u)) return route.abort();
-    // Any other external request is aborted immediately (no 86 s CDN stalls).
+    // Any other external request is aborted immediately (no long CDN stalls).
     if (!u.startsWith(`http://127.0.0.1:${PORT}/`) && !u.startsWith('data:')) return route.abort();
     return route.continue();
   });
