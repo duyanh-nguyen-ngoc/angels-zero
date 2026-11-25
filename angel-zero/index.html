@@ -48,7 +48,17 @@
   }
   /* NVG: dark halo + slight lift keeps green symbology crisp over the green tube image. */
   body.nvg #hud { filter: drop-shadow(0 0 1.2px rgba(0,0,0,.95)) drop-shadow(0 0 2.5px rgba(0,8,3,.85)) brightness(1.12); }
-  #status { position:fixed; z-index:25; left:50%; top:62%; transform:translateX(-50%); color:#52ff9c; font-size:13px; font-weight:600; letter-spacing:3px; pointer-events:none; text-shadow:0 0 10px rgba(0,255,110,.55); }
+  /* Tactical boot progress HUD — live percentage, MB and current loading stage. */
+  #status { position:fixed; z-index:25; left:50%; top:62%; transform:translateX(-50%); width:300px; pointer-events:none;
+    color:#52ff9c; font-family:'Share Tech Mono','Consolas',monospace; text-align:center;
+    opacity:1; transition:opacity 220ms ease; text-shadow:0 0 10px rgba(0,255,110,.55); }
+  #status.done { opacity:0; }
+  #statusTitle { font-size:12px; font-weight:600; letter-spacing:3px; white-space:nowrap; }
+  #statusStage { margin-top:6px; font-size:10px; letter-spacing:2px; opacity:.72; min-height:13px; }
+  #statusBar { margin:9px auto 0; width:260px; height:4px; background:rgba(82,255,156,.14); box-shadow:0 0 10px rgba(82,255,110,.18); }
+  #statusBarFill { width:0%; height:100%; background:#52ff9c; box-shadow:0 0 12px rgba(82,255,156,.65); transition:width 120ms linear; }
+  #status.failed #statusBarFill { background:#ff2e43; box-shadow:0 0 12px rgba(255,46,67,.7); }
+  #status.failed #statusTitle { color:#ff2e43; }
 
   /* AC7 Tactical OS Briefing & Pause HUD */
   #menu {
@@ -501,7 +511,11 @@
     <div class="crt-scanline"></div>
   </div>
   <div id="flybyPulse"></div>
-  <div id="status">LOADING F-15...</div>
+  <div id="status">
+    <div id="statusTitle">LOADING AIRCRAFT // 0%</div>
+    <div id="statusStage">AIRFRAME</div>
+    <div id="statusBar"><div id="statusBarFill"></div></div>
+  </div>
   <div id="menu" role="dialog" aria-modal="true" aria-labelledby="menuTitle">
     <div class="panel">
       <div class="top-bar">
@@ -746,46 +760,71 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s9ej';
-import { createAmbient } from './src/ambient.js?v=s9ek';
-import { createStormFX } from './src/stormfx.js?v=s9el';
-import { createWetDeck } from './src/wetdeck.js?v=s9en';
-import { createBlastFX } from './src/blastfx.js?v=s9ej';
-import { createHUD } from './src/hud.js?v=s9ej';
-import { createCockpit3D } from './src/cockpit3d.js?v=s9em';
-import { createCockpitF22 } from './src/cockpit_f22.js?v=s9ek';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9em';
-import { createEjection } from './src/eject.js?v=s9ej';
-import { createAudio } from './src/audio.js?v=s9ej';
-import { createYouTubeMusic } from './src/ytmusic.js?v=s9ej';
-import { createRadio } from './src/radio.js?v=s9ej';
-import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9ej';
-import { createLivery } from './src/livery.js?v=s9ej';
-import { createGear, GEAR_H, GEAR_PTS, GEAR_UNITS, setGearPoints } from './src/gear.js?v=s9ej';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9ek';
-import { createCanopyFX } from './src/canopy.js?v=s9ej';
-import { createNVG } from './src/nvg.js?v=s9ek';
-import { createWorld, WORLD } from './src/world.js?v=s9ej';
-import { createSurfaces } from './src/surfaces.js?v=s9ej';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9ek';
-import { createFreeLook } from './src/freelook.js?v=s9ej';
-import { createCanopyGlass } from './src/canopyglass.js?v=s9ej';
-import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9ej';
-import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9ej';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9en';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9ej';
-import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9ej';
-import { createRadioQueue } from './src/radioQueue.js?v=s9ej';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9ej';
+import { createVFX } from './src/vfx.js?v=s9eo';
+import { createAmbient } from './src/ambient.js?v=s9eo';
+import { createStormFX } from './src/stormfx.js?v=s9eo';
+import { createWetDeck } from './src/wetdeck.js?v=s9eo';
+import { createBlastFX } from './src/blastfx.js?v=s9eo';
+import { createHUD } from './src/hud.js?v=s9eo';
+import { createCockpit3D } from './src/cockpit3d.js?v=s9eo';
+import { createCockpitF22 } from './src/cockpit_f22.js?v=s9eo';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9eo';
+import { createEjection } from './src/eject.js?v=s9eo';
+import { createAudio } from './src/audio.js?v=s9eo';
+import { createYouTubeMusic } from './src/ytmusic.js?v=s9eo';
+import { createRadio } from './src/radio.js?v=s9eo';
+import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9eo';
+import { createLivery } from './src/livery.js?v=s9eo';
+import { createGear, GEAR_H, GEAR_PTS, GEAR_UNITS, setGearPoints } from './src/gear.js?v=s9eo';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9eo';
+import { createCanopyFX } from './src/canopy.js?v=s9eo';
+import { createNVG } from './src/nvg.js?v=s9eo';
+import { createWorld, WORLD } from './src/world.js?v=s9eo';
+import { createSurfaces } from './src/surfaces.js?v=s9eo';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9eo';
+import { createFreeLook } from './src/freelook.js?v=s9eo';
+import { createCanopyGlass } from './src/canopyglass.js?v=s9eo';
+import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9eo';
+import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9eo';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9eo';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9eo';
+import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9eo';
+import { createRadioQueue } from './src/radioQueue.js?v=s9eo';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9eo';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
-  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9ej';
-import { createFreeFlight, FREE_FLIGHT_PRESETS, loadFreeFlightCity, saveFreeFlightCity } from './src/freeflight.js?v=s9ej';
+  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9eo';
+import { createFreeFlight, FREE_FLIGHT_PRESETS, loadFreeFlightCity, saveFreeFlightCity } from './src/freeflight.js?v=s9eo';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
 const profile = createProfile();
 let livery = null;
 const DEBUG = Q.has('debug');
+// Tactical boot progress HUD: stage + real byte counts, declared early so every
+// boot stage (SFX, airframe, cockpit, carrier, shaders) can report into it.
+const bootT0 = performance.now();
+let bootMs = 0, bootPct = 0, sfxDone = 0, sfxTotal = 0;
+const statusEl = document.getElementById('status');
+const statusTitleEl = document.getElementById('statusTitle');
+const statusStageEl = document.getElementById('statusStage');
+const statusBarEl = document.getElementById('statusBarFill');
+const mbText = n => (n / 1048576).toFixed(1) + ' MB';
+function setLoadProgress(pct, stage, detail) {
+  bootPct = Math.max(bootPct, Math.max(0, Math.min(100, pct | 0)));  // monotonic: never walk the bar backwards
+  if (statusTitleEl) statusTitleEl.textContent = 'LOADING ' + AC.name + ' // ' + bootPct + '%';
+  if (statusStageEl) statusStageEl.textContent = stage + (detail ? '  ' + detail : '');
+  if (statusBarEl) statusBarEl.style.width = bootPct + '%';
+}
+function failBoot(msg) {
+  if (statusEl) { statusEl.classList.add('failed'); statusEl.classList.remove('done'); }
+  setLoadProgress(bootPct, 'LOAD FAILED', msg);
+}
+function finishBoot() {
+  bootMs = Math.round(performance.now() - bootT0);
+  setLoadProgress(100, 'READY', bootMs + ' ms');
+  if (statusEl) { statusEl.classList.add('done'); setTimeout(() => statusEl.remove(), 240); }
+  if (DEBUG) console.log('[ANGELS_ZERO] boot ' + bootMs + 'ms aircraft=' + AC.id);
+}
 // Hangar selection: persisted values, optionally overridden by ?spw= / ?livery= without saving.
 let selectedSPW = DEBUG && Q.has('spw') && SPW[Q.get('spw')] ? Q.get('spw') : loadSPW();
 let selectedLivery = DEBUG && Q.has('livery') && SQUADRON[Q.get('livery')] ? Q.get('livery') : loadLivery();
@@ -4965,7 +5004,11 @@ function drawCrtWave(now) {
   crtCtx.stroke(); crtCtx.globalAlpha = 1;
 }
 // Recorded SFX (assets/sfx/): fetch + decode now so they are ready at LAUNCH; failures fall back to procedural DSP.
-audio.preload().then(st => console.log('[ANGELS_ZERO] sfx', JSON.stringify(st)));
+audio.preload('assets/sfx/', (done, total) => {
+  sfxDone = done; sfxTotal = total;
+  if (!document.getElementById('status')) return;
+  setLoadProgress(72 + 13 * (total ? done / total : 0), 'SFX', done + ' / ' + total + ' CLIPS');
+}).then(st => console.log('[ANGELS_ZERO] sfx', JSON.stringify(st)));
 // Unlock / resume the AudioContext inside every user gesture (browsers keep it
 // suspended until one); the LAUNCH click still creates it as well.
 for (const ev of ['pointerdown', 'mousedown', 'keydown', 'touchstart']) addEventListener(ev, () => { audio.init(); audio.resume(); if (appMode !== 'PLAY') audio.silenceFlight(0.01); preloadRadioOnce(); }, { capture: true, passive: true });
@@ -5567,7 +5610,6 @@ if (DEBUG && Q.has('alert')) hud.setAlertState('MISSILE_ALERT');
 /* ============================================================================
    9. GLTF LOAD
    ============================================================================ */
-const statusEl = document.getElementById('status');
 const nozzleLocal = [];
 // Exterior canopy (chase view): smoked acrylic with a faint gold anti-glare coating,
 // clearcoat sky / env reflection and a glossy Fresnel rim that turns the glass
@@ -5587,6 +5629,7 @@ airframeMats.add(exteriorCanopyMat);
 const loader = new GLTFLoader();
 loader.setMeshoptDecoder(MeshoptDecoder);                 // CVN GLB uses EXT_meshopt_compression
 loader.load(AC.glb, async gltf => {
+  setLoadProgress(58, AC.id === 'F22A' ? 'COCKPIT' : 'AIRFRAME', AC.id === 'F22A' ? 'F-22A GLASS COCKPIT' : 'BANDIT FLEET');
   model = gltf.scene;
   const removed = [], names = [];
   model.traverse(o => {
@@ -5698,7 +5741,9 @@ loader.load(AC.glb, async gltf => {
   let fleetModel = model, fleetNozzles = nozzleLocal;
   if (AC.id !== 'F15C') {
     try {
-      fleetModel = (await loader.loadAsync('assets/angels_zero_jet.glb')).scene;
+      fleetModel = (await loader.loadAsync('assets/angels_zero_jet.glb', ev => {
+        if (ev && ev.lengthComputable && ev.total > 0) setLoadProgress(58 + 14 * ev.loaded / ev.total, 'AIRFRAME', 'BANDIT  ' + mbText(ev.loaded) + ' / ' + mbText(ev.total));
+      })).scene;
       const drop = [];
       fleetModel.traverse(o => {
         if (!o.isMesh) return;
@@ -5734,12 +5779,15 @@ loader.load(AC.glb, async gltf => {
     o.material.clipIntersection = true;
   });
   combatSys.update(0, 0, { playerActive: false, firing: false });   // place the wave before the first frame
+  setLoadProgress(72, 'CARRIER', 'USS ENTERPRISE');
+  setLoadProgress(88, 'SHADERS', 'COMPILING');
   modelReady = true;
+  bootMs = Math.round(performance.now() - bootT0);
   setView(appMode === 'PLAY' ? camMode : menuPreviewCockpit);
-  statusEl.remove();
+  finishBoot();
   if (appMode === 'PLAY') {
     warmupGPUSync();             // briefing skipped (?nointro): warm up right now
-    carrierLoadPromise = combatSys.loadCarrier(combatSys.CARRIER_GLB).then(() => carrierReady);
+    carrierLoadPromise = combatSys.loadCarrier(combatSys.CARRIER_GLB).then(() => { setLoadProgress(92, 'CARRIER', 'DECK READY'); return carrierReady; });
   } else {
     // Briefing up: compile in the background, then finish before LAUNCH unlocks.
     const hint = document.getElementById('menuHint');
@@ -6320,10 +6368,14 @@ loader.load(AC.glb, async gltf => {
   }
   if (DEBUG && Q.has('pause')) pauseSim();
   if (DEBUG && Q.has('fxhold')) fxHold = true;
-  if (DEBUG) console.log('[ANGELS_ZERO] F-15 ready:', names.length, 'nodes; wingtip', WINGTIP_R.toArray().map(x => +x.toFixed(2)));
-}, undefined, err => {
+  if (DEBUG) console.log('[ANGELS_ZERO] ' + AC.id + ' ready:', names.length, 'nodes; wingtip', WINGTIP_R.toArray().map(x => +x.toFixed(2)));
+}, ev => {
+  // Real byte progress from the network; compressed responses may omit `total`.
+  if (ev && ev.lengthComputable && ev.total > 0) setLoadProgress(55 * ev.loaded / ev.total, 'AIRFRAME', mbText(ev.loaded) + ' / ' + mbText(ev.total));
+  else if (ev) setLoadProgress(18, 'AIRFRAME', mbText(ev.loaded || 0));
+}, err => {
   console.error('[ANGELS_ZERO] GLTF load failed', err);
-  statusEl.textContent = 'F-15 LOAD FAILED';
+  failBoot(AC.short + ' LOAD FAILED — CHECK NETWORK & RELOAD');
 });
 
 /* ============================================================================
@@ -6547,7 +6599,7 @@ if (DEBUG) {
     get mode() { return flightMode; }, get enemies() { return combatSys.enemies; },
     spawnDroneSwarm: (n, anchor) => combatSys.spawnDroneSwarm(n, anchor), get drones() { return combatSys.drones; },
     killDrone: (i, how) => combatSys.killDrone(i, how), get swarm() { return combat.swarm; },
-    get model() { return model; }, get ready() { return modelReady; },
+    get model() { return model; }, get ready() { return modelReady; }, get bootMs() { return bootMs; }, get buildTag() { return AC.name; },
     get missionId() { return missionId; }, get mission() { return mission(); }, cycleMission, loadMissionScene, startSortie, launchSortie,
     setMission: id => { if (!MISSIONS[id]) return false; flightMode = 'FLY'; combat.health = 100; resetAircraft(); missionId = id; return startSortie(); },
     toMenu: () => { appMode = 'MENU'; showMenu('title'); },

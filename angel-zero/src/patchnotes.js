@@ -3,6 +3,10 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.77', title: 'BOOT PROGRESS HUD & ASSET LOADING OPTIMIZATION', bullets: [
+    'A tactical boot HUD now shows live percentage, downloaded MB and the current stage (AIRFRAME / COCKPIT / CARRIER / SFX / SHADERS) instead of a bare LOADING F-15... label, with the correct aircraft name for the F-22A Raptor.',
+    'Sound effects now preload in small batches with the active airframe\'s engine, weapon and RWR clips first, so the GLB downloads keep their HTTP connections. Boot time is measured and exposed as __az.bootMs.'
+  ] },
   { version: 'v1.1.76', title: 'STORM REALISM PASS 2 // WET DECK & COCKPIT GLOW', bullets: [
     'OVERLORD\'s flight deck now gets wet in naval ops and storms: a damp sheen that catches the moon, with amber deck-edge lights, new orange island beacons and your afterburner glow smearing across it during the catapult hold and the RTB approach.',
     'Fixed the carrier\'s deck-edge lights, which were floating over the sea beside the ship; they now run along both edges of the flight deck.',

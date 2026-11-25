@@ -6,7 +6,7 @@ Earlier step-by-step build notes live in the git history (`git log -- PLAN.md`).
 
 Status legend: `[x]` implemented and verified Â· `[ ]` open — gaps listed.
 
-**Verification / CI:** `node angel-zero/scripts/smoke_test.mjs` runs a self-contained headless Chromium smoke suite (12 scenarios: menu, 6 missions, F-22A camera cycle, wingman BTT, ace BFM, warp telemetry, debrief). It is wired into `.github/workflows/smoke.yml` on every push/PR to `main` beside the Cloudflare Pages deploy workflow. `?nowarm` is a debug-only hook that skips the software-GL shader warm-up so CI stays fast. The suite fulfills three.js r160 from repo-root `smoke_vendor/` (no unpkg dependency in CI) and blocks all third-party CDNs.
+**Verification / CI:** `node angel-zero/scripts/smoke_test.mjs` runs a self-contained headless Chromium smoke suite (12 scenarios: menu, 6 missions, F-22A camera cycle, wingman BTT, ace BFM, warp telemetry, debrief). It is wired into `.github/workflows/smoke.yml` on every push/PR to `main` beside the Cloudflare Pages deploy workflow. `?nowarm` is a debug-only hook that skips the software-GL shader warm-up so CI stays fast. The suite fulfills three.js r160 from repo-root `smoke_vendor/` (no unpkg dependency in CI) and blocks all third-party CDNs. Boot instrumentation: `setLoadProgress(pct, stage, detail)` drives a tactical HUD (`#statusTitle/#statusStage/#statusBarFill`) with real byte counts for AIRFRAME, COCKPIT, CARRIER, SFX and SHADERS; `window.__az.bootMs` records module-eval-to-ready time and the suite asserts a <15 s local budget and clean `#status` removal. `audio.preload(base, onProgress)` batches SFX in groups of six with the active airframe's core bank first.
 
 ---
 

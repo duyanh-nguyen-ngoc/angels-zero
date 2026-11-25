@@ -143,11 +143,21 @@ export function createAudio(opts = {}) {
     });
   }
   const samples = {}, sfxState = {};
-  function preload(base = 'assets/sfx/') {
+  function preload(base = 'assets/sfx/', onProgress) {
     const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-    if (!OAC) { for (const k in SFX) sfxState[k] = 'no-decoder'; return Promise.resolve(sfxState); }
+    const entries = Object.entries(SFX);
+    const total = entries.length;
+    const report = (done) => { if (typeof onProgress === 'function') onProgress(done, total); };
+    if (!OAC) { for (const k in SFX) sfxState[k] = 'no-decoder'; report(total); return Promise.resolve(sfxState); }
     const dec = new OAC(1, 1, 44100);
-    return Promise.all(Object.entries(SFX).map(([k, file]) => {
+    // Engine / weapon / RWR sounds for the active airframe first, then the rest.
+    // Small batches keep HTTP connections free for the much larger GLB downloads.
+    const CORE = ['buffet', 'breath', 'chime', 'f15Whine', 'f15Exh', 'f15AbOut', 'f15AbIn',
+      'f15Gun', 'f15AimLaunch', 'f15Flare', 'f15WarnTone', 'f15Incoming'];
+    entries.sort((a, b) => (CORE.indexOf(b[0]) >= 0 ? 1 : 0) - (CORE.indexOf(a[0]) >= 0 ? 1 : 0));
+    const queue = entries.slice();
+    let done = 0;
+    function loadOne([k, file]) {
       sfxState[k] = 'loading';
       return fetch(base + file).then(r => {
         if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -158,7 +168,16 @@ export function createAudio(opts = {}) {
         .then(ab => new Promise((res, rej) => { const pr = dec.decodeAudioData(ab, res, rej); if (pr && pr.catch) pr.catch(() => {}); }))
         .then(buf => { samples[k] = buf; sfxState[k] = 'ok ' + buf.duration.toFixed(1) + 's'; })
         .catch(e => { sfxState[k] = 'fallback (' + (e && e.message ? e.message : 'decode error') + ')'; });
-    })).then(() => sfxState);
+    }
+    async function drain() {
+      while (queue.length) {
+        const batch = queue.splice(0, 6);
+        await Promise.all(batch.map(loadOne));
+        done += batch.length;
+        report(done);
+      }
+    }
+    return Promise.all([drain(), drain()]).then(() => { report(total); return sfxState; });
   }
 
   // Procedural PTT one-shots rendered once into AudioBuffers (no per-event DSP allocation).
