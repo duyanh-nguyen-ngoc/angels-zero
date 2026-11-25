@@ -3,8 +3,9 @@
 // Three additive, slanted light shafts falling from the cloud base toward the sea
 // along the moon / sun direction, as if the key light breaks through gaps in the
 // storm deck. Each shaft is one quad, axis-locked billboard (its long axis is the
-// light direction, it turns about that axis to face the camera), kept at 2.4-5.2 km
-// from the camera on the light's side of the sky so it never comes within reach.
+// light direction, it turns about that axis to face the camera). Its foot sits on
+// the sea 2.2-4.6 km out on the light's side and it climbs toward the light to the
+// cloud base, so it never comes within reach of the camera.
 // Strength comes from the atmosphere preset (`shafts`, STORM_OPS = 1) and is
 // trimmed by heavier overcast and lightning-free darkness; at 0 the meshes are hidden.
 //
@@ -13,13 +14,13 @@
 
 const SHAFTS = [
   // azimuth offset from the light (rad), distance (m), width (m), length (m), phase
-  { off: -0.42, d: 2400, w: 520, l: 3600, ph: 0.0 },
-  { off: 0.10, d: 3900, w: 820, l: 4400, ph: 2.1 },
-  { off: 0.55, d: 5200, w: 640, l: 4000, ph: 4.3 }
+  { off: -0.38, d: 2200, w: 420, l: 7000, ph: 0.0 },
+  { off: 0.08, d: 3400, w: 700, l: 7000, ph: 2.1 },
+  { off: 0.46, d: 4600, w: 540, l: 7000, ph: 4.3 }
 ];
 const CLOUD_BASE = 2300;
 const SHAFT_COLOR = 0xaabdd6;
-const PEAK = 0.11;                 // additive peak (linear): stays far below the bloom knee
+const PEAK = 0.16;                 // additive peak (linear): stays far below the bloom knee
 
 export function createStormFX(THREE, env) {
   const { scene, camera } = env;
@@ -86,9 +87,11 @@ export function createStormFX(THREE, env) {
       const s = SHAFTS[i], m = meshes[i];
       const a = ha + s.off;
       _h.set(Math.sin(a), 0, Math.cos(a));
-      _top.set(cam.x + _h.x * s.d, CLOUD_BASE, cam.z + _h.z * s.d);
-      // shaft length clipped to the sea: the beam ends at y ~ 0
-      const len = Math.min(s.l, CLOUD_BASE / Math.max(0.2, -_axis.y));
+      // Foot on the sea s.d metres out on the light's side; the beam climbs along the
+      // light direction to the cloud base, so the whole shaft stays beyond the foot
+      // (a low moon gives long raking beams, never one sweeping over the camera).
+      const len = Math.min(s.l, CLOUD_BASE / Math.max(0.12, lightDir.y));
+      _top.set(cam.x + _h.x * s.d, 0, cam.z + _h.z * s.d).addScaledVector(lightDir, len);
       // axis-locked billboard: X = axis x toCam, Z = X x axis
       _toCam.copy(cam).sub(_top);
       _x.crossVectors(_axis, _toCam);

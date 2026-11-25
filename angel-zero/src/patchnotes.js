@@ -3,6 +3,12 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.75', title: 'STORM OPS // STORM REALISM PASS 1', bullets: [
+    'New STORM OPS conditions: a dark, moody storm deck under a cool silver moon that rim-lights the jets, a near-black sea with a narrow moonlit glint, light rain, lightning and heavy chop.',
+    'Moonlight now breaks through the storm in soft god-ray shafts falling to the sea.',
+    'STORM OPS rolls in automatically for NAVAL BATTLE phase 3, and you can pick it any time from STANDBY → Weather / Time.',
+    'Bloom is now reserved for real light sources (afterburners, explosions, deck and nav lights, tracers, cockpit displays), so bright skies and cloud tops no longer wash out; exposure was retuned to match.'
+  ] },
   { version: 'v1.1.74', title: 'HEADLESS CI SMOKE TESTS', bullets: [
     'A zero-dependency Playwright smoke suite now boots the real game in headless Chromium and checks menu boot, every mission, the F-22A camera cycle, wingman physics, ace BFM, warp telemetry and the debrief screen before each deploy.',
     'Every push and pull request to main runs the suite as a GitHub Action, catching JS exceptions, failed asset requests, WebGL errors and NaN flight state automatically.'
