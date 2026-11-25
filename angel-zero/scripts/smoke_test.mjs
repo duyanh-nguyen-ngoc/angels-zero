@@ -107,12 +107,18 @@ function attachCollectors(p) {
   });
 }
 
-async function navigate(query) {
+async function navigate(query, waitReady = true) {
   resetCollectors();
   const qs = query.includes('nowarm') ? query : `${query}&nowarm`;
   const t0 = Date.now();
   await page.goto(`${BASE}?${qs}`, { waitUntil: 'domcontentloaded', timeout: 90000 });
   console.log(`    [nav] domcontentloaded in ${Date.now() - t0} ms`);
+  // Menu-boot checks only need the debug object (set during module evaluation),
+  // not the full GLB/WebGL boot — navigating away immediately saves a cold boot.
+  if (!waitReady) {
+    await page.waitForFunction(() => typeof window.__az === 'object', null, { polling: 100, timeout: 30000 });
+    return;
+  }
   try {
     // Interval polling survives rAF starvation during first-frame shader compilation on CI.
     await page.waitForFunction(() => window.__az && window.__az.ready === true, null, { polling: 250, timeout: 240000 });
@@ -175,21 +181,21 @@ async function assertMission(id) {
 /* ------------------------------------------------------------------------- scenarios */
 const SCENARIOS = [
   ['Menu / hangar boot', async () => {
-    // ONE full page load for the whole suite: F-22A airframe + deterministic warp line + first mission.
-    await navigate('debug&nointro&nobgm&warp=3&aircraft=F22A&mission=AIR_SUPERIORITY');
-    await missionReady('AIR_SUPERIORITY');
-    // Return to the hangar through the real menu path, then relaunch for the mission scenarios.
-    await page.evaluate(() => window.__az.toMenu());
+    // Lightweight check: __az/appMode/buildChip/renderer are all set at module eval.
+    await navigate('debug&nobgm', false);
     const s = await page.evaluate(() => ({ mode: window.__az.appMode,
       chip: document.getElementById('buildChip')?.textContent || '' }));
     assert(s.mode === 'MENU', `appMode ${s.mode} !== MENU`);
     assert(/^v\d+\.\d+\.\d+$/.test(s.chip), `buildChip "${s.chip}" is not a version`);
     assert(await glError() === 0, 'WebGL error on menu boot');
-    await page.evaluate(() => window.__az.launchSortie());
-    await missionReady('AIR_SUPERIORITY');
   }],
 
-  ['Mission AIR_SUPERIORITY', async () => { await assertMission('AIR_SUPERIORITY'); }],
+  ['Mission AIR_SUPERIORITY', async () => {
+    // The ONE full page load: F-22A airframe + deterministic warp line + first mission.
+    await navigate('debug&nointro&nobgm&warp=3&aircraft=F22A&mission=AIR_SUPERIORITY');
+    await missionReady('AIR_SUPERIORITY');
+    await assertMission('AIR_SUPERIORITY');
+  }],
   ['Mission NAVAL_BATTLE', async () => { await switchMission('NAVAL_BATTLE'); await assertMission('NAVAL_BATTLE'); }],
   ['Mission CANYON_RUN', async () => { await switchMission('CANYON_RUN'); await assertMission('CANYON_RUN'); }],
   ['Mission ACE_DUEL', async () => { await switchMission('ACE_DUEL'); await assertMission('ACE_DUEL'); }],

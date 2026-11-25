@@ -749,9 +749,10 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createVFX } from './src/vfx.js?v=s9ej';
 import { createAmbient } from './src/ambient.js?v=s9ek';
 import { createStormFX } from './src/stormfx.js?v=s9el';
+import { createWetDeck } from './src/wetdeck.js?v=s9em';
 import { createBlastFX } from './src/blastfx.js?v=s9ej';
 import { createHUD } from './src/hud.js?v=s9ej';
-import { createCockpit3D } from './src/cockpit3d.js?v=s9ej';
+import { createCockpit3D } from './src/cockpit3d.js?v=s9em';
 import { createCockpitF22 } from './src/cockpit_f22.js?v=s9ek';
 import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9ej';
 import { createEjection } from './src/eject.js?v=s9ej';
@@ -959,6 +960,8 @@ const atmosphere = createAtmosphere(THREE, { scene, camera, sunDir: SUN_DIR, fog
 const sky = atmosphere.sky;
 const stormFx = createStormFX(THREE, { scene, camera });   // STORM OPS god-ray shafts (strength from the preset)
 let stormOpsAuto = false, stormOpsPrev = 'CLEAR';          // NAVAL phase-3 STORM OPS weather (see the frame loop)
+const wetDeck = createWetDeck(THREE, { camera, debug: DEBUG });   // CVN-ALLY damp deck + wet-light streaks (bound on carrier mount)
+const _wdNozL = new THREE.Vector3(), _wdNozR = new THREE.Vector3();
 
 function makeNormalMap(size, seed, scale) {
   const noise = createNoise2D(seed);
@@ -4620,6 +4623,16 @@ function updateCameraAndVisuals(dt, now) {
   atmosphere.setWeather({ overcast: weather.current.overcast, fogMul: weather.current.fogMul, flash: weather.flash });
   vfx.setCloudFlash(weather.flash);
   oceanUniforms.uChop.value = weather.current.chop;
+  // Wet deck (Storm Realism Pass 2): damp in any NAVAL op, soaked in rain / storm skies.
+  {
+    const wc = weather.current, sky = atmosphere.active.name;
+    let wt = Math.max(wc.rain * 1.4, wc.overcast > 0.3 ? wc.overcast * 0.8 : 0);
+    if (missionId === 'NAVAL_BATTLE') wt = Math.max(wt, 0.55);
+    if (sky === 'STORM_OPS' || sky === 'STORM') wt = 1;
+    const nz = nozzleLocal.length >= 2 && modelReady;
+    if (nz) { _wdNozL.copy(nozzleLocal[0]).applyMatrix4(jet.matrixWorld); _wdNozR.copy(nozzleLocal[1]).applyMatrix4(jet.matrixWorld); }
+    wetDeck.update(dt, Math.min(1, wt), state.afterburner || 0, state.throttle || 0, nz ? _wdNozL : null, nz ? _wdNozR : null);
+  }
   // Cloud fly-through: white-out fog + sky horizon around the camera (src/atmosphere.js).
   atmosphere.update(dt, vfx.mist, nvg.active);
   stormFx.update(dt, SUN_DIR);
@@ -5262,7 +5275,8 @@ ambient = createAmbient(THREE, { scene, camera, renderer, state, combat, world, 
 combatReady = true;
 // Boot-time carrier load: the 1.9 MB GLB is mounted and ray-cast before any launch path.
 carrierLoadPromise = Promise.resolve(gpuWarm.pending).then(() => combatSys.loadCarrier(combatSys.CARRIER_GLB)).then(() => carrierReady);
-combatSys.onCarrierMounted(() => {
+combatSys.onCarrierMounted(a => {
+  wetDeck.bind(a);
   const m = mission(), def = MAPS[m.mapTag] && MAPS[m.mapTag].carrier;
   if (def && (cat.ph === 'HOLD' || cat.ph === 'WAIT')) { combatSys.placeCarrier(def); catSnapAll(); }
   if (DEBUG) carrierDiag('mount');
@@ -6536,8 +6550,7 @@ if (DEBUG) {
     get model() { return model; }, get ready() { return modelReady; },
     get missionId() { return missionId; }, get mission() { return mission(); }, cycleMission, loadMissionScene, startSortie, launchSortie,
     setMission: id => { if (!MISSIONS[id]) return false; flightMode = 'FLY'; combat.health = 100; resetAircraft(); missionId = id; return startSortie(); },
-    toMenu: () => { appMode = 'MENU'; showMenu('title'); },
-    get surfaces() { return surfaces; }, get stormFx() { return stormFx; }, get weatherSys() { return weather; }, get atmo() { return atmosphere; }, get nvgSys() { return nvg; },
+    get surfaces() { return surfaces; }, get stormFx() { return stormFx; }, get wetDeck() { return wetDeck; }, get weatherSys() { return weather; }, get atmo() { return atmosphere; }, get nvgSys() { return nvg; },
     get aircraft() { return AC.id; }, get aircraftStats() { return AC; }, get gearPts() { return GEAR_PTS; },
     get reactive() { return { ...audio.reactive, log: RX_LOG ? RX_LOG.slice(-30) : [] }; }, rxFire, sayText, rxTelemetry,
     get autoland() { return autoland; }, autolandPrompt, engageAutoland, finishCarrierTrap, getMusicCtx, get hudPrompt() { return hud.promptText; }, get debrief() { return !debriefEl.hidden; },
