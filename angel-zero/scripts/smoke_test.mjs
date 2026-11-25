@@ -4,17 +4,18 @@
 // Run from anywhere:   node angel-zero/scripts/smoke_test.mjs
 // Optional:            SMOKE_PORT=8791 node angel-zero/scripts/smoke_test.mjs
 //
-// The game's software-GL shader warm-up costs tens of seconds per fresh page, so
-// the suite loads the app three times (menu, combat warp, F-22A) and switches
-// missions on a live page through __az.setMission(). Every assertion still runs
-// against the real production boot / mission / camera / debrief code paths.
+// three.js r160 is fulfilled from repo-root `smoke_vendor/` so CI never depends on
+// unpkg (a hung CDN request otherwise blocks module evaluation and __az never
+// appears). Software-GL shader warm-up is skipped via the debug-only ?nowarm hook;
+// the suite uses two full page loads and drives the rest through live __az helpers.
 
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');  // angel-zero/
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');   // angel-zero/
+const VENDOR = path.resolve(ROOT, '..', 'smoke_vendor');                          // repo root
 const PORT = Number(process.env.SMOKE_PORT) || 8791;
 const BASE = `http://127.0.0.1:${PORT}/index.html`;
 const MIME = {
@@ -32,6 +33,10 @@ try {
 } catch (err) {
   console.error('[SMOKE] Playwright is required. Install it with: npm i --no-save playwright && npx playwright install chromium');
   console.error('[SMOKE] ' + (err && err.message ? err.message : err));
+  process.exit(1);
+}
+if (!fs.existsSync(path.join(VENDOR, 'build', 'three.module.js'))) {
+  console.error('[SMOKE] Vendored three.js missing at ' + VENDOR);
   process.exit(1);
 }
 
@@ -82,6 +87,7 @@ function attachCollectors(p) {
     consoleMessages.push(text);
     if (text.startsWith('[ANGELS_ZERO] warp')) warpLogLine = text;
     if (m.type() !== 'error') return;
+    if (/ERR_ABORTED|ERR_FAILED|net::/.test(text)) return;   // navigation/CDN aborts are expected
     const loc = m.location() || {};
     const fromLocal = /127\.0\.0\.1|localhost/.test(loc.url || '') || /127\.0\.0\.1|localhost/.test(text);
     const thirdParty = /youtube|ytimg|googlevideo/i.test(text);
@@ -94,17 +100,19 @@ function attachCollectors(p) {
   });
   p.on('requestfailed', r => {
     const u = r.url();
-    if (/^https?:\/\/(127\.0\.0\.1|localhost)/.test(u)) badRequests.push(u + ' ' + (r.failure()?.errorText || ''));
+    if (!/^https?:\/\/(127\.0\.0\.1|localhost)/.test(u)) return;
+    const err = r.failure()?.errorText || '';
+    if (/ERR_ABORTED/.test(err)) return;                      // intentional navigation
+    badRequests.push(u + ' ' + err);
   });
 }
 
 async function navigate(query) {
   resetCollectors();
   try { await page.evaluate(() => { window.onbeforeunload = null; }); } catch { /* fresh page */ }
-  // CI smoke runs skip the multi-second software-GL shader warm-up; production never does.
   const qs = query.includes('nowarm') ? query : `${query}&nowarm`;
-  await page.goto(`${BASE}?${qs}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
-  await page.waitForFunction(() => window.__az && window.__az.ready === true, null, { timeout: 120000 });
+  await page.goto(`${BASE}?${qs}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.waitForFunction(() => window.__az && window.__az.ready === true, null, { timeout: 90000 });
 }
 async function missionReady(id) {
   await page.waitForFunction(mid => {
@@ -113,7 +121,9 @@ async function missionReady(id) {
   }, id, { timeout: 60000 });
 }
 async function switchMission(id) {
-  await page.evaluate(async mid => { await window.__az.setMission(mid); }, id);
+  // Fire-and-forget: startSortie() is async and may legitimately take seconds.
+  // Awaiting it directly could hang forever; missionReady() has a hard timeout.
+  await page.evaluate(mid => { window.__az.setMission(mid); }, id);
   await missionReady(id);
 }
 async function glError() {
@@ -136,6 +146,19 @@ async function run(name, fn) {
     console.log(`  FAIL  ${name.padEnd(44)} ${String(Date.now() - t0).padStart(6)} ms  ${detail.slice(0, 220)}`);
   }
 }
+async function assertMission(id) {
+  const s = await page.evaluate(() => {
+    const a = window.__az;
+    return { gl: a.renderer.getContext().getError(), mode: a.mode, app: a.appMode,
+      y: a.state.position.y, speed: a.state.speed, alive: a.enemies.filter(e => e.alive).length };
+  });
+  assert(s.gl === 0, 'WebGL error');
+  assert(s.mode === 'FLY', `flightMode ${s.mode}`);
+  assert(s.app === 'PLAY', `appMode ${s.app}`);
+  assert(finite(s.y) && finite(s.speed), `non-finite physics y=${s.y} speed=${s.speed}`);
+  if (id === 'ACE_DUEL') assert(s.alive === 1, `ACE_DUEL alive=${s.alive}`);
+  if (id === 'FREE_FLIGHT') assert(s.alive === 0, `FREE_FLIGHT alive=${s.alive}`);
+}
 
 /* ------------------------------------------------------------------------- scenarios */
 const SCENARIOS = [
@@ -149,8 +172,8 @@ const SCENARIOS = [
   }],
 
   ['Mission AIR_SUPERIORITY', async () => {
-    // One full warp boot: captures the deterministic warp telemetry line used by a later scenario.
-    await navigate('debug&nointro&nobgm&warp=3&mission=AIR_SUPERIORITY');
+    // Second + last full page load: F-22A airframe + deterministic warp line + first mission.
+    await navigate('debug&nointro&nobgm&warp=3&aircraft=F22A&mission=AIR_SUPERIORITY');
     await missionReady('AIR_SUPERIORITY');
     await assertMission('AIR_SUPERIORITY');
   }],
@@ -161,8 +184,8 @@ const SCENARIOS = [
   ['Mission FREE_FLIGHT', async () => { await switchMission('FREE_FLIGHT'); await assertMission('FREE_FLIGHT'); }],
 
   ['F-22A + cockpit + nose camera cycle', async () => {
-    await navigate('debug&nointro&nobgm&aircraft=F22A&mission=AIR_SUPERIORITY');
-    await missionReady('AIR_SUPERIORITY');
+    // No reload: the live page is already the F-22A build. Normalise view to CHASE.
+    await page.evaluate(() => window.__az.setView(false));
     let s = await page.evaluate(() => ({ ac: window.__az.aircraft, cam: window.__az.camMode }));
     assert(s.ac === 'F22A', `aircraft ${s.ac}`);
     assert(s.cam === 'CHASE', `initial camera ${s.cam}`);
@@ -215,20 +238,6 @@ const SCENARIOS = [
   }]
 ];
 
-async function assertMission(id) {
-  const s = await page.evaluate(() => {
-    const a = window.__az;
-    return { gl: a.renderer.getContext().getError(), mode: a.mode, app: a.appMode,
-      y: a.state.position.y, speed: a.state.speed, alive: a.enemies.filter(e => e.alive).length };
-  });
-  assert(s.gl === 0, 'WebGL error');
-  assert(s.mode === 'FLY', `flightMode ${s.mode}`);
-  assert(s.app === 'PLAY', `appMode ${s.app}`);
-  assert(finite(s.y) && finite(s.speed), `non-finite physics y=${s.y} speed=${s.speed}`);
-  if (id === 'ACE_DUEL') assert(s.alive === 1, `ACE_DUEL alive=${s.alive}`);
-  if (id === 'FREE_FLIGHT') assert(s.alive === 0, `FREE_FLIGHT alive=${s.alive}`);
-}
-
 /* ------------------------------------------------------------------------------ main */
 try {
   await listen(); await waitForServer();
@@ -238,10 +247,19 @@ try {
       '--autoplay-policy=no-user-gesture-required', '--no-sandbox']
   });
   const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
-  // Third-party YouTube + free-flight tile CDNs must never hang CI. Three.js/fonts stay enabled.
   await context.route('**/*', route => {
     const u = route.request().url();
-    if (/youtube\.com|ytimg\.com|googlevideo\.com|tiles\.openfreemap\.org|elevation-tiles-prod|arcgisonline\.com/i.test(u)) return route.abort();
+    // Vendored three.js r160 — never hit unpkg from CI.
+    const prefix = 'https://unpkg.com/three@0.160.0/';
+    if (u.startsWith(prefix)) {
+      const file = path.join(VENDOR, u.slice(prefix.length));
+      if (fs.existsSync(file)) return route.fulfill({ status: 200, contentType: 'text/javascript; charset=utf-8', body: fs.readFileSync(file) });
+      return route.abort();
+    }
+    // Third-party stuff must never hang CI: fonts, YouTube, free-flight tiles.
+    if (/fonts\.googleapis|fonts\.gstatic|youtube|ytimg|googlevideo|tiles\.openfreemap|elevation-tiles|arcgisonline/i.test(u)) return route.abort();
+    // Any other external request is aborted immediately (no 86 s CDN stalls).
+    if (!u.startsWith(`http://127.0.0.1:${PORT}/`) && !u.startsWith('data:')) return route.abort();
     return route.continue();
   });
   await context.addInitScript(() => { window.onbeforeunload = null; });

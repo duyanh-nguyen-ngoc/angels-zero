@@ -157,7 +157,7 @@ npm i --no-save playwright && npx playwright install chromium
 node angel-zero/scripts/smoke_test.mjs
 ```
 
-The same suite runs automatically as the **Smoke Test** GitHub Action on every push and pull request to `main`, alongside **Deploy to Cloudflare Pages**.
+The same suite runs automatically as the **Smoke Test** GitHub Action on every push and pull request to `main`, alongside **Deploy to Cloudflare Pages**. For determinism, the suite fulfills three.js r160 from the repo-root `smoke_vendor/` directory instead of hitting unpkg, and blocks YouTube/font/tile CDNs — so CI never stalls on third-party networks.
 
 <details>
 <summary><strong>Repository Structure &amp; Tech Stack</strong></summary>
@@ -178,8 +178,9 @@ Built with **vanilla ES modules + Three.js r160**, a **Blender headless GLB pipe
 │   │   ├── portraits/             # Phosphor CRT pilot & AWACS portraits
 │   │   ├── sfx/                   # F-22A (29-file F119 bank) + F-15C & environment SFX
 │   │   └── voicelines/radio/      # Radio-filtered voice clips
-│   ├── scripts/                   # Blender & audio asset pipeline scripts
+│   ├── scripts/                   # Blender / audio pipeline + smoke_test.mjs (headless CI smoke suite)
 │   └── PLAN.md                    # Roadmap, milestone log & ?debug URL flags
+├── smoke_vendor/                  # Offline three.js r160 mirror for the headless smoke suite
 ├── docs/screenshots/              # Screenshots & animated WebP gameplay footage for README
 ├── launch.bat / launch.sh         # One-click local launchers
 ├── server.py                      # Multi-threaded local HTTP server
