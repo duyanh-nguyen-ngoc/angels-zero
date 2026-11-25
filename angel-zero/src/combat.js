@@ -8,6 +8,8 @@
 // burning wrecks that splash, scoring, waves, lock-on and threat warnings.
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { createDroneSwarm } from './drones.js?v=s9eu';
+import { createAceBFM } from './ace_bfm.js?v=s9eu';
 import { DIFFICULTY_PRESETS } from './difficulty.js?v=s9c2';
 import { SPW } from './loadout.js?v=s9c2';
 import { missionConfig } from './missions.js?v=s9dz';
@@ -381,321 +383,18 @@ export function createCombat(THREE, env) {
   const playerTracers = new Tracers(320, new THREE.Color(2.6, 2.0, 1.15), new THREE.Color(1.0, 0.42, 0.1));
   const enemyTracers = new Tracers(220, new THREE.Color(2.4, 0.95, 0.45), new THREE.Color(0.85, 0.16, 0.04));
 
-  /* ==================================================== agile drone swarm */
-  // Separate pooled archetype: one InstancedMesh body + one additive engine-glow
-  // Points cloud, fixed DRONE_N slots, typed-array state, zero per-frame objects.
-  // Drones are virtual lock targets only -- never enemies entries, never RWR.
-  const DR_POS = new Float32Array(DRONE_N * 3);
-  const DR_VEL = new Float32Array(DRONE_N * 3);
-  const DR_ALIVE = new Uint8Array(DRONE_N);
-  const DR_GUNCD = new Float32Array(DRONE_N);
-  const DR_BURST = new Float32Array(DRONE_N);
-  const DR_SWARM = new Int8Array(DRONE_N);          // -1 none, 0 player anchor, 1 carrier anchor
-  const DR_PHASE = new Float32Array(DRONE_N);       // orbit phase (radians)
-  const DR_ATK = new Float32Array(DRONE_N);         // attack timer (negative = pursuing)
-  const DR_BANK = new Float32Array(DRONE_N);
-  const DRONES_N = new THREE.Vector3(0, 0, -1), DR_UP = new THREE.Vector3(0, 1, 0);
-  const DRONE_TGT = Array.from({ length: DRONE_N }, (_, i) => ({
-    kind: 'DRONE', idx: i, pos: new THREE.Vector3(), vel: new THREE.Vector3(), alive: false,
-    label: 'DRONE-' + String(i + 1).padStart(2, '0'), type: 'UAV', cloud: 0, heading: 0
-  }));
-  // 4-triangle delta wing (~3.5 m span) + one vertical fin; built once.
-  const droneGeo = (() => {
-    const v = [0, 0, -1.8, -1.75, 0, 0.9, 0, 0, 1.0, 1.75, 0, 0.9,
-      -0.55, 0, 1.65, 0.55, 0, 1.65, 0, 0, 0.55, 0, 0, 1.45, 0, 0.62, 1.45];
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
-    g.setIndex([0, 1, 2, 0, 2, 3, 1, 4, 2, 2, 5, 3, 6, 7, 8]);
-    g.computeVertexNormals(); g.computeBoundingSphere();
-    return g;
-  })();
-  const droneMat = new THREE.MeshStandardMaterial({ color: 0x58616b, metalness: 0.45, roughness: 0.55,
-    emissive: 0x142430, emissiveIntensity: 0.8, side: THREE.DoubleSide });
-  const droneMesh = new THREE.InstancedMesh(droneGeo, droneMat, DRONE_N);
-  droneMesh.frustumCulled = true; droneMesh.count = DRONE_N; droneMesh.renderOrder = 5;
-  scene.add(droneMesh);
-  // Additive engine glow: same logdepth pattern as the SAM tracer glow in vfx.js.
-  const DR_GLOW_V = LOG_V + `
-    attribute float aSize; attribute float aAlpha;
-    varying float vA;
-    void main() {
-      vA = aAlpha;
-      vec4 mv = modelViewMatrix * vec4(position, 1.0);
-      gl_Position = projectionMatrix * mv;
-      gl_PointSize = aSize * 320.0 / max(1.0, -mv.z);
-      #include <logdepthbuf_vertex>
-    }`;
-  const DR_GLOW_F = LOG_F + `
-    varying float vA;
-    void main() {
-      #include <logdepthbuf_fragment>
-      vec2 d = gl_PointCoord - 0.5;
-      float r = length(d) * 2.0;
-      float a = pow(max(0.0, 1.0 - r), 2.0) * vA;
-      if (a < 0.01) discard;
-      gl_FragColor = vec4(vec3(1.0, 0.56, 0.24) * a, a);
-    }`;
-  const drGlowGeo = new THREE.BufferGeometry();
-  const DR_GLOW_POS = new Float32Array(DRONE_N * 3), DR_GLOW_SIZE = new Float32Array(DRONE_N), DR_GLOW_A = new Float32Array(DRONE_N);
-  drGlowGeo.setAttribute('position', new THREE.BufferAttribute(DR_GLOW_POS, 3));
-  drGlowGeo.setAttribute('aSize', new THREE.BufferAttribute(DR_GLOW_SIZE, 1));
-  drGlowGeo.setAttribute('aAlpha', new THREE.BufferAttribute(DR_GLOW_A, 1));
-  const drGlow = new THREE.Points(drGlowGeo, new THREE.ShaderMaterial({ vertexShader: DR_GLOW_V, fragmentShader: DR_GLOW_F,
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, fog: false }));
-  drGlow.frustumCulled = false; drGlow.renderOrder = 8; scene.add(drGlow);
-  // Scratch (preallocated): steering, orientation, guns, glow, culling.
-  const _drp = new THREE.Vector3(), _drv = new THREE.Vector3(), _dracc = new THREE.Vector3();
-  const _drq = new THREE.Quaternion(), _drqr = new THREE.Quaternion(), _drm4 = new THREE.Matrix4(), _drup = new THREE.Vector3(1, 1, 1);
-  const _drzero = new THREE.Vector3(0, 0, 0), _drPos = new THREE.Vector3(), _drGoal = new THREE.Vector3();
-  const _drCent = new THREE.Vector3(), _drAli = new THREE.Vector3(), _drSep = new THREE.Vector3(), _drTmp = new THREE.Vector3();
-  const _drFwd = new THREE.Vector3(), _drRight = new THREE.Vector3(), _drAnchor = new THREE.Vector3(), _drCarrier = new THREE.Vector3();
-  const _drLead = new THREE.Vector3(), _drDir = new THREE.Vector3(), _drMuz = new THREE.Vector3(), _drBul = new THREE.Vector3(), _drToP = new THREE.Vector3();
-  let droneSpawned = 0, droneKilled = 0, droneCleared = 0;
-  let droneAtkT = 4, droneSalvoT = 0, droneSalvoKills = 0, droneSalvoPaid = false;
-
-  function clearDronePool() {
-    for (let i = 0; i < DRONE_N; i++) {
-      DR_ALIVE[i] = 0; DRONE_TGT[i].alive = false; DR_BURST[i] = 0; DR_SWARM[i] = -1;
-      _drm4.compose(_drPos.set(0, 0, 0), _drq.identity(), _drzero);
-      droneMesh.setMatrixAt(i, _drm4);
-      DR_GLOW_A[i] = 0;
-    }
-    droneMesh.instanceMatrix.needsUpdate = true;
-    drGlowGeo.attributes.aAlpha.needsUpdate = true;
-    C.swarm.on = false; C.swarm.n = 0; C.swarm.alive = 0; C.swarm.bonusPaid = true; C.swarm.t = 0;
-  }
-  clearDronePool();                                            // hide all slots from the first frame
-
-  function spawnSwarm(n, anchorKind) {
-    if (gunsOnly()) return 0;                                  // ACE_DUEL never fields missiles or drones
-    const want = clamp(n | 0, SWARM_MIN, SWARM_MAX);
-    let free = 0;
-    for (let i = 0; i < DRONE_N; i++) if (!DR_ALIVE[i]) free++;
-    if (!free) return 0;
-    const cnt = Math.min(want, free);
-    const useCarrier = anchorKind === 'CARRIER' && C.ally && (C.ally.root || C.ally.g);
-    if (useCarrier) {
-      const root = C.ally.root || C.ally.g;
-      root.updateWorldMatrix(true, false);
-      root.getWorldPosition(_drCarrier);
-    }
-    const a0 = rand() * Math.PI * 2, dist = 4000 + rand() * 2000;
-    const baseX = S.position.x + Math.cos(a0) * dist, baseZ = S.position.z + Math.sin(a0) * dist;
-    const baseY = clamp(S.position.y + (rand() - 0.5) * 600, 140, 12000);
-    let placed = 0;
-    for (let i = 0; i < DRONE_N && placed < cnt; i++) {
-      if (DR_ALIVE[i]) continue;
-      const k = (i / cnt) * Math.PI * 2;
-      DR_POS[i * 3] = baseX + Math.cos(k) * 20 + (rand() - 0.5) * 20;
-      DR_POS[i * 3 + 1] = clamp(baseY + (rand() - 0.5) * 30, 120, 12000);
-      DR_POS[i * 3 + 2] = baseZ + Math.sin(k) * 20 + (rand() - 0.5) * 20;
-      _drPos.set(DR_POS[i * 3], DR_POS[i * 3 + 1], DR_POS[i * 3 + 2]);
-      _drv.copy(S.position).sub(_drPos).normalize();
-      DR_VEL[i * 3] = _drv.x * DRONE_V; DR_VEL[i * 3 + 1] = _drv.y * DRONE_V; DR_VEL[i * 3 + 2] = _drv.z * DRONE_V;
-      DR_ALIVE[i] = 1; DR_SWARM[i] = useCarrier && placed >= cnt * 0.5 ? 1 : 0;
-      DR_PHASE[i] = k; DR_ATK[i] = 4 + rand() * 3; DR_BANK[i] = 0;
-      DR_GUNCD[i] = 1 + rand() * 2; DR_BURST[i] = 0;
-      const t = DRONE_TGT[i];
-      t.alive = true; t.pos.copy(_drPos); t.vel.set(DR_VEL[i * 3], DR_VEL[i * 3 + 1], DR_VEL[i * 3 + 2]);
-      t.heading = (Math.atan2(_drv.x, -_drv.z) / D2R + 360) % 360;
-      DR_GLOW_SIZE[i] = 4.5 + rand() * 2; DR_GLOW_A[i] = 0.9;
-      drGlowGeo.attributes.aSize.needsUpdate = true; drGlowGeo.attributes.aAlpha.needsUpdate = true;
-      droneSpawned++; placed++;
-    }
-    if (!placed) return 0;
-    C.swarm.on = true; C.swarm.n = placed; C.swarm.alive = placed;
-    C.swarm.anchor = useCarrier ? 'CARRIER' : 'PLAYER'; C.swarm.bonusPaid = false; C.swarm.t = 0;
-    droneAtkT = 4;
-    C.droneInboundT = performance.now();
-    say('BANDITS — DRONE SWARM, LOW AND FAST!', 2.6, '#ffbf3f');
-    if (env.onRadio) env.onRadio('DRONE_INBOUND');
-    missionUpdate('ambush');
-    if (env.debug) console.log('[ANGELS_ZERO] drone swarm spawned n=' + placed + ' anchor=' + C.swarm.anchor);
-    return placed;
-  }
-
-  function killDrone(i, how) {
-    if (i < 0 || i >= DRONE_N || !DR_ALIVE[i]) return false;
-    DR_ALIVE[i] = 0; DRONE_TGT[i].alive = false; DR_BURST[i] = 0; DR_SWARM[i] = -1;
-    const pos = DRONE_TGT[i].pos;
-    _drm4.compose(pos, _drq.identity(), _drzero); droneMesh.setMatrixAt(i, _drm4);
-    droneMesh.instanceMatrix.needsUpdate = true;
-    DR_GLOW_A[i] = 0; drGlowGeo.attributes.aAlpha.needsUpdate = true;
-    C.swarm.alive = Math.max(0, C.swarm.alive - 1);
-    droneKilled++;
-    explosion(pos, 0.35, { vel: DRONE_TGT[i].vel });
-    if (env.samPuff) env.samPuff(_drTmp.copy(pos));
-    if (env.onSfx) env.onSfx('explosion', pos, 0.35);
-    C.score += DRONE_PTS;
-    pushEvent('DRONE', 'SWARM KILL', DRONE_PTS);
-    if (C.weapon === 'AAM4' && how === 'MSL' && droneSalvoT > 0 && performance.now() - droneSalvoT < 1500) {
-      droneSalvoKills++;
-      if (droneSalvoKills >= 4 && !droneSalvoPaid) { droneSalvoPaid = true; awardStyle('QUAD_SPLASH'); }
-    }
-    if (C.swarm.alive === 0 && !C.swarm.bonusPaid) {
-      C.swarm.bonusPaid = true; C.swarm.on = false; droneCleared++;
-      C.score += SWARM_BONUS;
-      pushEvent('SWARM', 'SWARM CLEARED', SWARM_BONUS, '#ffd45a');
-      C.droneClearedT = performance.now();
-      say('SWARM CLEARED — NICE WORK', 2.4);
-      if (env.onRadio) env.onRadio('SWARM_CLEARED');
-    }
-    return true;
-  }
-
-  function droneSplash(pos, hitIdx) {
-    killDrone(hitIdx, 'MSL');
-    for (let i = 0; i < DRONE_N; i++) {
-      if (!DR_ALIVE[i] || i === hitIdx) continue;
-      if (DRONE_TGT[i].pos.distanceToSquared(pos) < 12 * 12) killDrone(i, 'MSL');
-    }
-  }
-
-  function updateDrones(dt, playerActive) {
-    if (!C.swarm.on) {
-      for (let i = 0; i < DRONE_N; i++) if (DR_ALIVE[i]) { C.swarm.on = true; break; }
-      if (!C.swarm.on) return;
-    }
-    C.swarm.t += dt;
-    droneAtkT -= dt;
-    if (droneAtkT <= 0) {                                      // one random drone peels off every 4 s
-      for (let k = 0; k < DRONE_N; k++) if (DR_ALIVE[k]) { DR_ATK[k] = -3; break; }
-      droneAtkT = 4;
-    }
-    const carrier = C.ally && (C.ally.root || C.ally.g);
-    if (carrier) { carrier.updateWorldMatrix(true, false); carrier.getWorldPosition(_drCarrier); }
-    // Neighbour pass: coherence + alignment per swarm, separation for any close pair.
-    for (let i = 0; i < DRONE_N; i++) {
-      if (!DR_ALIVE[i]) continue;
-      _drCent.set(0, 0, 0); _drAli.set(0, 0, 0); _drSep.set(0, 0, 0);
-      let n = 0;
-      for (let j = 0; j < DRONE_N; j++) {
-        if (j === i || !DR_ALIVE[j]) continue;
-        const dx = DR_POS[j * 3] - DR_POS[i * 3], dy = DR_POS[j * 3 + 1] - DR_POS[i * 3 + 1], dz = DR_POS[j * 3 + 2] - DR_POS[i * 3 + 2];
-        const d2 = dx * dx + dy * dy + dz * dz;
-        if (d2 < DRONE_SEP_R * DRONE_SEP_R && d2 > 1e-6) {
-          const inv = 1 / Math.sqrt(d2);
-          _drSep.x -= dx * inv; _drSep.y -= dy * inv; _drSep.z -= dz * inv;
-        }
-        if (DR_SWARM[j] !== DR_SWARM[i]) continue;
-        _drCent.x += DR_POS[j * 3]; _drCent.y += DR_POS[j * 3 + 1]; _drCent.z += DR_POS[j * 3 + 2];
-        _drAli.x += DR_VEL[j * 3]; _drAli.y += DR_VEL[j * 3 + 1]; _drAli.z += DR_VEL[j * 3 + 2];
-        n++;
-      }
-      if (n) {
-        _drCent.divideScalar(n); _drAli.divideScalar(n);
-        _drCent.x -= DR_POS[i * 3]; _drCent.y -= DR_POS[i * 3 + 1]; _drCent.z -= DR_POS[i * 3 + 2];
-        _drAli.x -= DR_VEL[i * 3]; _drAli.y -= DR_VEL[i * 3 + 1]; _drAli.z -= DR_VEL[i * 3 + 2];
-        if (_drCent.lengthSq() > 1) _drCent.normalize();
-        if (_drAli.lengthSq() > 1) _drAli.normalize();
-      }
-      // Pursuit state: peel-off drone chases the player for 3 s then rejoins.
-      if (DR_ATK[i] < 0) { DR_ATK[i] += dt; if (DR_ATK[i] >= 0) DR_ATK[i] = 4; }
-      const pursuing = DR_ATK[i] < 0;
-      _drAnchor.copy(DR_SWARM[i] === 1 && carrier ? _drCarrier : S.position);
-      if (pursuing) {
-        _drGoal.copy(S.position);
-      } else {
-        const th = C.swarm.t * 0.6 + DR_PHASE[i];
-        _drGoal.set(_drAnchor.x + Math.cos(th) * DRONE_ORBIT_R,
-          Math.max(groundLevel(_drAnchor.x, _drAnchor.z) + 260, _drAnchor.y + DRONE_ORBIT_DY),
-          _drAnchor.z + Math.sin(th) * DRONE_ORBIT_R);
-      }
-      _drTmp.set(_drGoal.x - DR_POS[i * 3], _drGoal.y - DR_POS[i * 3 + 1], _drGoal.z - DR_POS[i * 3 + 2]);
-      if (_drTmp.lengthSq() > 1) _drTmp.normalize().multiplyScalar(DRONE_V);
-      else _drTmp.set(0, 0, 0);
-      _drTmp.x -= DR_VEL[i * 3]; _drTmp.y -= DR_VEL[i * 3 + 1]; _drTmp.z -= DR_VEL[i * 3 + 2];
-      if (_drTmp.lengthSq() > 1) _drTmp.normalize();
-      _dracc.copy(_drTmp).multiplyScalar(DRONE_ORBIT)
-        .addScaledVector(_drCent, DRONE_COH).addScaledVector(_drAli, DRONE_ALI)
-        .addScaledVector(_drSep, DRONE_SEP);
-      // Terrain floor with 80 m clearance.
-      const floor = groundLevel(DR_POS[i * 3], DR_POS[i * 3 + 2]) + 80;
-      if (DR_POS[i * 3 + 1] < floor + 40) _dracc.y += (floor + 40 - DR_POS[i * 3 + 1]) * 0.02;
-      const gLim = DRONE_G * 9.81;
-      if (_dracc.lengthSq() > gLim * gLim) _dracc.setLength(gLim);
-      DR_VEL[i * 3] += _dracc.x * dt; DR_VEL[i * 3 + 1] += _dracc.y * dt; DR_VEL[i * 3 + 2] += _dracc.z * dt;
-      _drFwd.set(DR_VEL[i * 3], DR_VEL[i * 3 + 1], DR_VEL[i * 3 + 2]);
-      if (_drFwd.lengthSq() < 1) _drFwd.set(0, 0, -1);
-      _drFwd.normalize().multiplyScalar(DRONE_V);
-      DR_VEL[i * 3] = _drFwd.x; DR_VEL[i * 3 + 1] = _drFwd.y; DR_VEL[i * 3 + 2] = _drFwd.z;
-      DR_POS[i * 3] += _drFwd.x * dt; DR_POS[i * 3 + 1] += _drFwd.y * dt; DR_POS[i * 3 + 2] += _drFwd.z * dt;
-      // Bank from lateral acceleration (aLat = a . right, right = up x fwd).
-      _drRight.crossVectors(DR_UP, _drFwd).normalize();
-      DR_BANK[i] = clamp(Math.atan2(_dracc.dot(_drRight), gLim), -0.85, 0.85);
-      _drPos.set(DR_POS[i * 3], DR_POS[i * 3 + 1], DR_POS[i * 3 + 2]);
-      _drm4.lookAt(_drPos, _drTmp.copy(_drPos).add(_drFwd), DR_UP);
-      _drq.setFromRotationMatrix(_drm4);
-      _drqr.setFromAxisAngle(DRONES_N, DR_BANK[i]); _drq.multiply(_drqr);
-      _drm4.compose(_drPos, _drq, _drup); droneMesh.setMatrixAt(i, _drm4);
-      // Sync virtual lock target.
-      const t = DRONE_TGT[i];
-      t.pos.copy(_drPos); t.vel.copy(_drFwd); t.alive = true;
-      t.heading = (Math.atan2(_drFwd.x, -_drFwd.z) / D2R + 360) % 360;
-      // Engine glow sits 2 m behind along -vel.
-      DR_GLOW_POS[i * 3] = _drPos.x - _drFwd.x * 2 / DRONE_V;
-      DR_GLOW_POS[i * 3 + 1] = _drPos.y - _drFwd.y * 2 / DRONE_V;
-      DR_GLOW_POS[i * 3 + 2] = _drPos.z - _drFwd.z * 2 / DRONE_V;
-      // Gun burst: lead the player using the ace closest-approach test.
-      if (DR_BURST[i] > 0) {
-        DR_BURST[i] -= dt;
-        const rounds = Math.min(3, Math.floor(DRONE_GUN_RPS * dt + 0.5));
-        for (let r = 0; r < rounds; r++) {
-          const d = _drTmp.copy(S.position).sub(_drPos).length();
-          let tof = d / ACE_BULLET_V;
-          _drLead.copy(S.velocity).multiplyScalar(tof).add(S.position);
-          tof = _drLead.distanceTo(_drPos) / ACE_BULLET_V;
-          _drLead.copy(S.velocity).multiplyScalar(tof).add(S.position);
-          _drDir.subVectors(_drLead, _drPos).normalize();
-          _drMuz.copy(_drPos).addScaledVector(_drFwd, 2.5 / DRONE_V);
-          _drBul.copy(_drDir).multiplyScalar(ACE_BULLET_V);
-          _drToP.copy(S.position).sub(_drMuz);
-          const along = _drToP.dot(_drBul), v2 = ACE_BULLET_V * ACE_BULLET_V;
-          if (playerActive && along > 0 && along < DRONE_GUN_R * ACE_BULLET_V) {
-            _drToP.copy(_drBul).multiplyScalar(along / v2).sub(_drToP);
-            if (_drToP.length() < ACE_HIT_R) {
-              damagePlayer(DRONE_GUN_DMG);
-              if (env.onSfx) env.onSfx('gunhit', S.position, 1);
-            }
-          }
-          if (r === 0 && env.aaTracer) env.aaTracer(_drMuz, _drBul, 0.3, true);
-        }
-        if (DR_BURST[i] <= 0) DR_GUNCD[i] = DRONE_GUN_CD;
-      } else {
-        DR_GUNCD[i] -= dt;
-        _drTmp.copy(S.position).sub(_drPos);
-        const d = _drTmp.length();
-        if (playerActive && DR_GUNCD[i] <= 0 && d < DRONE_GUN_R && d > 1) {
-          _drTmp.divideScalar(d);
-          _drFwd.set(DR_VEL[i * 3], DR_VEL[i * 3 + 1], DR_VEL[i * 3 + 2]).normalize();
-          if (_drTmp.dot(_drFwd) >= DRONE_GUN_COS) {
-            DR_BURST[i] = DRONE_BURST; DR_GUNCD[i] = DRONE_GUN_CD;
-            if (env.onSfx) env.onSfx('egun', _drPos, 0.4);
-          }
-        }
-      }
-    }
-    // Live centroid bound for frustum culling (written in place, never recomputed).
-    let n = 0, cx = 0, cy = 0, cz = 0, maxR = 0;
-    for (let i = 0; i < DRONE_N; i++) if (DR_ALIVE[i]) {
-      const x = DR_POS[i * 3], y = DR_POS[i * 3 + 1], z = DR_POS[i * 3 + 2];
-      cx += x; cy += y; cz += z; n++;
-    }
-    if (n) {
-      cx /= n; cy /= n; cz /= n;
-      for (let i = 0; i < DRONE_N; i++) if (DR_ALIVE[i]) {
-        const dx = DR_POS[i * 3] - cx, dy = DR_POS[i * 3 + 1] - cy, dz = DR_POS[i * 3 + 2] - cz;
-        const r = dx * dx + dy * dy + dz * dz; if (r > maxR) maxR = r;
-      }
-      droneGeo.boundingSphere.center.set(cx, cy, cz);
-      droneGeo.boundingSphere.radius = Math.sqrt(maxR) + 10;
-      droneMesh.instanceMatrix.needsUpdate = true;
-      drGlowGeo.attributes.position.needsUpdate = true;
-      drGlowGeo.attributes.aAlpha.needsUpdate = true;
-    }
-  }
-
-  // M61A1 in the starboard wing-root fairing; rounds converge on the boresight at 1,500 ft.
+  const droneSwarm = createDroneSwarm(THREE, {
+  scene, state: S, stateRef: S, S, C, groundLevel, clamp, D2R, rand, say, pushEvent, missionUpdate,
+  explosion, awardStyle, gunsOnly, damagePlayer, outer: env,
+  DRONE_N, DRONE_HIT_R, DRONE_V, DRONE_G, DRONE_COH, DRONE_SEP, DRONE_ALI, DRONE_ORBIT,
+  DRONE_SEP_R, DRONE_ORBIT_R, DRONE_ORBIT_DY, DRONE_GUN_R, DRONE_GUN_COS, DRONE_BURST,
+  DRONE_GUN_CD, DRONE_GUN_DMG, DRONE_GUN_RPS, DRONE_PTS, SWARM_BONUS, SWARM_MIN, SWARM_MAX,
+  ACE_BULLET_V, ACE_HIT_R, LOG_V, LOG_F
+});
+const { clearDronePool, spawnSwarm, killDrone, droneSplash, updateDrones } = droneSwarm;
+const DRONE_TGT = droneSwarm.getDrones();
+const droneStats = droneSwarm.stats;
+// M61A1 in the starboard wing-root fairing; rounds converge on the boresight at 1,500 ft.
   const GUN_PORT = new THREE.Vector3(1.45, 0.35, -1.8);
   const CONVERGE_M = 1500 * FT;
   const DISPERSION = 0.008;                                   // 8 mrad cone (diameter)
@@ -1174,7 +873,7 @@ export function createCombat(THREE, env) {
   function waveAlive() {
     let n = 0;
     for (const e of enemies) if (e.alive && !e.scripted && !e.bomber && !e.ace && !e.aceFlight) n++;
-    for (let i = 0; i < DRONE_N; i++) if (DR_ALIVE[i]) n++;       // a wave isn't clear until its swarm is gone
+    for (let i = 0; i < DRONE_N; i++) if (droneSwarm.isAlive(i)) n++;       // a wave isn't clear until its swarm is gone
     return n;
   }
   let furSwarmT = 75;
@@ -1526,174 +1225,14 @@ export function createCombat(THREE, env) {
   }
   const wrapPi = a => Math.atan2(Math.sin(a), Math.cos(a));
 
-  /* ---------------------------------------------------------------------------
-     Shared bank-to-turn jet integrator. Used by wingmen (enemies keep their
-     tuned combat integrator in updateEnemy). All scratch is module-level:
-     zero allocations per frame. `lim` is a preallocated constant object.
-     --------------------------------------------------------------------------- */
-  const _btDir = new THREE.Vector3(), _btPerp = new THREE.Vector3(), _btUp = new THREE.Vector3(),
-    _btRight = new THREE.Vector3(), _btLift = new THREE.Vector3(), _btAcc = new THREE.Vector3(),
-    _btAhead = new THREE.Vector3(), _btF = new THREE.Vector3(), _btOrg = new THREE.Vector3(),
-    _btQ = new THREE.Quaternion(), _btM = new THREE.Matrix4(), _btZax = new THREE.Vector3(0, 0, 1);
-  function flyBTT(a, desDir, desSpeed, dt, lim) {
-    const G = 9.81, v0 = Math.max(a.speed || 100, 60);
-    desSpeed = Math.max(desSpeed, lim.vMin || 100);
-    _btDir.copy(desDir);
-    // Terrain look-ahead: blend the demand upward before the predicted path hits the floor.
-    const minAGL = lim.minAGL || 0;
-    if (minAGL > 0) {
-      _btAhead.copy(a.fwd).multiplyScalar(Math.min(v0 * 2, 700)).add(a.pos);
-      const curFloor = groundLevel(a.pos.x, a.pos.z);
-      const aheadFloor = groundLevel(_btAhead.x, _btAhead.z) + minAGL;
-      if (a.pos.y < curFloor + minAGL * 0.5 && a.fwd.y < 0.25) _btDir.y = Math.max(_btDir.y, 0.35);
-      else if (aheadFloor > a.pos.y && a.fwd.y < 0.15) _btDir.y += clamp((aheadFloor - a.pos.y) / 400, 0, 0.5);
-    }
-    _btDir.normalize();
-    const cosA = clamp(a.fwd.dot(_btDir), -1, 1), ang = Math.acos(cosA);
-    _btPerp.copy(_btDir).addScaledVector(a.fwd, -cosA);
-    if (_btPerp.lengthSq() < 1e-8) _btPerp.copy(_btUp.set(0, 1, 0)); else _btPerp.normalize();
-    _btUp.set(0, 1, 0);
-    _btRight.crossVectors(a.fwd, _btUp);
-    if (_btRight.lengthSq() < 1e-6) _btRight.set(1, 0, 0); else _btRight.normalize();
-    const maxG = lim.maxG || 6, rollRate = lim.rollRate || 2.6;
-    const omega = Math.min(ang * 1.4, (maxG * G) / v0);
-    const bankT = clamp(Math.atan2(-_btPerp.dot(_btRight), _btPerp.dot(_btUp)), -1.4, 1.4);
-    const err = wrapPi(bankT - (a.bank || 0)), dB = clamp(err, -rollRate * dt, rollRate * dt);
-    a.bank = wrapPi((a.bank || 0) + dB);
-    _btLift.copy(_btUp).multiplyScalar(Math.cos(a.bank)).addScaledVector(_btRight, -Math.sin(a.bank));
-    const n = clamp(omega * v0, 0, maxG * G);
-    a.gNow = n / G;
-    _btAcc.copy(_btLift).multiplyScalar(n).addScaledVector(_btUp, -G);
-    a.fwd.addScaledVector(_btAcc, dt / v0).normalize();
-    // Throttle lag + induced drag; afterburner only when the demand is large.
-    const dv = desSpeed - a.speed;
-    const rate = dv > 0 ? (lim.accAB || lim.acc || 9) : (lim.dec || 14);
-    const induced = 0.08 * Math.max(0, a.gNow * a.gNow - 1);
-    a.speed += clamp(dv, -rate * dt, rate * dt) - induced * dt;
-    a.speed = clamp(a.speed, 60, lim.vMax || 340);
-    a.ab = dv > 25 ? 1 : Math.max(0, (a.ab || 0) - dt);
-    _btM.lookAt(_btOrg, a.fwd, _btUp);
-    a.quat.setFromRotationMatrix(_btM).multiply(_btQ.setFromAxisAngle(_btZax, a.bank));
-    a.vel.copy(a.fwd).multiplyScalar(a.speed);
-    a.pos.addScaledVector(a.vel, dt);
-    if (minAGL > 0) {
-      const floorY = groundLevel(a.pos.x, a.pos.z) + 10;
-      if (a.pos.y < floorY) {
-        a.pos.y = floorY;
-        a.fwd.y = Math.max(a.fwd.y, 0.15); a.fwd.normalize();
-      }
-    }
-    return Math.abs(a.gNow);
-  }
-
-  // ---- Ace BFM: preallocated output struct + scratch (no per-frame allocation).
-  const _bfmOut = { maxG: 0, useAB: false, bankOverride: null, desSpeed: 0 };
-  const _bfmDir = new THREE.Vector3(), _bfmUp = new THREE.Vector3(), _bfmRight = new THREE.Vector3(),
-    _bfmLead = new THREE.Vector3(), _bfmLos = new THREE.Vector3(), _bfmMate = new THREE.Vector3(),
-    _bfmAim = new THREE.Vector3(), _bfmRel = new THREE.Vector3();
-  function aceEnergy(a) {
-    const p = a.pos || a.position, v = a.vel || a.velocity;
-    const sp = v ? v.lengthSq() : (a.speed || 0) * (a.speed || 0);
-    return (p ? p.y : 0) + sp / (2 * G0);
-  }
-  function enemyCM(e, kind, seduce) {
-    if (kind === 'FLARE') {
-      if (e.decoys > 0) { banditFlares(e); e.decoys--; }
-    } else if (e.decoys > 0 && e.chaffN > 0) {
-      e.chaffN--;
-      for (let i = 0; i < 36; i++) {
-        fire.spawn(spo(e.pos.x + (rand() - 0.5) * 10, e.pos.y + (rand() - 0.5) * 8, e.pos.z + (rand() - 0.5) * 10, (rand() - 0.5) * 14, (rand() - 0.5) * 8, (rand() - 0.5) * 14, 0.7 + rand(), 0.7, 0.25, 0.76, 0.76, 0.78, 0.75, 2.8));
-      }
-    }
-    if (env.debug) console.log('[ANGELS_ZERO] ace cm kind=' + kind + ' seduced=' + !!seduce);
-  }
-  // Returns true when a BFM state overrode the normal combat AI for this frame.
-  function aceBFM(e, dt, toP, dist, playerActive, desired, out) {
-    if (!(e.aceFlight || e.ace || e.isAce) || !playerActive) return false;
-    if (!e.bfm) e.bfm = { st: 'ENGAGE', t: 0, phase: '', flip: 1, flipT: 0, pairT: 0, role: 'LEAD' };
-    const B = e.bfm;
-    B.t += dt; B.flipT -= dt;
-    const pFwd = _pFwd.set(0, 0, -1).applyQuaternion(S.quaternion);
-    _bfmLos.copy(toP).normalize();
-    _bfmAim.copy(_bfmLos).negate();                       // ace -> player unit vector
-    const playerOn = pFwd.dot(_bfmAim) > SCIS_PLAYER_COS;  // player nose at the ace
-    const behind = e.fwd.dot(_bfmLos) < 0;
-    const aceOn = e.fwd.dot(_bfmLos) > Math.cos(60 * D2R);
-    _bfmRel.copy(S.velocity).sub(e.vel);
-    const closure = -_bfmRel.dot(_bfmLos);
-    const Ea = aceEnergy(e), Ep = aceEnergy(S), dE = Ea - Ep;
-    let changed = false;
-    // State priority: scissors > Cobra > high yo-yo > normal engagement.
-    if (B.st === 'BREAK_SCISSORS' && B.t > 5) { B.st = 'ENGAGE'; changed = true; }
-    if (behind && dist < SCIS_R && playerOn && B.st !== 'BREAK_SCISSORS') { B.st = 'BREAK_SCISSORS'; B.t = 0; B.flip = rand() < 0.5 ? -1 : 1; B.flipT = SCIS_FLIP_T[0] + rand() * (SCIS_FLIP_T[1] - SCIS_FLIP_T[0]); changed = true; }
-    if (B.st === 'BREAK_SCISSORS') {
-      if (B.flipT <= 0) { B.flip = -B.flip; B.flipT = SCIS_FLIP_T[0] + rand() * (SCIS_FLIP_T[1] - SCIS_FLIP_T[0]); }
-      _bfmUp.set(0, 1, 0);
-      _bfmRight.crossVectors(e.fwd, _bfmUp).normalize();
-      desired.copy(e.fwd).addScaledVector(_bfmRight, B.flip * 0.9).addScaledVector(_bfmUp, 0.35 * B.flip).normalize();
-      out.maxG = SCIS_G; out.useAB = false; out.desSpeed = SCIS_V;
-      out.bankOverride = B.flip * 135 * D2R;
-      if (e.speed < COBRA_V && (e.psmCD || 0) <= 0 && closure > 40 && dist < 900) {
-        e.psm = { kind: 'COBRA', t: 0, dur: 2.2 }; e.psmCD = PSM_CD; e.speed *= 0.55;
-        B.st = 'COBRA'; B.t = 0; changed = true;
-      }
-      return true;
-    }
-    if (B.st === 'COBRA') { if (B.t > 2.4) { B.st = 'ENGAGE'; B.t = 0; } desired.copy(e.fwd); out.maxG = 4; out.desSpeed = SCIS_V; return true; }
-    if (B.st === 'HIGH_YOYO') {
-      if (B.phase === 'CLIMB' && B.t >= YOYO_T) { B.phase = 'ROLL'; B.t = 0; changed = true; }
-      else if (B.phase === 'ROLL' && B.t >= 0.6) { B.phase = 'DIVE'; B.t = 0; changed = true; }
-      else if (B.phase === 'DIVE' && B.t >= 2.0) { B.st = 'ENGAGE'; B.t = 0; changed = true; }
-      if (changed && env.debug) console.log('[ANGELS_ZERO] ace yoyo ph=' + B.phase);
-      _bfmUp.set(0, 1, 0);
-      _bfmRight.crossVectors(e.fwd, _bfmUp).normalize();
-      if (B.phase === 'CLIMB') desired.copy(e.fwd).addScaledVector(_bfmUp, YOYO_PITCH * 0.6).addScaledVector(_bfmRight, -0.25).normalize();
-      else if (B.phase === 'ROLL') { desired.copy(e.fwd).addScaledVector(_bfmUp, YOYO_PITCH).normalize(); out.bankOverride = 160 * D2R; }
-      else {
-        const tof = dist / Math.max(e.speed + 300, 1);
-        _bfmLead.copy(toP).addScaledVector(S.velocity, tof);
-        desired.copy(_bfmLead).sub(e.pos).normalize().addScaledVector(_bfmUp, -0.3).normalize();
-      }
-      out.maxG = Math.min(8.5, e.gMax); out.useAB = B.phase !== 'DIVE';
-      return true;
-    }
-    // Enter a high yo-yo when offensive and about to overshoot with an energy edge.
-    const aoff = Math.acos(clamp(e.fwd.dot(_bfmLos), -1, 1));
-    if (aceOn && dist < 1500 && (closure > YOYO_CLOSE || aoff > YOYO_AOFF) && dE >= YOYO_E_MARGIN && B.t > 2) {
-      B.st = 'HIGH_YOYO'; B.phase = 'CLIMB'; B.t = 0; changed = true;
-      if (env.debug) console.log('[ANGELS_ZERO] ace yoyo ph=CLIMB');
-      return false;
-    }
-    // Pair bracket / drag-and-bag while two aces are alive.
-    if (C.acePair && C.acePair.length === 2) {
-      const mateIdx = C.acePair[0] === e.id ? C.acePair[1] : C.acePair[1] === e.id ? C.acePair[0] : -1;
-      const mate = mateIdx >= 0 ? enemies[mateIdx] : null;
-      if (mate && mate.alive) {
-        _bfmMate.copy(mate.pos).sub(S.position);
-        const mt = _bfmMate.length();
-        if (dist > PAIR_CONVERGE_R) {
-          const off = Math.tan(PAIR_SPLIT) * Math.min(dist, 3000) * 0.5;
-          _bfmRight.crossVectors(_bfmLos, _bfmUp.set(0, 1, 0)).normalize();
-          desired.addScaledVector(_bfmRight, (e.id === C.acePair[0] ? -1 : 1) * off).normalize();
-        }
-        if (playerOn && dist < 2500 && mt < 4000) {
-          const role = e.id === C.acePair[0] ? 'DRAG' : 'BAG';
-          if (B.role !== role) {
-            B.role = role;
-            if (role === 'DRAG' && env.onWing) env.onWing('CRIMSON-2: SHE\'S ON YOU — DRAGGING HIM TO ME', 'CRIMSON-2', '#ff3b5c');
-          }
-          if (role === 'DRAG') { desired.copy(e.pos).sub(S.position).normalize(); out.useAB = true; out.desSpeed = e.abSpeed; }
-          else {
-            const tof = dist / Math.max(e.speed + 300, 1);
-            desired.copy(toP).addScaledVector(S.velocity, tof).sub(e.pos).normalize();
-          }
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
+const aceBFM = createAceBFM(THREE, {
+  S, C, enemies, groundLevel, clamp, D2R, rand, banditFlares, fire, spo,
+  G0, YOYO_PITCH, YOYO_T, YOYO_E_MARGIN, YOYO_AOFF, YOYO_CLOSE,
+  SCIS_R, SCIS_PLAYER_COS, SCIS_FLIP_T, SCIS_G, SCIS_V, COBRA_V, PSM_CD,
+  PAIR_SPLIT, PAIR_CONVERGE_R, wrapPi, pFwd: _pFwd
+});
+const { flyBTT, updateAceBFM, enemyCM } = aceBFM;
+const _bfmOut = aceBFM.bfmOut, _bfmLos = aceBFM.los, _bfmUp = aceBFM.up, _bfmMate = aceBFM.mate;
   // Closest player missile still tracking this bandit.
   function threatMissile(e) {
     let best = null, bd = 4500;
@@ -1938,7 +1477,7 @@ export function createCombat(THREE, env) {
     }
     // Ace BFM overlays: high yo-yo / scissors / cobra / bracket (scalar state, shared scratch).
     e.bfmDesSpeed = 0;
-    if (aceBFM(e, dt, toP, dist, playerActive, desired, _bfmOut)) {
+    if (updateAceBFM(e, dt, toP, dist, playerActive, desired, _bfmOut)) {
       maxG = Math.max(maxG, _bfmOut.maxG);
       useAB = useAB || _bfmOut.useAB;
       if (_bfmOut.bankOverride !== null && bankOverride === null) bankOverride = _bfmOut.bankOverride;
@@ -3017,7 +2556,7 @@ export function createCombat(THREE, env) {
     const targets = locked.length ? locked : [null];
     const n = Math.min(targets.length, C.aam4);
     for (let i = 0; i < n; i++) ripple.push({ t: i * AAM4_STAGGER, target: targets[i] });
-    if (locked.some(e => e.kind === 'DRONE')) { droneSalvoT = performance.now(); droneSalvoKills = 0; droneSalvoPaid = false; }
+    if (locked.some(e => e.kind === 'DRONE')) droneSwarm.resetSalvo(performance.now());
     mslCooldown = MSL_INTERVAL;
     C.lastLaunch = locked.length ? 'LOCK' : 'NONE';
     say(locked.length ? `FOX THREE ×${n} — RIPPLE` : 'FOX THREE — NO LOCK, DUMB FIRE', 1.4, locked.length ? '#4dff91' : '#ffbf3f');
@@ -3105,7 +2644,7 @@ export function createCombat(THREE, env) {
     return t;
   }
   const stagedMission = () => !!(C.mcfg && C.mcfg.stages && C.mcfg.stages.length && C.mode !== 'FURBALL');
-  const gunsOnly = () => !!(C.mcfg && C.mcfg.gunsOnly);
+  function gunsOnly() { return !!(C.mcfg && C.mcfg.gunsOnly); }
   function clearStagedShips() {
     for (const t of stagedShips) { t.alive = false; t.g.visible = false; }
   }
@@ -5097,7 +4636,7 @@ export function createCombat(THREE, env) {
     lockList.length = 0;
     for (const e of enemies) lockList.push(e);
     for (const t of taskForce) if (t.alive) lockList.push(t);
-    for (let i = 0; i < DRONE_N; i++) if (DR_ALIVE[i]) lockList.push(DRONE_TGT[i]);
+    for (let i = 0; i < DRONE_N; i++) if (droneSwarm.isAlive(i)) lockList.push(DRONE_TGT[i]);
     return lockList;
   }
 
@@ -6195,7 +5734,7 @@ export function createCombat(THREE, env) {
     Object.assign(C.bw, { eligible: false, landed: false, logged: false });
     Object.assign(C.intr, { st: 'IDLE', t: 0, ace: -1, used: false, farT: 0 }); C.wingHold = false;
     Object.assign(C.sc, { st: 'IDLE', used: false, pz: S.position.z, px: S.position.x, py: S.position.y, logT: 0, bannerT: 0 });
-    clearDronePool(); droneSalvoT = 0; droneSalvoKills = 0; droneSalvoPaid = false;
+    clearDronePool(); droneSwarm.resetSalvo();
     for (const e of enemies) e.bLock = 0;
     playerTracers.clear(); enemyTracers.clear();
     for (const m of missiles) if (!m.enemy || m.target?.isPlayer) { m.active = false; m.mesh.visible = false; }
@@ -6406,7 +5945,7 @@ export function createCombat(THREE, env) {
         if (t.alive && segHit(b, t.pos, t.r * 0.6)) { C.gunHitsP++; damageSurface(t, t.strike ? 3 : t.ship ? 0.8 : 2); hitSparks(b.p, b.v); return true; }
       }
       for (let i = 0; i < DRONE_N; i++) {
-        if (DR_ALIVE[i] && segHit(b, DRONE_TGT[i].pos, DRONE_HIT_R)) {
+        if (droneSwarm.isAlive(i) && segHit(b, DRONE_TGT[i].pos, DRONE_HIT_R)) {
           C.gunHitsP++; killDrone(i, 'GUN'); hitSparks(b.p, b.v); return true;
         }
       }
@@ -6459,7 +5998,7 @@ export function createCombat(THREE, env) {
       if (env.onIntrusion) env.onIntrusion('RESET');
       Object.assign(C.sc, { st: 'IDLE', used: false, pz: S.position.z, px: S.position.x, py: S.position.y, logT: 0, bannerT: 0 });
       C.subKills = 0; C.siteKills = 0; C.flagBannerT = 0; C.crackLevel = 0; C.crackSeed = 0;
-      clearDronePool(); furSwarmT = 75; droneSalvoT = 0; droneSalvoKills = 0; droneSalvoPaid = false;
+      clearDronePool(); furSwarmT = 75; droneSwarm.resetSalvo();
       SITE_HPV.fill(SITE_HP); SITE_ON.fill(1); sectorDead.fill(0);
       // Rim batteries carved away by the shortcut stay disabled on every reset.
       for (let i = 0; i < SAM_SITE_N; i++) {
@@ -6723,9 +6262,8 @@ export function createCombat(THREE, env) {
         furball: { mode: C.mode, alive: waveAlive() + enemies.filter(e => e.alive && e.aceFlight).length,
           kills: C.furballKills || 0, nextAce: FURBALL_ACE_EVERY - (C.furballKills || 0) % FURBALL_ACE_EVERY },
         drones: { on: !!C.swarm.on, alive: C.swarm.alive, n: C.swarm.n, anchor: C.swarm.anchor,
-          spawned: droneSpawned, killed: droneKilled, cleared: droneCleared,
-          cull: droneGeo.boundingSphere ? Math.round(droneGeo.boundingSphere.radius) : 0,
-          pos: DRONE_TGT.filter(d => d.alive).map(d => d.pos.toArray().map(v => Math.round(v))).slice(0, 8) },
+          ...droneStats(),
+          pos: droneSwarm.getDrones().filter(d => d.alive).map(d => d.pos.toArray().map(v => Math.round(v))).slice(0, 8) },
         loadout: { spw: C.spw, wpn: C.weapon, qaam: C.qaam, livery: env.getLivery ? env.getLivery() : null },
         psm: { active: !!S.psm, alphaPk: +(S.alphaPk * D2R).toFixed(1), spin: S.spin || 0, lastMan: C.manLabel || '—' },
         assist: S.assist || 0, returnT: C.returnT || 0,
