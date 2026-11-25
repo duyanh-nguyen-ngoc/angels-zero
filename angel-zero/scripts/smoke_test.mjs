@@ -111,8 +111,22 @@ async function navigate(query) {
   resetCollectors();
   try { await page.evaluate(() => { window.onbeforeunload = null; }); } catch { /* fresh page */ }
   const qs = query.includes('nowarm') ? query : `${query}&nowarm`;
+  const t0 = Date.now();
   await page.goto(`${BASE}?${qs}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.waitForFunction(() => window.__az && window.__az.ready === true, null, { timeout: 90000 });
+  console.log(`    [nav] domcontentloaded in ${Date.now() - t0} ms`);
+  try {
+    await page.waitForFunction(() => window.__az && window.__az.ready === true, null, { timeout: 90000 });
+    console.log(`    [nav] __az.ready in ${Date.now() - t0} ms`);
+  } catch (e) {
+    let st = {}, tail = [], errs = [];
+    try { st = await page.evaluate(() => ({ az: typeof window.__az, ready: window.__az?.ready,
+      chip: document.getElementById('buildChip')?.textContent })); } catch { /* gone */ }
+    tail = consoleMessages.slice(-12); errs = pageErrors.slice(-4);
+    console.log('    [nav] DIAG ' + JSON.stringify(st).slice(0, 600));
+    console.log('    [nav] console tail ' + JSON.stringify(tail).slice(0, 1200));
+    console.log('    [nav] pageErrors ' + JSON.stringify(errs).slice(0, 900));
+    throw e;
+  }
 }
 async function missionReady(id) {
   await page.waitForFunction(mid => {
