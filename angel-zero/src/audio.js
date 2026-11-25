@@ -26,27 +26,11 @@ export function createAudio(opts = {}) {
   let sprayK = 0, sprayKt = 0;                             // sea-skim DSP targets (scalars only)
   let burnerCount = 0;                                     // MIL -> AB ignition thump counter (getter lives at module scope)
   let tyreCount = 0, noseCount = 0, clankCount = 0;       // touchdown / nose slap / shuttle clank counters
-  // --- streamed scenario soundtrack -------------------------------------------------
-  const BGM_DIR = 'assets/audio/bgm/', XFADE = 1.5, DUCK_DB = -5, DUCK_GAIN = 0.5623, DUCK_T = 0.25, MIN_DWELL = 4.0;
-  const BGM_OK = typeof Audio !== 'undefined' && new Audio().canPlayType('audio/ogg; codecs="vorbis"') !== '';
-  const decks = [];                                        // two reusable MediaElementAudioSourceNodes
-  const sinCurve = new Float32Array(64), cosCurve = new Float32Array(64);
-  for (let i = 0; i < 64; i++) { const t = i / 63 * Math.PI / 2; sinCurve[i] = Math.sin(t); cosCurve[i] = Math.cos(t); }
-  const lastIdx = Object.create(null);                     // scenario -> last track index
-  const bag = Object.create(null), bagPos = Object.create(null);  // per-scenario shuffle bags
-  let manifest = null, active = 0, curScn = '01_hangar', pendScn = '', dwell = 0, bgmUnlocked = false, lastTickT = 0, switchSeq = 0;
-  let bgmForce = '', bgmCtx = null, currentIdx = 0;
-  let auto = true, manualId = -1, advancing = false, advTimer = null, changeCb = null, changeKey = '';
-  // Streamed-BGM startup state. All scalars: no allocation on any frame.
-  let manifestReady = false, manifestRetries = 0, pendingScn = null, pendingForce = false;
-  let unlocked = false, playConfirmed = false, retryT = 0, bgmRetries = 0;
-  let bgmPausedByUser = false, gestureArmed = false;
-  let cScn = '', cIdx = 0, cIdle = 0, cSeq = 0, loading = false; // pending crossfade commit (applied on 'playing')
-  const BGM_RETRY_S = 1.5, BGM_RETRY_MAX = 6;
-  const GESTURES = ['pointerdown', 'keydown', 'click', 'touchend'];
+  // --- soundtrack bridge: the BGM is now a YouTube/IFrame player (src/ytmusic.js) ---
+  let yt = null, bgmCtx = null, bgmForce = '', changeCb = null, musicOn = true;
+  const MIN_DWELL = 4.0;
   const BGM_KEYS = ['01_hangar', '02_catapult', '03_air_superiority', '04_storm', '05_night',
     '06_strike', '07_canyon', '08_crimson_duel', '09_furball', '10_last_stand', '11_rtb', '12_debrief'];
-  const RESOLVER_KEYS = BGM_KEYS;                          // resolver literals + c.bgmScenario values
   const radioBufs = Object.create(null);                   // decoded voice clips, cached by line id
   const radioState = { plays: 0, lastId: '', loaded: 0, playing: false };
   const tc = 0.06;                                         // param smoothing time-constant
@@ -208,13 +192,6 @@ export function createAudio(opts = {}) {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return false;
     ctx = new AC();
-    // A suspended context (tab hidden / OS audio change) must re-arm the gesture
-    // retry, otherwise a later click cannot restart a paused deck.
-    ctx.onstatechange = () => {
-      if (ctx.state === 'suspended') armUnlock();
-      else if (pendingScn) switchTo(pendingScn, true);     // deferred scenario finally can play
-    };
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) armUnlock(); });
     master = gain(muted ? 0 : volume);
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -16; comp.knee.value = 12; comp.ratio.value = 5; comp.attack.value = 0.004; comp.release.value = 0.25;
@@ -292,7 +269,6 @@ export function createAudio(opts = {}) {
     N.rStaticBP = filt('bandpass', 1500, 0.6);
     N.rStaticG = gain(0);
     N.rStatic.connect(N.rStaticBP).connect(N.rStaticG).connect(N.rPan);
-    initMusic();
 
     // === F100 twin-engine DSP: entire graph built once here, never after init. ===
     const E = N.E = { rpmL: RPM_IDLE, rpmR: RPM_IDLE * 1.015, abK: 0, lastT: 0, freqAcc: 0, f0Sent: 0, rms: -100, f0: 650 };
@@ -1509,290 +1485,14 @@ export function createAudio(opts = {}) {
     duckWorld(0.5, 0.3); o.start(t); o.stop(t + 0.7);
   }
 
-  /* ------------------------------------------- adaptive 3-layer soundtrack */
-  // 136 BPM D-minor synth-rock step sequencer, lookahead-scheduled on
-  // ctx.currentTime (a 25 ms timer + every audio frame top up 0.3 s of notes),
-  // so frame-rate dips never move a note. 8-bar loop Dm | Dm | Bb | Bb | C | C | A | A
-  // (bass D2 -> Bb1 -> C2 -> A1).
-  //   L1 PATROL  pulsing sub-bass, dark filtered stereo pad, sonar ping (airborne)
-  //   L2 FURBALL kick + gated snare, driving 16th saw arp bass (bandit < 3 km or x1.5)
-  //   L3 ACE     detuned brass lead w/ vibrato + dotted-8th delay, 16th hats (x3.0 or Ace alive)
-  // Layers crossfade with setTargetAtTime(0.6 s). Bus: layers -> musicGain (K
-  // toggle) -> musicDuck (radio -35 %) -> master -> G-LOC tunnel, so the music
-  // muffles with blackout and follows master volume / mute.
-  const BPM = 136, STEP = 60 / BPM / 4, LOOK = 0.3, LOOP = 128;
-  const ROOTS = [38, 34, 36, 33];                                        // D2 Bb1 C2 A1 (per 2 bars)
-  const CHORDS = [[50, 53, 57], [46, 50, 53], [48, 52, 55], [45, 49, 52]]; // Dm Bb C A (pad voicings)
-  const ARP = [0, 0, 12, 0, 7, 0, 12, 0, 0, 0, 12, 0, 7, 12, 10, 7];
-  const MELODY = [                                                       // [step, midi, len] per bar
-    [[0, 69, 4], [4, 74, 4], [8, 76, 2], [10, 77, 2], [12, 76, 2], [14, 74, 2]],
-    [[0, 81, 8], [8, 79, 4], [12, 77, 4]],
-    [[0, 74, 4], [4, 77, 4], [8, 82, 6], [14, 81, 2]],
-    [[0, 79, 8], [8, 77, 4], [12, 74, 4]],
-    [[0, 76, 4], [4, 79, 4], [8, 84, 6], [14, 82, 2]],
-    [[0, 81, 8], [8, 79, 4], [12, 76, 4]],
-    [[0, 73, 4], [4, 76, 4], [8, 81, 4], [12, 85, 4]],
-    [[0, 86, 12], [12, 85, 4]]
-  ];
-  const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
-  let musicOn = true, mStep = 0, mNext = 0, mLvl = 0, mLvlT = 0, mNear = false, mIdleT = 0, mNotes = 0, mTimer = null;
-  // Manifest + unlock helpers. Declared as functions so initMusic can call them
-  // before their textual definition; no per-frame work or allocation here.
-  function setPending(scn) { pendingScn = scn || null; pendScn = scn || ''; }
-  function auditBgmKeys() {
-    const man = (manifest && manifest.scenarios) || {};
-    let missing = 0;
-    for (let i = 0; i < BGM_KEYS.length; i++) {
-      const k = BGM_KEYS[i];
-      if (!man[k]) { console.log('[ANGELS_ZERO] bgm key MISSING ' + k + ' (from manifest)'); missing++; }
-      if (RESOLVER_KEYS.indexOf(k) < 0) { console.log('[ANGELS_ZERO] bgm key MISSING ' + k + ' (from resolver)'); missing++; }
-    }
-    for (const id in MISSIONS) {
-      const k = MISSIONS[id].bgmScenario;
-      if (k && !man[k]) { console.log('[ANGELS_ZERO] bgm key MISSING ' + k + ' (from missions)'); missing++; }
-    }
-    if (!missing) console.log('[ANGELS_ZERO] bgm keys ok=' + BGM_KEYS.length);
+  /* ------------------------------------------------ external soundtrack bridge */
+  // The IFrame player is created by index.html and injected here. Every legacy
+  // BGM call site forwards to it; no local decks or Web Audio music nodes remain.
+  function attachYouTubeMusic(controller) {
+    yt = controller || null;
+    if (yt && yt.attachChange) yt.attachChange(s => { if (changeCb) changeCb(s); });
   }
-  function fetchManifest() {
-    fetch(BGM_DIR + 'manifest.json').then(r => {
-      if (!r.ok) throw new Error('status ' + r.status);
-      return r.json();
-    }).then(m => {
-      if (m && m.scenarios) {
-        for (const k in m.scenarios) {
-          if (!Array.isArray(m.scenarios[k])) continue;
-          m.scenarios[k] = m.scenarios[k].map(e => typeof e === 'string'
-            ? { file: e, title: e.replace(/_0\d\.ogg$/, '').toUpperCase() } : e);
-        }
-        manifest = m;
-      }
-      manifestReady = true;
-      auditBgmKeys();
-      if (pendingScn) switchTo(pendingScn, true);           // manifest landed after the gesture
-    }).catch(e => {
-      console.log('[ANGELS_ZERO] bgm manifest FAIL ' + (e && e.message ? e.message : e));
-      if (manifestRetries++ < 1) setTimeout(fetchManifest, 2000);   // one retry; synth fallback untouched
-    });
-  }
-  function initMusic() {
-    if (BGM_OK) {
-      // src -> g -> musicBus -> duckG -> musicVolG -> master (all created once).
-      N.musicBus = gain(0.62); N.duckG = gain(1); N.musicVolG = gain(musicOn ? musicVol : 0);
-      N.musicBus.connect(N.duckG).connect(N.musicVolG);
-    N.gBgmG = gain(1); N.musicVolG.connect(N.gBgmG).connect(master);
-      for (let i = 0; i < 2; i++) {
-        const el = new Audio();
-        el.loop = true; el.preload = 'none'; el.crossOrigin = 'anonymous';
-        // The real 'playing' event is the single source of truth for playback state.
-        el.addEventListener('playing', onDeckPlaying);
-        decks.push({ el, src: ctx.createMediaElementSource(el), g: gain(0) });
-        decks[i].src.connect(decks[i].g).connect(N.musicBus);
-        // Attached once per deck; auto-advance never re-registers listeners.
-        el.addEventListener('timeupdate', () => {
-          const d = decks[i];
-          if (d !== decks[active] || advancing || !musicOn) return;
-          if (isFinite(el.duration) && el.duration - el.currentTime <= XFADE) advance();
-        });
-        el.addEventListener('ended', () => { if (decks[i] === decks[active]) advance(); });
-      }
-      // The manifest is the ONLY network request; the .ogg files stream through Audio().
-      fetchManifest();
-      armUnlock();
-      return;
-    }
-    // --- legacy synth fallback (older Safari without Ogg Vorbis) ---
-    N.music = gain(musicOn ? musicVol : 0);
-    N.musicDuck = gain(1);
-    N.musicBus = gain(0.62);
-    N.music.connect(N.musicDuck).connect(N.musicBus).connect(master);
-    N.mDelay = ctx.createDelay(1); N.mDelay.delayTime.value = STEP * 3;
-    N.mFb = gain(0.34); N.mWet = gain(0.3); N.mDelayLP = filt('lowpass', 3200, 0.5);
-    N.mDelay.connect(N.mDelayLP).connect(N.mFb).connect(N.mDelay); N.mDelayLP.connect(N.mWet).connect(N.music);
-    N.mL = [gain(0), gain(0), gain(0)];
-    for (const g of N.mL) g.connect(N.music);
-    N.mSend = [gain(0.22), gain(0), gain(0.45)];
-    N.mL.forEach((g, i) => g.connect(N.mSend[i]).connect(N.mDelay));
-    N.padLP = filt('lowpass', 750, 1.1); N.padLP.connect(N.mL[0]);
-    N.padLFO = osc('sine', 0.07); N.padLFOAmt = gain(380); N.padLFO.connect(N.padLFOAmt).connect(N.padLP.frequency);
-    if (!mTimer) mTimer = setInterval(musicTick, 25);
-  }
-  // Autoplay unlock: every gesture retries until a deck reports a real 'playing'
-  // event. Listeners are bound once and removed as soon as that event arrives.
-  function onGesture() {
-    unlocked = true;
-    if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
-    if (pendingScn) switchTo(pendingScn, true);
-    else {
-      const d = decks[active];
-      if (d && d.el && d.el.paused && !bgmPausedByUser) playDeck(d);
-    }
-  }
-  function armUnlock() {
-    if (!BGM_OK || playConfirmed || gestureArmed) return;
-    gestureArmed = true;
-    for (let i = 0; i < GESTURES.length; i++) window.addEventListener(GESTURES[i], onGesture, { capture: true, passive: true });
-  }
-  function disarmUnlock() {
-    if (!gestureArmed) return;
-    gestureArmed = false;
-    for (let i = 0; i < GESTURES.length; i++) window.removeEventListener(GESTURES[i], onGesture, { capture: true });
-  }
-  // --- track catalogue + shuffle bag ----------------------------------------
-  function tracksOf(scn) {
-    const list = manifest && manifest.scenarios && manifest.scenarios[scn];
-    return list && list.length ? list : null;
-  }
-  function allTracks() { return manifest && manifest.tracks && manifest.tracks.length ? manifest.tracks : null; }
-  function nextIdx(scn) {
-    const list = tracksOf(scn);
-    if (!list) return 0;
-    const n = list.length;
-    if (!bag[scn] || (bagPos[scn] || 0) >= n) {
-      const b = new Int8Array(n);
-      for (let i = 0; i < n; i++) b[i] = i;
-      for (let i = n - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0, t = b[i]; b[i] = b[j]; b[j] = t; }
-      if (n > 1 && b[0] === (lastIdx[scn] ?? -1)) { const t = b[0]; b[0] = b[1]; b[1] = t; }
-      bag[scn] = b; bagPos[scn] = 0;
-    }
-    return bag[scn][bagPos[scn]++];
-  }
-  function emitChange() {
-    if (!changeCb) return;
-    const t = tracksOf(curScn), title = t && t[currentIdx] ? t[currentIdx].title : '';
-    const key = `${curScn}/${currentIdx}/${auto ? 1 : 0}`;
-    if (key === changeKey) return;
-    changeKey = key;
-    changeCb({ title, scn: curScn, idx: currentIdx, auto });
-  }
-  // Handlers bound once; no closure is created per play() call or per frame.
-  const onPlayOK = () => { retryT = 0; bgmRetries = 0; };
-  const onPlayFail = e => {
-    const name = e && e.name ? e.name : 'Error';
-    if (name === 'AbortError') return;
-    loading = false;
-    console.log('[ANGELS_ZERO] bgm play blocked ' + name);
-    if (name === 'NotAllowedError') { setPending(pendingScn || cScn || curScn); armUnlock(); }
-    else if (bgmRetries < BGM_RETRY_MAX) { bgmRetries++; retryT = BGM_RETRY_S; }
-  };
-  function playDeck(deck) {
-    if (!deck || !deck.el || !deck.el.src || bgmPausedByUser) return;
-    deck.el.play().then(onPlayOK).catch(onPlayFail);
-  }
-  function onDeckPlaying(e) {
-    loading = false;
-    let played = -1;
-    for (let i = 0; i < decks.length; i++) if (decks[i].el === e.target) { played = i; break; }
-    // Only the deck we intended to start commits the logical scenario, so the
-    // bgm getter and the widget always describe what is actually playing.
-    if (played >= 0 && played === cIdle) { active = played; curScn = cScn; currentIdx = cIdx; dwell = 0; }
-    playConfirmed = true; unlocked = true;
-    setPending(null); pendingForce = false;
-    disarmUnlock(); retryT = 0; bgmRetries = 0;
-    emitChange();                                  // the widget repaints here, not before play resolves
-  }
-  // Equal-power crossfade between the two decks. An explicit idx pins a track.
-  function crossfadeTo(scn, idx, force = false, userAction = false) {
-    if (!BGM_OK || !decks.length) return;
-    if (!manifestReady || (ctx && ctx.state === 'suspended')) {
-      setPending(scn); pendingForce = pendingForce || force; armUnlock(); return;
-    }
-    const list = tracksOf(scn);
-    if (!list || !list.length) { setPending(scn); pendingForce = pendingForce || force; armUnlock(); return; }
-    const i = Number.isInteger(idx) && idx >= 0 && idx < list.length ? idx : nextIdx(scn);
-    const cur = decks[active];
-    // Never abort an already in-flight load for the same scenario unless triggered by user skip/select.
-    if (loading && scn === cScn && !userAction) return;
-    if (!force && !pendingScn && scn === curScn && cur.el.src && !cur.el.paused && cur.el.currentTime > 0) return;
-    lastIdx[scn] = i;
-    const idle = 1 - active, out = active, seq = ++switchSeq;
-    const d = decks[idle], o = decks[out];
-    d.el.src = BGM_DIR + list[i].file; d.el.currentTime = 0;
-    d.el.loop = list.length === 1;
-    const now = ctx.currentTime;
-    d.g.gain.cancelScheduledValues(now); d.g.gain.setValueAtTime(0, now);
-    d.g.gain.setValueCurveAtTime(sinCurve, now, XFADE);
-    if (o.g.gain.cancelAndHoldAtTime) o.g.gain.cancelAndHoldAtTime(now);
-    else { o.g.gain.cancelScheduledValues(now); o.g.gain.setValueAtTime(o.g.gain.value, now); }
-    o.g.gain.setValueCurveAtTime(cosCurve, now, XFADE);
-    o.g.gain.setValueAtTime(0, now + XFADE + 0.01);
-    cScn = scn; cIdx = i; cIdle = idle; cSeq = seq;
-    loading = true; dwell = 0; setPending(null); pendingForce = false;
-    playDeck(d);
-    setTimeout(() => {
-      if (seq !== switchSeq || active !== idle) return;
-      try { o.el.pause(); o.el.removeAttribute('src'); o.el.load(); } catch (e) { /* already released */ }
-    }, (XFADE + 0.1) * 1000);
-  }
-  function switchTo(scn, force = false) {
-    if (!BGM_OK) return;
-    if (BGM_KEYS.indexOf(scn) < 0) {
-      console.log('[ANGELS_ZERO] bgm key UNKNOWN ' + scn + ' -> 03_air_superiority');
-      scn = '03_air_superiority';
-    }
-    // Defer BEFORE the decks check: the first scenario usually arrives before
-    // init() has built the two deck elements.
-    if (!manifestReady || !decks.length || (ctx && ctx.state === 'suspended')) {
-      setPending(scn); pendingForce = pendingForce || force; armUnlock(); return;
-    }
-    crossfadeTo(scn, auto ? nextIdx(scn) : null, force);
-  }
-  function manualNext() {
-    const list = allTracks();
-    if (!list || !list.length) return null;
-    const id = (manualId + 1 + list.length * 2) % list.length;
-    const t = list[id], own = tracksOf(t.scn);
-    return { scn: t.scn, idx: own ? own.findIndex(e => e.file === t.file) : 0, id };
-  }
-  function advance() {
-    if (advancing || !BGM_OK) return;
-    advancing = true;
-    if (auto) crossfadeTo(curScn, nextIdx(curScn), true, true);
-    else {
-      const nx = manualNext();
-      if (nx) { manualId = nx.id; crossfadeTo(nx.scn, nx.idx < 0 ? 0 : nx.idx, true, true); }
-    }
-    clearTimeout(advTimer);
-    advTimer = setTimeout(() => { advancing = false; }, (XFADE + 0.1) * 1000);
-  }
-  function selectTrack(id) {
-    const list = allTracks(), t = list && list[id];
-    if (!t) return;
-    auto = false; manualId = id;
-    const own = tracksOf(t.scn), idx = own ? own.findIndex(e => e.file === t.file) : 0;
-    crossfadeTo(t.scn, idx < 0 ? 0 : idx, true, true);     // widget repaints on 'playing'
-  }
-  function skip(dir) {
-    if (!auto) {
-      const all = allTracks(), n = all ? all.length : 24;
-      selectTrack((manualId + (dir > 0 ? 1 : -1) + 2 * n) % n);
-      return;
-    }
-    const list = tracksOf(curScn);
-    if (!list) return;
-    let target;
-    if (dir > 0) target = nextIdx(curScn);
-    else {
-      const b = bag[curScn];
-      if (!b || b.length < 2) target = nextIdx(curScn);
-      else { const p = ((bagPos[curScn] || 0) - 2 + b.length * 2) % b.length; target = b[p]; bagPos[curScn] = p + 1; }
-    }
-    crossfadeTo(curScn, target, true, true);
-  }
-  function setAuto(on) {
-    auto = !!on;
-    if (auto) { manualId = -1; dwell = MIN_DWELL; }
-    else {
-      const own = tracksOf(curScn), file = own && own[currentIdx] ? own[currentIdx].file : '';
-      const all = allTracks();
-      manualId = all ? all.findIndex(t => t.scn === curScn && t.file === file) : 0;
-      if (manualId < 0) manualId = 0;
-    }
-    emitChange();
-  }
-  function onBgmChange(cb) { changeCb = cb || null; if (changeCb) emitChange(); }
-  // Priority-ordered resolver: first matching scenario wins.
-  // Mission-aware priority: dynamic overrides first, then the mission's own track.
-  // wxOverride gates night/storm so CANYON_RUN / NAVAL_BATTLE / ACE_DUEL keep their score.
+  function emitChange() { if (changeCb && yt) changeCb(yt.status()); }
   function resolveScenario(c) {
     if (bgmForce) return bgmForce;
     if (!c) return '01_hangar';
@@ -1808,179 +1508,24 @@ export function createAudio(opts = {}) {
     if (c.wxOverride && (c.night || c.nvg)) return '05_night';
     return c.bgmScenario || '03_air_superiority';
   }
-  function env(g, at, peak, a, d, sus = 0.0008) {
-    g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(peak, at + a); g.gain.exponentialRampToValueAtTime(Math.max(sus, 0.0008), at + a + d);
-  }
-  function voice(type, f, at, len, peak, out, a = 0.005, detune = 0, pan = 0) {
-    const o = ctx.createOscillator(); o.type = type; o.frequency.value = f; o.detune.value = detune;
-    const g = gain(0); env(g, at, peak, a, len);
-    let node = o.connect(g);
-    if (pan && ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = pan; node = node.connect(p); }
-    node.connect(out); o.start(at); o.stop(at + a + len + 0.05); mNotes++;
-    return o;
-  }
-  function noiseHit(at, len, peak, out, type, f, q = 0.8) {
-    const s = ctx.createBufferSource(); s.buffer = N.whiteBuf;
-    const b = filt(type, f, q), g = gain(0); env(g, at, peak, 0.002, len);
-    s.connect(b).connect(g).connect(out); s.start(at, Math.random() * 3); s.stop(at + len + 0.05); mNotes++;
-  }
-  function scheduleStep(s, t) {
-    const bar = (s >> 4) & 7, st = s & 15, ci = bar >> 1, root = ROOTS[ci];
-    const on = N.mL.map(g => g.gain.value > 0.003 || N.mTgt[N.mL.indexOf(g)] > 0);
-    if (on[0]) {
-      if (!(st & 1)) {                                                   // pulsing 8th-note sub-bass
-        voice('sine', mtof(root), t, STEP * 1.7, st % 4 === 0 ? 0.36 : 0.24, N.mL[0], 0.004);
-        voice('triangle', mtof(root + 12), t, STEP * 0.9, 0.05, N.mL[0], 0.004);
-      }
-      if (st === 0 && !(bar & 1)) {                                      // dark stereo pad, one chord per 2 bars
-        const len = STEP * 32;
-        for (const m of CHORDS[ci]) for (const [dt, pn] of [[-8, -0.6], [8, 0.6]]) {
-          const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = mtof(m); o.detune.value = dt;
-          const g = gain(0), p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
-          g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.028, t + 0.9);
-          g.gain.setValueAtTime(0.028, t + len - 0.5); g.gain.linearRampToValueAtTime(0, t + len + 0.6);
-          if (p) { p.pan.value = pn; o.connect(g).connect(p).connect(N.padLP); } else o.connect(g).connect(N.padLP);
-          o.start(t); o.stop(t + len + 0.7); mNotes++;
-        }
-      }
-      if (st === 0 || st === 10) voice('sine', mtof(root + 48 + (st ? 7 : 0)), t, 1.1, st ? 0.022 : 0.04, N.mL[0], 0.003);   // sonar ping
-    }
-    if (on[1]) {
-      if (st % 4 === 0 || st === 14) {                                   // kick
-        const o = ctx.createOscillator(); o.type = 'sine';
-        o.frequency.setValueAtTime(155, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.13);
-        const g = gain(0); env(g, t, st === 14 ? 0.5 : 0.85, 0.002, 0.26);
-        o.connect(g).connect(N.mL[1]); o.start(t); o.stop(t + 0.32); mNotes++;
-        noiseHit(t, 0.012, 0.18, N.mL[1], 'highpass', 3000);            // beater click
-      }
-      if (st === 4 || st === 12) {                                       // gated snare
-        const s2 = ctx.createBufferSource(); s2.buffer = N.whiteBuf;
-        const b = filt('bandpass', 1900, 0.7), g = gain(0);
-        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.42, t + 0.002); g.gain.setValueAtTime(0.34, t + 0.09); g.gain.linearRampToValueAtTime(0, t + 0.11);
-        s2.connect(b).connect(g).connect(N.mL[1]); s2.start(t, Math.random() * 3); s2.stop(t + 0.14);
-        voice('triangle', 196, t, 0.08, 0.22, N.mL[1], 0.002); mNotes++;
-      }
-      {                                                                  // 16th saw arp bass with filter pluck
-        const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = mtof(root + 12 + ARP[st]);
-        const lp = filt('lowpass', 2400, 4), g = gain(0);
-        lp.frequency.setValueAtTime(2600, t); lp.frequency.exponentialRampToValueAtTime(420, t + STEP * 0.9);
-        env(g, t, st % 4 === 0 ? 0.11 : 0.08, 0.003, STEP * 0.95);
-        o.connect(lp).connect(g).connect(N.mL[1]); o.start(t); o.stop(t + STEP + 0.05); mNotes++;
-      }
-    }
-    if (on[2]) {
-      noiseHit(t, st & 1 ? 0.022 : 0.035, st & 1 ? 0.05 : 0.085, N.mL[2], 'highpass', 8200, 1.2);   // double-time closed hats
-      for (const [ns, m, ln] of MELODY[bar]) if (ns === st) {            // brass lead
-        const len = ln * STEP;
-        const lp = filt('lowpass', 700, 1.6), g = gain(0);
-        lp.frequency.setValueAtTime(700, t); lp.frequency.linearRampToValueAtTime(3600, t + 0.07); lp.frequency.setTargetAtTime(2100, t + 0.07, 0.15);
-        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.075, t + 0.05);
-        g.gain.setValueAtTime(0.068, t + Math.max(0.06, len - 0.06)); g.gain.linearRampToValueAtTime(0, t + len + 0.08);
-        lp.connect(g).connect(N.mL[2]);
-        let vib = null;
-        if (len > 0.3) {                                                 // delayed 5.6 Hz vibrato on held notes (own LFO, stops with the note)
-          const v = ctx.createOscillator(); v.frequency.value = 5.6; vib = gain(0);
-          vib.gain.setValueAtTime(0, t); vib.gain.linearRampToValueAtTime(9, t + 0.3);
-          v.connect(vib); v.start(t); v.stop(t + len + 0.12);
-        }
-        for (const [type, dt] of [['sawtooth', -9], ['sawtooth', 9], ['square', 0]]) {
-          const o = ctx.createOscillator(); o.type = type; o.frequency.value = mtof(m) * (type === 'square' ? 0.5 : 1); o.detune.value = dt;
-          if (vib) vib.connect(o.detune);
-          const og = gain(type === 'square' ? 0.35 : 1);
-          o.connect(og).connect(lp); o.start(t); o.stop(t + len + 0.12); mNotes++;
-        }
-      }
-    }
-  }
-  function musicTick(dtOverride) {
-    if (!ready || ctx.state !== 'running') return;
-    if (BGM_OK) {
-      // Once per frame: resolve the scenario, enforce dwell, start crossfades.
-      // Debug stepping may pass its own dt; production uses the wall clock.
-      let dt = dtOverride;
-      if (dt === undefined) {
-        const nowMs = performance.now();
-        dt = lastTickT ? Math.min(0.1, (nowMs - lastTickT) / 1000) : 0;
-        lastTickT = nowMs;
-      }
-      dwell += dt;
-      // Retry a failed play() once its timer expires (capped, no per-frame allocation).
-      if (retryT > 0) {
-        retryT -= dt;
-        if (retryT <= 0) {
-          retryT = 0;
-          if (pendingScn) switchTo(pendingScn, true);
-          else playDeck(decks[active]);
-        }
-      }
-      const scn = resolveScenario(bgmCtx);
-      const wait = (scn === '12_debrief' || scn === '01_hangar' || scn === '11_rtb') ? 0 : MIN_DWELL;
-      if (auto && (scn !== curScn || pendingScn || pendScn) && !(loading && scn === cScn && !pendingForce && !pendingScn) && dwell >= wait) {
-        switchTo(scn, pendingForce);
-        pendingForce = false;
-      }
-      return;
-    }
-    if (!N.mL) return;
-    const live = musicOn && (N.mTgt.some(v => v > 0) || ctx.currentTime < mIdleT);
-    if (!live) { mNext = 0; return; }
-    const now = ctx.currentTime;
-    if (mNext < now - 0.2 || mNext === 0) mNext = now + 0.06;          // (re)start or recover after a stall
-    while (mNext < now + LOOK) { scheduleStep(mStep, mNext); mNext += STEP; mStep = (mStep + 1) % LOOP; }
-  }
-  // Intensity: 0 off / 1 patrol (airborne) / 2 furball (bandit < 3 km, leaves
-  // > 3.4 km, or combo >= x1.5) / 3 ace (combo >= x3.0 or the PHASE 3 Ace alive); 4 s hold before dropping.
-  N.mTgt = [0, 0, 0];
-  function updateMusic(p, dtOverride) {
-    bgmCtx = p;
-    if (BGM_OK) { musicTick(dtOverride); return; }
-    if (!N.mL) return;
-    const d = p.banditDist ?? Infinity, combo = p.combo || 1;
-    mNear = mNear ? d < 3400 : d < 3000;
-    let lvl = 0;
-    if (p.airborne) { lvl = 1; if (mNear || combo >= 1.5) lvl = 2; if (combo >= 3 || p.ace) lvl = 3; }   // Ace phase = climax
-    const now = ctx.currentTime;
-    if (lvl >= mLvl || now - mLvlT > 4) { if (lvl !== mLvl) mLvlT = now; mLvl = lvl; }
-    const tg = [mLvl >= 1 ? 0.9 : 0, mLvl >= 2 ? 1 : 0, mLvl >= 3 ? 1 : 0];
-    tg.forEach((v, i) => { if (v !== N.mTgt[i]) { N.mTgt[i] = v; set(N.mL[i].gain, v, 0.6); } });
-    if (mLvl > 0) mIdleT = now + 4;                                      // keep scheduling through the fade-out
-    musicTick();
-  }
-  function setMusic(on) {
-    musicOn = !!on;
-    if (BGM_OK) {
-      if (N.musicVolG) N.musicVolG.gain.setTargetAtTime(musicOn ? musicVol : 0, ctx.currentTime, 0.25);
-      if (!musicOn) setTimeout(() => { if (!musicOn) for (const d of decks) { try { d.el.pause(); } catch (e) { /* noop */ } } }, 300);
-      else if (unlocked || playConfirmed) {
-        const d = decks[active];
-        if (d && d.el.src) playDeck(d);
-        else switchTo(pendingScn || pendScn || curScn, true);
-      }
-      return;
-    }
-    if (N.music) set(N.music.gain, musicOn ? musicVol : 0, 0.25);
-    if (musicOn) mNext = 0;
-  }
-  // Music-bed level: 0..1, persisted separately from the master volume and the K toggle.
+  function updateMusic(p) { bgmCtx = p || null; }          // scenario names are cosmetic now
+  function switchTo(scn) { if (yt) { /* playlist is user-driven; keep player playing */ } }
+  function selectTrack(id) { if (yt) yt.next(); }
+  function skip(dir) { if (yt) (dir > 0 ? yt.next() : yt.prev()); }
+  function setAuto(on) { if (yt) yt.setAuto(on); }
+  function setMusic(on) { musicOn = !!on; if (yt) (musicOn ? yt.play() : yt.pause()); }
   function setMusicVolume(v) {
     musicVol = Math.min(1, Math.max(0, v));
     try { localStorage.setItem('angelsZero_musicVol', String(musicVol)); } catch (e) { /* ignore */ }
-    if (BGM_OK) { if (N.musicVolG) N.musicVolG.gain.setTargetAtTime(musicOn ? musicVol : 0, ctx.currentTime, 0.05); return; }
-    if (N.music) set(N.music.gain, musicOn ? musicVol : 0, 0.08);
+    if (yt) yt.setVolume(Math.round(musicVol * 100));
   }
-  // Music ducking is owned solely by the radio transmission envelope (txOpen/txClose).
-  // This legacy hook now only touches the short SFX dip; it never writes duckG.
+  function setBgmPause(on) { if (yt) yt.duck(!!on); }
+  function onBgmChange(cb) { changeCb = cb || null; if (yt && changeCb) yt.attachChange(changeCb); }
+  function getBgmTracks() { return []; }
+  function bumpBgmDwell() { /* no crossfade dwell with a continuous playlist */ }
+  function setBgmForce(v) { bgmForce = v || ''; }
   function setRadio(active) {
     if (N.duck) set(N.duck.gain, active ? 0.63 : 1, 0.08);
-  }
-  // PAUSED keeps the stream alive but ducks it; the world SFX bus stays untouched.
-  function setBgmPause(on) {
-    bgmPausedByUser = !!on;
-    if (!BGM_OK || !N.duckG) return;
-    const gp = N.duckG.gain, t = ctx.currentTime, cur = gp.value;
-    gp.cancelScheduledValues(t); gp.setValueAtTime(cur, t);
-    gp.linearRampToValueAtTime(on ? DUCK_GAIN : 1, t + DUCK_T);
-    if (!bgmPausedByUser) playDeck(decks[active]);        // resume does not fight the pause
   }
   // ---- PTT transmission envelope --------------------------------------------
   function playPtt(buf) {
@@ -1989,6 +1534,7 @@ export function createAudio(opts = {}) {
     s.connect(N.rPan); s.start();                          // one-shot source is the only per-event node
   }
   function rampDuck(to, secs) {
+    if (yt) yt.duck(to < 1);
     if (!N.duckG) return;
     const gp = N.duckG.gain, t = ctx.currentTime;
     gp.cancelScheduledValues(t); gp.setValueAtTime(gp.value, t);
@@ -2022,33 +1568,31 @@ export function createAudio(opts = {}) {
     setTimeout(() => { if (rxState === 'FADE') { rxState = 'IDLE'; rxCur = null; } }, FADE_S * 1000);
   }
   function txClose() { txTail(); }
-  // Mid-mission signal intrusion: mute the music bed and blast radio static for a
-  // fixed window, then restore. Decks keep running, so autoplay is never disturbed.
+  // Mid-mission signal intrusion / mission update: duck the YouTube bed, keep the radio static SFX.
   function bgmCut(secs = 1.5) {
-    if (!ready || !N.duckG || !N.rStaticG) return;
-    const t = ctx.currentTime, dur = Math.max(0.2, secs);
-    rampDuck(0, 0.08);
-    const sg = N.rStaticG.gain;
-    sg.cancelScheduledValues(t); sg.setValueAtTime(sg.value, t);
-    sg.linearRampToValueAtTime(0.6, t + 0.05);
-    sg.setValueAtTime(0.6, t + Math.max(0.06, dur - 0.08));
-    sg.linearRampToValueAtTime(0, t + dur);
-    if (N.rStaticBP) N.rStaticBP.frequency.setValueAtTime(1400, t);
-    setTimeout(() => { rampDuck(bgmPausedByUser ? DUCK_GAIN : 1, 0.25); }, dur * 1000);
+    if (!ready) return;
+    const dur = Math.max(0.2, secs);
+    if (yt) yt.duck(true);
+    if (N.rStaticG) {
+      const t = ctx.currentTime, sg = N.rStaticG.gain;
+      sg.cancelScheduledValues(t); sg.setValueAtTime(sg.value, t);
+      sg.linearRampToValueAtTime(0.6, t + 0.05);
+      sg.setValueAtTime(0.6, t + Math.max(0.06, dur - 0.08));
+      sg.linearRampToValueAtTime(0, t + dur);
+      if (N.rStaticBP) N.rStaticBP.frequency.setValueAtTime(1400, t);
+    }
+    setTimeout(() => { if (yt) yt.duck(false); }, dur * 1000);
   }
-  // Mission-update sting: a short, clean music dip with no radio static. The
-  // decks keep playing; index.html schedules the scenario snap at the low point.
   function bgmDip(secs = 1.2) {
-    if (!ready || !N.duckG) return;
     const dur = Math.max(0.4, secs);
-    rampDuck(0.03, 0.1);
-    setTimeout(() => { rampDuck(bgmPausedByUser ? DUCK_GAIN : 1, 0.1); }, Math.max(0.2, dur - 0.1) * 1000);
+    if (yt) yt.duck(true);
+    setTimeout(() => { if (yt) yt.duck(false); }, dur * 1000);
   }
   function bgmStaticEnd() {
+    if (yt) yt.duck(false);
     if (!ready || !N.rStaticG) return;
     const t = ctx.currentTime, sg = N.rStaticG.gain;
     sg.cancelScheduledValues(t); sg.setValueAtTime(sg.value, t); sg.linearRampToValueAtTime(0, t + 0.12);
-    rampDuck(bgmPausedByUser ? DUCK_GAIN : 1, 0.2);
   }
   // Lazy clip cache: single throttled background worker prevents fetch/decode hitches at launch.
   function preloadRadio(lines) {
@@ -2688,7 +2232,7 @@ export function createAudio(opts = {}) {
   }
 
   return {
-    init, resume, suspend, update, updateMusic, bgmCut, bgmDip, bgmStaticEnd, setSpray, setFlagCharge, setDroneHum, enemyGun, gunhit, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, samLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, setBgmPause, bumpBgmDwell() { dwell = MIN_DWELL; }, setBgmForce: v => { bgmForce = v || ''; }, switchTo, selectTrack, skip, setAuto, onBgmChange, get bgmTracks() { return allTracks() || []; }, radioSquelch, preloadRadio, playRadio, stopRadio, txOpen, txTail, txClose, preload, generateReactiveLine, textLineSecs, callsigns: CALLSIGNS, get reactive() { return rxStats; },
+    init, resume, suspend, update, updateMusic, bgmCut, bgmDip, bgmStaticEnd, attachYouTubeMusic, setSpray, setFlagCharge, setDroneHum, enemyGun, gunhit, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, samLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, setBgmPause, bumpBgmDwell, setBgmForce, switchTo, selectTrack, skip, setAuto, onBgmChange, get bgmTracks() { return getBgmTracks(); }, radioSquelch, preloadRadio, playRadio, stopRadio, txOpen, txTail, txClose, preload, generateReactiveLine, textLineSecs, callsigns: CALLSIGNS, get reactive() { return rxStats; },
     get radioAnalyser() { return N.rAnalyser || null; }, get radioFreq() { return N.rFreq || null; }, get radioTime() { return N.rTime || null; },
     get radioCh() { return RADIO_CH; },
     get radioDsp() { return { pttOpen: !!N.pttOpen, pttTail: !!N.pttTail, static: !!N.rStatic, hp: N.rHP ? N.rHP.frequency.value : 0,
@@ -2697,27 +2241,18 @@ export function createAudio(opts = {}) {
     toggleMusic() { setMusic(!musicOn); return musicOn; },
     get musicOn() { return musicOn; }, setMusicVolume,
     get musicVolume() { return musicVol; },
-    // Music state for __audioDebug: streamed decks when available, legacy sequencer otherwise.
-    get music() {
-      if (BGM_OK) return { on: musicOn, layer: 0, gains: decks.map(d => +d.g.gain.value.toFixed(2)),
-        bar: 0, step: 0, notes: 0, duck: N.duckG ? +N.duckG.gain.value.toFixed(3) : 1,
-        bus: N.musicVolG ? +N.musicVolG.gain.value.toFixed(2) : 0, ahead: 0, scn: curScn };
-      return { on: musicOn, layer: mLvl, gains: N.mL ? N.mL.map(g => +g.gain.value.toFixed(2)) : [0, 0, 0],
-        bar: (mStep >> 4) + 1, step: mStep, notes: mNotes, duck: N.musicDuck ? +N.musicDuck.gain.value.toFixed(2) : 1,
-        bus: N.music ? +N.music.gain.value.toFixed(2) : 0, ahead: mNext && ctx ? +(mNext - ctx.currentTime).toFixed(3) : 0 };
-    },
+    // Music state now comes from the YouTube IFrame controller.
+    get music() { const q = yt ? yt.status() : { status: 'OFF', playing: false }; return { on: musicOn, layer: 0, gains: [], bar: 0, step: 0, notes: 0, duck: 1, bus: 0, ahead: 0, scn: q.status, playing: q.playing }; },
     get bgm() {
-      if (!BGM_OK) return { ok: false, scn: '', idx: 0, dwell: 0, auto, manualId, file: '', title: '', bag: [], bagPos: 0 };
-      const list = tracksOf(curScn), t = list && list[currentIdx], b = bag[curScn];
-      return { scn: curScn, curScn, idx: currentIdx, dwell: +dwell.toFixed(2), auto, manualId,
-        file: t ? t.file : '', title: t ? t.title : '', bag: b ? Array.from(b) : [], bagPos: bagPos[curScn] || 0,
-        deckT: +decks[active]?.el.currentTime.toFixed(2) || 0, duck: N.duckG ? +N.duckG.gain.value.toFixed(3) : 1,
-        unlocked: unlocked || playConfirmed, ok: BGM_OK, pending: pendingScn || pendScn || '',
-        manifestReady, ctxState: ctx ? ctx.state : 'uninitialised', paused: !!decks[active]?.el.paused,
-        pendingScn: pendingScn || pendScn || '', playConfirmed, retries: bgmRetries, force: pendingForce };
+      const q = yt ? yt.status() : { status: 'OFF', title: '—', auto: true, playing: false, ready: false, errors: 0 };
+      return { scn: q.status, curScn: q.status, idx: 0, dwell: 0, auto: q.auto, manualId: -1,
+        file: '', title: q.title || '—', bag: [], bagPos: 0, deckT: 0, duck: 1,
+        unlocked: !!q.ready, ok: true, pending: '', manifestReady: true,
+        ctxState: ctx ? ctx.state : 'uninitialised', paused: !q.playing,
+        pendingScn: '', playConfirmed: !!q.ready, retries: q.errors || 0, force: bgmForce,
+        status: q.status, playing: q.playing, shuffle: !!q.shuffle, playlist: q.playlist, video: q.video };
     },
-    get bgmAuto() { return auto; }, get bgmDecks() { return decks; },
-    resolveScenario,
+    get bgmAuto() { return yt ? yt.info.auto : true; }, get bgmDecks() { return []; }, resolveScenario,
     get radio() { return { ...radioState, rxState, rxT: +rxT.toFixed(2), cur: rxCur ? { ch: rxCur.ch, id: rxCur.id } : null,
       duck: N.duckG ? +N.duckG.gain.value.toFixed(3) : (N.duck ? +N.duck.gain.value.toFixed(2) : 1) }; }, setVolume, setMuted,
     get sfxStatus() { return { ...sfxState }; },

@@ -2,31 +2,50 @@
 
 # ANGELS ZERO
 
-**Ace Combat-style 3D F-15C Eagle dogfight & strike simulator — playable right in your browser, zero installs.**
+**Ace Combat-inspired 3D F-22A Raptor & F-15C Eagle dogfight, strike & free-flight simulator — playable right in your browser, zero installs.**
 
 [![Play Live](https://img.shields.io/badge/Play%20Live-angels--zero.pages.dev-00ff66?style=for-the-badge&logo=cloudflarepages&logoColor=white)](https://angels-zero.pages.dev/)
-[![Build](https://img.shields.io/badge/Version-v1.1.14-52ff9c?style=for-the-badge)](angel-zero/src/patchnotes.js)
+[![Build](https://img.shields.io/badge/Version-v1.1.73-52ff9c?style=for-the-badge)](angel-zero/src/patchnotes.js)
 [![Three.js](https://img.shields.io/badge/Three.js-r160%20WebGL2-black?style=for-the-badge&logo=threedotjs)](https://threejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-lightgrey?style=for-the-badge)](LICENSE)
 
 <h3><a href="https://angels-zero.pages.dev/">PLAY IN BROWSER</a></h3>
 
-![ANGELS ZERO Chase Dogfight](docs/screenshots/chase-combat.png)
+![ANGELS ZERO F-22A Chase Dogfight](docs/screenshots/chase-combat.png)
 
 </div>
 
 ---
 
-## Core Systems
+## Live Gameplay Footage
+
+<table>
+  <tr>
+    <td width="50%">
+      <img src="docs/screenshots/gameplay-dogfight.webp" alt="F-22A Raptor Dogfight Gameplay Footage" />
+      <p align="center"><strong>F-22A Raptor Dogfight &amp; Cloud Sea</strong><br /><sub>2D rectangular TVC plumes, AC7 dreamy HDR bloom, volumetric cumulus sea &amp; cirrus sky</sub></p>
+    </td>
+    <td width="50%">
+      <img src="docs/screenshots/gameplay-nose-clouds.webp" alt="Ace Combat 7 Nose Camera Gameplay Footage" />
+      <p align="center"><strong>Ace Combat 7 Nose Camera HUD</strong><br /><sub>Cyan-mint bracketed HUD-only nose view with gull-wing boresight &amp; rolling compass</sub></p>
+    </td>
+  </tr>
+</table>
+
+---
+
+## Core Systems (`v1.1.73`)
 
 | System | Capabilities |
 | :--- | :--- |
-| **Game Modes** | 5 selectable missions (*Air Superiority, Naval Battle, Canyon Run, Ace Duel, endless Furball*) + USS Enterprise bow catapult launch & arrestor recovery |
-| **Post-Stall Maneuvering** | Decoupled AoA for **Cobra**, **Kulbit**, **Hammerhead**, flat spins, Mach-1 shock cones & pilot G-LOC |
-| **3D F-15C Cockpit** | Live 16-dial analog panel, animated HOTAS, bubble canopy rain/glare & cyclable VSD MFDs (`[` / `]`) |
-| **Voiced Radio & CRT Portraits** | 45 radio-filtered voice lines across **AWACS Overlord**, **Warden** wingmen & **Crimson** aces |
-| **Arsenal & Countermeasures** | M61A1 Vulcan, AIM-9M, 4AAM, QAAM, CCIP/CCRP bombs, flares, chaff, ECM jammer, missile cam & ejection |
-| **Weather, NVG & Debrief** | Dawn-to-night skies, thunderstorms, AN/AVS-9 night vision (`N`) & animated **S/A/B/C** flight trace replay |
+| **Flyable Fighters** | **F-22A Raptor** (supercruise, 2D TVC agility, stealth RCS, APG-77 AESA lock, 29-file F119 soundpack) &amp; **F-15C Eagle** (selectable squadron liveries) |
+| **3-Way Camera &amp; HUD** | Cycle **Chase → 3D Cockpit → Nose Cam (`Space`)** featuring an **Ace Combat 7 HUD-only Nose View** with bracketed tapes, throttle bar &amp; dotted compass |
+| **Sculpted 3D Cockpits** | **F-22A Blender-sculpted all-glass pit** (6 live displays, ICP, animated side-stick &amp; twin throttles) + **F-15C 16-dial analog panel** with cyclable MFDs (`[` / `]`) |
+| **6 Theatres &amp; Free Flight** | *Air Superiority, Naval Battle (fjord strait), Canyon Run (Crater Citadel &amp; bridges), Ace Duel, endless Furball,* &amp; **Unarmed Real-World Free Flight** (Toronto, Tokyo, San Francisco, New York, Swiss Alps) |
+| **Ace BFM &amp; Wingman BTT** | Real bank-to-turn (`flyBTT`) wingmen (`FORM / COVER / FOCUS`) &amp; **CRIMSON-1 / CRIMSON-2** Ace AI with `HIGH_YOYO`, `BREAK_SCISSORS`, Cobra traps, bracket/drag-and-bag &amp; smart flares/chaff/notch |
+| **Volumetric Clouds &amp; HDR** | 24-step Beer-Powder volumetric cloud sea, towering cumulus congestus turrets, high-altitude cirrus streaks, AC7 split-tone filmic grade &amp; AN/AVS-9 Night Vision (`N`) |
+| **YouTube / YT Music Player** | Built-in top-right **YouTube &amp; YouTube Music playlist player** (`‹ / ▶ / › / ▾ / SHUF`), custom URL paste &amp; persistence, automatic radio ducking &amp; embed-error skip |
+| **Post-Stall &amp; Carrier Ops** | Decoupled AoA for **Cobra / Kulbit** (`B+Shift` &lt; 290 kt), flat spins, Mach-1 cone, USS Enterprise bow catapult &amp; arrestor recovery, voiced radio + CRT portraits, &amp; Auto-Fullscreen Shortcut Lock |
 
 ---
 
@@ -35,28 +54,38 @@
 <table>
   <tr>
     <td width="50%">
-      <img src="docs/screenshots/title-briefing.png" alt="Borderless STANDBY Hangar Menu" />
-      <p align="center"><strong>Borderless Standby Hangar</strong><br /><sub>Live 3D F-15C orbit with mode, SPW, squadron livery & weather/time selectors</sub></p>
+      <img src="docs/screenshots/title-briefing.png" alt="Borderless STANDBY Hangar Menu with F-22A Raptor" />
+      <p align="center"><strong>Standby Hangar &amp; F-22A Raptor</strong><br /><sub>Live 3D orbit over the cloud sea with aircraft, mission, SPW, wingman role, weather &amp; Key Lock selectors</sub></p>
     </td>
     <td width="50%">
-      <img src="docs/screenshots/cockpit-hud.png" alt="3D F-15C Cockpit and Combiner HUD" />
-      <p align="center"><strong>3D Cockpit & Cyclable VSD MFDs</strong><br /><sub>Collimated combiner HUD, bubble canopy, animated HOTAS & live tactical radar</sub></p>
+      <img src="docs/screenshots/cockpit-f22.png" alt="F-22A Raptor Sculpted Blender 3D Cockpit" />
+      <p align="center"><strong>F-22A Sculpted All-Glass 3D Cockpit</strong><br /><sub>Blender-modeled glare shield, ICP keypad, APG-77 AESA, TSD, ALR-94 EW, animated HOTAS &amp; wide HUD combiner</sub></p>
     </td>
   </tr>
   <tr>
     <td width="50%">
-      <img src="docs/screenshots/canyon-strike.png" alt="Canyon Strike & Low-Altitude Jamming" />
-      <p align="center"><strong>Low-Altitude Canyon Strike</strong><br /><sub>Thread sheer canyon walls below 500 ft to beat enemy EW radar jamming</sub></p>
+      <img src="docs/screenshots/nose-hud.png" alt="Ace Combat 7 Nose Camera HUD over Cloud Sea" />
+      <p align="center"><strong>AC7 Nose Camera HUD (<code>Space</code>)</strong><br /><sub>Unobstructed forward nose view with cyan-mint brackets, boxed SPEED/ALT, throttle bar &amp; gull-wing boresight</sub></p>
     </td>
     <td width="50%">
-      <img src="docs/screenshots/night-nvg.png" alt="Night Vision NVG Sortie" />
-      <p align="center"><strong>AN/AVS-9 Night Vision (<code>N</code>)</strong><br /><sub>Gen-3 green phosphor amplification with contour edges & HDR halo bloom</sub></p>
+      <img src="docs/screenshots/canyon-strike.png" alt="Canyon Run Gorge Strike in F-22A Raptor" />
+      <p align="center"><strong>Overhauled Canyon Run Theatre</strong><br /><sub>Thread deep river gorges below 500 ft to evade EW jamming and strike the fortified Crater Citadel</sub></p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <img src="docs/screenshots/freeflight-city.png" alt="Free Flight over Real-World Terrain & Cities" />
+      <p align="center"><strong>Real-World Streaming Free Flight</strong><br /><sub>High-altitude unarmed scenic flight with streaming elevation, satellite imagery, 3D OSM buildings &amp; landmarks</sub></p>
+    </td>
+    <td width="50%">
+      <img src="docs/screenshots/night-nvg.png" alt="AN/AVS-9 Night Vision Sortie" />
+      <p align="center"><strong>AN/AVS-9 Night Vision (<code>N</code>)</strong><br /><sub>Gen-3 green phosphor amplification with contour edges, binocular mask &amp; HDR halo bloom</sub></p>
     </td>
   </tr>
   <tr>
     <td colspan="2" align="center">
       <img src="docs/screenshots/debrief-trace.png" alt="Tactical Trace Map & Composite Rank Debrief" width="76%" />
-      <p align="center"><strong>Animated Tactical Trace Debrief</strong><br /><sub>15-minute flight path replay with kill/ace/strike/trap markers & composite S/A/B/C score</sub></p>
+      <p align="center"><strong>Animated Tactical Trace Debrief</strong><br /><sub>15-minute flight path replay with kill/ace/strike/trap markers &amp; composite S/A/B/C score</sub></p>
     </td>
   </tr>
 </table>
@@ -67,44 +96,45 @@
 
 | Input | Action | Input | Action |
 | :--- | :--- | :--- | :--- |
-| **Mouse / WASD** | Pitch & roll | **C** | Lock missile seeker / cycle target |
-| **Shift / Ctrl / Wheel** | Throttle ± & Afterburner | **X / Z** | Deploy flares / chaff |
-| **Q / E** | Rudder yaw | **Space** | Toggle 3D Cockpit / Chase camera |
-| **LMB / RMB** | Vulcan cannon / Fire missile *(hold: Missile Cam)* | **N / H** | Night Vision (NVG) / Pause & Controls |
+| **Mouse / WASD** | Pitch &amp; roll | **C** | Lock missile seeker / cycle target |
+| **Shift / Ctrl / Wheel** | Throttle ± &amp; Afterburner | **X / Z** | Deploy flares / chaff |
+| **Q / E** | Rudder yaw | **Space** | Cycle **Chase → 3D Cockpit → Nose Cam** |
+| **LMB / RMB** | Vulcan cannon / Fire missile *(hold: Missile Cam)* | **N / H / F11** | Night Vision (`N`) · Pause (`H`) · Fullscreen Key Lock (`F11`) |
 
 <details>
-<summary><strong>Full Controls Reference (PSM, Wingmen, MFDs, Carrier Ops)</strong></summary>
+<summary><strong>Full Controls Reference (PSM, Wingmen, YouTube Music, MFDs, Carrier Ops)</strong></summary>
 
-#### Flight & Post-Stall Maneuvering
+#### Flight &amp; Post-Stall Maneuvering
 | Input | Action |
 | :--- | :--- |
-| **Mouse / W A S D** | Pitch & roll (`W/S` pitch, `A/D` roll, smoothly blends with mouse aim) |
-| **Shift / Ctrl / ↑ / ↓ / Wheel** | Throttle up / down; `Shift` at full throttle lights Afterburner & assists High-G pulls (`B+Shift` < `290 kt` = PSM Cobra/Kulbit) |
+| **Mouse / W A S D** | Pitch &amp; roll (`W/S` pitch, `A/D` roll, smoothly blends with mouse aim) |
+| **Shift / Ctrl / ↑ / ↓ / Wheel** | Throttle up / down; `Shift` at full throttle lights Afterburner &amp; assists High-G pulls (`B+Shift` &lt; `290 kt` = PSM Cobra/Kulbit) |
 | **Q / E** | Rudder yaw (and parachute steering after ejection) |
 | **V** | Evasive `360°` barrel roll |
 | **B** | Dorsal speedbrake / wheel brakes |
 | **L** | Landing gear / tailhook toggle (`[L]` autoland on carrier finals; forgiving deck/runway traps) |
 
-#### Combat, Weapons & Wingmen
+#### Combat, Weapons &amp; Wingmen
 | Input | Action |
 | :--- | :--- |
-| **Left-Click / F** | M61A1 20mm Vulcan cannon (if engine fire: `F` = Halon bottle, hold `F` = windmill relight) |
+| **Left-Click / F** | 20mm Vulcan cannon (if engine fire: `F` = Halon bottle, hold `F` = windmill relight) |
 | **Right-Click / M** | Fire selected weapon (`MSL` / `4AAM` / `QAAM` / drop `UGB`; hold = Missile Cam) |
 | **R · 1 / 2 / 3** | Cycle or select `MSL` / `4AAM` / `UGB` / `QAAM` |
 | **C** | Lock missile seeker / cycle target inside sight cone |
-| **X / Z / J** | Flares (`X`, IR decoys) · Chaff (`Z`, >2.5 km radar decoys) · ALQ-135 ECM Jammer (`J`) |
-| **G** | Toggle Warden wingmen formation / engage |
+| **X / Z / J** | Flares (`X`, IR decoys) · Chaff (`Z`, radar decoys) · ALQ-135 ECM Jammer (`J`) |
+| **G** | Cycle Warden wingmen orders (`FORM` / `FOCUS` / `COVER`) |
 
-#### Camera, Avionics & Sortie Controls
+#### Camera, Avionics, Music &amp; Shortcut Lock
 | Input | Action |
 | :--- | :--- |
-| **Space** | Toggle 1st-person 3D Cockpit / 3rd-person Chase camera |
+| **Space** | Cycle **Chase → 3D Cockpit → AC7 Nose Cam** |
 | **Alt / Middle-Click** | Free Look (hold + drag mouse; springs back on release) |
-| **[ / ]** | Cycle cockpit VSD MFD page (`TACTICAL RADAR` / `STORES & DMG` / `RWR THREAT SCOPE`) |
-| **N / K** | Toggle Night Vision (`N`) / Combat music on-off (`K`) |
-| **, / . / /** | Music previous track / next track / toggle AUTO shuffle |
+| **[ / ]** | Cycle cockpit VSD MFD page (`TACTICAL RADAR` / `STORES &amp; DMG` / `RWR THREAT SCOPE`) |
+| **N / K** | Toggle Night Vision (`N`) / YouTube Music Play-Pause (`K`) |
+| **, / .** | YouTube Music previous track / next track (use `▾` in top-right bar to paste any YT / YT Music playlist URL) |
+| **F11 / KEY LOCK** | Toggle DOM Fullscreen + `navigator.keyboard.lock()` (auto-engaged on launch/resume to block `Ctrl+W/T/R/N` &amp; `Tab`) |
 | **F1 / Tab Tab** | In-flight keybind cheat-sheet (`F1`) / End sortie to Debrief (`Tab` twice) |
-| **P / H / Backspace** | Eject (`P`) · Pause & Settings (`H` / `Esc`) · Reset (`Backspace`) |
+| **P / H / Backspace** | Eject (`P`) · Pause &amp; Settings (`H` / `Esc`) · Reset (`Backspace`) |
 
 </details>
 
@@ -119,32 +149,34 @@ No build step or dependencies needed—just serve `angel-zero/` over HTTP:
 - **Manual (Python 3):** `python server.py` → opens at `http://127.0.0.1:8090/`
 
 <details>
-<summary><strong>Repository Structure & Tech Stack</strong></summary>
+<summary><strong>Repository Structure &amp; Tech Stack</strong></summary>
 
-Built with **vanilla ES modules + Three.js r160**, a **Blender 5.3 headless GLB pipeline**, and **procedural Web Audio + radio-filtered voice lines**:
+Built with **vanilla ES modules + Three.js r160**, a **Blender headless GLB pipeline**, **YouTube IFrame Music integration**, and **procedural Web Audio + radio-filtered voice lines**:
 
 ```text
 .
 ├── .github/workflows/deploy.yml   # Cloudflare Pages deployment from angel-zero/
 ├── angel-zero/                    # Deployable game root (angels-zero.pages.dev)
 │   ├── index.html                 # Orchestrator: WebGL2, 6-DOF + PSM physics, STANDBY & Debrief UI
-│   ├── src/                       # 24 vanilla ES modules (hud, cockpit3d, combat, audio, vfx, nvg, ...)
+│   ├── src/                       # 31 vanilla ES modules (hud, cockpit3d, cockpit_f22, combat, ytmusic, freeflight, vfx, nvg, ...)
 │   ├── assets/
-│   │   ├── angels_zero_jet.glb    # Normalized 19.4 m F-15C GLB (11.5 MB, 16 ordnance nodes)
-│   │   ├── portraits/             # 6 phosphor CRT pilot & AWACS portraits (< 20 KB)
-│   │   ├── sfx/                   # Supplemental CC0 audio textures
-│   │   └── voicelines/radio/      # 45 mono radio-filtered voice clips (0.92 MB)
-│   ├── scripts/                   # prep_f15.py (Blender), make_portraits.py, radio_voice_pass.py
-│   ├── PLAN.md                    # Roadmap, milestone log & ?debug URL flags
-│   └── AGENTS.md                  # Asset pipeline conventions
-├── docs/screenshots/              # Gameplay screenshots for README
+│   │   ├── angels_zero_f22.glb    # F-22A Raptor airframe GLB
+│   │   ├── f22_cockpit.glb        # Blender-sculpted F-22A all-glass cockpit GLB
+│   │   ├── angels_zero_jet.glb    # Normalized 19.4 m F-15C GLB (16 ordnance nodes)
+│   │   ├── portraits/             # Phosphor CRT pilot & AWACS portraits
+│   │   ├── sfx/                   # F-22A (29-file F119 bank) + F-15C & environment SFX
+│   │   └── voicelines/radio/      # Radio-filtered voice clips
+│   ├── scripts/                   # Blender & audio asset pipeline scripts
+│   └── PLAN.md                    # Roadmap, milestone log & ?debug URL flags
+├── docs/screenshots/              # Screenshots & animated WebP gameplay footage for README
 ├── launch.bat / launch.sh         # One-click local launchers
-├── server.py                      # Zero-dependency local HTTP server
-├── PROJECT.md                     # Full 24-module architecture & pipeline documentation
+├── server.py                      # Multi-threaded local HTTP server
+├── PROJECT.md                     # Full module architecture & pipeline documentation
+├── CODEBASE_MAP.md                # Symbol & hook index
 └── LICENSE                        # MIT License
 ```
 
-See [PROJECT.md](PROJECT.md) for the complete 24-module breakdown and [angel-zero/PLAN.md](angel-zero/PLAN.md) for headless `?debug` flags.
+See [PROJECT.md](PROJECT.md) for the architecture breakdown, [CODEBASE_MAP.md](CODEBASE_MAP.md) for the symbol index, and [angel-zero/PLAN.md](angel-zero/PLAN.md) for headless `?debug` flags.
 
 </details>
 

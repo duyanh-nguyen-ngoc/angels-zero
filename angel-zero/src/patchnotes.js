@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.73', title: 'YOUTUBE MUSIC PLAYER', bullets: [
+    'The bundled scenario soundtrack is gone. Music now streams from a YouTube / YouTube Music playlist you pick, so the game ships ~10 MB smaller and the score is always yours to choose.',
+    'Paste any playlist or video URL into the new [▾] playlist panel, or use the quick presets and RESET DEFAULT. Your choice is remembered between sessions.',
+    'Music controls moved to the top-right bar: ‹ / ▶ / › for tracks, SHUF for shuffle, K for play/pause, and , / . for previous / next. Radio calls duck the music automatically, and embed-blocked videos are skipped.'
+  ] },
   { version: 'v1.1.72', title: 'BROWSER SHORTCUT LOCK & AUTO-FULLSCREEN', bullets: [
     'Launching or resuming a sortie now automatically engages DOM Fullscreen + full navigator.keyboard.lock() so Ctrl+W, Ctrl+T, Ctrl+N, Ctrl+R, Alt+Left/Right, and Tab no longer trigger browser shortcuts while flying.',
     'Added capture-phase shortcut blocking, F11 DOM-fullscreen shortcut-lock intercept, and a [ KEY LOCK: LOCKED / OFF ] toggle in Standby.'

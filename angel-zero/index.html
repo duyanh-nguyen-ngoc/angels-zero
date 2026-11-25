@@ -333,13 +333,20 @@
   #bgmWidget button:hover { background:rgba(0,255,102,.15); }
   #bgmWidget button.on { background:rgba(0,255,102,.25); }
   #bgmPicker { --bgmTop:50px; position:fixed; top:calc(var(--bgmTop) + 58px); right:12px; z-index:31; display:none;
-    max-height:60vh; overflow:auto; padding:6px 10px; background:rgba(0,0,0,.72); border:1px solid #00ff66;
+    width:340px; max-height:60vh; overflow:auto; padding:8px 10px; background:rgba(0,0,0,.82); border:1px solid #00ff66;
     color:#00ff66; font:11px 'Share Tech Mono',monospace; pointer-events:auto; }
   #bgmPicker.open { display:block; }
-  #bgmPicker ul { list-style:none; margin:0; padding:0; }
+  #bgmPicker ul { list-style:none; margin:6px 0 0; padding:0; }
   #bgmPicker li { padding:2px 4px; cursor:pointer; }
   #bgmPicker li:hover { background:rgba(0,255,102,.16); }
   #bgmPicker li.h { color:#ffb000; cursor:default; font-weight:bold; margin-top:5px; }
+  #bgmPicker input { width:232px; font:11px 'Share Tech Mono',monospace; color:#00ff66; background:rgba(0,20,10,.7);
+    border:1px solid rgba(0,255,102,.5); padding:3px 5px; outline:none; }
+  #bgmPicker input:focus { border-color:#00ff66; }
+  #bgmPicker button { font:11px 'Share Tech Mono',monospace; color:#00ff66; background:transparent;
+    border:1px solid rgba(0,255,102,.5); padding:3px 6px; margin-left:4px; cursor:pointer; }
+  #bgmPicker button:hover { background:rgba(0,255,102,.15); }
+  #bgmPicker .hint { color:#7d9c8b; font-size:10px; margin-top:6px; }
 
   /* Centered, high-contrast patch-notes modal (above menu + HUD layers). */
   #patchOverlay { position:fixed; inset:0; z-index:100; display:none; align-items:center; justify-content:center; padding:20px; box-sizing:border-box;
@@ -688,13 +695,20 @@
   </div>
   <button id="hBadge" type="button"><kbd>H</kbd>CONTROLS</button>
   <div id="bgmWidget">
-    <span class="bt" id="bgmTitle">♪ —</span> <span class="bs" id="bgmTag">[—] AUTO</span>
+    <span class="bt" id="bgmTitle">♪ —</span> <span class="bs" id="bgmTag">[YT OFF] AUTO</span>
     <button id="bgmPrev" type="button" title="Previous track (,)">‹</button>
+    <button id="bgmPlay" type="button" title="Play / Pause (K)">▶</button>
     <button id="bgmNext" type="button" title="Next track (.)">›</button>
-    <button id="bgmPick" type="button" title="Select track">▾</button>
-    <button id="bgmAuto" type="button" title="Toggle AUTO (/)">AUTO</button>
+    <button id="bgmPick" type="button" title="Playlist">▾</button>
+    <button id="bgmAuto" type="button" title="Toggle shuffle (/)">SHUF</button>
   </div>
-  <div id="bgmPicker"><ul id="bgmPickerList"></ul></div>
+  <div id="bgmPicker">
+    <input id="bgmUrl" type="text" placeholder="Paste YouTube / YT Music playlist or video URL..." autocomplete="off" spellcheck="false" />
+    <button id="bgmLoad" type="button">LOAD</button>
+    <div id="bgmPresets"></div>
+    <button id="bgmReset" type="button">RESET DEFAULT</button>
+    <div class="hint">, prev · . next · K play/pause · / shuffle. Audio plays from YouTube.</div>
+  </div>
   <div id="patchOverlay">
     <div id="patchPanel" role="dialog" aria-modal="true" aria-labelledby="patchTitle">
       <div class="patch-head">
@@ -732,37 +746,38 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s9ed';
-import { createAmbient } from './src/ambient.js?v=s9dz';
-import { createBlastFX } from './src/blastfx.js?v=s9dd';
-import { createHUD } from './src/hud.js?v=s9ed';
-import { createCockpit3D } from './src/cockpit3d.js?v=s9dr';
-import { createCockpitF22 } from './src/cockpit_f22.js?v=s9dy';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9dz';
-import { createEjection } from './src/eject.js?v=s9di';
-import { createAudio } from './src/audio.js?v=s9dz';
-import { createRadio } from './src/radio.js?v=s9dd';
-import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9dd';
-import { createLivery } from './src/livery.js?v=s9dd';
-import { createGear, GEAR_H, GEAR_PTS, GEAR_UNITS, setGearPoints } from './src/gear.js?v=s9dl';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9ed';
-import { createCanopyFX } from './src/canopy.js?v=s9dd';
-import { createNVG } from './src/nvg.js?v=s9ed';
-import { createWorld, WORLD } from './src/world.js?v=s9dz';
-import { createSurfaces } from './src/surfaces.js?v=s9dd';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9dd';
-import { createFreeLook } from './src/freelook.js?v=s9dd';
-import { createCanopyGlass } from './src/canopyglass.js?v=s9dd';
-import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9dd';
-import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9dd';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9ee';
-import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9de';
-import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9dd';
-import { createRadioQueue } from './src/radioQueue.js?v=s9dj';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9dz';
+import { createVFX } from './src/vfx.js?v=s9ei';
+import { createAmbient } from './src/ambient.js?v=s9ei';
+import { createBlastFX } from './src/blastfx.js?v=s9ei';
+import { createHUD } from './src/hud.js?v=s9ei';
+import { createCockpit3D } from './src/cockpit3d.js?v=s9ei';
+import { createCockpitF22 } from './src/cockpit_f22.js?v=s9ei';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9ei';
+import { createEjection } from './src/eject.js?v=s9ei';
+import { createAudio } from './src/audio.js?v=s9ei';
+import { createYouTubeMusic } from './src/ytmusic.js?v=s9ei';
+import { createRadio } from './src/radio.js?v=s9ei';
+import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9ei';
+import { createLivery } from './src/livery.js?v=s9ei';
+import { createGear, GEAR_H, GEAR_PTS, GEAR_UNITS, setGearPoints } from './src/gear.js?v=s9ei';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s9ei';
+import { createCanopyFX } from './src/canopy.js?v=s9ei';
+import { createNVG } from './src/nvg.js?v=s9ei';
+import { createWorld, WORLD } from './src/world.js?v=s9ei';
+import { createSurfaces } from './src/surfaces.js?v=s9ei';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s9ei';
+import { createFreeLook } from './src/freelook.js?v=s9ei';
+import { createCanopyGlass } from './src/canopyglass.js?v=s9ei';
+import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9ei';
+import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9ei';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s9ei';
+import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9ei';
+import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9ei';
+import { createRadioQueue } from './src/radioQueue.js?v=s9ei';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s9ei';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
-  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9dz';
-import { createFreeFlight, FREE_FLIGHT_PRESETS, loadFreeFlightCity, saveFreeFlightCity } from './src/freeflight.js?v=s9dz';
+  GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s9ei';
+import { createFreeFlight, FREE_FLIGHT_PRESETS, loadFreeFlightCity, saveFreeFlightCity } from './src/freeflight.js?v=s9ei';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -2997,6 +3012,7 @@ const keyOf = e => ((e.altKey || e.ctrlKey || e.shiftKey)
     : (e.key || '').toLowerCase())
   : (e.key || '').toLowerCase());
 addEventListener('keydown', e => {
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;  // playlist URL typing is not flight input
   if (e.code === 'F11' && !e.repeat) { e.preventDefault(); toggleShortcutLock(); return; }
   if (appMode === 'PLAY' && !uiModal) {
     if ((e.ctrlKey || e.altKey || e.metaKey) && e.code !== 'F12') e.preventDefault();
@@ -3005,6 +3021,7 @@ addEventListener('keydown', e => {
   }
 }, { capture: true });
 addEventListener('keydown', e => {
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;  // never hijack playlist URL typing
   if (freeLook.onKey(e, true)) return;
   const k = keyOf(e);
   if (k === 'escape' && patchOverlay.classList.contains('open')) { setPatchOpen(false); return; }
@@ -3022,9 +3039,9 @@ addEventListener('keydown', e => {
       'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'AltLeft', 'AltRight', 'ControlLeft', 'ControlRight'].includes(e.code)) e.preventDefault();
   }
   // Music player: , . / are free; [ ] remain the cockpit MFD pages. Work in MENU/PAUSED too.
-  if (!e.repeat && e.code === 'Comma') { audio.skip(-1); hud.setMusicToast('♪ ' + (audio.bgm.title || '—')); return; }
-  if (!e.repeat && e.code === 'Period') { audio.skip(1); hud.setMusicToast('♪ ' + (audio.bgm.title || '—')); return; }
-  if (!e.repeat && e.code === 'Slash') { audio.setAuto(!audio.bgm.auto); hud.setMusicToast('♪ ' + (audio.bgm.title || '—')); return; }
+  if (!e.repeat && e.code === 'Comma') { ytMusic.prev(); hud.setMusicToast('♪ ' + (ytMusic.info.title || '—')); return; }
+  if (!e.repeat && e.code === 'Period') { ytMusic.next(); hud.setMusicToast('♪ ' + (ytMusic.info.title || '—')); return; }
+  if (!e.repeat && e.code === 'Slash') { ytMusic.setShuffle(!ytMusic.info.shuffle); hud.setMusicToast('♪ SHUFFLE ' + (ytMusic.info.shuffle ? 'ON' : 'OFF')); return; }
   if (appMode === 'DEBRIEF') {                         // debrief: Enter = primary action, B = briefing; no flight input
     if (k === 'enter' && !['dbBrief', 'dbReplay', 'dbEquip'].includes(document.activeElement?.id)) { e.preventDefault(); replaySortie(dbEquipId); }
     else if ((k === 'b' || k === 'escape') && !e.repeat) debriefToBriefing();
@@ -4654,7 +4671,11 @@ let glFilter = '';
    8. VFX + HUD MODULES (src/vfx.js, src/hud.js)
    ============================================================================ */
 const audio = createAudio({ aircraft: AC.id });
-if (DEBUG && Q.has('bgm')) audio.setBgmForce(Q.get('bgm'));   // force a soundtrack scenario for headless checks
+// External YouTube / YouTube Music playlist player. All legacy audio.bgm* calls delegate to it.
+const ytMusic = createYouTubeMusic({ noBgm: DEBUG && Q.has('nobgm'),
+  onToast: txt => hud && hud.setMusicToast && hud.setMusicToast(txt) });
+audio.attachYouTubeMusic(ytMusic);
+if (DEBUG && Q.has('bgm')) audio.setBgmForce(Q.get('bgm'));   // legacy scenario force (debug only)
 /* ---- Tactical Voice Box: DOM state machine driven by the radio queue ---- */
 const crtBox = document.getElementById('crtBox'), activePortrait = document.getElementById('activePortrait');
 const crtTag = document.getElementById('crtTag'), crtSub = document.getElementById('crtSub');
@@ -5450,51 +5471,60 @@ const hud = createHUD(THREE, {
 });
 
 /* --------------------------------------------------------------------------
-   Now-playing widget. DOM overlay because the HUD is a canvas (no click target).
-   Only the onBgmChange callback paints it; no per-frame polling or allocations.
+   Now-playing widget: YouTube / YouTube Music playlist player.
+   Painted by the controller's on-change callback; no per-frame DOM work.
    -------------------------------------------------------------------------- */
 {
-  const w = document.getElementById('bgmWidget'), title = document.getElementById('bgmTitle');
-  const tag = document.getElementById('bgmTag'), autoBtn = document.getElementById('bgmAuto');
-  const picker = document.getElementById('bgmPicker'), list = document.getElementById('bgmPickerList');
-  let pickerBuilt = false;
-  const toast = () => hud.setMusicToast('♪ ' + (audio.bgm.title || '—'));
-  const paint = info => {
-    title.textContent = '♪ ' + (info.title || '—');
-    tag.textContent = '[' + (info.scn || '—') + '] ' + (info.auto ? 'AUTO' : 'MAN');
-    autoBtn.classList.toggle('on', !!info.auto);
+  const title = document.getElementById('bgmTitle'), tag = document.getElementById('bgmTag');
+  const playBtn = document.getElementById('bgmPlay'), shufBtn = document.getElementById('bgmAuto');
+  const picker = document.getElementById('bgmPicker'), input = document.getElementById('bgmUrl');
+  const toast = () => hud.setMusicToast('♪ ' + (ytMusic.info.title || '—'));
+  const paint = q => {
+    title.textContent = '♪ ' + (q.title || '—');
+    tag.textContent = '[' + (q.status || 'YT OFF') + '] ' + (q.auto ? 'SHUF' : 'SEQ');
+    playBtn.textContent = q.playing ? '❚❚' : '▶';
+    shufBtn.classList.toggle('on', !!q.auto);
   };
-  audio.onBgmChange(paint);
-  paint(audio.bgm);
+  ytMusic.attachChange(paint);
+  paint(ytMusic.status());
   const bind = (id, fn) => document.getElementById(id).addEventListener('click', e => { e.stopPropagation(); e.preventDefault(); fn(); });
-  bind('bgmPrev', () => { audio.skip(-1); toast(); });
-  bind('bgmNext', () => { audio.skip(1); toast(); });
-  bind('bgmAuto', () => { audio.setAuto(!audio.bgm.auto); toast(); });
+  bind('bgmPrev', () => { ytMusic.prev(); toast(); });
+  bind('bgmNext', () => { ytMusic.next(); toast(); });
+  bind('bgmPlay', () => { ytMusic.toggle(); toast(); });
+  bind('bgmAuto', () => { ytMusic.setShuffle(!ytMusic.info.shuffle); toast(); });
   bind('bgmPick', () => {
-    if (!pickerBuilt) {
-      const tracks = audio.bgmTracks;
-      if (!tracks.length) return;                         // manifest still streaming
-      let scn = '';
-      for (const t of tracks) {
-        if (t.scn !== scn) { scn = t.scn; const h = document.createElement('li'); h.className = 'h'; h.textContent = scn.toUpperCase(); list.appendChild(h); }
-        const li = document.createElement('li'), id = t.id;
-        li.textContent = t.title || t.file;
-        li.addEventListener('click', e => { e.stopPropagation(); audio.selectTrack(id); picker.classList.remove('open'); toast(); });
-        list.appendChild(li);
-      }
-      pickerBuilt = true;
-    }
-    picker.classList.toggle('open');
+    const open = picker.classList.toggle('open');
+    if (open && input && !input.value) input.focus();
   });
-  for (const el of [w, picker]) el.addEventListener('mousedown', e => e.stopPropagation());
-  if (DEBUG && Q.has('bgmtrack')) {
-    let tries = 0;
-    const force = () => {
-      if (audio.bgmTracks.length) audio.selectTrack(Math.min(audio.bgmTracks.length - 1, Math.max(0, Number(Q.get('bgmtrack')) || 0)));
-      else if (++tries < 20) setTimeout(force, 200);
-    };
-    setTimeout(force, 200);
+  bind('bgmLoad', () => {
+    const ok = ytMusic.loadInput(input.value);
+    if (ok) { picker.classList.remove('open'); toast(); }
+  });
+  bind('bgmReset', () => { ytMusic.resetDefault(); picker.classList.remove('open'); toast(); });
+  const presets = document.getElementById('bgmPresets');
+  for (const p of ytMusic.presets) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = p.label;
+    b.addEventListener('click', e => { e.stopPropagation(); ytMusic.loadInput(p.id); picker.classList.remove('open'); toast(); });
+    presets.appendChild(b);
   }
+  // Typing / pasting in the playlist input must never reach the flight controls.
+  for (const el of [picker, input]) {
+    el.addEventListener('mousedown', e => e.stopPropagation());
+    el.addEventListener('keydown', e => e.stopPropagation());
+  }
+  input.addEventListener('focus', () => { uiModal = true; });
+  input.addEventListener('blur', () => { uiModal = ctrlOpen || document.getElementById('patchOverlay').classList.contains('open'); });
+  input.addEventListener('keydown', e => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); ytMusic.loadInput(input.value); picker.classList.remove('open'); }
+  });
+}
+// Start the external player lazily on the first gesture, never in headless ?nobgm runs.
+if (!(DEBUG && Q.has('nobgm'))) {
+  let ytStarted = false;
+  const startYT = () => { if (ytStarted) return; ytStarted = true; ytMusic.start(); };
+  for (const ev of ['pointerdown', 'keydown', 'touchstart']) addEventListener(ev, startYT, { capture: true, passive: true });
 }
 if (DEBUG && Q.has('alert')) hud.setAlertState('MISSILE_ALERT');
 
@@ -6465,7 +6495,7 @@ if (DEBUG) {
     get dmgTrails() { return vfx.dmgTrails.stats; },
     hurtEnemy: (i, f) => combatSys.damageEnemyAt(i, f),
     touch: (sink, surf) => onTouchdown(sink, surf || 'RUNWAY'),
-    get engine() { return audio.engine; },
+    get engine() { return audio.engine; }, ytMusic,
     flyWingmen: dt => updateWingmanFlight(dt),
     get wingState() { return wingmen.map(w => ({ mode: w.mode, v: w.speed, bank: w.bank, g: w.gNow, pos: w.pos.toArray() })); },
     get gforce() { return gforce; }, get simTime() { return simTime; },

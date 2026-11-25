@@ -1812,6 +1812,12 @@ Status legend: `[x]` implemented and verified Â· `[ ]` open — gaps listed.
    - **Allocations (measured by a constructor-tracing harness; was 21-145 THREE objects/frame):** `hud.js` pooled `toScreen()` ring (256) + per-site scratch vectors; `combat.js` pooled `radarCandidates()` records/output, scratch `fwdOf()`, loop-based `autoDesignate()` / NEXT cue / 4AAM dead-track check, `updateFlares()` scratch centres, `update()` segment scratch, shared `spo()` record for all 44 `Particles.spawn` sites; `cockpit3d.js` reused `glassOutlineWorld()` array; `index.html` vapour-tint scratch Color.
    - **Robustness:** lock / 4AAM off-boresight divide guarded with `max(d, 1e-3)`; `<link rel="icon" href="data:,">` removes the favicon 404.
 
+- [x] **YouTube / YouTube Music playlist player** *(build `s9ef`, v1.1.73, `src/ytmusic.js`, `src/audio.js`, `index.html`)*
+   - Removed the 24 bundled `.ogg` beds, `manifest.json` and the whole local streamed/synth BGM engine (~10 MB). `audio.js` keeps every jet / weapon / RWR / VWS / radio SFX path intact; all legacy `bgm*` methods are now thin delegates to an injected `ytMusic` controller, and `resolveScenario()` survives as a pure scenario-name resolver for debug compatibility.
+   - New `createYouTubeMusic()` wraps the IFrame Player API: parses playlist/watch/short URL forms and raw IDs, persists the user URL in `angelsZero_ytPlaylist`, mounts a 2×2 off-screen player, starts on the first gesture, supports play/pause/next/prev/shuffle/volume, ducks ~40 % during radio, skips embed-blocked videos up to 3 times, and emits live track titles.
+   - `#bgmWidget` now shows the real YouTube title + `[YT PLAY/PAUSED/OFF]` status with ‹ ▶ ›, SHUF and ▾; the picker is a URL input + LOAD + presets + RESET DEFAULT. `K` toggles play/pause, `,` / `.` change track, `/` toggles shuffle; URL-input typing is shielded from the flight key handlers. `?nobgm` skips the external API load for offline headless runs.
+   - No per-frame audio nodes from music, no new draw calls; 0 JS/WebGL errors and ~60 FPS in headless verification with `?nobgm`.
+
 ## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.
