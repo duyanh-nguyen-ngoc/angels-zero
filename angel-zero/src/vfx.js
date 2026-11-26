@@ -1414,6 +1414,11 @@ export function createVFX(THREE, env) {
         col += uSunCol * sunGlow;
         float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
         if (lum > uCap) col *= uCap / lum;                               // tops never reach the bloom threshold
+        // Sun-through-cloud HDR silver lining: peaks ONLY on thin backlit cloud edges (T ~ 0.5),
+        // crossing BLOOM_THRESHOLD (0.88) so UnrealBloomPass blooms sun-kissed cloud rims.
+        float thinEdge = clamp(T * (1.0 - T) * 4.0, 0.0, 1.0);
+        float rimPhase = hg(cosT, 0.86) * 0.42 + pow(max(cosT, 0.0), 18.0) * 0.65;
+        col += min(uSunCol * rimPhase * thinEdge * clamp(uGain, 0.0, 1.2) * smoothstep(-0.02, 0.12, uSun.y), vec3(1.55));
         float dist = tHit > 0.0 ? tHit : t0;
         #ifdef USE_FOG
           float af = 1.0 - exp(-fogDensity * fogDensity * dist * dist * 0.22);   // crisp distant cumulus towers
@@ -1647,6 +1652,10 @@ export function createVFX(THREE, env) {
         col = col * uGain + vec3(0.75, 0.8, 1.0) * uFlash * (0.45 + 0.55 * (1.0 - vH));
         float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
         if (lum > uCap) col *= uCap / lum;                               // crisp white, never blooms
+        // Sun-through-cloud HDR silver lining on thin backlit 3D cumulus puff silhouettes.
+        float rimEdge = (1.0 - smoothstep(0.08, 0.58, a)) * smoothstep(0.04, 0.16, a) * (0.35 + 0.65 * vH);
+        float rimBloom = (hg(cosT, 0.86) * 0.35 + pow(max(cosT, 0.0), 16.0) * 0.60) * rimEdge;
+        col += min(uSunCol * rimBloom * clamp(uGain, 0.0, 1.2), vec3(1.55));
         gl_FragColor = vec4(col, a * uOpacity * vAlpha * near);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -1723,6 +1732,41 @@ export function createVFX(THREE, env) {
     }
     if (p.y > deckBase && p.y < deckBase + deckThick) best = Math.max(best, Math.min(1, deckDensity(p.x, p.y, p.z) * 1.4));
     return best;
+  }
+  // Optical transmittance (0..1) from camera toward sun through BOTH active 3D cumulus banks and the upper deck.
+  function sampleCloudSun(camPos, sunDir) {
+    if (sunDir.y <= 0.01) return 1;
+    let t = 1;
+    // 1. Ray vs active 3D cumulus bank ellipsoids (zero allocations; matches cloudDensity transform)
+    for (let i = 0; i < banks.length; i++) {
+      const b = banks[i];
+      if (!b.on) continue;
+      const rx = b.W * 0.47, rz = b.D * 0.47, ry = b.H * 0.62;
+      const dxw = camPos.x - windOff.x - b.x, dzw = camPos.z - windOff.z - b.z;
+      const ox = (dxw * b.c + dzw * b.s) / rx, oz = (-dxw * b.s + dzw * b.c) / rz;
+      const oy = (camPos.y - (b.base + b.H * 0.5)) / ry;
+      const sx = (sunDir.x * b.c + sunDir.z * b.s) / rx, sz = (-sunDir.x * b.s + sunDir.z * b.c) / rz, sy = sunDir.y / ry;
+      const ss2 = sx * sx + sy * sy + sz * sz;
+      if (ss2 < 1e-12) continue;
+      const proj = Math.max(0, -(ox * sx + oy * sy + oz * sz) / ss2);
+      const px = ox + sx * proj, py = oy + sy * proj, pz = oz + sz * proj;
+      const r2 = px * px + py * py + pz * pz;
+      if (r2 < 1) t = Math.min(t, Math.exp(-Math.sqrt(1 - r2) * 1.6));
+    }
+    // 2. Ray vs upper cloud deck slab (3 taps along ray segment inside [deckBase, deckBase + deckThick])
+    const y0 = deckBase, y1 = deckBase + deckThick;
+    const ta = (y0 - camPos.y) / sunDir.y, tb = (y1 - camPos.y) / sunDir.y;
+    const t0 = Math.max(0, Math.min(ta, tb)), t1 = Math.min(28000, Math.max(ta, tb));
+    if (t1 > t0) {
+      let od = 0;
+      const span = t1 - t0;
+      for (let i = 0; i < 3; i++) {
+        const s = t0 + span * (0.2 + i * 0.3);
+        od += deckDensity(camPos.x + sunDir.x * s, camPos.y + sunDir.y * s, camPos.z + sunDir.z * s);
+      }
+      t = Math.min(t, Math.exp(-od * 1.45));
+    }
+    return t;
   }
   let mist = 0, cloudTime = 0, frame = 0;
   function updateMist(dt) {
@@ -1838,7 +1882,7 @@ export function createVFX(THREE, env) {
     get windOffset() { return windOff; },
     setMistBoost(k) { mistBoost = Math.max(0, Math.min(1, k)); },
     makeRibbon(opts) { return new Ribbon(opts); },
-    cloudDensity, placeDebugCloud,
+    cloudDensity, sampleCloudSun, placeDebugCloud,
     get cloudCount() { return banks.filter(b => b.on && !b.dbg).length; },
     setCloudSea, get cloudSea() { return cloudSea; },
     get wind() { return WIND; },                          // live cloud wind (m/s), reseeded per sortie
