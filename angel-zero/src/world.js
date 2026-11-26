@@ -479,7 +479,14 @@ export function createWorld(THREE, env) {
     // below 0.20 and sheds cleanly off steep walls above 0.44; uAORidge brightens alpine crests.
     uRockSlopeLo: { value: 0.16 }, uRockSlopeHi: { value: 0.29 },
     uSnowSlopeMin: { value: 0.20 }, uSnowSlopeMax: { value: 0.44 },
-    uAORidge: { value: 0.72 }, uGorgeFloor: { value: GORGE_FLOOR_Y }
+    uAORidge: { value: 0.72 }, uGorgeFloor: { value: GORGE_FLOOR_Y },
+    // Directional Mie aerial perspective + valley mist (driven by atmosphere.setTerrainFog).
+    uSun: { value: new THREE.Vector3(0.4, 0.7, -0.5).normalize() },
+    uMieCol: { value: lin(0xffd69e) },
+    uMieK: { value: 0.95 },
+    uMistH: { value: 190.0 },
+    uMistK: { value: 1.0 },
+    uCloudShadowK: { value: 1.0 }
   };
   const FARM_GLSL = `
     uniform vec3 uPal[5]; uniform vec3 uHedge; uniform vec3 uRoad; uniform vec3 uHwy; uniform vec3 uShore; uniform vec3 uSand;
@@ -487,6 +494,8 @@ export function createWorld(THREE, env) {
     uniform vec4 uAfb; uniform vec4 uTown; uniform vec4 uGorgeBox;
     uniform float uMapMode; uniform vec2 uCloudOff;
     uniform float uRockSlopeLo, uRockSlopeHi, uSnowSlopeMin, uSnowSlopeMax, uAORidge, uGorgeFloor;
+    uniform vec3 uSun; uniform vec3 uMieCol; uniform float uMieK;
+    uniform float uMistH; uniform float uMistK; uniform float uCloudShadowK;
     varying vec3 vEro;                                   // erosion analysis: (cavity AO, sediment, flow)
     // Screen-space micro-normal perturbation (same maths as three.js perturbNormalArb):
     // dHdxy is the screen derivative of a procedural micro-height, no extra texture taps.
@@ -723,7 +732,28 @@ export function createWorld(THREE, env) {
             float magma = smoothstep(0.64, 0.82, crk * 0.65 + crk2 * 0.45) * (1.0 - smoothstep(140.0, 340.0, vd)) * smoothstep(0.65, 0.9, vWNrm.y);
             totalEmissiveRadiance += vec3(2.1, 0.44, 0.07) * magma;
           }
-        }`);
+        }`)
+      .replace('#include <fog_fragment>', `
+        #ifdef USE_FOG
+          vec3 vToP = vWPos - cameraPosition;
+          float vDist = length(vToP);
+          vec3 vDir = vToP / max(vDist, 1e-4);
+          float sunAlign = max(dot(vDir, normalize(uSun + vec3(0.0, 1e-5, 0.0))), 0.0);
+          // Two-tone Flyout aerial perspective: cool Rayleigh fog away from sun, warm luminous Mie veil toward sun.
+          vec3 mieTint = uMieCol * (pow(sunAlign, 4.0) * 0.42 + pow(sunAlign, 20.0) * 0.58) * uMieK;
+          vec3 aerialCol = fogColor + mieTint * smoothstep(600.0, 7500.0, vDist);
+          #ifdef FOG_EXP2
+            float distFog = 1.0 - exp(-fogDensity * fogDensity * vDist * vDist);
+          #else
+            float distFog = smoothstep(fogNear, fogFar, vFogDepth);
+          #endif
+          // Height-exponential valley mist pooling in gorge floors & coastal coves.
+          float mistBase = (uMapMode > 0.5 && uMapMode < 1.5) ? uGorgeFloor : 0.0;
+          float valleyBand = exp(-max(vWPos.y - mistBase, 0.0) / uMistH);
+          float valleyMist = (1.0 - exp(-vDist * 0.00018 * valleyBand)) * 0.42 * uMistK * smoothstep(300.0, 2200.0, vDist);
+          float fogFactor = clamp(max(distFog, valleyMist), 0.0, 1.0);
+          gl_FragColor.rgb = mix(gl_FragColor.rgb, aerialCol, fogFactor);
+        #endif`);
   };
   const terrain = new THREE.Mesh(geo, terrainMat);
   terrain.position.set(WORLD.CX, 0, WORLD.CZ);
@@ -1669,10 +1699,35 @@ export function createWorld(THREE, env) {
     tg.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
     const tm = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0, flatShading: true, fog: true });
     tm.onBeforeCompile = sh => {
-      sh.vertexShader = sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      sh.uniforms.uSun = FARM_U.uSun;
+      sh.uniforms.uMieCol = FARM_U.uMieCol;
+      sh.uniforms.uMieK = FARM_U.uMieK;
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vTWPos;')
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
         #ifdef USE_INSTANCING
           vec3 tOrg = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
           transformed *= 1.0 - smoothstep(6000.0, 9000.0, distance(tOrg, cameraPosition));
+          vTWPos = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;
+        #else
+          vTWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
+        #endif`);
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform vec3 uSun; uniform vec3 uMieCol; uniform float uMieK; varying vec3 vTWPos;')
+        .replace('#include <fog_fragment>', `
+        #ifdef USE_FOG
+          vec3 tToP = vTWPos - cameraPosition;
+          float tDist = length(tToP);
+          vec3 tDir = tToP / max(tDist, 1e-4);
+          float tSun = max(dot(tDir, normalize(uSun + vec3(0.0, 1e-5, 0.0))), 0.0);
+          vec3 tMie = uMieCol * (pow(tSun, 4.0) * 0.42 + pow(tSun, 20.0) * 0.58) * uMieK;
+          vec3 tAerial = fogColor + tMie * smoothstep(600.0, 7500.0, tDist);
+          #ifdef FOG_EXP2
+            float tFog = 1.0 - exp(-fogDensity * fogDensity * tDist * tDist);
+          #else
+            float tFog = smoothstep(fogNear, fogFar, vFogDepth);
+          #endif
+          gl_FragColor.rgb = mix(gl_FragColor.rgb, tAerial, clamp(tFog, 0.0, 1.0));
         #endif`);
     };
     const im = new THREE.InstancedMesh(tg, tm, list.length);
@@ -2006,8 +2061,17 @@ export function createWorld(THREE, env) {
     else envProps.islands.push(o);
   }
 
+  function setAtmosphereFog(sunDir, mieCol, mieK, mistK, cloudK) {
+    FARM_U.uSun.value.copy(sunDir);
+    FARM_U.uMieCol.value.copy(mieCol);
+    FARM_U.uMieK.value = mieK;
+    FARM_U.uMistK.value = mistK;
+    FARM_U.uCloudShadowK.value = cloudK;
+  }
+
   return {
     terrain, props, heightAt, analyticHeight, straitHeight, gorgeHeight, erosionStats, collide, addBox, update, rebuild, envProps,
+    setAtmosphereFog,
     get map() { return activeMap; },
     get mode() { return currentMode; },
     forest: trees.mesh, farmEdge: FARM.edge,

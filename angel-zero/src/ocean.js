@@ -47,7 +47,11 @@ const oceanUniforms = {
   uGlitter: { value: 1 },                            // sun / moon glitter-path width & strength
   uChop: { value: 0 },                               // weather: wind-chopped sea + whitecaps 0..1
   uSwell: { value: 1 },                              // ambient: calm -> storm swell amplitude
-  uScroll: { value: new THREE.Vector2() }            // ambient: wind-driven normal-octave scroll
+  uScroll: { value: new THREE.Vector2() },           // ambient: wind-driven normal-octave scroll
+  uMieCol: { value: new THREE.Vector3(1.0, 0.84, 0.62) },
+  uMieK: { value: 0.95 },
+  uCloudOff: { value: new THREE.Vector2() },
+  uCloudShadowK: { value: 1.0 }
 };
 const ocean = new THREE.Mesh(new THREE.PlaneGeometry(OCEAN_SPAN, OCEAN_SPAN, 1, 1), new THREE.ShaderMaterial({
   uniforms: oceanUniforms,
@@ -67,6 +71,7 @@ const ocean = new THREE.Mesh(new THREE.PlaneGeometry(OCEAN_SPAN, OCEAN_SPAN, 1, 
     uniform float uLevel; uniform float uGlitter; uniform float uChop;
     uniform float uSwell; uniform vec2 uScroll;
     uniform vec3 uDeep; uniform vec3 uShallow;
+    uniform vec3 uMieCol; uniform float uMieK; uniform vec2 uCloudOff; uniform float uCloudShadowK;
     // One directional deep-water wave: accumulates its surface slope (Gerstner-style
     // dispersion w = sqrt(g k), so long swells travel faster than short chop).
     void wave(vec2 p, vec2 d, float lambda, float steep, float t, inout vec2 g) {
@@ -165,9 +170,11 @@ const ocean = new THREE.Mesh(new THREE.PlaneGeometry(OCEAN_SPAN, OCEAN_SPAN, 1, 
       float sparkle = pow(NdH, 2400.0) * 1.6 * nearK;
       col += uSunColor * (spec * 0.032 + sparkle) * clamp(uGlitter, 0.0, 1.3) * NdL;
 
-      // Dissolve into the shared horizon colour: exp2 fog + radial edge fade.
+      // Dissolve into directional Mie aerial perspective: cool horizon haze away from sun, warm luminous veil toward sun.
+      float sunAlign = max(dot(-V, L), 0.0);
+      vec3 oceanFog = uFog + uMieCol * (pow(sunAlign, 4.0) * 0.36 + pow(sunAlign, 20.0) * 0.48) * uMieK * smoothstep(1000.0, 10000.0, dist);
       float fogK = 1.0 - exp(-uFogD * uFogD * dist * dist);
-      col = mix(col, uFog, max(fogK, smoothstep(uFade.x, uFade.y, dist)));
+      col = mix(col, oceanFog, max(fogK, smoothstep(uFade.x, uFade.y, dist)));
       gl_FragColor = vec4(col, 1.0);
       #include <tonemapping_fragment>
       #include <colorspace_fragment>
