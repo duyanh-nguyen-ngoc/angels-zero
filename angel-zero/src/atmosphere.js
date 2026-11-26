@@ -25,36 +25,36 @@ export const PRESETS = {
   // mist gradient, the same #95b1cc in the lower dome, the fog and the ocean far fade.
   // Warm-white key below the bloom threshold, cool low fill so undersides stay shadowed.
   CLOUD_SEA: {
-    label: 'DAYLIGHT // CLOUD SEA', sunEl: 48, lightEl: 48, az: 332, moon: false, window: [10 * 60 + 30, 13 * 60 + 30],
-    horizon: 0x9ec2e2, mid: 0x3b72b5, zenith: 0x1a4480, mie: 0xffe6c2, mieK: 0.55, disc: 0xfff6e6, discK: 1.0, discSize: 0.99990,
-    light: 0xfff6e6, lightI: 2.85, hemiSky: 0x6f94bc, hemiGround: 0x2a343b, hemiI: 1.05, amb: 0x7f95ad, ambI: 0.2,
-    exposure: 1.0, fogK: 0.72, stars: 0, corona: 1.0,
-    oceanSun: 0xffe8c4, oceanSunK: 1.0, oceanSky: 0x4f74a0, oceanLevel: 1.0, glitter: 1.0,
-    cloudTop: 0xf7faff, cloudBelly: 0x4b6482, env: 1.0, nvgGain: 2.1, nav: 0.0, exact: 1
+    label: 'DAYLIGHT // CLOUD SEA', sunEl: 42, lightEl: 42, az: 332, moon: false, window: [10 * 60 + 30, 13 * 60 + 30],
+    horizon: 0x9ec2e2, mid: 0x356cb0, zenith: 0x143870, mie: 0xffe4bc, mieK: 0.72, disc: 0xfff6e6, discK: 1.0, discSize: 0.99990,
+    light: 0xfff4e0, lightI: 3.35, hemiSky: 0x5f86b4, hemiGround: 0x161f2b, hemiI: 0.62, amb: 0x5c7596, ambI: 0.11,
+    exposure: 1.02, fogK: 0.72, stars: 0, corona: 1.05,
+    oceanSun: 0xffe8c4, oceanSunK: 1.05, oceanSky: 0x4b709c, oceanLevel: 1.0, glitter: 1.05,
+    cloudTop: 0xf7faff, cloudBelly: 0x3d5575, env: 1.12, nvgGain: 2.1, nav: 0.0, exact: 1
   },
   DAWN: {
-    label: 'DAWN BREAK', sunEl: 6, lightEl: 6, moon: false, window: [5 * 60 + 35, 6 * 60 + 25],
-    horizon: 0xf5b895, mid: 0x7d86b8, zenith: 0x1f3f73, mie: 0xff9f78, mieK: 1.25, disc: 0xffd2a8, discK: 1.0, discSize: 0.99990,
-    light: 0xffb88e, lightI: 2.0, hemiSky: 0xc8b4d6, hemiGround: 0x3a3442, hemiI: 0.95, amb: 0xb7a6cc, ambI: 0.24,
-    exposure: 0.95, fogK: 1.15, stars: 0.12, corona: 0.85,
-    oceanSun: 0xffb08a, oceanSunK: 1.0, oceanSky: 0x6f7aa6, oceanLevel: 0.8, glitter: 1.4,
-    cloudTop: 0xffcdbd, cloudBelly: 0x8a83aa, env: 0.75, nvgGain: 3.2, nav: 0.45
+    label: 'DAWN BREAK', sunEl: 7, lightEl: 7, moon: false, window: [5 * 60 + 35, 6 * 60 + 25],
+    horizon: 0xf2b58e, mid: 0x6f7cb0, zenith: 0x193466, mie: 0xffa674, mieK: 1.45, disc: 0xffd6ac, discK: 1.0, discSize: 0.99990,
+    light: 0xffbe8a, lightI: 2.85, hemiSky: 0x9ba4c8, hemiGround: 0x181c28, hemiI: 0.52, amb: 0x6c7598, ambI: 0.10,
+    exposure: 0.98, fogK: 1.12, stars: 0.12, corona: 0.95,
+    oceanSun: 0xffb484, oceanSunK: 1.15, oceanSky: 0x5d6a98, oceanLevel: 0.8, glitter: 1.5,
+    cloudTop: 0xffd2be, cloudBelly: 0x5f6288, env: 0.90, nvgGain: 3.2, nav: 0.45
   },
   DAYLIGHT: {
-    label: 'CLEAR DAYLIGHT', sunEl: 58, lightEl: 58, moon: false, window: [11 * 60 + 20, 14 * 60 + 10],
-    horizon: 0xa8d4ff, mid: 0x2c7be5, zenith: 0x0f3b7a, mie: 0xffc98a, mieK: 0.8, disc: 0xfff1d8, discK: 1.0, discSize: 0.99990,
-    light: 0xfff0d6, lightI: 3.4, hemiSky: 0xbdd6ee, hemiGround: 0x3b4a40, hemiI: 1.5, amb: 0xa8bdd0, ambI: 0.35,
-    exposure: 1.0, fogK: 1.0, stars: 0, corona: 1.0,
-    oceanSun: 0xffe0b3, oceanSunK: 1.0, oceanSky: 0x4d70a0, oceanLevel: 1.0, glitter: 1.0,
-    cloudTop: 0xffffff, cloudBelly: 0x567396, env: 1.1, nvgGain: 2.1, nav: 0.0
+    label: 'CLEAR DAYLIGHT', sunEl: 46, lightEl: 46, moon: false, window: [11 * 60 + 20, 14 * 60 + 10],
+    horizon: 0xa4d0f8, mid: 0x2670d8, zenith: 0x0b316b, mie: 0xffd69e, mieK: 0.95, disc: 0xfff3dc, discK: 1.0, discSize: 0.99990,
+    light: 0xfff0d4, lightI: 3.85, hemiSky: 0x8eb8e0, hemiGround: 0x18212b, hemiI: 0.78, amb: 0x708ca8, ambI: 0.14,
+    exposure: 1.02, fogK: 0.96, stars: 0, corona: 1.05,
+    oceanSun: 0xffe2b6, oceanSunK: 1.1, oceanSky: 0x456998, oceanLevel: 1.0, glitter: 1.1,
+    cloudTop: 0xffffff, cloudBelly: 0x466387, env: 1.22, nvgGain: 2.1, nav: 0.0
   },
   GOLDEN_HOUR: {
-    label: 'GOLDEN HOUR', sunEl: 9, lightEl: 9, moon: false, window: [17 * 60, 17 * 60 + 55],
-    horizon: 0xf4d5a6, mid: 0x8ea5c4, zenith: 0x4a6e99, mie: 0xffb35c, mieK: 1.6, disc: 0xffd79a, discK: 1.0, discSize: 0.99989,
-    light: 0xffbe6b, lightI: 2.9, hemiSky: 0xf0d2a8, hemiGround: 0x4a3a2a, hemiI: 1.1, amb: 0xdec08e, ambI: 0.3,
-    exposure: 1.0, fogK: 1.05, stars: 0, corona: 1.0,
-    oceanSun: 0xffbe6b, oceanSunK: 1.25, oceanSky: 0x8a8ea8, oceanLevel: 0.9, glitter: 2.6,
-    cloudTop: 0xfff0cf, cloudBelly: 0x7d7a92, env: 0.95, nvgGain: 2.4, nav: 0.2
+    label: 'GOLDEN HOUR', sunEl: 10, lightEl: 10, moon: false, window: [17 * 60, 17 * 60 + 55],
+    horizon: 0xf2cf9c, mid: 0x7a96bd, zenith: 0x355a8c, mie: 0xffbc68, mieK: 1.85, disc: 0xffdca0, discK: 1.0, discSize: 0.99989,
+    light: 0xffc06a, lightI: 3.55, hemiSky: 0xbec4d4, hemiGround: 0x1a1d26, hemiI: 0.56, amb: 0x7f889e, ambI: 0.11,
+    exposure: 1.02, fogK: 1.02, stars: 0, corona: 1.12,
+    oceanSun: 0xffc06a, oceanSunK: 1.35, oceanSky: 0x6d7c9c, oceanLevel: 0.9, glitter: 2.6,
+    cloudTop: 0xfff2d2, cloudBelly: 0x5b647d, env: 1.10, nvgGain: 2.4, nav: 0.2
   },
   DUSK: {
     label: 'CIVIL TWILIGHT', sunEl: -4, lightEl: 4, moon: false, window: [18 * 60 + 50, 19 * 60 + 30],
@@ -147,7 +147,8 @@ export function createAtmosphere(THREE, env) {
     uSunColor: { value: cur.disc }, uMie: { value: cur.mie },
     uMieK: { value: 1 }, uDiscK: { value: 1 }, uDiscSize: { value: 0.9999 },
     uStars: { value: 0 }, uTime: { value: 0 }, uMoon: { value: 0 },
-    uWhite: { value: 0 }                                 // in-cloud white-out 0..1
+    uWhite: { value: 0 },                                // in-cloud white-out 0..1
+    uCamAlt: { value: 0 }                                // camera altitude (m) for stratosphere zenith
   };
   const sky = new THREE.Mesh(new THREE.SphereGeometry(45000, 64, 32), new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false,
@@ -164,7 +165,7 @@ export function createAtmosphere(THREE, env) {
       varying vec3 vDir;
       uniform vec3 uSun; uniform vec3 uHorizon; uniform vec3 uMid; uniform vec3 uZenith;
       uniform vec3 uSunColor; uniform vec3 uMie; uniform float uMieK; uniform float uDiscK; uniform float uDiscSize;
-      uniform float uStars; uniform float uTime; uniform float uMoon; uniform float uWhite;
+      uniform float uStars; uniform float uTime; uniform float uMoon; uniform float uWhite; uniform float uCamAlt;
       float hash3(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
       float cHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float cNoise(vec2 p) {
@@ -186,7 +187,9 @@ export function createAtmosphere(THREE, env) {
         float tMid = (1.0 - exp(-max(h - 0.008, 0.0) * 7.0)) * smoothstep(0.0, 0.14, h + 0.02);
         float tZen = smoothstep(0.18, 1.0, h);
         vec3 col = mix(uHorizon, uMid, tMid);
-        col = mix(col, uZenith, tZen * tZen * (3.0 - 2.0 * tZen));
+        float stratK = smoothstep(4500.0, 14000.0, uCamAlt);
+        vec3 zenCol = mix(uZenith, vec3(0.008, 0.022, 0.075), stratK * 0.78);
+        col = mix(col, zenCol, tZen * tZen * (3.0 - 2.0 * tZen));
         float mu = dot(d, L);
         float mup = max(mu, 0.0);
         // Mie forward scatter around the sun azimuth; strongest near the horizon
@@ -194,11 +197,13 @@ export function createAtmosphere(THREE, env) {
         float horizonBias = 1.0 - smoothstep(0.0, 0.45, h);
         vec3 az = normalize(vec3(L.x, 0.0, L.z) + 1e-5);
         float azGlow = max(dot(normalize(vec3(d.x, 0.0, d.z) + 1e-5), az), 0.0);
-        col += uMie * uMieK * (pow(mup, 6.0) * 0.30 * (0.35 + 0.65 * horizonBias) + pow(mup, 48.0) * 0.55
+        col += uMie * uMieK * (pow(mup, 6.0) * 0.36 * (0.35 + 0.65 * horizonBias) + pow(mup, 32.0) * 0.62
                                + pow(azGlow, 4.0) * horizonBias * 0.22);
-        // Sun or moon disc + aureole.
+        // Sun or moon disc + mid-aureole + tight corona.
         float disc = smoothstep(uDiscSize, uDiscSize + 0.00006, mu);
-        col += uSunColor * uDiscK * (pow(mup, 600.0) * (uMoon > 0.5 ? 0.6 : 3.0) + disc * (uMoon > 0.5 ? 2.2 : 26.0));
+        col += uSunColor * uDiscK * (pow(mup, 140.0) * (uMoon > 0.5 ? 0.15 : 1.15)
+                                     + pow(mup, 600.0) * (uMoon > 0.5 ? 0.6 : 3.2)
+                                     + disc * (uMoon > 0.5 ? 2.2 : 26.0));
         // Procedural starfield (twinkling), fading toward the horizon haze.
         if (uStars > 0.001) {
           vec3 sp = d * 260.0, cell = floor(sp);
@@ -218,7 +223,7 @@ export function createAtmosphere(THREE, env) {
           float c1 = cirrusFbm((cp + wq * 0.45) * vec2(0.55, 1.85));
           float cirrus = smoothstep(0.45, 0.85, c1) * smoothstep(0.03, 0.24, d.y) * smoothstep(0.95, 0.40, d.y)
             * (1.0 - uStars * 0.85) * 0.28;
-          vec3 cirCol = mix(uHorizon * 1.08, uSunColor * 1.15, 0.35 + 0.45 * pow(mup, 4.0));
+          vec3 cirCol = mix(uHorizon * 1.08, uSunColor * 1.35, 0.35 + 0.55 * pow(mup, 4.0) + 0.42 * pow(mup, 10.0));
           col = mix(col, cirCol, cirrus);
         }
         // Luminous horizon atmospheric band where the cloud sea meets the sky.
@@ -341,6 +346,8 @@ export function createAtmosphere(THREE, env) {
   }
 
   let nvgOn = false;
+  let autoExp = 1, cloudSunVis = 1;
+  const _fwd = new THREE.Vector3();
   function applyToScene() {
     skyDir.copy(cur.skyDir);
     sunDir.copy(cur.lightDir);
@@ -360,7 +367,7 @@ export function createAtmosphere(THREE, env) {
     const fill = nvgOn ? 2.4 : 1;                        // NVG light intensification on top of the preset
     if (L.hemiLight) { L.hemiLight.color.copy(cur.hemiSky).lerp(slate, oc * 0.4); L.hemiLight.groundColor.copy(cur.hemiGround); L.hemiLight.intensity = cur.hemiI * fill * (1 - 0.3 * oc) + fl * 3.0; }
     if (L.ambLight) { L.ambLight.color.copy(cur.amb); L.ambLight.intensity = cur.ambI * fill; }
-    if (L.renderer) L.renderer.toneMappingExposure = cur.exposure * EXPOSURE_TRIM;
+    if (L.renderer) L.renderer.toneMappingExposure = cur.exposure * EXPOSURE_TRIM * autoExp;
     if (L.setShafts) L.setShafts(cur.shafts, oc);
     if (L.ocean) {
       const u = L.ocean;
@@ -369,6 +376,10 @@ export function createAtmosphere(THREE, env) {
       u.uSky.value.set(_ct.r, _ct.g, _ct.b);
       if (u.uLevel) u.uLevel.value = cur.oceanLevel * (1 - 0.3 * oc) + fl * 0.6;
       if (u.uGlitter) u.uGlitter.value = cur.glitter * (1 - 0.9 * oc) + 0.05;
+      // Forward-compatible hooks for Tasks 2–3 (guarded: those uniforms arrive later).
+      if (u.uMieCol) u.uMieCol.value.set(cur.mie.r, cur.mie.g, cur.mie.b);
+      if (u.uMieK) u.uMieK.value = cur.mieK * (1 - 0.85 * oc);
+      if (u.uCloudShadowK) u.uCloudShadowK.value = (1 - 0.75 * oc) * (skyUniforms.uMoon.value > 0.5 ? 0.35 : 1.0);
     }
     if (L.setCloudColors) {
       // Overcast: slate cloud bodies, darker indigo bellies; lightning floods them.
@@ -408,6 +419,7 @@ export function createAtmosphere(THREE, env) {
     applyToScene();
     skyUniforms.uTime.value = time;
     sky.position.copy(camera.position);
+    skyUniforms.uCamAlt.value = Math.max(0, camera.position.y);
     // Colour discipline: the horizon haze (fog = sky horizon band = ocean far colour) is
     // held ~22 % desaturated so HUD green, afterburners, trails and explosions pop.
     fogColor.copy(cur.horizon);
@@ -427,13 +439,33 @@ export function createAtmosphere(THREE, env) {
     const moon = skyUniforms.uMoon.value > 0.5;
     corona.scale.setScalar(SUN_DIST * (moon ? 0.16 : 0.34));
     corona.material.color.copy(moon ? cur.disc : _sc.copy(cur.light).lerp(_white, 0.5));
-    const target = (sunOccluded() || skyDir.y < -0.01 ? 0 : 1 - Math.min(1, mist * 1.4)) * cur.corona * (1 - wx.overcast);
+    const cloudT = bound.sampleCloudSun ? bound.sampleCloudSun(camera.position, skyDir) : 1;
+    cloudSunVis += (cloudT - cloudSunVis) * Math.min(1, dt * 5);
+    const rawTarget = (sunOccluded() || skyDir.y < -0.01 ? 0 : 1 - Math.min(1, mist * 1.4)) * cur.corona * (1 - wx.overcast * 0.92);
+    const target = rawTarget * (0.22 + 0.78 * cloudSunVis);
     sunVis += (target - sunVis) * Math.min(1, dt * 6);
     corona.material.opacity = 0.95 * sunVis;
     corona.visible = sunVis > 0.01;
+    // Smooth eye/camera auto-exposure dip when looking directly into unoccluded sun.
+    camera.getWorldDirection(_fwd);
+    const lookSun = Math.max(0, skyDir.dot(_fwd));
+    const targetExp = moon || nvg ? 1 : 1 - 0.14 * Math.pow(lookSun, 4) * sunVis;
+    autoExp += (targetExp - autoExp) * Math.min(1, dt * 3.5);
+    if (bound.renderer) bound.renderer.toneMappingExposure = cur.exposure * EXPOSURE_TRIM * autoExp;
 
     _n.copy(corona.position).project(camera);
-    const inFront = _n.z < 1 && skyDir.dot(camera.getWorldDirection(_p)) > 0;
+    const inFront = _n.z < 1 && skyDir.dot(_fwd) > 0;
+    if (bound.setSunGlare) {
+      const glare = !moon && !nvg && inFront
+        ? Math.pow(lookSun, 2.0) * (0.35 + 0.65 * rawTarget) * (0.55 + 0.45 * cloudSunVis) * cur.mieK * 0.42
+        : 0;
+      bound.setSunGlare(_n.x * 0.5 + 0.5, _n.y * 0.5 + 0.5, Math.min(1, glare), cur.mie.r, cur.mie.g, cur.mie.b);
+    }
+    if (bound.setTerrainFog) {
+      const mistK = (1 - wx.overcast * 0.4) * (moon ? 0.45 : 1.0);
+      const cloudShadK = (1 - wx.overcast * 0.75) * (moon ? 0.35 : 1.0);
+      bound.setTerrainFog(skyDir, cur.mie, cur.mieK * (1 - 0.85 * wx.overcast), mistK, cloudShadK);
+    }
     const edge = Math.max(Math.abs(_n.x), Math.abs(_n.y));
     const gv = inFront && !moon ? sunVis * (1 - THREE.MathUtils.smoothstep(edge, 0.85, 1.25)) : 0;
     const tanY = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)), D = 10;

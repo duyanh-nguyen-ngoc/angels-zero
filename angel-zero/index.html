@@ -798,7 +798,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -944,7 +943,29 @@ scene.add(hemiLight, ambLight);
 // Fill / sun light values are driven per frame by the time-of-day engine (src/atmosphere.js).
 
 const pmrem = new THREE.PMREMGenerator(renderer);
-const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+const envTex = (() => {
+  const es = new THREE.Scene(), eg = new THREE.SphereGeometry(20, 24, 16);
+  const em = new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    uniforms: { uSun: { value: SUN_DIR } },
+    vertexShader: 'varying vec3 vD; void main(){ vD = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `varying vec3 vD; uniform vec3 uSun;
+      void main() {
+        float y = vD.y;
+        vec3 sky = mix(vec3(0.45, 0.65, 0.88), vec3(0.06, 0.22, 0.54), smoothstep(0.0, 0.65, max(y, 0.0)));
+        vec3 gnd = mix(vec3(0.18, 0.24, 0.28), vec3(0.05, 0.08, 0.11), smoothstep(0.0, 0.5, max(-y, 0.0)));
+        vec3 col = y >= 0.0 ? sky : gnd;
+        col = mix(col, vec3(0.76, 0.86, 0.95), exp(-abs(y) * 9.0) * 0.75);
+        float mu = max(dot(normalize(vD), normalize(uSun)), 0.0);
+        col += vec3(3.6, 2.9, 2.0) * pow(mu, 80.0) + vec3(0.8, 0.65, 0.45) * pow(mu, 8.0) * 0.35;
+        gl_FragColor = vec4(col, 1.0);
+      }`
+  });
+  const m = new THREE.Mesh(eg, em); es.add(m);
+  const t = pmrem.fromScene(es, 0.03).texture;
+  eg.dispose(); em.dispose(); pmrem.dispose();
+  return t;
+})();
 
 /* ============================================================================
    1. SEEDED NOISE
