@@ -30,7 +30,7 @@ const FT = 0.3048;
 export const RWY = { x: 900, z0: -1400, z1: 1600, width: 50, elev: 10 };       // runway 18/36, 3,000 m
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { erodeGrid } from './erosion.js?v=s9ter1';
+import { erodeGrid } from './erosion.js?v=s9ter2';
 import { gorgeCentreX, gorgeSlope, gorgeHeading, gorgeDist, GORGE_FLOOR_Y, GORGE_RIM_Y, GORGE_CRATER_R,
   GORGE_CRATER_WALL_Y, GORGE_CRATER_Z, GORGE_GATE_Z, GORGE_GATE_N, GORGE_FORT, CEIL_M,
   GORGE_BBOX, GORGE_HALF_W, GORGE_RAMP_W, SEA_FLOOR_Y, RUNWAY_BBOX,
@@ -359,14 +359,15 @@ export function createWorld(THREE, env) {
     const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
   }
   const COL = {
-    deep: new THREE.Color(0x283a42), seabed: new THREE.Color(0x7d8a7c), coral: new THREE.Color(0x3f7a74),
-    basalt: new THREE.Color(0x23282d), sand: new THREE.Color(0x98907d),
-    scrub: new THREE.Color(0x495a41), scrubDark: new THREE.Color(0x354436),
-    ridge: new THREE.Color(0x485045), cliff: new THREE.Color(0x3b4249), peak: new THREE.Color(0x757b7e),
-    snow: new THREE.Color(0xd2dae2), cinder: new THREE.Color(0x232024), lava: new THREE.Color(0x8e3312),
+    deep: new THREE.Color(0x162d3d), seabed: new THREE.Color(0x9b967c), coral: new THREE.Color(0x2a8f88),
+    basalt: new THREE.Color(0x252b31), sand: new THREE.Color(0xcbb98c),
+    grass: new THREE.Color(0x3f6e34), forest: new THREE.Color(0x244a28),
+    dryGrass: new THREE.Color(0x8c7f4a), tundra: new THREE.Color(0x7c7864),
+    ridge: new THREE.Color(0x595e4c), cliff: new THREE.Color(0x464a4f), peak: new THREE.Color(0x8c8a85),
+    snow: new THREE.Color(0xeef3f8), cinder: new THREE.Color(0x252126), lava: new THREE.Color(0xa83a14),
     pad: new THREE.Color(0x6f7660),
-    canyonFloor: new THREE.Color(0x554e45), canyonWall: new THREE.Color(0x47413e),
-    canyonRim: new THREE.Color(0x525644), crater: new THREE.Color(0x34383d)
+    canyonFloor: new THREE.Color(0x685a49), canyonWall: new THREE.Color(0x784e38),
+    canyonRim: new THREE.Color(0x8f744c), crater: new THREE.Color(0x363a40)
   };
   const geo = new THREE.PlaneGeometry(WORLD.SIZE, WORLD.SIZE, N, N);
   geo.rotateX(-Math.PI / 2);
@@ -388,44 +389,58 @@ export function createWorld(THREE, env) {
   setErosionAttr(eroArch.erosion);
   geo.setAttribute('aErosion', eroAttr);
   const nrm = geo.attributes.normal, colors = new Float32Array(pos.count * 3);
-  const _vc = new THREE.Color(), _scrub = new THREE.Color();
+  const _vc = new THREE.Color(), _humid = new THREE.Color(), _arid = new THREE.Color();
 
   function computeTerrainColors(mode, outArr) {
     for (let i = 0; i < pos.count; i++) {
       const h = pos.getY(i), slope = 1 - nrm.getY(i);
       const wx = pos.getX(i) + WORLD.CX, wz = pos.getZ(i) + WORLD.CZ;
       const v = fbm(nVeg, wx * 0.0018, wz * 0.0018, 3) * 0.5 + 0.5;
+      // Macro climate zoning (after ProceduralTerrains biomeGLSL):
+      // low-frequency moisture & temperature fields create emerald-green humid valleys & foothills
+      // contrasting against warm arid golden-ochre highlands.
+      const moistRaw = fbm(nVeg, wx * 0.00028 + 11.4, wz * 0.00028 - 6.7, 3) * 0.5 + 0.5;
+      const tempRaw = fbm(nHill, wx * 0.00024 - 19.2, wz * 0.00024 + 8.3, 3) * 0.5 + 0.5;
+      const h01 = clamp(h / 780, 0, 1);
+      const valleyMoist = clamp(moistRaw * 1.15 - h01 * 0.42 + (1 - ss(slope, 0.08, 0.34)) * 0.18, 0, 1);
+      const tempEff = clamp(tempRaw * 0.85 + 0.15 - h01 * 0.55, 0, 1);
       const inGorgeTrench = mode === 'gorge' &&
         !(wx >= RUNWAY_BBOX.x[0] && wx <= RUNWAY_BBOX.x[1] && wz >= RUNWAY_BBOX.z[0] && wz <= RUNWAY_BBOX.z[1]) &&
         wx >= GORGE_BBOX.x[0] && wx <= GORGE_BBOX.x[1] && wz <= GORGE_BBOX.z[0] && wz >= GORGE_BBOX.z[1];
       if (inGorgeTrench) {
         const cr = Math.hypot(wx - gorgeCentreX(GORGE_CRATER_Z), wz - GORGE_CRATER_Z);
         _vc.copy(COL.canyonFloor).lerp(COL.canyonRim, ss(h, GORGE_FLOOR_Y + 25, GORGE_RIM_Y - 15));
-        _vc.lerp(COL.canyonWall, ss(slope, 0.22, 0.48));
-        _vc.lerp(COL.basalt, ss(slope, 0.45, 0.72) * 0.55);
+        _vc.lerp(COL.canyonWall, ss(slope, 0.17, 0.38));
+        _vc.lerp(COL.basalt, ss(slope, 0.44, 0.70) * 0.45);
         if (cr < GORGE_CRATER_R * 1.1) _vc.lerp(COL.crater, ss(cr, GORGE_CRATER_R * 1.1, GORGE_CRATER_R * 0.55) * (1 - ss(h, 90, 240)));
-        if (h > 500) _vc.lerp(COL.peak, ss(h, 520, 760) * (1 - 0.5 * ss(slope, 0.45, 0.75)));
+        if (h > 480) _vc.lerp(COL.peak, ss(h, 500, 740) * (1 - 0.5 * ss(slope, 0.40, 0.70)));
       } else if (h < 0) {
-        _vc.copy(COL.seabed).lerp(COL.coral, ss(-h, 1.5, 9) * (1 - ss(-h, 14, 28)))
-          .lerp(COL.basalt, ss(slope, 0.3, 0.5)).lerp(COL.deep, ss(-h, 5, 65));
+        _vc.copy(COL.seabed).lerp(COL.coral, ss(-h, 1.2, 8.5) * (1 - ss(-h, 14, 30)))
+          .lerp(COL.basalt, ss(slope, 0.28, 0.48)).lerp(COL.deep, ss(-h, 6, 58));
       } else {
-        _vc.copy(COL.basalt).lerp(COL.sand, (1 - ss(slope, 0.08, 0.22)) * ss(h, 0.6, 2.8) * (1 - ss(h, 6.5, 10)));
-        _scrub.copy(COL.scrub).lerp(COL.scrubDark, v);
-        _vc.lerp(_scrub, ss(h, 4.5, 12) * (1 - ss(slope, 0.18, 0.32)));
-        _vc.lerp(COL.ridge, ss(h, 90, 220));
-        _vc.lerp(COL.cliff, ss(slope, 0.28, 0.5) * ss(h, 2, 10));
-        _vc.lerp(COL.basalt, ss(slope, 0.3, 0.5) * (1 - ss(h, 25, 70)));
-        const weather = ss(fbm(nRidge, wx * 0.004, wz * 0.004, 3) + (h - 500) / 220, -0.2, 0.35);
-        _vc.lerp(COL.peak, ss(h, 380, 540) * (1 - 0.6 * ss(slope, 0.45, 0.75)) * weather);
-        // Volcano caldera cinder + magma tint vs alpine summit rime on high peaks.
+        // Golden-sand beaches on gentle coasts vs dark coastal basalt on steep sea cliffs.
+        _vc.copy(COL.basalt).lerp(COL.sand, (1 - ss(slope, 0.09, 0.24)) * ss(h, 0.3, 2.2) * (1 - ss(h, 8.5, 14)));
+        // Humid emerald valley/foothill lushness vs warm arid golden-ochre highlands.
+        _humid.copy(COL.grass).lerp(COL.forest, clamp(v * 0.85 + (1 - tempEff) * 0.3, 0, 1));
+        _arid.copy(COL.dryGrass).lerp(COL.tundra, ss(h, 210, 440) * 0.72);
+        const aridMix = clamp((1 - ss(valleyMoist, 0.28, 0.66)) * 0.78 + ss(h, 130, 340) * 0.52, 0, 1);
+        _humid.lerp(_arid, aridMix);
+        _vc.lerp(_humid, ss(h, 4.0, 13.0) * (1 - ss(slope, 0.16, 0.30)));
+        // High-altitude ridge transition & crisp slope-gated exposed granite/basalt cliffs.
+        _vc.lerp(COL.ridge, ss(h, 180, 380) * 0.35 * (1 - aridMix * 0.5));
+        _vc.lerp(COL.cliff, ss(slope, 0.17, 0.32) * ss(h, 2.0, 10.0));
+        _vc.lerp(COL.basalt, ss(slope, 0.28, 0.48) * (1 - ss(h, 28, 85)));
+        const weather = ss(fbm(nRidge, wx * 0.004, wz * 0.004, 3) + (h - 440) / 210, -0.22, 0.35);
+        _vc.lerp(COL.peak, ss(h, 330, 510) * (1 - 0.45 * ss(slope, 0.38, 0.68)) * weather);
+        // Volcano caldera cinder + magma tint vs alpine snowcaps clinging to high flat ledges.
         const vd = mode === 'archipelago' ? Math.hypot(wx - 5600, wz + 8300) : 99999;
         if (vd < 950) {
           const cal = ss(vd, 900, 320);
           _vc.lerp(COL.cinder, cal * ss(h, 460, 680));
           if (vd < 380 && h < 760) _vc.lerp(COL.lava, ss(vd, 360, 110) * (1 - ss(slope, 0.25, 0.55)) * 0.55);
-        } else if (h > 580) {
-          const snowK = ss(h, 590, 710) * (1 - ss(slope, 0.32, 0.58)) * (0.55 + 0.45 * v);
-          _vc.lerp(COL.snow, snowK * 0.72);
+        } else if (h > 515) {
+          const snowK = ss(h, 525, 650) * (1 - ss(slope, 0.20, 0.44)) * (0.65 + 0.35 * v);
+          _vc.lerp(COL.snow, snowK * 0.88);
         }
         if (mode !== 'strait' && Math.abs(h - RWY.elev) < 0.6 && Math.abs(wx - RWY.x - 85) < 360 && wz > RWY.z0 - 140 && wz < RWY.z1 + 160) _vc.lerp(COL.pad, 0.6);
       }
@@ -451,23 +466,24 @@ export function createWorld(THREE, env) {
   const FARM_U = {
     uPal: { value: [0x4a5935, 0x7e6c47, 0x3a4c2d, 0x42382c, 0x64684a].map(lin) },
     uHedge: { value: lin(0x26331f) }, uRoad: { value: lin(0x5d5c57) }, uHwy: { value: lin(0x35383d) },
-    uShore: { value: lin(0x3b3a34) }, uRockA: { value: lin(0x3c4349) }, uRockB: { value: lin(0x282d32) },
-    uPeak: { value: lin(0x6b706c) }, uRiver: { value: lin(0x1b464a) },
+    uShore: { value: lin(0x8e7c58) }, uSand: { value: lin(0xc8b482) },
+    uRockA: { value: lin(0x54575c) }, uRockB: { value: lin(0x282d33) }, uRockHi: { value: lin(0x8b877f) },
+    uPeak: { value: lin(0x88857d) }, uSnow: { value: lin(0xe8eff7) }, uRiver: { value: lin(0x185258) },
     uAfb: { value: new THREE.Vector4(RWY.x - 300, RWY.x + 560, RWY.z0 - 450, RWY.z1 + 450) },
     uTown: { value: new THREE.Vector4(-2050, -450, -1850, 350) },
     uGorgeBox: { value: new THREE.Vector4(GORGE_BBOX.x[0] - 450, GORGE_BBOX.x[1] + 450, GORGE_BBOX.z[1] - 450, GORGE_BBOX.z[0] + 450) },
     uMapMode: { value: 0 },                             // 0 archipelago, 1 gorge, 2 strait
     uCloudOff: { value: new THREE.Vector2(0, 0) },
-    // Slope gates + ridge accent (after ZyFou/ProceduralTerrains terrainColor.glsl, MIT):
-    // rock bleeds in from slope 0.17 and is fully exposed by 0.30 (1 - normal.y); snow
-    // holds below slope 0.22 and sheds entirely above 0.48; uAORidge brightens crests.
-    uRockSlopeLo: { value: 0.17 }, uRockSlopeHi: { value: 0.30 },
-    uSnowSlopeMin: { value: 0.22 }, uSnowSlopeMax: { value: 0.48 },
-    uAORidge: { value: 0.45 }, uGorgeFloor: { value: GORGE_FLOOR_Y }
+    // Crisp slope gates + strong ridge accent (after ZyFou/ProceduralTerrains terrainColor.glsl, MIT):
+    // rock cuts in sharply from slope 0.16 to 0.29 (1 - normal.y); snow holds on flat ledges
+    // below 0.20 and sheds cleanly off steep walls above 0.44; uAORidge brightens alpine crests.
+    uRockSlopeLo: { value: 0.16 }, uRockSlopeHi: { value: 0.29 },
+    uSnowSlopeMin: { value: 0.20 }, uSnowSlopeMax: { value: 0.44 },
+    uAORidge: { value: 0.72 }, uGorgeFloor: { value: GORGE_FLOOR_Y }
   };
   const FARM_GLSL = `
-    uniform vec3 uPal[5]; uniform vec3 uHedge; uniform vec3 uRoad; uniform vec3 uHwy; uniform vec3 uShore;
-    uniform vec3 uRockA; uniform vec3 uRockB; uniform vec3 uPeak; uniform vec3 uRiver;
+    uniform vec3 uPal[5]; uniform vec3 uHedge; uniform vec3 uRoad; uniform vec3 uHwy; uniform vec3 uShore; uniform vec3 uSand;
+    uniform vec3 uRockA; uniform vec3 uRockB; uniform vec3 uRockHi; uniform vec3 uPeak; uniform vec3 uSnow; uniform vec3 uRiver;
     uniform vec4 uAfb; uniform vec4 uTown; uniform vec4 uGorgeBox;
     uniform float uMapMode; uniform vec2 uCloudOff;
     uniform float uRockSlopeLo, uRockSlopeHi, uSnowSlopeMin, uSnowSlopeMax, uAORidge, uGorgeFloor;
@@ -547,12 +563,15 @@ export function createWorld(THREE, env) {
       .replace('#include <common>', '#include <common>\nuniform sampler2D uDetail; varying vec3 vWPos; varying vec3 vWNrm;\n' + FARM_GLSL)
       .replace('#include <map_fragment>', `#include <map_fragment>
         float camD = length(vWPos - cameraPosition);
-        float det = 0.5, d1v = 0.5;
-        if (camD < 13000.0) {
+        float det = 0.5, d1v = 0.5, d3v = 0.5;
+        if (camD < 13500.0) {
           vec3 tw = pow(abs(vWNrm), vec3(4.0)); tw /= (tw.x + tw.y + tw.z);
-          float d1 = texture2D(uDetail, vWPos.zy * 0.012).r * tw.x + texture2D(uDetail, vWPos.xz * 0.012).r * tw.y + texture2D(uDetail, vWPos.xy * 0.012).r * tw.z;
-          float d2 = texture2D(uDetail, vWPos.zy * 0.0021).r * tw.x + texture2D(uDetail, vWPos.xz * 0.0021).r * tw.y + texture2D(uDetail, vWPos.xy * 0.0021).r * tw.z;
+          float d1 = texture2D(uDetail, vWPos.zy * 0.013).r * tw.x + texture2D(uDetail, vWPos.xz * 0.013).r * tw.y + texture2D(uDetail, vWPos.xy * 0.013).r * tw.z;
+          float d2 = texture2D(uDetail, vWPos.zy * 0.0022).r * tw.x + texture2D(uDetail, vWPos.xz * 0.0022).r * tw.y + texture2D(uDetail, vWPos.xy * 0.0022).r * tw.z;
           det = d1 * 0.6 + d2 * 0.4; d1v = d1;
+          if (camD < 4800.0) {
+            d3v = texture2D(uDetail, vWPos.zy * 0.038).r * tw.x + texture2D(uDetail, vWPos.xz * 0.038).r * tw.y + texture2D(uDetail, vWPos.xy * 0.038).r * tw.z;
+          }
         }
         float inGorgeMask = (uMapMode > 0.5 && uMapMode < 1.5) ? rectMask(vWPos.xz, uGorgeBox, 350.0) * (1.0 - rectMask(vWPos.xz, uAfb, 120.0)) : 0.0;
         // Erosion shading stays off the AFB pad and Port City (flat, authored ground).
@@ -561,8 +580,8 @@ export function createWorld(THREE, env) {
         if (vWPos.y > 0.0) {
           float ny = clamp(vWNrm.y, 0.0, 1.0);
           float slope = 1.0 - ny, jit = det - 0.5;
-          // Slope-gated rock exposure with noise jitter; eroded flow lines expose rock earlier.
-          float cliffK = smoothstep(uRockSlopeLo, uRockSlopeHi, slope + jit * 0.06 + sqrt(vEro.z) * 0.05 * eroK);
+          // Crisp slope-gated rock exposure with triplanar noise jitter; eroded flow lines expose rock earlier.
+          float cliffK = smoothstep(uRockSlopeLo, uRockSlopeHi, slope + jit * 0.065 + sqrt(vEro.z) * 0.06 * eroK);
           tRock = cliffK;
           float allowFarm = (uMapMode > 1.5) ? 0.0 : (1.0 - inGorgeMask);
           float farmK = allowFarm * smoothstep(13.0, 18.0, vWPos.y) * (1.0 - smoothstep(295.0, 315.0, vWPos.y)) * smoothstep(0.78, 0.86, ny)
@@ -595,41 +614,44 @@ export function createWorld(THREE, env) {
             land = mix(land, uRiver * 1.15, stream * inGorgeMask * 0.78);
             tWet = max(tWet, stream * inGorgeMask);
           }
-          vec3 rock = mix(uRockA, uRockB, 0.5 + 0.5 * sin(vWPos.y * 0.21 + vWPos.x * 0.004 + vWPos.z * 0.003));
+          // Layered granite / basalt cliff albedo with altitude weathering & bedding bands.
+          float rockBand = 0.5 + 0.5 * sin(vWPos.y * 0.22 + vWPos.x * 0.004 + vWPos.z * 0.003 + det * 2.2);
+          vec3 rock = mix(uRockB, uRockA, clamp(rockBand * 0.72 + d1v * 0.35, 0.0, 1.0));
+          rock = mix(rock, uRockHi, smoothstep(260.0, 560.0, vWPos.y) * (0.45 + 0.35 * det));
           if (inGorgeMask > 0.01) {
-            // Multi-band sedimentary strata (after dryCanyon.js canyonBeddedRock): fine bedding
-            // warped by detail noise, a slower sandstone / basalt cycle and dark caprock bands.
+            // Multi-band sedimentary strata (after dryCanyon.js canyonBeddedRock): rich red-rock
+            // sandstone / ochre bands warped by detail noise and dark basalt caprock layers.
             float bedding = mix(0.5, sin(vWPos.y * 0.42 + det * 2.6) * 0.5 + 0.5, 1.0 - smoothstep(0.5, 1.4, fwidth(vWPos.y) * 0.42));
             float cycle = sin(vWPos.y * 0.093 + 1.7 + det * 0.8) * 0.5 + 0.5;
-            vec3 sandstone = mix(vec3(0.115, 0.085, 0.062), vec3(0.24, 0.195, 0.145), bedding * 0.4 + det * 0.6);
-            vec3 strata = mix(sandstone, vec3(0.055, 0.06, 0.066), smoothstep(0.72, 0.86, cycle));
-            rock = mix(rock, strata, inGorgeMask * 0.8);
+            vec3 sandstone = mix(vec3(0.24, 0.135, 0.082), vec3(0.42, 0.285, 0.175), bedding * 0.45 + det * 0.55);
+            vec3 strata = mix(sandstone, vec3(0.085, 0.082, 0.084), smoothstep(0.74, 0.88, cycle));
+            rock = mix(rock, strata, inGorgeMask * 0.86);
             // Talus scree aprons at the wall base: moderate slopes just above the floor.
             float talus = smoothstep(0.10, 0.24, slope) * (1.0 - smoothstep(0.42, 0.62, slope))
               * (1.0 - smoothstep(uGorgeFloor + 50.0, uGorgeFloor + 150.0, vWPos.y));
-            vec3 scree = mix(vec3(0.17, 0.15, 0.12), vec3(0.28, 0.25, 0.20), d1v);
+            vec3 scree = mix(vec3(0.22, 0.18, 0.13), vec3(0.35, 0.29, 0.21), d1v);
             land = mix(land, scree, talus * inGorgeMask * 0.85);
           }
-          land = mix(land, rock, cliffK * smoothstep(2.0, 8.0, vWPos.y));
+          land = mix(land, rock, cliffK * smoothstep(2.0, 7.5, vWPos.y));
           // Erosion fans: sediment settles as pale scree / alluvium on the gentle ground below
           // gullies; strong flow lines on flats read as darker, damp drainage channels.
           float sed = vEro.y * eroK * (1.0 - smoothstep(0.12, 0.35, slope)) * smoothstep(3.0, 9.0, vWPos.y);
-          vec3 alluvium = mix(vec3(0.22, 0.20, 0.16), vec3(0.32, 0.29, 0.23), d1v);
-          land = mix(land, mix(alluvium, mix(vec3(0.17, 0.15, 0.12), vec3(0.28, 0.25, 0.20), d1v), inGorgeMask), sed * 0.35);
-          float chan = smoothstep(0.58, 0.88, vEro.z) * (1.0 - smoothstep(0.18, 0.42, slope)) * eroK * smoothstep(3.0, 8.0, vWPos.y);
-          land *= 1.0 - 0.26 * chan;
+          vec3 alluvium = mix(vec3(0.26, 0.23, 0.17), vec3(0.38, 0.34, 0.25), d1v);
+          land = mix(land, mix(alluvium, mix(vec3(0.22, 0.18, 0.13), vec3(0.35, 0.29, 0.21), d1v), inGorgeMask), sed * 0.38);
+          float chan = smoothstep(0.54, 0.86, vEro.z) * (1.0 - smoothstep(0.18, 0.44, slope)) * eroK * smoothstep(3.0, 8.0, vWPos.y);
+          land *= 1.0 - 0.32 * chan;
           tWet = max(tWet, chan);
-          // Preserve alpine snow & caldera cinder above 580 m; weathered stone on mid-peaks.
-          float midPeak = smoothstep(320.0, 360.0, vWPos.y) * (1.0 - smoothstep(560.0, 640.0, vWPos.y)) * (1.0 - cliffK) * (1.0 - inGorgeMask);
-          land = mix(land, uPeak, midPeak);
-          // Per-pixel alpine snow: clings to flatter ledges, sheds off sheer rock (slope-gated),
+          // Preserve alpine snow & caldera cinder above 540 m; weathered granite on mid-peaks.
+          float midPeak = smoothstep(310.0, 380.0, vWPos.y) * (1.0 - smoothstep(520.0, 610.0, vWPos.y)) * (1.0 - cliffK) * (1.0 - inGorgeMask);
+          land = mix(land, uPeak, midPeak * 0.72);
+          // Per-pixel alpine snowcaps: cling to high flat ledges, shed crisply off steep rock walls,
           // never on the volcano caldera or inside the canyon trench.
           float calderaD = length(vWPos.xz - vec2(5600.0, -8300.0));
-          float snowLine = 600.0 + jit * 60.0;
-          float snow = smoothstep(snowLine, snowLine + 85.0, vWPos.y)
-            * (1.0 - smoothstep(uSnowSlopeMin, uSnowSlopeMax, slope + jit * 0.08))
+          float snowLine = 545.0 + jit * 65.0;
+          float snow = smoothstep(snowLine, snowLine + 80.0, vWPos.y)
+            * (1.0 - smoothstep(uSnowSlopeMin, uSnowSlopeMax, slope + jit * 0.07))
             * ((uMapMode < 0.5) ? smoothstep(900.0, 1050.0, calderaD) : 1.0) * (1.0 - inGorgeMask);
-          land = mix(land, vec3(0.62, 0.67, 0.73) * (0.92 + 0.16 * d1v), snow);
+          land = mix(land, uSnow * (0.94 + 0.12 * d1v), snow);
           tSnow = snow;
           // Main Island carved mountain stream & island highways (ARCHIPELAGO).
           if (uMapMode < 0.5) {
@@ -654,36 +676,42 @@ export function createWorld(THREE, env) {
               }
             }
           }
-          land = mix(land, uShore, (1.0 - smoothstep(10.0, 16.0, vWPos.y)) * (1.0 - inGorgeMask));
-          tWet = max(tWet, (1.0 - smoothstep(1.2, 4.0, vWPos.y)) * (1.0 - inGorgeMask));   // wave-wet sand
-          // Erosion cavity / ridge AO: carved gullies and valley floors darken (to 0.68),
-          // convex crests get the uAORidge accent so ridgelines catch the light.
+          // Golden-sand beaches on gentle coasts + narrow wave-wet sand rim at the waterline.
+          float gentleCoast = (1.0 - smoothstep(0.08, 0.24, slope)) * (1.0 - inGorgeMask) * eroK;
+          float dryBeach = smoothstep(1.2, 3.2, vWPos.y) * (1.0 - smoothstep(7.5, 13.0, vWPos.y)) * gentleCoast;
+          land = mix(land, uSand * (0.92 + 0.16 * d1v), dryBeach * 0.72);
+          float wetBand = (1.0 - smoothstep(1.2, 4.6, vWPos.y)) * (1.0 - inGorgeMask);
+          land = mix(land, mix(uRockB, uShore, gentleCoast), wetBand * 0.75);
+          tWet = max(tWet, (1.0 - smoothstep(1.2, 4.2, vWPos.y)) * (1.0 - inGorgeMask));   // wave-wet sand
+          // Stronger erosion cavity / ridge AO: carved gullies & valleys deepen (to 0.54),
+          // convex crests get the uAORidge highlight so jagged ridgelines pop in sunlight.
           float cav = vEro.x;
-          float ao = mix(0.68, 1.0, smoothstep(0.08, 0.5, cav));
-          ao = min(ao * (1.0 + uAORidge * clamp((cav - 0.5) * 2.0, 0.0, 1.0) * 0.45), 1.25);
-          land *= mix(1.0, ao, eroK * smoothstep(1.0, 8.0, vWPos.y));
+          float ao = mix(0.54, 1.0, smoothstep(0.06, 0.50, cav));
+          ao = min(ao * (1.0 + uAORidge * clamp((cav - 0.5) * 2.0, 0.0, 1.0) * 0.55), 1.32);
+          land *= mix(1.0, ao, eroK * smoothstep(1.0, 7.5, vWPos.y));
           diffuseColor.rgb = land;
         }
-        float steep = smoothstep(0.32, 0.6, 1.0 - clamp(vWNrm.y, 0.0, 1.0));
-        float strata = 0.80 + 0.20 * sin(vWPos.y * 0.62 + det * 7.0);
+        float steep = smoothstep(0.24, 0.54, 1.0 - clamp(vWNrm.y, 0.0, 1.0));
+        float strata = 0.76 + 0.24 * sin(vWPos.y * 0.62 + det * 7.0);
         // Subtle drifting cloud-shadow dappling across islands & mountains.
         vec2 cUv = (vWPos.xz + uCloudOff) * 0.00014;
         float cShad = texture2D(uDetail, cUv).r * 0.65 + texture2D(uDetail, cUv * 2.3 + 0.37).r * 0.35;
-        float cloudMul = mix(1.0, 0.82 + 0.24 * smoothstep(0.28, 0.72, cShad), smoothstep(0.0, 8.0, vWPos.y));
-        diffuseColor.rgb *= (0.74 + 0.52 * det) * mix(1.0, strata, steep) * cloudMul;
-        // Micro-height for the normal pass: fine triplanar grain + coarse detail, plus
-        // horizontal strata ledges on steep faces so cliffs catch raking light.
-        // Ledges are 20 m apart and fade out once a band shrinks below ~1.5 px (no aliasing stripes).
-        float ledgeAA = 1.0 - smoothstep(0.35, 1.0, fwidth(vWPos.y) * 0.31);
-        float microH = d1v * 1.1 + det * 0.6 + steep * sin(vWPos.y * 0.31 + det * 5.0) * 0.18 * ledgeAA;`)
+        float cloudMul = mix(1.0, 0.84 + 0.22 * smoothstep(0.28, 0.72, cShad), smoothstep(0.0, 8.0, vWPos.y));
+        float grainMul = mix(0.76 + 0.48 * det, 0.68 + 0.40 * det + 0.26 * d3v, tRock * 0.75);
+        diffuseColor.rgb *= grainMul * mix(1.0, strata, steep) * cloudMul;
+        // Micro-height for the normal pass: sharp 3-octave triplanar rock grain + horizontal
+        // strata ledges on steep faces so cliffs catch crisp raking light.
+        // Ledges fade out once a band shrinks below ~1.5 px (no aliasing stripes).
+        float ledgeAA = 1.0 - smoothstep(0.35, 1.0, fwidth(vWPos.y) * 0.34);
+        float microH = d3v * 0.85 + d1v * 1.25 + det * 0.55 + steep * sin(vWPos.y * 0.34 + det * 5.2) * 0.26 * ledgeAA;`)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-        // Matte 0.95 on dry rock / soil, glossier 0.62 on wet riverbeds, drainage, shore and snow.
-        roughnessFactor = mix(0.95, 0.62, clamp(max(tWet, tSnow * 0.8), 0.0, 1.0));`)
+        // Matte 0.95 on dry rock / soil, glossier 0.58 on wet riverbeds, drainage, shore and snow.
+        roughnessFactor = mix(0.95, 0.58, clamp(max(tWet, tSnow * 0.82), 0.0, 1.0));`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         {
-          // Procedural micro-normals, faded out by 9 km (no distant shimmer); strongest on rock.
+          // Sharp triplanar micro-normals, faded out cleanly by 10.5 km; strongest on exposed cliffs.
           vec2 dH = vec2(dFdx(microH), dFdy(microH));
-          float bumpK = (1.0 - smoothstep(3500.0, 9000.0, camD)) * mix(0.55, 1.5, tRock) * (1.0 - 0.6 * tSnow) * step(0.0, vWPos.y);
+          float bumpK = (1.0 - smoothstep(4200.0, 10500.0, camD)) * mix(0.60, 2.35, tRock) * (1.0 - 0.65 * tSnow) * step(0.0, vWPos.y);
           normal = azPerturbNormal(-vViewPosition, normal, dH * bumpK, faceDirection);
         }`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>

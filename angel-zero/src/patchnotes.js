@@ -3,6 +3,12 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.89', title: 'ALPINE PEAKS, MULTI-BIOME TERRAIN & TURQUOISE SHOALS', bullets: [
+    'Combat-theatre mountains across the Archipelago and Naval Strait now rise into sharper jagged spires, incised tributary valleys, indented coastal coves and deeper hydraulic/thermal erosion channels.',
+    'Upgraded multi-biome terrain shading pairs lush emerald valleys with warm arid golden-ochre highlands, crisp slope-gated granite and basalt cliffs, stronger ridge/cavity ambient occlusion, sharper triplanar rock relief and snowcaps that cling to high flat ledges.',
+    'Coastlines now blend into golden-sand beaches and luminous turquoise-emerald shallows with Beer-Lambert depth tinting, visible sunlit seabed shelves and organic shoreline surf foam.',
+    'Every protected landmark — Archipelago AFB runway and approaches, Port City, strait bridges, carrier sea lanes and the CANYON_RUN trench and gates — remains strictly preserved.'
+  ] },
   { version: 'v1.1.88', title: 'ERODED TERRAIN & SHARPER ROCK', bullets: [
     'Mountains across the Archipelago and the Naval Strait fjords are now carved by simulated rain and rockfall: real gullies, sharper ridgelines, scree fans and alluvial deposits below the peaks.',
     'Cliffs, ridges and canyon walls catch the sun with fine rock detail, rock shows through on steep ground, and snow now clings to the flatter ledges of the high peaks instead of the sheer faces.',

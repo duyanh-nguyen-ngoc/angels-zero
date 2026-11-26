@@ -33,8 +33,8 @@ const oceanUniforms = {
   uN1: { value: makeNormalMap(256, 1337, 6.0) },
   uN2: { value: makeNormalMap(256, 90210, 13.0) },
   uDepth: { value: buildDepthTexture(512) },
-  uDeep: { value: new THREE.Color(0x13222e) },       // deep slate-navy
-  uShallow: { value: new THREE.Color(0x24605c) },    // subtle dark teal over shelves / near coasts
+  uDeep: { value: new THREE.Color(0x0d2133) },       // abyssal sapphire-navy
+  uShallow: { value: new THREE.Color(0x168a84) },    // luminous turquoise-emerald over coastal shelves
   uTerr: { value: new THREE.Vector3(terrainCenter.x, terrainCenter.y, terrainSize) },
   uSun: { value: sunDir },
   uSunColor: { value: new THREE.Vector3(1.0, 0.88, 0.70) },
@@ -120,29 +120,38 @@ const ocean = new THREE.Mesh(new THREE.PlaneGeometry(OCEAN_SPAN, OCEAN_SPAN, 1, 
       }
 
       // Body colour: abyssal sapphire-navy, emerald subsurface scattering through backlit
-      // wave crests, luminous turquoise coral/shelf lagoons, multi-band coastal surf & cloud dappling.
+      // wave crests, luminous turquoise-emerald coastal shallows, visible sunlit sandy seabed
+      // shelves, and multi-band animated surf foam (after ProceduralTerrains WaterMaterial).
       float cShad = 1.0 - 0.13 * smoothstep(0.02, 0.62, nB.x * 0.65 + nB.y * 0.45) * (1.0 - smoothstep(14000.0, 38000.0, dist));
-      vec3 deepC = uDeep * (0.84 + 0.32 * NdV) * cShad + vec3(0.0, 0.028, 0.036) * max(0.0, slope.x + slope.y) * NdL;
+      vec3 deepC = uDeep * (0.84 + 0.34 * NdV) * cShad + vec3(0.0, 0.032, 0.042) * max(0.0, slope.x + slope.y) * NdL;
       float crestK = clamp(length(g) * 5.2 + max(0.0, slope.x * L.x + slope.y * L.z) * 1.9, 0.0, 1.0);
       float backLit = pow(max(dot(V, -normalize(vec3(L.x, L.y * 0.32, L.z))), 0.0), 3.2) * step(0.0, L.y);
-      vec3 sss = vec3(0.035, 0.25, 0.24) * crestK * (0.28 + 0.92 * backLit) * (0.35 + 0.65 * midK);
+      vec3 sss = vec3(0.035, 0.28, 0.27) * crestK * (0.30 + 0.92 * backLit) * (0.35 + 0.65 * midK);
       deepC += sss;
-      float shallow = 1.0 - smoothstep(2.5, 42.0, dm);
-      vec3 lagoonC = mix(uShallow, vec3(0.11, 0.48, 0.49), clamp(shoalMask * 0.65 + n2.y * 0.15, 0.0, 1.0));
-      vec3 body = mix(deepC, lagoonC * (0.84 + 0.20 * n2.x) * cShad, shallow * shallow * (3.0 - 2.0 * shallow) * 0.88);
-      body = mix(body, lagoonC * 1.48 + vec3(0.06, 0.06, 0.045), (1.0 - smoothstep(0.0, 3.2, dm)) * 0.50);
-      float shore = 1.0 - smoothstep(0.0, 5.8, dm);
-      float bands = 0.5 + 0.5 * sin(dm * 2.25 + uTime * 1.65 + n3.x * 3.1 + n1.y * 2.1);
-      float surf = shore * smoothstep(0.46, 0.94, bands) + (1.0 - smoothstep(0.0, 1.35, dm)) * 0.90;
-      surf *= 0.72 + 0.28 * sin(uTime * 0.92 + (p.x + p.y) * 0.004);
+      // Exponential Beer-Lambert coastal bathymetry: deep sapphire -> emerald shelf -> luminous turquoise -> sandy seabed.
+      float shelfK = exp(-dm * 0.058) * (1.0 - smoothstep(34.0, 56.0, dm));
+      float shoalTurq = exp(-dm * 0.145) * clamp(0.45 + 0.75 * shoalMask, 0.0, 1.0);
+      float seabedVis = exp(-dm * 0.34) * (1.0 - smoothstep(6.0, 12.0, dm));
+      vec3 turquoiseC = mix(uShallow, vec3(0.08, 0.58, 0.56), clamp(shoalMask * 0.72 + n2.y * 0.14, 0.0, 1.0));
+      float caustic = 0.88 + 0.24 * smoothstep(0.12, 0.86, n3.x * 0.55 + n2.y * 0.45 + 0.5) * nearK;
+      vec3 sandyBed = vec3(0.50, 0.45, 0.31) * (0.90 + 0.18 * n2.x) * caustic;
+      vec3 body = mix(deepC, turquoiseC * (0.86 + 0.18 * n2.x) * cShad, clamp(shelfK * 0.92, 0.0, 0.94));
+      body = mix(body, vec3(0.10, 0.66, 0.62) * cShad * caustic, clamp(shoalTurq * 0.68, 0.0, 0.72));
+      body = mix(body, sandyBed * cShad, clamp(seabedVis * 0.76, 0.0, 0.78));
+      // Multi-band organic coastal surf + bright shoreline ribbon.
+      float shore = 1.0 - smoothstep(0.0, 6.0, dm);
+      float foamPatch = smoothstep(-0.35, 0.45, n1.y * 0.6 + n2.x * 0.5);
+      float bands = 0.5 + 0.5 * sin(dm * 2.35 + uTime * 1.7 + n3.x * 3.1 + n1.y * 2.2);
+      float surf = shore * smoothstep(0.42, 0.92, bands) * (0.45 + 0.55 * foamPatch) + (1.0 - smoothstep(0.0, 1.35, dm)) * 0.95;
+      surf *= 0.74 + 0.26 * sin(uTime * 0.95 + (p.x + p.y) * 0.004);
       float caps = (0.12 + 0.88 * uChop) * smoothstep(0.80 - 0.06 * uChop, 1.06, n2.x * 0.5 + 0.5 + n1.x * 0.36) * (1.0 - shore) * 0.34 * midK;
-      body = (body + vec3(0.68, 0.71, 0.73) * surf * 0.52 + vec3(0.72, 0.76, 0.80) * caps) * uLevel;
+      body = (body + vec3(0.76, 0.81, 0.84) * surf * 0.56 + vec3(0.74, 0.78, 0.82) * caps) * uLevel;
 
       // Fresnel sky reflection: navy looking straight down -> the sky / horizon at
-      // grazing angles (reflected ray low = horizon haze, high = preset sky colour).
+      // grazing angles, gently relaxed over ultra-shallows so turquoise shelves & seabed stay readable.
       vec3 R = reflect(-V, N);
       vec3 refl = mix(uFog, uSky, smoothstep(0.02, 0.45, R.y));
-      float fres = pow(1.0 - NdV, 4.0);
+      float fres = pow(1.0 - NdV, 4.0) * (1.0 - 0.34 * clamp(shoalTurq + seabedVis * 0.5, 0.0, 1.0));
       // (capped a touch below 1 near the jet so facet-scale glare never reads as snow)
       vec3 col = mix(body, refl * 0.92, clamp(0.02 + 0.98 * fres, 0.0, mix(0.82, 1.0, smoothstep(800.0, 6000.0, dist))));
 
