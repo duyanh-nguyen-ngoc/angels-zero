@@ -3,6 +3,9 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.90', title: 'CONTINUOUS M1 CANNON FIRE FIX', bullets: [
+    'Fixed desktop M1 / F continuous Vulcan cannon fire being cleared every frame when the mobile touch HUD was hidden.'
+  ] },
   { version: 'v1.1.89', title: 'ALPINE PEAKS, MULTI-BIOME TERRAIN & TURQUOISE SHOALS', bullets: [
     'Combat-theatre mountains across the Archipelago and Naval Strait now rise into sharper jagged spires, incised tributary valleys, indented coastal coves and deeper hydraulic/thermal erosion channels.',
     'Upgraded multi-biome terrain shading pairs lush emerald valleys with warm arid golden-ochre highlands, crisp slope-gated granite and basalt cliffs, stronger ridge/cavity ambient occlusion, sharper triplanar rock relief and snowcaps that cling to high flat ledges.',

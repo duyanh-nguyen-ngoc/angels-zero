@@ -164,12 +164,14 @@ export function createInputExt(THREE, env) {
     _st.ab = thrLevel > 0.85; _st.brake = thrLevel < 0.12;
   }
 
+  let wasShown = false;
   function update(dt) {
     pollGamepad(dt);
     const playing = env.getAppMode && env.getAppMode() === 'PLAY';
     const show = !!root && playing && (env.isTouchDevice || touchTest);
     if (root) root.style.display = show ? 'block' : 'none';
-    if (!show) { releaseAllTouch(); _st.fire = false; if (env.keys) env.keys.fire = false; }
+    if (!show && wasShown) { releaseAllTouch(); _st.fire = false; if (env.keys) env.keys.fire = false; }
+    wasShown = show;
     if (!show && !hasGamepad) { _st.active = false; return; }
     if (show) {
       if (env.keys) {
