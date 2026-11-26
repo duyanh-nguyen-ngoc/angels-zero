@@ -5,7 +5,7 @@
 **Ace Combat-inspired 3D F-22A Raptor & F-15C Eagle dogfight, strike & free-flight simulator — playable right in your browser, zero installs.**
 
 [![Play Live](https://img.shields.io/badge/Play%20Live-angels--zero.pages.dev-00ff66?style=for-the-badge&logo=cloudflarepages&logoColor=white)](https://angels-zero.pages.dev/)
-[![Build](https://img.shields.io/badge/Version-v1.1.80-52ff9c?style=for-the-badge)](angel-zero/src/patchnotes.js)
+[![Build](https://img.shields.io/badge/Version-v1.1.87-52ff9c?style=for-the-badge)](angel-zero/src/patchnotes.js)
 [![GitHub Release](https://img.shields.io/github/v/release/duyanh-nguyen-ngoc/angels-zero?style=for-the-badge)](https://github.com/duyanh-nguyen-ngoc/angels-zero/releases)
 [![Three.js](https://img.shields.io/badge/Three.js-r160%20WebGL2-black?style=for-the-badge&logo=threedotjs)](https://threejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-lightgrey?style=for-the-badge)](LICENSE)
@@ -35,18 +35,20 @@
 
 ---
 
-## Core Systems (`v1.1.73`)
+## Core Systems (`v1.1.87`)
 
 | System | Capabilities |
 | :--- | :--- |
 | **Flyable Fighters** | **F-22A Raptor** (supercruise, 2D TVC agility, stealth RCS, APG-77 AESA lock, 29-file F119 soundpack) &amp; **F-15C Eagle** (selectable squadron liveries) |
 | **3-Way Camera &amp; HUD** | Cycle **Chase → 3D Cockpit → Nose Cam (`Space`)** featuring an **Ace Combat 7 HUD-only Nose View** with bracketed tapes, throttle bar &amp; dotted compass |
 | **Sculpted 3D Cockpits** | **F-22A Blender-sculpted all-glass pit** (6 live displays, ICP, animated side-stick &amp; twin throttles) + **F-15C 16-dial analog panel** with cyclable MFDs (`[` / `]`) |
-| **6 Theatres &amp; Free Flight** | *Air Superiority, Naval Battle (fjord strait), Canyon Run (Crater Citadel &amp; bridges), Ace Duel, endless Furball,* &amp; **Unarmed Real-World Free Flight** (Toronto, Tokyo, San Francisco, New York, Swiss Alps) |
+| **7 Modes &amp; Free Flight** | *Air Superiority, Naval Battle (fjord strait), Canyon Run (Crater Citadel &amp; bridges), Ace Duel, endless Furball,* **Guided 6-Step Training Sortie**, &amp; **Free Flight** with any-city Nominatim search, OSM runways &amp; attribution |
 | **Ace BFM &amp; Wingman BTT** | Real bank-to-turn (`flyBTT`) wingmen (`FORM / COVER / FOCUS`) &amp; **CRIMSON-1 / CRIMSON-2** Ace AI with `HIGH_YOYO`, `BREAK_SCISSORS`, Cobra traps, bracket/drag-and-bag &amp; smart flares/chaff/notch |
+| **Controls &amp; Input** | Desktop **Mouse + Keyboard** (with Auto-Fullscreen Shortcut Lock), **Gamepad API** (Xbox / PS / HOTAS + rumble), &amp; **Mobile Touch HUD** (virtual stick + throttle) |
 | **Volumetric Clouds &amp; HDR** | 24-step Beer-Powder volumetric cloud sea, towering cumulus congestus turrets, high-altitude cirrus streaks, AC7 split-tone filmic grade &amp; AN/AVS-9 Night Vision (`N`) |
+| **Social, Replays &amp; Cloud Sync** | **Shareable Debrief Replay URLs (`?replay=`)**, **Global Mission Leaderboard**, **Pilot Cloud Profile Sync (`AZ-XXXX-XXXX`) &amp; Save Export/Import**, plus live **Boot Progress HUD** |
 | **YouTube / YT Music Player** | Built-in top-right **YouTube &amp; YouTube Music playlist player** (`‹ / ▶ / › / ▾ / SHUF`), custom URL paste &amp; persistence, automatic radio ducking &amp; embed-error skip |
-| **Post-Stall &amp; Carrier Ops** | Decoupled AoA for **Cobra / Kulbit** (`B+Shift` &lt; 290 kt), flat spins, Mach-1 cone, USS Enterprise bow catapult &amp; arrestor recovery, voiced radio + CRT portraits, &amp; Auto-Fullscreen Shortcut Lock |
+| **Post-Stall, Carrier &amp; Pit-Stop** | Decoupled AoA for **Cobra / Kulbit** (`B+Shift` &lt; 290 kt), flat spins, Mach-1 cone, **USS Enterprise** catapult/trap, **Runway Landing, Taxi &amp; Mid-Sortie Rearm/Repair Pit-Stop**, &amp; 43 modular ES files |
 
 ---
 
