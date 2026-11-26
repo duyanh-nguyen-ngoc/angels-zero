@@ -30,6 +30,7 @@ const FT = 0.3048;
 export const RWY = { x: 900, z0: -1400, z1: 1600, width: 50, elev: 10 };       // runway 18/36, 3,000 m
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { erodeGrid } from './erosion.js?v=s9ter1';
 import { gorgeCentreX, gorgeSlope, gorgeHeading, gorgeDist, GORGE_FLOOR_Y, GORGE_RIM_Y, GORGE_CRATER_R,
   GORGE_CRATER_WALL_Y, GORGE_CRATER_Z, GORGE_GATE_Z, GORGE_GATE_N, GORGE_FORT, CEIL_M,
   GORGE_BBOX, GORGE_HALF_W, GORGE_RAMP_W, SEA_FLOOR_Y, RUNWAY_BBOX,
@@ -286,9 +287,57 @@ export function createWorld(THREE, env) {
   const N = WORLD.SEG, STEP = WORLD.SIZE / N, X0 = WORLD.CX - WORLD.SIZE / 2, Z0 = WORLD.CZ - WORLD.SIZE / 2;
   const grid = new Float32Array((N + 1) * (N + 1));
   for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) grid[j * (N + 1) + i] = analyticHeight(X0 + i * STEP, Z0 + j * STEP);
+
+  /* ------------------------------------------- erosion (src/erosion.js) */
+  // Droplet hydraulic + thermal erosion runs on the grid itself, before the mesh,
+  // normals, colours and every prop placement, so heightAt() stays exact. Protect
+  // masks (0 = never moves, feathered): runway pad + apron, both 3.8 km approach
+  // funnels, Port City, the four bridge spits, a band either side of the CANYON_RUN
+  // trench bbox edge (gorge mode swaps the inside for the analytic trench), and the
+  // coast itself (beaches / shelves stay put). The sim's flow / deposition analysis
+  // is kept everywhere and shipped to the shader as the aErosion attribute.
+  const NV = N + 1;
+  const GB = GORGE_BBOX;
+  const inTrenchBox = (x, z) => !(x >= RUNWAY_BBOX.x[0] && x <= RUNWAY_BBOX.x[1] && z >= RUNWAY_BBOX.z[0] && z <= RUNWAY_BBOX.z[1]) &&
+    x >= GB.x[0] && x <= GB.x[1] && z <= GB.z[0] && z >= GB.z[1];
+  const rectDist = (x, z, x0, x1, z0, z1) => Math.hypot(Math.max(x0 - x, 0, x - x1), Math.max(z0 - z, 0, z - z1));
+  function protectArch(x, z) {
+    let m = ss(rectDist(x, z, RWY.x - 300, RWY.x + 470, RWY.z0 - 140, RWY.z1 + 160), 250, 650);
+    m = Math.min(m, ss(rectDist(x, z, RWY.x - 700, RWY.x + 700, RWY.z0 - 3800, RWY.z1 + 3800), 0, 400));
+    m = Math.min(m, ss(rectDist(x, z, -2050, -450, -1850, 350), 150, 500));
+    for (const b of BRIDGES) {
+      m = Math.min(m, ss(capsule(x, z, b.fromA[0], b.fromA[1], b.a[0], b.a[1]), 380, 700));
+      m = Math.min(m, ss(capsule(x, z, b.fromB[0], b.fromB[1], b.b[0], b.b[1]), 380, 700));
+    }
+    // Zero on the trench bbox edge itself (continuous both sides).
+    const edge = Math.min(Math.abs(x - GB.x[0]), Math.abs(x - GB.x[1]), Math.abs(z - GB.z[0]), Math.abs(z - GB.z[1]));
+    const nearBox = x > GB.x[0] - 350 && x < GB.x[1] + 350 && z < GB.z[0] + 350 && z > GB.z[1] - 350;
+    if (nearBox) m = Math.min(m, ss(edge, 0, 300));
+    return m;
+  }
+  function buildMask(src, fn) {
+    const m = new Float32Array(NV * NV);
+    for (let j = 0; j < NV; j++) for (let i = 0; i < NV; i++) {
+      const k = j * NV + i, h = src[k];
+      if (h < 0.8) continue;
+      m[k] = fn(X0 + i * STEP, Z0 + j * STEP) * ss(h, 0.8, 7);
+    }
+    return m;
+  }
+  const ERO = { archipelago: { seed: 4242, cellScale: STEP }, strait: { seed: 9137, cellScale: STEP, droplets: 17000 },
+    gorge: { seed: 5521, cellScale: STEP, droplets: 15000, thermalIterations: 0 } };
+  const erosionStats = Object.create(null);
+  const eroArch = erodeGrid(grid, NV, buildMask(grid, protectArch), ERO.archipelago);
+  erosionStats.archipelago = eroArch.stats;
+
   // Same triangulation as THREE.PlaneGeometry rotated -90 deg about X.
   function heightAt(x, z) {
     if (activeHeightFn) return activeHeightFn(x, z);        // exact canyon / ocean surface for collision + SAM masking
+    return gridHeight(x, z);
+  }
+  // CANYON_RUN: the analytic trench inside its bbox, the (eroded) shared grid outside it.
+  const gorgeExact = (x, z) => inTrenchBox(x, z) ? gorgeHeight(x, z) : gridHeight(x, z);
+  function gridHeight(x, z) {
     const fx = (x - X0) / STEP, fz = (z - Z0) / STEP;
     if (fx < 0 || fz < 0 || fx >= N || fz >= N) return -180;
     const i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j;
@@ -322,11 +371,22 @@ export function createWorld(THREE, env) {
   const geo = new THREE.PlaneGeometry(WORLD.SIZE, WORLD.SIZE, N, N);
   geo.rotateX(-Math.PI / 2);
   const pos = geo.attributes.position;
+  const vGrid = new Uint32Array(pos.count);                 // vertex -> grid cell (fixed for the plane's lifetime)
   for (let i = 0; i < pos.count; i++) {
     const gi = Math.round((pos.getX(i) + WORLD.SIZE / 2) / STEP), gj = Math.round((pos.getZ(i) + WORLD.SIZE / 2) / STEP);
-    pos.setY(i, grid[gj * (N + 1) + gi]);
+    vGrid[i] = gj * (N + 1) + gi;
+    pos.setY(i, grid[vGrid[i]]);
   }
   geo.computeVertexNormals();
+  // aErosion = (cavity AO, sediment, flow) per vertex from the erosion analysis.
+  const eroAttr = new THREE.BufferAttribute(new Float32Array(pos.count * 3), 3);
+  function setErosionAttr(data) {
+    const a = eroAttr.array;
+    for (let i = 0; i < pos.count; i++) { const k = vGrid[i] * 3; a[i * 3] = data[k]; a[i * 3 + 1] = data[k + 1]; a[i * 3 + 2] = data[k + 2]; }
+    eroAttr.needsUpdate = true;
+  }
+  setErosionAttr(eroArch.erosion);
+  geo.setAttribute('aErosion', eroAttr);
   const nrm = geo.attributes.normal, colors = new Float32Array(pos.count * 3);
   const _vc = new THREE.Color(), _scrub = new THREE.Color();
 
@@ -379,7 +439,8 @@ export function createWorld(THREE, env) {
   gridCache.archipelago = {
     grid: new Float32Array(grid),
     normals: new Float32Array(geo.attributes.normal.array),
-    colors: new Float32Array(colors)
+    colors: new Float32Array(colors),
+    erosion: eroArch.erosion
   };
   let activeTerrainMode = 'archipelago';
   const OCEAN_HEIGHT = () => SEA_FLOOR_Y;
@@ -396,13 +457,30 @@ export function createWorld(THREE, env) {
     uTown: { value: new THREE.Vector4(-2050, -450, -1850, 350) },
     uGorgeBox: { value: new THREE.Vector4(GORGE_BBOX.x[0] - 450, GORGE_BBOX.x[1] + 450, GORGE_BBOX.z[1] - 450, GORGE_BBOX.z[0] + 450) },
     uMapMode: { value: 0 },                             // 0 archipelago, 1 gorge, 2 strait
-    uCloudOff: { value: new THREE.Vector2(0, 0) }
+    uCloudOff: { value: new THREE.Vector2(0, 0) },
+    // Slope gates + ridge accent (after ZyFou/ProceduralTerrains terrainColor.glsl, MIT):
+    // rock bleeds in from slope 0.17 and is fully exposed by 0.30 (1 - normal.y); snow
+    // holds below slope 0.22 and sheds entirely above 0.48; uAORidge brightens crests.
+    uRockSlopeLo: { value: 0.17 }, uRockSlopeHi: { value: 0.30 },
+    uSnowSlopeMin: { value: 0.22 }, uSnowSlopeMax: { value: 0.48 },
+    uAORidge: { value: 0.45 }, uGorgeFloor: { value: GORGE_FLOOR_Y }
   };
   const FARM_GLSL = `
     uniform vec3 uPal[5]; uniform vec3 uHedge; uniform vec3 uRoad; uniform vec3 uHwy; uniform vec3 uShore;
     uniform vec3 uRockA; uniform vec3 uRockB; uniform vec3 uPeak; uniform vec3 uRiver;
     uniform vec4 uAfb; uniform vec4 uTown; uniform vec4 uGorgeBox;
     uniform float uMapMode; uniform vec2 uCloudOff;
+    uniform float uRockSlopeLo, uRockSlopeHi, uSnowSlopeMin, uSnowSlopeMax, uAORidge, uGorgeFloor;
+    varying vec3 vEro;                                   // erosion analysis: (cavity AO, sediment, flow)
+    // Screen-space micro-normal perturbation (same maths as three.js perturbNormalArb):
+    // dHdxy is the screen derivative of a procedural micro-height, no extra texture taps.
+    vec3 azPerturbNormal(vec3 surfPos, vec3 surfNorm, vec2 dHdxy, float faceDir) {
+      vec3 sx = normalize(dFdx(surfPos)), sy = normalize(dFdy(surfPos));
+      vec3 r1 = cross(sy, surfNorm), r2 = cross(surfNorm, sx);
+      float fDet = dot(sx, r1) * faceDir;
+      vec3 grad = sign(fDet) * (dHdxy.x * r1 + dHdxy.y * r2);
+      return normalize(abs(fDet) * surfNorm - grad);
+    }
     float fh12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
     float rectMask(vec2 p, vec4 r, float f) {
       vec2 d = max(vec2(r.x - p.x, r.z - p.y), vec2(p.x - r.y, p.y - r.w));
@@ -463,23 +541,29 @@ export function createWorld(THREE, env) {
     sh.uniforms.uDetail = { value: detail };
     Object.assign(sh.uniforms, FARM_U);
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos; varying vec3 vWNrm;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = (modelMatrix * vec4(position, 1.0)).xyz; vWNrm = normalize(mat3(modelMatrix) * normal);');
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos; varying vec3 vWNrm; attribute vec3 aErosion; varying vec3 vEro;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = (modelMatrix * vec4(position, 1.0)).xyz; vWNrm = normalize(mat3(modelMatrix) * normal); vEro = aErosion;');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', '#include <common>\nuniform sampler2D uDetail; varying vec3 vWPos; varying vec3 vWNrm;\n' + FARM_GLSL)
       .replace('#include <map_fragment>', `#include <map_fragment>
         float camD = length(vWPos - cameraPosition);
-        float det = 0.5;
+        float det = 0.5, d1v = 0.5;
         if (camD < 13000.0) {
           vec3 tw = pow(abs(vWNrm), vec3(4.0)); tw /= (tw.x + tw.y + tw.z);
           float d1 = texture2D(uDetail, vWPos.zy * 0.012).r * tw.x + texture2D(uDetail, vWPos.xz * 0.012).r * tw.y + texture2D(uDetail, vWPos.xy * 0.012).r * tw.z;
           float d2 = texture2D(uDetail, vWPos.zy * 0.0021).r * tw.x + texture2D(uDetail, vWPos.xz * 0.0021).r * tw.y + texture2D(uDetail, vWPos.xy * 0.0021).r * tw.z;
-          det = d1 * 0.6 + d2 * 0.4;
+          det = d1 * 0.6 + d2 * 0.4; d1v = d1;
         }
         float inGorgeMask = (uMapMode > 0.5 && uMapMode < 1.5) ? rectMask(vWPos.xz, uGorgeBox, 350.0) * (1.0 - rectMask(vWPos.xz, uAfb, 120.0)) : 0.0;
+        // Erosion shading stays off the AFB pad and Port City (flat, authored ground).
+        float eroK = (uMapMode > 1.5) ? 1.0 : (1.0 - rectMask(vWPos.xz, uAfb, 220.0)) * (1.0 - rectMask(vWPos.xz, uTown, 180.0));
+        float tWet = 0.0, tRock = 0.0, tSnow = 0.0;      // feed the roughness + micro-normal passes
         if (vWPos.y > 0.0) {
           float ny = clamp(vWNrm.y, 0.0, 1.0);
-          float cliffK = 1.0 - smoothstep(0.72, 0.82, ny);
+          float slope = 1.0 - ny, jit = det - 0.5;
+          // Slope-gated rock exposure with noise jitter; eroded flow lines expose rock earlier.
+          float cliffK = smoothstep(uRockSlopeLo, uRockSlopeHi, slope + jit * 0.06 + sqrt(vEro.z) * 0.05 * eroK);
+          tRock = cliffK;
           float allowFarm = (uMapMode > 1.5) ? 0.0 : (1.0 - inGorgeMask);
           float farmK = allowFarm * smoothstep(13.0, 18.0, vWPos.y) * (1.0 - smoothstep(295.0, 315.0, vWPos.y)) * smoothstep(0.78, 0.86, ny)
             * (1.0 - rectMask(vWPos.xz, uAfb, 160.0)) * (1.0 - rectMask(vWPos.xz, uTown, 140.0));
@@ -509,16 +593,44 @@ export function createWorld(THREE, env) {
             float braid = sin(vWPos.x * 0.045 + sin(vWPos.z * 0.0042) * 3.5 + det * 3.0);
             float stream = smoothstep(0.76, 0.95, braid) * (1.0 - smoothstep(47.0, 56.0, vWPos.y));
             land = mix(land, uRiver * 1.15, stream * inGorgeMask * 0.78);
+            tWet = max(tWet, stream * inGorgeMask);
           }
           vec3 rock = mix(uRockA, uRockB, 0.5 + 0.5 * sin(vWPos.y * 0.21 + vWPos.x * 0.004 + vWPos.z * 0.003));
           if (inGorgeMask > 0.01) {
-            vec3 warmStrata = mix(vec3(0.14, 0.11, 0.09), vec3(0.06, 0.07, 0.08), 0.5 + 0.5 * sin(vWPos.y * 0.13 + det * 4.0));
-            rock = mix(rock, warmStrata, inGorgeMask * 0.65);
+            // Multi-band sedimentary strata (after dryCanyon.js canyonBeddedRock): fine bedding
+            // warped by detail noise, a slower sandstone / basalt cycle and dark caprock bands.
+            float bedding = mix(0.5, sin(vWPos.y * 0.42 + det * 2.6) * 0.5 + 0.5, 1.0 - smoothstep(0.5, 1.4, fwidth(vWPos.y) * 0.42));
+            float cycle = sin(vWPos.y * 0.093 + 1.7 + det * 0.8) * 0.5 + 0.5;
+            vec3 sandstone = mix(vec3(0.115, 0.085, 0.062), vec3(0.24, 0.195, 0.145), bedding * 0.4 + det * 0.6);
+            vec3 strata = mix(sandstone, vec3(0.055, 0.06, 0.066), smoothstep(0.72, 0.86, cycle));
+            rock = mix(rock, strata, inGorgeMask * 0.8);
+            // Talus scree aprons at the wall base: moderate slopes just above the floor.
+            float talus = smoothstep(0.10, 0.24, slope) * (1.0 - smoothstep(0.42, 0.62, slope))
+              * (1.0 - smoothstep(uGorgeFloor + 50.0, uGorgeFloor + 150.0, vWPos.y));
+            vec3 scree = mix(vec3(0.17, 0.15, 0.12), vec3(0.28, 0.25, 0.20), d1v);
+            land = mix(land, scree, talus * inGorgeMask * 0.85);
           }
           land = mix(land, rock, cliffK * smoothstep(2.0, 8.0, vWPos.y));
+          // Erosion fans: sediment settles as pale scree / alluvium on the gentle ground below
+          // gullies; strong flow lines on flats read as darker, damp drainage channels.
+          float sed = vEro.y * eroK * (1.0 - smoothstep(0.12, 0.35, slope)) * smoothstep(3.0, 9.0, vWPos.y);
+          vec3 alluvium = mix(vec3(0.22, 0.20, 0.16), vec3(0.32, 0.29, 0.23), d1v);
+          land = mix(land, mix(alluvium, mix(vec3(0.17, 0.15, 0.12), vec3(0.28, 0.25, 0.20), d1v), inGorgeMask), sed * 0.35);
+          float chan = smoothstep(0.58, 0.88, vEro.z) * (1.0 - smoothstep(0.18, 0.42, slope)) * eroK * smoothstep(3.0, 8.0, vWPos.y);
+          land *= 1.0 - 0.26 * chan;
+          tWet = max(tWet, chan);
           // Preserve alpine snow & caldera cinder above 580 m; weathered stone on mid-peaks.
           float midPeak = smoothstep(320.0, 360.0, vWPos.y) * (1.0 - smoothstep(560.0, 640.0, vWPos.y)) * (1.0 - cliffK) * (1.0 - inGorgeMask);
           land = mix(land, uPeak, midPeak);
+          // Per-pixel alpine snow: clings to flatter ledges, sheds off sheer rock (slope-gated),
+          // never on the volcano caldera or inside the canyon trench.
+          float calderaD = length(vWPos.xz - vec2(5600.0, -8300.0));
+          float snowLine = 600.0 + jit * 60.0;
+          float snow = smoothstep(snowLine, snowLine + 85.0, vWPos.y)
+            * (1.0 - smoothstep(uSnowSlopeMin, uSnowSlopeMax, slope + jit * 0.08))
+            * ((uMapMode < 0.5) ? smoothstep(900.0, 1050.0, calderaD) : 1.0) * (1.0 - inGorgeMask);
+          land = mix(land, vec3(0.62, 0.67, 0.73) * (0.92 + 0.16 * d1v), snow);
+          tSnow = snow;
           // Main Island carved mountain stream & island highways (ARCHIPELAGO).
           if (uMapMode < 0.5) {
             if (vWPos.x > 80.0 && vWPos.x < 2360.0 && vWPos.z < -1820.0 && vWPos.z > -3450.0 && ny > 0.72) {
@@ -526,6 +638,7 @@ export function createWorld(THREE, env) {
                              segDist(vWPos.xz, vec2(1160.0, -2460.0), vec2(360.0, -3180.0)));
               float wMask = (1.0 - smoothstep(9.0, 22.0, rd + (det - 0.5) * 14.0)) * (1.0 - smoothstep(140.0, 220.0, vWPos.y));
               land = mix(land, uRiver * (0.9 + 0.35 * det), wMask * 0.9);
+              tWet = max(tWet, wMask);
             }
             if (camD < 14000.0 && vWPos.y > 2.5 && ny > 0.65) {
               float hd = hwyNetwork(vWPos.xz);
@@ -542,6 +655,13 @@ export function createWorld(THREE, env) {
             }
           }
           land = mix(land, uShore, (1.0 - smoothstep(10.0, 16.0, vWPos.y)) * (1.0 - inGorgeMask));
+          tWet = max(tWet, (1.0 - smoothstep(1.2, 4.0, vWPos.y)) * (1.0 - inGorgeMask));   // wave-wet sand
+          // Erosion cavity / ridge AO: carved gullies and valley floors darken (to 0.68),
+          // convex crests get the uAORidge accent so ridgelines catch the light.
+          float cav = vEro.x;
+          float ao = mix(0.68, 1.0, smoothstep(0.08, 0.5, cav));
+          ao = min(ao * (1.0 + uAORidge * clamp((cav - 0.5) * 2.0, 0.0, 1.0) * 0.45), 1.25);
+          land *= mix(1.0, ao, eroK * smoothstep(1.0, 8.0, vWPos.y));
           diffuseColor.rgb = land;
         }
         float steep = smoothstep(0.32, 0.6, 1.0 - clamp(vWNrm.y, 0.0, 1.0));
@@ -550,7 +670,22 @@ export function createWorld(THREE, env) {
         vec2 cUv = (vWPos.xz + uCloudOff) * 0.00014;
         float cShad = texture2D(uDetail, cUv).r * 0.65 + texture2D(uDetail, cUv * 2.3 + 0.37).r * 0.35;
         float cloudMul = mix(1.0, 0.82 + 0.24 * smoothstep(0.28, 0.72, cShad), smoothstep(0.0, 8.0, vWPos.y));
-        diffuseColor.rgb *= (0.74 + 0.52 * det) * mix(1.0, strata, steep) * cloudMul;`)
+        diffuseColor.rgb *= (0.74 + 0.52 * det) * mix(1.0, strata, steep) * cloudMul;
+        // Micro-height for the normal pass: fine triplanar grain + coarse detail, plus
+        // horizontal strata ledges on steep faces so cliffs catch raking light.
+        // Ledges are 20 m apart and fade out once a band shrinks below ~1.5 px (no aliasing stripes).
+        float ledgeAA = 1.0 - smoothstep(0.35, 1.0, fwidth(vWPos.y) * 0.31);
+        float microH = d1v * 1.1 + det * 0.6 + steep * sin(vWPos.y * 0.31 + det * 5.0) * 0.18 * ledgeAA;`)
+      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+        // Matte 0.95 on dry rock / soil, glossier 0.62 on wet riverbeds, drainage, shore and snow.
+        roughnessFactor = mix(0.95, 0.62, clamp(max(tWet, tSnow * 0.8), 0.0, 1.0));`)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+        {
+          // Procedural micro-normals, faded out by 9 km (no distant shimmer); strongest on rock.
+          vec2 dH = vec2(dFdx(microH), dFdy(microH));
+          float bumpK = (1.0 - smoothstep(3500.0, 9000.0, camD)) * mix(0.55, 1.5, tRock) * (1.0 - 0.6 * tSnow) * step(0.0, vWPos.y);
+          normal = azPerturbNormal(-vViewPosition, normal, dH * bumpK, faceDirection);
+        }`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
         if (uMapMode < 0.5 && vWPos.y > 580.0 && vWPos.y < 765.0) {
           float vd = length(vWPos.xz - vec2(5600.0, -8300.0));
@@ -1114,7 +1249,16 @@ export function createWorld(THREE, env) {
   // ---- LIGHTHOUSES (rotating beams) + RADAR STATIONS ------------------------
   const beamG = new THREE.CylinderGeometry(1.5, 34, 1100, 16, 1, true); beamG.translate(0, 550, 0); beamG.rotateZ(-Math.PI / 2);
   const beamMat = new THREE.MeshBasicMaterial({ color: 0xfff2c8, transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
+  // Strait props are placed from the analytic straitHeight before that grid exists, so
+  // their sites are recorded and kept out of the strait erosion (protectStrait).
+  const straitSites = [];
+  const protectStrait = (x, z) => {
+    let m = 1;
+    for (let k = 0; k < straitSites.length; k++) m = Math.min(m, ss(Math.hypot(x - straitSites[k][0], z - straitSites[k][1]), 260, 560));
+    return m;
+  };
   function lighthouse(x, z, mapKind = 'arch', hFn = heightAt) {
+    if (mapKind === 'strait') straitSites.push([x, z]);
     const y = Math.max(2, hFn(x, z));
     const bucket = mapKind === 'strait' ? 'strait' : (inGorgeBBox(x, z) ? 'islandsIn' : 'islandsOut');
     const mapId = mapKind === 'strait' ? 2 : 0;
@@ -1128,6 +1272,7 @@ export function createWorld(THREE, env) {
     light(x, y + 33, z, 0xfff6d0, 10, 0, 0, mapId);
   }
   function radarStation(x, z, mapKind = 'arch', hFn = heightAt) {
+    if (mapKind === 'strait') straitSites.push([x, z]);
     const y = Math.max(2, hFn(x, z));
     const bucket = mapKind === 'strait' ? 'strait' : (inGorgeBBox(x, z) ? 'islandsIn' : 'islandsOut');
     const mapId = mapKind === 'strait' ? 2 : 0;
@@ -1692,7 +1837,7 @@ export function createWorld(THREE, env) {
       : mode === 'strait' ? straitHeight
       : mode === 'gorge' ? gorgeHeight
         : analyticHeight;
-    activeHeightFn = mode === 'ocean' ? OCEAN_HEIGHT : mode === 'gorge' ? gorgeHeight : null;
+    activeHeightFn = mode === 'ocean' ? OCEAN_HEIGHT : mode === 'gorge' ? gorgeExact : null;
     FARM_U.uMapMode.value = mode === 'gorge' ? 1 : mode === 'strait' ? 2 : 0;
     if (mode !== 'ocean' && mode !== activeTerrainMode) {
       const cached = gridCache[mode];
@@ -1704,8 +1849,25 @@ export function createWorld(THREE, env) {
         }
         geo.attributes.normal.array.set(cached.normals);
         geo.attributes.color.array.set(cached.colors);
+        setErosionAttr(cached.erosion);
       } else {
-        for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) grid[j * (N + 1) + i] = fn(X0 + i * STEP, Z0 + j * STEP);
+        let ero;
+        if (mode === 'gorge') {
+          // Outside the trench bbox: the eroded archipelago grid; inside: the analytic trench
+          // (untouched, analysis-only erosion pass for flow / scree shading on the walls).
+          const base = gridCache.archipelago.grid;
+          for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) {
+            const k = j * NV + i, x = X0 + i * STEP, z = Z0 + j * STEP;
+            grid[k] = inTrenchBox(x, z) ? gorgeHeight(x, z) : base[k];
+          }
+          ero = erodeGrid(grid, NV, new Float32Array(NV * NV), ERO.gorge);
+        } else {
+          for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) grid[j * (N + 1) + i] = fn(X0 + i * STEP, Z0 + j * STEP);
+          const fnMask = mode === 'strait' ? protectStrait : () => 0;
+          ero = erodeGrid(grid, NV, buildMask(grid, fnMask), mode === 'strait' ? ERO.strait : ERO.gorge);
+        }
+        erosionStats[mode] = ero.stats;
+        setErosionAttr(ero.erosion);
         for (let i = 0; i < pos.count; i++) {
           const gi = Math.round((pos.getX(i) + WORLD.SIZE / 2) / STEP), gj = Math.round((pos.getZ(i) + WORLD.SIZE / 2) / STEP);
           pos.setY(i, grid[gj * (N + 1) + gi]);
@@ -1715,7 +1877,8 @@ export function createWorld(THREE, env) {
         gridCache[mode] = {
           grid: new Float32Array(grid),
           normals: new Float32Array(geo.attributes.normal.array),
-          colors: new Float32Array(geo.attributes.color.array)
+          colors: new Float32Array(geo.attributes.color.array),
+          erosion: ero.erosion
         };
       }
       geo.attributes.position.needsUpdate = true;
@@ -1816,7 +1979,7 @@ export function createWorld(THREE, env) {
   }
 
   return {
-    terrain, props, heightAt, analyticHeight, straitHeight, gorgeHeight, collide, addBox, update, rebuild, envProps,
+    terrain, props, heightAt, analyticHeight, straitHeight, gorgeHeight, erosionStats, collide, addBox, update, rebuild, envProps,
     get map() { return activeMap; },
     get mode() { return currentMode; },
     forest: trees.mesh, farmEdge: FARM.edge,

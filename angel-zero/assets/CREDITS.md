@@ -9,4 +9,16 @@
   stations regrouped (two duplicated onto the main-bay rails), textures JPEG-compressed.
   Built by `scripts/prep_f22.py` from the unmodified source file (not committed).
 
+## Terrain erosion & shading techniques (`src/erosion.js`, terrain shader in `src/world.js`)
+- **ProceduralTerrains** by **ZyFou** — https://github.com/ZyFou/ProceduralTerrains
+- License: **MIT** — Copyright (c) 2026 ZyFou. Permission is hereby granted, free of charge,
+  to any person obtaining a copy of this software and associated documentation files, to deal
+  in the Software without restriction, subject to including the copyright notice and permission
+  notice in all copies or substantial portions; the software is provided "as is", without warranty.
+- Adapted: the droplet hydraulic erosion + thermal talus model (`erosion/erosionSim.js`),
+  the slope-gated rock / snow and ridge-accent AO terms (`shaders/terrainColor.glsl.js`) and
+  the bedded-rock / scree canyon palette ideas (`terrain/dryCanyon.js`). Re-implemented for
+  the ANGELS ZERO height grid (protect masks, in-place masked blend, per-vertex analysis) and
+  the three.js r160 `MeshStandardMaterial` terrain shader; no files copied verbatim.
+
 Sound credits: see `assets/sfx/CREDITS.md`.

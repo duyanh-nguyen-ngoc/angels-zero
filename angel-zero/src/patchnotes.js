@@ -3,6 +3,12 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.1.88', title: 'ERODED TERRAIN & SHARPER ROCK', bullets: [
+    'Mountains across the Archipelago and the Naval Strait fjords are now carved by simulated rain and rockfall: real gullies, sharper ridgelines, scree fans and alluvial deposits below the peaks.',
+    'Cliffs, ridges and canyon walls catch the sun with fine rock detail, rock shows through on steep ground, and snow now clings to the flatter ledges of the high peaks instead of the sheer faces.',
+    'CANYON_RUN walls show layered sandstone and basalt strata with scree at their base; gullies and valleys get deeper shadows, and riverbeds, wet sand and snow have a subtle sheen.',
+    'The runway, approach paths, Port City, the bridges and the canyon route are untouched, so landing, flying the canyon and every crash check behave exactly as before.'
+  ] },
   { version: 'v1.1.87', title: 'MOBILE CONTROL RELEASE FIX', bullets: [
     'Touch action buttons now release correctly when you lift your finger, even if the browser moves the pointer off the button or cancels the gesture. Guns, missiles and the virtual stick no longer stay stuck down.'
   ] },
