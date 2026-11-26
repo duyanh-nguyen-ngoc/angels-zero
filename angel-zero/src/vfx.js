@@ -1835,6 +1835,7 @@ export function createVFX(THREE, env) {
     get mist() { return mist; },
     // ambient.js owns cloud drift + deck punch-through; both are scalar-only writes.
     setWind(x, z) { windDriven = true; windOff.set(x, 0, z); cloudMat.uniforms.uWind.value.copy(windOff); deckMat.uniforms.uWind.value.copy(windOff); },
+    get windOffset() { return windOff; },
     setMistBoost(k) { mistBoost = Math.max(0, Math.min(1, k)); },
     makeRibbon(opts) { return new Ribbon(opts); },
     cloudDensity, placeDebugCloud,

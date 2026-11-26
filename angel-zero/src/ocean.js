@@ -127,7 +127,10 @@ const ocean = new THREE.Mesh(new THREE.PlaneGeometry(OCEAN_SPAN, OCEAN_SPAN, 1, 
       // Body colour: abyssal sapphire-navy, emerald subsurface scattering through backlit
       // wave crests, luminous turquoise-emerald coastal shallows, visible sunlit sandy seabed
       // shelves, and multi-band animated surf foam (after ProceduralTerrains WaterMaterial).
-      float cShad = 1.0 - 0.13 * smoothstep(0.02, 0.62, nB.x * 0.65 + nB.y * 0.45) * (1.0 - smoothstep(14000.0, 38000.0, dist));
+      vec2 cUv = (p - uCloudOff) * 0.000244140625;
+      float cRaw = texture2D(uN1, cUv).r * 0.62 + texture2D(uN2, cUv * 2.0 + vec2(0.37, 0.61)).r * 0.38;
+      float cMask = smoothstep(0.36, 0.64, cRaw);
+      float cShad = mix(1.0, mix(0.68, 1.02, cMask), uCloudShadowK * (1.0 - smoothstep(14000.0, 36000.0, dist)));
       vec3 deepC = uDeep * (0.84 + 0.34 * NdV) * cShad + vec3(0.0, 0.032, 0.042) * max(0.0, slope.x + slope.y) * NdL;
       float crestK = clamp(length(g) * 5.2 + max(0.0, slope.x * L.x + slope.y * L.z) * 1.9, 0.0, 1.0);
       float backLit = pow(max(dot(V, -normalize(vec3(L.x, L.y * 0.32, L.z))), 0.0), 3.2) * step(0.0, L.y);
@@ -168,7 +171,8 @@ const ocean = new THREE.Mesh(new THREE.PlaneGeometry(OCEAN_SPAN, OCEAN_SPAN, 1, 
       float F = 0.02 + 0.98 * pow(1.0 - max(dot(H, V), 0.0), 5.0);
       float spec = min(D * F / (4.0 * max(NdV, 0.2)), 60.0) * step(0.0, L.y);
       float sparkle = pow(NdH, 2400.0) * 1.6 * nearK;
-      col += uSunColor * (spec * 0.032 + sparkle) * clamp(uGlitter, 0.0, 1.3) * NdL;
+      float sunShadowK = mix(0.35, 1.0, mix(1.0, cMask, uCloudShadowK));
+      col += uSunColor * (spec * 0.032 + sparkle) * sunShadowK * clamp(uGlitter, 0.0, 1.3) * NdL;
 
       // Dissolve into directional Mie aerial perspective: cool horizon haze away from sun, warm luminous veil toward sun.
       float sunAlign = max(dot(-V, L), 0.0);

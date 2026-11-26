@@ -4163,6 +4163,7 @@ function updateCameraAndVisuals(dt, now) {
   }
   // Cloud fly-through: white-out fog + sky horizon around the camera (src/atmosphere.js).
   atmosphere.update(dt, vfx.mist, nvg.active);
+  { const wo = vfx.windOffset; world.setCloudOffset(wo.x, wo.z); oceanUniforms.uCloudOff.value.set(wo.x, wo.z); }
   stormFx.update(dt, SUN_DIR);
   // 3D bubble canopy glass: glare / sheen lighting + water driven by rain, cloud and airspeed.
   canopyGlass.update({ dt, time: simTime, rain: flightMode === 'FLY' ? Math.max(weather.rainHere, cloudWet, ambient.rain) : 0,

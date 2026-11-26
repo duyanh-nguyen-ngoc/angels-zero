@@ -692,20 +692,23 @@ export function createWorld(THREE, env) {
           float wetBand = (1.0 - smoothstep(1.2, 4.6, vWPos.y)) * (1.0 - inGorgeMask);
           land = mix(land, mix(uRockB, uShore, gentleCoast), wetBand * 0.75);
           tWet = max(tWet, (1.0 - smoothstep(1.2, 4.2, vWPos.y)) * (1.0 - inGorgeMask));   // wave-wet sand
-          // Stronger erosion cavity / ridge AO: carved gullies & valleys deepen (to 0.54),
+          // Stronger erosion cavity / ridge AO: carved gullies & valleys deepen (to 0.38),
           // convex crests get the uAORidge highlight so jagged ridgelines pop in sunlight.
           float cav = vEro.x;
-          float ao = mix(0.54, 1.0, smoothstep(0.06, 0.50, cav));
-          ao = min(ao * (1.0 + uAORidge * clamp((cav - 0.5) * 2.0, 0.0, 1.0) * 0.55), 1.32);
-          land *= mix(1.0, ao, eroK * smoothstep(1.0, 7.5, vWPos.y));
+          float ao = mix(0.38, 1.0, smoothstep(0.05, 0.52, cav));
+          ao = min(ao * (1.0 + uAORidge * clamp((cav - 0.5) * 2.0, 0.0, 1.0) * 0.62), 1.35);
+          // Raking-light vertical gully darkening along steep hydraulic flow channels (Flyout canyon look).
+          float gully = smoothstep(0.28, 0.78, vEro.z) * smoothstep(0.14, 0.42, slope) * eroK;
+          land *= mix(1.0, ao * (1.0 - 0.34 * gully), eroK * smoothstep(1.0, 7.5, vWPos.y));
           diffuseColor.rgb = land;
         }
         float steep = smoothstep(0.24, 0.54, 1.0 - clamp(vWNrm.y, 0.0, 1.0));
-        float strata = 0.76 + 0.24 * sin(vWPos.y * 0.62 + det * 7.0);
-        // Subtle drifting cloud-shadow dappling across islands & mountains.
-        vec2 cUv = (vWPos.xz + uCloudOff) * 0.00014;
-        float cShad = texture2D(uDetail, cUv).r * 0.65 + texture2D(uDetail, cUv * 2.3 + 0.37).r * 0.35;
-        float cloudMul = mix(1.0, 0.84 + 0.22 * smoothstep(0.28, 0.72, cShad), smoothstep(0.0, 8.0, vWPos.y));
+        float strata = 0.72 + 0.28 * sin(vWPos.y * 0.62 + det * 7.0);
+        // Wind-synced 2D FBM cloud shadows (1/4096 frequency matches ambient.js 4096 m wrap with zero pop).
+        vec2 cUv = (vWPos.xz - uCloudOff) * 0.000244140625;
+        float cShad = texture2D(uDetail, cUv).r * 0.62 + texture2D(uDetail, cUv * 2.0 + vec2(0.37, 0.61)).r * 0.38;
+        float cMask = smoothstep(0.34, 0.66, cShad);
+        float cloudMul = mix(1.0, mix(0.64, 1.04, cMask), uCloudShadowK * smoothstep(0.0, 8.0, vWPos.y) * (1.0 - smoothstep(16000.0, 26000.0, camD)));
         float grainMul = mix(0.76 + 0.48 * det, 0.68 + 0.40 * det + 0.26 * d3v, tRock * 0.75);
         diffuseColor.rgb *= grainMul * mix(1.0, strata, steep) * cloudMul;
         // Micro-height for the normal pass: sharp 3-octave triplanar rock grain + horizontal
@@ -1819,7 +1822,6 @@ export function createWorld(THREE, env) {
     night = nightLevel;
     lightMat.uniforms.uTime.value = t;
     lightMat.uniforms.uNight.value = nightLevel;
-    FARM_U.uCloudOff.value.set(t * 5.2, -t * 4.6);
     if (renderer && camera) lightMat.uniforms.uScale.value = renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
     beamMat.opacity = 0.03 + 0.2 * nightLevel;
     for (const b of beams) b.rotation.y = t * 1.1;
@@ -2061,6 +2063,7 @@ export function createWorld(THREE, env) {
     else envProps.islands.push(o);
   }
 
+  function setCloudOffset(x, z) { FARM_U.uCloudOff.value.set(x, z); }
   function setAtmosphereFog(sunDir, mieCol, mieK, mistK, cloudK) {
     FARM_U.uSun.value.copy(sunDir);
     FARM_U.uMieCol.value.copy(mieCol);
@@ -2071,7 +2074,7 @@ export function createWorld(THREE, env) {
 
   return {
     terrain, props, heightAt, analyticHeight, straitHeight, gorgeHeight, erosionStats, collide, addBox, update, rebuild, envProps,
-    setAtmosphereFog,
+    setAtmosphereFog, setCloudOffset,
     get map() { return activeMap; },
     get mode() { return currentMode; },
     forest: trees.mesh, farmEdge: FARM.edge,
