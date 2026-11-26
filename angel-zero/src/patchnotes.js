@@ -3,6 +3,12 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.2.0', title: 'FLYOUT-GRADE ATMOSPHERE, CLOUD BLOOM & SOLAR GLARE', bullets: [
+    'Rebuilt daylight, dawn, golden-hour and cloud-sea lighting with ~5:1 sun-to-shadow mountain contrast, stratospheric zenith darkening above 15,000 ft, smooth camera auto-exposure and outdoor sky-ground airframe reflections.',
+    'Replaced flat distance fog on terrain, forests and ocean with directional two-tone Mie aerial perspective and height-exponential valley mist pooling in canyons and coves.',
+    'Deepened hydraulic erosion gully striations and synchronized wrap-free cloud shadows across mountains and ocean specular glitter.',
+    'Added sun-through-cloud HDR silver linings on both the upper volumetric deck and 3D cumulus banks, all-cloud solar occlusion, and a display-space photographic solar glare veil with filmic split-tone grading.'
+  ] },
   { version: 'v1.1.90', title: 'CONTINUOUS M1 CANNON FIRE FIX', bullets: [
     'Fixed desktop M1 / F continuous Vulcan cannon fire being cleared every frame when the mobile touch HUD was hidden.'
   ] },
