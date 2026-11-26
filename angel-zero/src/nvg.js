@@ -24,7 +24,7 @@ export function createNVG(THREE, renderer, post) {
   //   strength 0.40, radius 0.6: only HDR emissives -- tracers, muzzle flash,
   //   afterburner cores, the sun -- cross it), OutputPass applies ACES Filmic +
   //   sRGB exactly once. The 2D HUD canvas sits above WebGL, so it never blurs.
-  let composer = null, renderPass = null, bloom = null, gPass = null;
+  let composer = null, renderPass = null, bloom = null, gradePass = null, gPass = null;
   if (post) {
     const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 0 });
     composer = new post.EffectComposer(renderer, rt);
@@ -35,20 +35,40 @@ export function createNVG(THREE, renderer, post) {
     bloom = new post.UnrealBloomPass(new THREE.Vector2(Math.max(1, Math.floor(size.x * 0.25)), Math.max(1, Math.floor(size.y * 0.25))), 0.40, 0.6, BLOOM_THRESHOLD);
     composer.addPass(renderPass); composer.addPass(bloom); composer.addPass(new post.OutputPass());
     if (post.ShaderPass) {
-      const gradePass = new post.ShaderPass({
-        uniforms: { tDiffuse: { value: null } },
+      gradePass = new post.ShaderPass({
+        uniforms: {
+          tDiffuse: { value: null },
+          uSunPos: { value: new THREE.Vector2(0.5, 0.5) },
+          uSunGlare: { value: 0 },
+          uSunCol: { value: new THREE.Vector3(1.0, 0.88, 0.72) },
+          uAspect: { value: size.x / Math.max(1, size.y) }
+        },
         vertexShader: gVert(),
         fragmentShader: `
           uniform sampler2D tDiffuse;
+          uniform vec2 uSunPos; uniform float uSunGlare; uniform vec3 uSunCol; uniform float uAspect;
           varying vec2 vUv;
           void main() {
             vec4 s = texture2D(tDiffuse, vUv);
-            vec3 c = s.rgb;
+            vec3 c = clamp(s.rgb, 0.0, 1.0);
+            // Broad Flyout-style atmospheric solar glare veil (soft radial + gentle anamorphic breath).
+            // Runs after OutputPass in sRGB display space: convert linear uSunCol and use screen-blend rolloff.
+            if (uSunGlare > 0.002) {
+              vec2 d = (vUv - uSunPos) * vec2(uAspect, 1.0);
+              float r = length(d);
+              float veil = exp(-r * 2.0) * 0.36 + exp(-r * 6.8) * 0.30;
+              float anam = exp(-abs(d.y) * 14.0) * exp(-abs(d.x) * 2.4) * 0.14;
+              vec3 sunDisp = pow(clamp(uSunCol, 0.0, 1.0), vec3(1.0 / 2.2));
+              vec3 glareGlow = clamp(sunDisp * uSunGlare * (veil + anam), 0.0, 0.88);
+              c = 1.0 - (1.0 - c) * (1.0 - glareGlow);
+            }
+            // Filmic shadow-cool / highlight-warm split-tone + subtle contrast knee.
             float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
-            c = mix(vec3(l), c, 1.08);
-            vec3 tint = mix(vec3(0.95, 0.98, 1.05), vec3(1.03, 1.01, 0.97), smoothstep(0.15, 0.85, l));
+            c = clamp(mix(vec3(l), c, 1.09), 0.0, 1.0);
+            c = mix(c, c * c * (3.0 - 2.0 * c), 0.08);
+            vec3 tint = mix(vec3(0.93, 0.97, 1.07), vec3(1.04, 1.01, 0.95), smoothstep(0.14, 0.84, l));
             c *= tint;
-            float v = 1.0 - smoothstep(0.58, 1.42, length((vUv - 0.5) * vec2(1.15, 1.0))) * 0.16;
+            float v = 1.0 - smoothstep(0.58, 1.44, length((vUv - 0.5) * vec2(1.15, 1.0))) * 0.17;
             gl_FragColor = vec4(max(c * v, 0.0), s.a);
           }`
       });
@@ -187,6 +207,7 @@ export function createNVG(THREE, renderer, post) {
     if (composer) {
       composer.setSize(size.x, size.y);                                       // target pixel ratio is 1: drawing-buffer px
       bloom.setSize(Math.max(1, Math.floor(size.x * 0.25)), Math.max(1, Math.floor(size.y * 0.25)));    // 0.25-res bloom chain
+      if (gradePass) gradePass.uniforms.uAspect.value = size.x / Math.max(1, size.y);
     }
     gRT.setSize(size.x, size.y);
   }
@@ -224,6 +245,13 @@ export function createNVG(THREE, renderer, post) {
     target: sceneRT,                                   // pre-allocated HDR target (shader warm-up compiles against it)
     get bloom() { return bloom; }, get composer() { return composer; },
     setG, get gPass() { return gPass; }, get gActive() { return gState.active; },
+    setSunGlare(nx, ny, g, r, gr, b) {
+      if (!gradePass) return;
+      const u = gradePass.uniforms;
+      u.uSunPos.value.set(nx, ny);
+      u.uSunGlare.value = g;
+      u.uSunCol.value.set(r, gr, b);
+    },
     setGain(k) { compMat.uniforms.uGain.value = k; },
     get gain() { return compMat.uniforms.uGain.value; },
     get active() { return active; },

@@ -4890,6 +4890,7 @@ atmosphere.bind({
   sunLight, hemiLight, ambLight, renderer, ocean: oceanUniforms,
   setTerrainFog: world.setAtmosphereFog,
   sampleCloudSun: vfx.sampleCloudSun,
+  setSunGlare: nvg.setSunGlare,
   setCloudColors: (top, belly, sun, k) => { vfx.setCloudColors(top, belly, sun, k); vfx.setVaporTint(_vaporTint.setRGB(1, 1, 1).lerp(top, 0.65)); },
   setEnv: k => { for (const m of airframeMats) m.envMapIntensity = k; },
   setNavLights: k => { navLevel = k; },
