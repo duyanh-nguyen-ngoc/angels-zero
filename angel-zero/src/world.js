@@ -346,17 +346,51 @@ export function createWorld(THREE, env) {
   }
 
   /* -------------------------------------------------- terrain mesh */
+  // v1.2.1 seamless RGB detail atlas (built once at boot):
+  //   R  periodic 5-octave value FBM (macro soil / grass / cloud-shadow noise), rescaled to the
+  //      old 0.15..0.85 range so every existing .r consumer keeps its thresholds;
+  //   G  sharp ridged multifractal (1 - |2 fbm - 1|)^2: rock fractures, scree streaks, striations;
+  //   B  high-frequency micro-grain (lattice periods 16 / 32 / 64): no smooth "Play-Doh" ground.
+  // Periodic lattice value noise (like vfx.js vper) on per-period hash tables: the tile wraps
+  // with zero seams and the whole build stays a few tens of ms.
   function detailTexture(size, seed) {
-    const noise = createNoise2D(seed);
-    const cv = document.createElement('canvas'); cv.width = cv.height = size;
-    const ctx = cv.getContext('2d'), img = ctx.createImageData(size, size);
-    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
-      const n = fbm(noise, (x / size) * 8, (y / size) * 8, 5);
-      const v = clamp((0.5 + n * 0.5) * 255, 0, 255);
-      const k = (y * size + x) * 4; img.data[k] = img.data[k + 1] = img.data[k + 2] = v; img.data[k + 3] = 255;
+    let st = (seed * 2654435761) >>> 0;
+    const rnd = () => { st = (st + 0x6d2b79f5) | 0; let t = Math.imul(st ^ (st >>> 15), 1 | st); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const N2 = size * size, R = new Float32Array(N2), G = new Float32Array(N2), B = new Float32Array(N2);
+    // Accumulate one periodic octave (P lattice cells across the tile) into dst, weight amp.
+    // Lattice coordinates are integer-aligned per texel row/column, so the smoothstep weights
+    // and wrapped indices are computed once per column / row (fast boot, zero seams).
+    const sxW = new Float32Array(size), x0I = new Int32Array(size), x1I = new Int32Array(size);
+    function octave(dst, P, amp) {
+      const tb = new Float32Array(P * P); for (let i = 0; i < tb.length; i++) tb[i] = rnd();
+      const off = rnd();                                  // decorrelate octaves (sub-cell phase)
+      for (let x = 0; x < size; x++) {
+        const f = (x / size) * P + off, xi = Math.floor(f), xf = f - xi;
+        sxW[x] = xf * xf * (3 - 2 * xf); x0I[x] = xi % P; x1I[x] = (xi + 1) % P;
+      }
+      for (let y = 0; y < size; y++) {
+        const f = (y / size) * P + off, yi = Math.floor(f), yf = f - yi, sy = yf * yf * (3 - 2 * yf);
+        const r0 = (yi % P) * P, r1 = ((yi + 1) % P) * P, row = y * size;
+        for (let x = 0; x < size; x++) {
+          const a = tb[r0 + x0I[x]], b = tb[r0 + x1I[x]], c = tb[r1 + x0I[x]], d = tb[r1 + x1I[x]], sx = sxW[x];
+          dst[row + x] += amp * (a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy);
+        }
+      }
     }
-    ctx.putImageData(img, 0, 0);
-    const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+    const fbmInto = (dst, periods) => { let amp = 0.5; for (const P of periods) { octave(dst, P, amp); amp *= 0.5; } };
+    fbmInto(R, [4, 8, 16, 32, 64]);
+    fbmInto(G, [6, 12, 24, 48]);
+    fbmInto(B, [16, 32, 64]);
+    { let lo = 1e9, hi = -1e9; for (let i = 0; i < N2; i++) { if (G[i] < lo) lo = G[i]; if (G[i] > hi) hi = G[i]; }
+      for (let i = 0; i < N2; i++) { const r = 1 - Math.abs(2 * (G[i] - lo) / Math.max(1e-6, hi - lo) - 1); G[i] = r * r; } }
+    const stretch = (A, lo2, hi2) => { let lo = 1, hi = 0; for (let i = 0; i < N2; i++) { if (A[i] < lo) lo = A[i]; if (A[i] > hi) hi = A[i]; } const s = (hi2 - lo2) / Math.max(1e-6, hi - lo); for (let i = 0; i < N2; i++) A[i] = lo2 + (A[i] - lo) * s; };
+    stretch(R, 0.15, 0.85); stretch(G, 0.0, 1.0); stretch(B, 0.0, 1.0);
+    const d = new Uint8Array(N2 * 4);
+    for (let i = 0; i < N2; i++) { d[i * 4] = R[i] * 255; d[i * 4 + 1] = G[i] * 255; d[i * 4 + 2] = B[i] * 255; d[i * 4 + 3] = 255; }
+    const t = new THREE.DataTexture(d, size, size, THREE.RGBAFormat);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter;
+    t.generateMipmaps = true; t.anisotropy = 4; t.needsUpdate = true;
+    return t;
   }
   const COL = {
     deep: new THREE.Color(0x162d3d), seabed: new THREE.Color(0x9b967c), coral: new THREE.Color(0x2a8f88),
@@ -460,7 +494,9 @@ export function createWorld(THREE, env) {
   let activeTerrainMode = 'archipelago';
   const OCEAN_HEIGHT = () => SEA_FLOOR_Y;
 
-  const detail = detailTexture(256, 777);
+  const _dt0 = performance.now();
+  const detail = detailTexture(512, 777);
+  const detailMs = +(performance.now() - _dt0).toFixed(1);
   const terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 });
   const lin = hex => new THREE.Color(hex);
   const FARM_U = {
@@ -572,15 +608,20 @@ export function createWorld(THREE, env) {
       .replace('#include <common>', '#include <common>\nuniform sampler2D uDetail; varying vec3 vWPos; varying vec3 vWNrm;\n' + FARM_GLSL)
       .replace('#include <map_fragment>', `#include <map_fragment>
         float camD = length(vWPos - cameraPosition);
-        float det = 0.5, d1v = 0.5, d3v = 0.5;
+        // RGB detail atlas: r macro FBM, g ridged rock fractures, b micro-grain (v1.2.1).
+        float det = 0.5, d1v = 0.5, d3v = 0.5, rockG = 0.5, microB = 0.5, closeB = 0.5;
+        float closeK = 1.0 - smoothstep(1800.0, 3200.0, camD);
         if (camD < 13500.0) {
           vec3 tw = pow(abs(vWNrm), vec3(4.0)); tw /= (tw.x + tw.y + tw.z);
-          float d1 = texture2D(uDetail, vWPos.zy * 0.013).r * tw.x + texture2D(uDetail, vWPos.xz * 0.013).r * tw.y + texture2D(uDetail, vWPos.xy * 0.013).r * tw.z;
+          vec3 t1 = texture2D(uDetail, vWPos.zy * 0.013).rgb * tw.x + texture2D(uDetail, vWPos.xz * 0.013).rgb * tw.y + texture2D(uDetail, vWPos.xy * 0.013).rgb * tw.z;
           float d2 = texture2D(uDetail, vWPos.zy * 0.0022).r * tw.x + texture2D(uDetail, vWPos.xz * 0.0022).r * tw.y + texture2D(uDetail, vWPos.xy * 0.0022).r * tw.z;
-          det = d1 * 0.6 + d2 * 0.4; d1v = d1;
+          det = t1.r * 0.6 + d2 * 0.4; d1v = t1.r; rockG = t1.g; microB = t1.b;
           if (camD < 4800.0) {
-            d3v = texture2D(uDetail, vWPos.zy * 0.038).r * tw.x + texture2D(uDetail, vWPos.xz * 0.038).r * tw.y + texture2D(uDetail, vWPos.xy * 0.038).r * tw.z;
+            vec3 t3 = texture2D(uDetail, vWPos.zy * 0.038).rgb * tw.x + texture2D(uDetail, vWPos.xz * 0.038).rgb * tw.y + texture2D(uDetail, vWPos.xy * 0.038).rgb * tw.z;
+            d3v = t3.r; rockG = mix(rockG, t3.g, 0.5); microB = mix(microB, t3.b, 0.5);
           }
+          // Close-range tactile grain (11.8 m tile): flat pads, hills and valley floors stay textured.
+          if (camD < 3200.0) closeB = texture2D(uDetail, vWPos.xz * 0.085).b * tw.y + texture2D(uDetail, vWPos.zy * 0.085).b * tw.x + texture2D(uDetail, vWPos.xy * 0.085).b * tw.z;
         }
         float inGorgeMask = (uMapMode > 0.5 && uMapMode < 1.5) ? rectMask(vWPos.xz, uGorgeBox, 350.0) * (1.0 - rectMask(vWPos.xz, uAfb, 120.0)) : 0.0;
         // Erosion shading stays off the AFB pad and Port City (flat, authored ground).
@@ -687,9 +728,11 @@ export function createWorld(THREE, env) {
           }
           // Golden-sand beaches on gentle coasts + narrow wave-wet sand rim at the waterline.
           float gentleCoast = (1.0 - smoothstep(0.08, 0.24, slope)) * (1.0 - inGorgeMask) * eroK;
-          float dryBeach = smoothstep(1.2, 3.2, vWPos.y) * (1.0 - smoothstep(7.5, 13.0, vWPos.y)) * gentleCoast;
+          // Waterline bands jittered by micro-grain + macro noise: organic shores, not vertex sawteeth.
+          float shoreY = vWPos.y + (mix(microB, closeB, closeK) - 0.5) * 2.2 + (det - 0.5) * 1.6;
+          float dryBeach = smoothstep(1.2, 3.2, shoreY) * (1.0 - smoothstep(7.5, 13.0, shoreY)) * gentleCoast;
           land = mix(land, uSand * (0.92 + 0.16 * d1v), dryBeach * 0.72);
-          float wetBand = (1.0 - smoothstep(1.2, 4.6, vWPos.y)) * (1.0 - inGorgeMask);
+          float wetBand = (1.0 - smoothstep(1.2, 4.6, shoreY)) * (1.0 - inGorgeMask);
           land = mix(land, mix(uRockB, uShore, gentleCoast), wetBand * 0.75);
           tWet = max(tWet, (1.0 - smoothstep(1.2, 4.2, vWPos.y)) * (1.0 - inGorgeMask));   // wave-wet sand
           // Stronger erosion cavity / ridge AO: carved gullies & valleys deepen (to 0.38),
@@ -709,13 +752,17 @@ export function createWorld(THREE, env) {
         float cShad = texture2D(uDetail, cUv).r * 0.62 + texture2D(uDetail, cUv * 2.0 + vec2(0.37, 0.61)).r * 0.38;
         float cMask = smoothstep(0.34, 0.66, cShad);
         float cloudMul = mix(1.0, mix(0.64, 1.04, cMask), uCloudShadowK * smoothstep(0.0, 8.0, vWPos.y) * (1.0 - smoothstep(16000.0, 26000.0, camD)));
-        float grainMul = mix(0.76 + 0.48 * det, 0.68 + 0.40 * det + 0.26 * d3v, tRock * 0.75);
+        // Rock gets the ridged fracture channel; everything gets close-range micro-grain.
+        float grainMul = mix(0.76 + 0.48 * det, 0.60 + 0.34 * det + 0.22 * d3v + 0.30 * rockG, tRock * 0.8);
+        grainMul *= mix(1.0, 0.86 + 0.28 * closeB, closeK * (vWPos.y > 0.0 ? 1.0 : 0.0));
+        grainMul *= 0.94 + 0.12 * microB;
         diffuseColor.rgb *= grainMul * mix(1.0, strata, steep) * cloudMul;
         // Micro-height for the normal pass: sharp 3-octave triplanar rock grain + horizontal
         // strata ledges on steep faces so cliffs catch crisp raking light.
         // Ledges fade out once a band shrinks below ~1.5 px (no aliasing stripes).
         float ledgeAA = 1.0 - smoothstep(0.35, 1.0, fwidth(vWPos.y) * 0.34);
-        float microH = d3v * 0.85 + d1v * 1.25 + det * 0.55 + steep * sin(vWPos.y * 0.34 + det * 5.2) * 0.26 * ledgeAA;`)
+        float microH = d3v * 0.85 + d1v * 1.25 + det * 0.55 + steep * sin(vWPos.y * 0.34 + det * 5.2) * 0.26 * ledgeAA
+          + rockG * 0.9 * tRock + closeB * 0.55 * closeK + microB * 0.25;`)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
         // Matte 0.95 on dry rock / soil, glossier 0.58 on wet riverbeds, drainage, shore and snow.
         roughnessFactor = mix(0.95, 0.58, clamp(max(tWet, tSnow * 0.82), 0.0, 1.0));`)
@@ -2073,7 +2120,7 @@ export function createWorld(THREE, env) {
   }
 
   return {
-    terrain, props, heightAt, analyticHeight, straitHeight, gorgeHeight, erosionStats, collide, addBox, update, rebuild, envProps,
+    terrain, props, heightAt, analyticHeight, straitHeight, gorgeHeight, erosionStats, detailMs, collide, addBox, update, rebuild, envProps,
     setAtmosphereFog, setCloudOffset,
     get map() { return activeMap; },
     get mode() { return currentMode; },

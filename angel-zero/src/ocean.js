@@ -88,10 +88,12 @@ const ocean = new THREE.Mesh(new THREE.PlaneGeometry(OCEAN_SPAN, OCEAN_SPAN, 1, 
       // Each octave fades out once its wavelength nears the pixel footprint, so the
       // short waves never alias into moire stripes in the middle distance.
       vec2 g = vec2(0.0);
-      wave(p, normalize(vec2(0.83, 0.56)), 210.0, 0.050 * sw * (1.0 - smoothstep(9000.0, 26000.0, dist)), tw, g);
-      wave(p, normalize(vec2(0.38, 0.92)), 118.0, 0.042 * sw * (1.0 - smoothstep(4000.0, 12000.0, dist)), tw, g);
-      if (dist < 5000.0) wave(p, normalize(vec2(-0.62, 0.78)), 61.0, 0.034 * sw * (1.0 - smoothstep(1500.0, 5000.0, dist)), tw, g);
-      if (dist < 2200.0) wave(p, normalize(vec2(0.95, -0.30)), 29.0, 0.026 * sw * (1.0 - smoothstep(600.0, 2200.0, dist)), tw, g);
+      // v1.2.1: ~55 % gentler slopes; steep broad waves swung the Fresnel reflection
+      // between white horizon and navy sky in big "cow-print" blotches.
+      wave(p, normalize(vec2(0.83, 0.56)), 210.0, 0.020 * sw * (1.0 - smoothstep(9000.0, 26000.0, dist)), tw, g);
+      wave(p, normalize(vec2(0.38, 0.92)), 118.0, 0.017 * sw * (1.0 - smoothstep(4000.0, 12000.0, dist)), tw, g);
+      if (dist < 5000.0) wave(p, normalize(vec2(-0.62, 0.78)), 61.0, 0.015 * sw * (1.0 - smoothstep(1500.0, 5000.0, dist)), tw, g);
+      if (dist < 2200.0) wave(p, normalize(vec2(0.95, -0.30)), 29.0, 0.012 * sw * (1.0 - smoothstep(600.0, 2200.0, dist)), tw, g);
       // Detail octaves fade with distance (no shimmer / moire far out); skip distant texture reads.
       float nearK = 1.0 - smoothstep(350.0, 4000.0, dist);
       float midK = 1.0 - smoothstep(2500.0, 22000.0, dist);
@@ -106,8 +108,8 @@ const ocean = new THREE.Mesh(new THREE.PlaneGeometry(OCEAN_SPAN, OCEAN_SPAN, 1, 
         n4 = texture2D(uN1, p * 0.067 + vec2(-tw * 0.05, -tw * 0.04)).rgb * 2.0 - 1.0;   // micro ripples (100 ft skim)
       }
       float rough = 1.0 + 1.5 * uChop;
-      vec2 slope = g + nB.xy * 0.2 + (n1.xy + n2.xy) * 0.21 * midK * rough
-                 + n3.xy * 0.11 * (1.0 + uChop) * nearK + n4.xy * 0.055 * nearK;
+      vec2 slope = g + nB.xy * 0.055 + (n1.xy + n2.xy) * 0.085 * midK * rough
+                 + n3.xy * 0.075 * (1.0 + uChop) * nearK + n4.xy * 0.048 * nearK;   // sleek from altitude, crisp at sea-skim
       vec3 N = normalize(vec3(-slope.x, 1.0, -slope.y));
       vec3 V = normalize(uCam - vWorldPos);
       vec3 L = normalize(uSun);
@@ -129,8 +131,8 @@ const ocean = new THREE.Mesh(new THREE.PlaneGeometry(OCEAN_SPAN, OCEAN_SPAN, 1, 
       // shelves, and multi-band animated surf foam (after ProceduralTerrains WaterMaterial).
       vec2 cUv = (p - uCloudOff) * 0.000244140625;
       float cRaw = texture2D(uN1, cUv).r * 0.62 + texture2D(uN2, cUv * 2.0 + vec2(0.37, 0.61)).r * 0.38;
-      float cMask = smoothstep(0.36, 0.64, cRaw);
-      float cShad = mix(1.0, mix(0.68, 1.02, cMask), uCloudShadowK * (1.0 - smoothstep(14000.0, 36000.0, dist)));
+      float cMask = smoothstep(0.22, 0.78, cRaw);                       // broad, soft cloud shadows (no cow-spots)
+      float cShad = mix(1.0, mix(0.84, 1.0, cMask), uCloudShadowK * (1.0 - smoothstep(14000.0, 36000.0, dist)));
       vec3 deepC = uDeep * (0.84 + 0.34 * NdV) * cShad + vec3(0.0, 0.032, 0.042) * max(0.0, slope.x + slope.y) * NdL;
       float crestK = clamp(length(g) * 5.2 + max(0.0, slope.x * L.x + slope.y * L.z) * 1.9, 0.0, 1.0);
       float backLit = pow(max(dot(V, -normalize(vec3(L.x, L.y * 0.32, L.z))), 0.0), 3.2) * step(0.0, L.y);
@@ -158,14 +160,15 @@ const ocean = new THREE.Mesh(new THREE.PlaneGeometry(OCEAN_SPAN, OCEAN_SPAN, 1, 
       // Fresnel sky reflection: navy looking straight down -> the sky / horizon at
       // grazing angles, gently relaxed over ultra-shallows so turquoise shelves & seabed stay readable.
       vec3 R = reflect(-V, N);
-      vec3 refl = mix(uFog, uSky, smoothstep(0.02, 0.45, R.y));
-      float fres = pow(1.0 - NdV, 4.0) * (1.0 - 0.34 * clamp(shoalTurq + seabedVis * 0.5, 0.0, 1.0));
-      // (capped a touch below 1 near the jet so facet-scale glare never reads as snow)
-      vec3 col = mix(body, refl * 0.92, clamp(0.02 + 0.98 * fres, 0.0, mix(0.82, 1.0, smoothstep(800.0, 6000.0, dist))));
+      // Wide sky gradient so small wave tilts never snap from navy to white; physical water
+      // Schlick Fresnel (F0 = 0.02) capped at 0.62 near the jet rising to 0.92 at the horizon.
+      vec3 refl = mix(uFog, uSky, smoothstep(-0.08, 0.58, R.y));
+      float fres = (0.02 + 0.98 * pow(1.0 - NdV, 5.0)) * (1.0 - 0.34 * clamp(shoalTurq + seabedVis * 0.5, 0.0, 1.0));
+      vec3 col = mix(body, refl * 0.92, clamp(fres, 0.0, mix(0.62, 0.92, smoothstep(1500.0, 12000.0, dist))));
 
       // Sun specular: GGX lobe, crisp near the jet and widening with distance into a
       // shimmering glitter lane stretching to the horizon; micro sparkle up close.
-      float a = (mix(0.04, 0.17, smoothstep(400.0, 16000.0, dist)) + 0.06 * uChop) * (0.85 + 0.15 * min(uGlitter, 1.6));
+      float a = (mix(0.028, 0.12, smoothstep(400.0, 18000.0, dist)) + 0.05 * uChop) * (0.85 + 0.15 * min(uGlitter, 1.6));   // tighter sun lane
       float a2 = a * a, dd = NdH * NdH * (a2 - 1.0) + 1.0;
       float D = a2 / (3.14159265 * dd * dd);
       float F = 0.02 + 0.98 * pow(1.0 - max(dot(H, V), 0.0), 5.0);

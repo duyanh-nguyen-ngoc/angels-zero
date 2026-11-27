@@ -16,7 +16,7 @@
 export const WEATHER = {
   // Theatre weather paired with the CLOUD_SEA lighting preset: a cohesive cumulus sea at
   // 3,500-5,800 ft (sea: 1 switches vfx to the cloud-sea layout), crisp air, light chop.
-  CLOUD_SEA:     { label: 'DAYLIGHT // CLOUD SEA', chip: 'CLOUD SEA // 3,500-5,800 FT', coverage: 0.8, overcast: 0.0, fogMul: 0.95, rain: 0, chop: 0.16, turb: 0.04, storm: 0, sea: 1 },
+  CLOUD_SEA:     { label: 'DAYLIGHT // CLOUD SEA', chip: 'CLOUD SEA // 3,500-5,800 FT', coverage: 0.48, overcast: 0.0, fogMul: 0.95, rain: 0, chop: 0.16, turb: 0.04, storm: 0, sea: 1 },
   CLEAR:        { label: 'CLEAR',             chip: 'CLEAR',             coverage: 0.3,  overcast: 0.0,  fogMul: 0.9, rain: 0,    chop: 0.05, turb: 0,    storm: 0 },
   SCATTERED:     { label: 'SCATTERED',         chip: 'SCATTERED CLOUD',   coverage: 0.72, overcast: 0.12, fogMul: 1.05, rain: 0,   chop: 0.2,  turb: 0.05, storm: 0 },
   OVERCAST_RAIN: { label: 'OVERCAST // RAIN',  chip: 'OVERCAST // RAIN',  coverage: 1.0,  overcast: 0.86, fogMul: 2.3, rain: 0.62, chop: 0.62, turb: 0.15, storm: 0 },

@@ -56,10 +56,10 @@ export function createNVG(THREE, renderer, post) {
             if (uSunGlare > 0.002) {
               vec2 d = (vUv - uSunPos) * vec2(uAspect, 1.0);
               float r = length(d);
-              float veil = exp(-r * 2.0) * 0.36 + exp(-r * 6.8) * 0.30;
+              float veil = exp(-r * 1.55) * 0.44 + exp(-r * 5.2) * 0.34;   // v1.2.1: wider veil wraps ridges & cloud edges
               float anam = exp(-abs(d.y) * 14.0) * exp(-abs(d.x) * 2.4) * 0.14;
               vec3 sunDisp = pow(clamp(uSunCol, 0.0, 1.0), vec3(1.0 / 2.2));
-              vec3 glareGlow = clamp(sunDisp * uSunGlare * (veil + anam), 0.0, 0.88);
+              vec3 glareGlow = clamp(sunDisp * uSunGlare * (veil + anam), 0.0, 0.62);   // cap: veil, never a white-out
               c = 1.0 - (1.0 - c) * (1.0 - glareGlow);
             }
             // Filmic shadow-cool / highlight-warm split-tone + subtle contrast knee.

@@ -3,6 +3,12 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.2.1', title: 'FLYOUT VISUAL REBUILD — CLEAN VOLUMETRIC CLOUDS, SLEEK OCEAN & CRISP TERRAIN', bullets: [
+    'Clouds are clean and silky: the grainy stipple and hatching in the volumetric deck are gone, cloud bellies are brighter and airier, low cumulus is softer, and the Cloud Sea now leaves most of the sky open blue.',
+    'The ocean reads as deep, sleek sapphire water: no more white-and-navy blotches, gentler swell, softer cloud shadows, a realistic horizon reflection and a crisp glittering sun lane.',
+    'Terrain gets a new seamless rock-and-grain detail texture, so cliffs show sharp fractures, and runways, beaches and hills have fine surface texture with organic shorelines instead of smooth plastic.',
+    'Cloud Sea now flies under a blazing low sun ahead and to the left with a cobalt-to-cyan sky, Daylight has raking light on the mountains, and looking into the sun gives a soft creamy glare.'
+  ] },
   { version: 'v1.2.0', title: 'FLYOUT-GRADE ATMOSPHERE, CLOUD BLOOM & SOLAR GLARE', bullets: [
     'Rebuilt daylight, dawn, golden-hour and cloud-sea lighting with ~5:1 sun-to-shadow mountain contrast, stratospheric zenith darkening above 15,000 ft, smooth camera auto-exposure and outdoor sky-ground airframe reflections.',
     'Replaced flat distance fog on terrain, forests and ocean with directional two-tone Mie aerial perspective and height-exponential valley mist pooling in canyons and coves.',

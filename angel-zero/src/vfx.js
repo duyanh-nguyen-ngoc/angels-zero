@@ -1259,14 +1259,14 @@ export function createVFX(THREE, env) {
     const u = (x + windOff.x) / DECK_SCALE, v = (z + windOff.z) / DECK_SCALE;
     // Coverage field + two-tier cumulus turret mask + pseudo-3-D billows / erosion.
     const s = 0.56 * samp(nR, u, v) + 0.30 * slice3(nG, u * 2.6 + 0.37, v * 2.6 + 0.61, h * 3.8)
-      + 0.14 * (slice3(nG, u * 5.9, v * 5.9, h * 6.8) - 0.5);
+      + 0.14 * (slice3(nG, u * 5.9, v * 5.9, h * 3.4) - 0.5);
     const tRaw = Math.min(1, Math.max(0, 0.65 * samp(nR, u * 1.35 + 0.21, v * 1.35 + 0.73) + 0.35 * samp(nG, u * 2.1, v * 2.1)));
     const turret = Math.pow(tRaw, 1.85);
     const lift = deckThr + 0.28 * h * h - 0.24 * turret * ss(0.15, 0.85, h);
     const cov = ss(lift, lift + 0.16, s);
     if (cov <= 0) return 0;
     let d = cov * ss(0, 0.16, h) * ss(1.0, 0.78, h);
-    d -= slice3(nB, u * 8.5, v * 8.5, h * 7.5) * 0.24 * (1 - 0.25 * h);
+    d -= slice3(nB, u * 8.5, v * 8.5, h * 3.6) * 0.24 * (1 - 0.25 * h);
     return Math.min(1, Math.max(0, d * 1.75)) * hole;
   }
   // Pseudo-3-D noise: blend two 2-D slices (hashed offsets) by the fractional depth z.
@@ -1304,14 +1304,16 @@ export function createVFX(THREE, env) {
       if (uHoleK > 0.0) for (int i = 0; i < 3; i++) hole = min(hole, ssf(uWin[i].z - 700.0, uWin[i].z + 1400.0, length(p.xz - uWin[i].xy)));
       if (hole <= 0.0) return 0.0;
       vec2 uv = (p.xz + uWind.xz) / ${DECK_SCALE.toFixed(1)};
+      // v1.2.1: half the slice frequency on the detail terms (fewer pseudo-3-D slice
+      // boundaries across the slab = no wavy bands on the underside); JS twin matches.
       float s = 0.56 * NOISE(uv).r + 0.30 * slice3(uv * 2.6 + vec2(0.37, 0.61), h * 3.8).g
-        + 0.14 * (slice3(uv * 5.9, h * 6.8).g - 0.5);
+        + 0.14 * (slice3(uv * 5.9, h * 3.4).g - 0.5);
       float turret = pow(clamp(0.65 * NOISE(uv * 1.35 + vec2(0.21, 0.73)).r + 0.35 * NOISE(uv * 2.1).g, 0.0, 1.0), 1.85);
       float lift = uThr + 0.28 * h * h - 0.24 * turret * ssf(0.15, 0.85, h);
       float cov = ssf(lift, lift + 0.16, s);
       if (cov <= 0.0) return 0.0;
       float d = cov * ssf(0.0, 0.16, h) * ssf(1.0, 0.78, h);
-      d -= slice3(uv * 8.5, h * 7.5).b * 0.24 * (1.0 - 0.25 * h);
+      d -= slice3(uv * 8.5, h * 3.6).b * 0.24 * (1.0 - 0.25 * h);
       return clamp(d * 1.75, 0.0, 1.0) * hole;
     }`;
 
@@ -1360,17 +1362,19 @@ export function createVFX(THREE, env) {
         }
         if (t1 <= t0) discard;
         float len = min(t1 - t0, 11000.0);
-        const int STEPS = 24;
-        // Geometric steps: fine where the ray enters the cloud skin, growing
-        // 12 % per step for silky close-up billows with zero hatching.
-        const float GROW = 1.12;
+        // v1.2.1: 32 geometric steps growing 8 % each. The step lengths are identical
+        // for every pixel (no per-pixel stepL scaling): without a TAA resolve, scaling
+        // the step by the dither changed each pixel's integrated optical depth and
+        // coated the sky in stipple / diagonal hatching.
+        const int STEPS = 32;
+        const float GROW = 1.08;
         float stepL = len * (GROW - 1.0) / (pow(GROW, float(STEPS)) - 1.0);
-        // Interleaved gradient noise ray-offset dither (no row-correlated streaks), rotated per frame.
-        vec2 fc = gl_FragCoord.xy + vec2(5.588238, 5.588238) * uFrame;
-        float jit = fract(52.9829189 * fract(dot(fc, vec2(0.06711056, 0.00583715))));
-        // jitter by a fractional step index so the offset scales with the growing steps
-        float t = t0 + stepL * (pow(GROW, jit) - 1.0) / (GROW - 1.0);
-        stepL *= pow(GROW, jit);
+        // Static ray-start offset from a SMOOTH direction-space noise (not a per-pixel hash):
+        // neighbouring pixels get nearly the same offset, so there is no stipple / hatching,
+        // while step-index bands are warped into soft organic shapes instead of straight lines.
+        gLod = 0.0;
+        float jit = NOISE(rd.xz * 2.7 / (abs(rd.y) + 0.35) + vec2(0.13, 0.71)).b;
+        float t = t0 + stepL * (jit * 0.9);
         float T = 1.0, tHit = -1.0;
         vec3 col = vec3(0.0);
         float cosT = dot(rd, uSun);
@@ -1388,18 +1392,18 @@ export function createVFX(THREE, env) {
             if (T > 0.06) {
               float lodV = gLod;
               gLod = lodV + 1.2;
-              float od = deckDensity(p + sunL * (135.0 + 85.0 * jit)) * 240.0;
+              float od = deckDensity(p + sunL * 165.0) * 240.0;       // fixed taps: a jittered light march = pepper noise without TAA
               gLod = lodV + 2.4;
-              od += deckDensity(p + sunL * (480.0 + 160.0 * jit)) * 460.0;
+              od += deckDensity(p + sunL * 540.0) * 460.0;
               gLod = lodV;
               float beer = exp(-od * 0.0068);
               float powder = 1.0 - exp(-od * 0.018);
               Tl = beer * mix(1.0, 0.45 + 1.15 * powder, 0.55);
             }
             float h = clamp((p.y - y0) / (y1 - y0), 0.0, 1.0);
-            vec3 amb = mix(uBelly * 0.62, uTop * 1.05, smoothstep(0.05, 0.82, h));
+            vec3 amb = mix(uBelly * 0.78, uTop * 1.05, smoothstep(0.05, 0.82, h));   // brighter, airier bellies
             vec3 S = amb * 0.56 + uSunCol * Tl * (0.48 + phase) * 1.08 + vec3(0.75, 0.8, 1.0) * uFlash * 0.6;
-            float a = 1.0 - exp(-d * 0.0062 * stepL);                      // Beer-Lambert extinction
+            float a = 1.0 - exp(-d * 0.0048 * stepL);                      // Beer-Lambert extinction (softer, less muddy)
             col += T * a * S;
             T *= 1.0 - a;
             if (T < 0.02) break;
@@ -1428,6 +1432,9 @@ export function createVFX(THREE, env) {
         // Above the deck, grazing rays (< ~1-3 deg below the horizon) skim the dome
         // tops and alias into horizontal bands: fade them into the haze instead.
         if (ro.y > y1) alpha *= smoothstep(0.012, 0.05, -rd.y);
+        // Same from below the base: near-horizontal rays skim kilometres of the deck's
+        // underside with coarse steps and smear into streaks -> dissolve them into the haze.
+        else if (ro.y < y0) alpha *= smoothstep(0.008, 0.045, rd.y);
         gl_FragColor = vec4(col, alpha);
         ${isGL2 ? '#ifdef USE_LOGDEPTHBUF\n          gl_FragDepth = log2(1.0 + max(dist * dot(rd, uCamFwd), 1.0)) * logDepthBufFC * 0.5;\n        #endif' : ''}
         #include <tonemapping_fragment>
@@ -1637,7 +1644,7 @@ export function createVFX(THREE, env) {
         float near = smoothstep(uNear.x, uNear.y, d);                    // 180 -> 40 m: fade into the vapour
         if (near < 0.002) discard;
         // Sculpted cauliflower normal (view space) + crevice AO from the atlas.
-        vec2 lobeN = (tex.rg * 2.0 - 1.0) * 0.95;
+        vec2 lobeN = (tex.rg * 2.0 - 1.0) * 0.55;                         // softer lobes: volumetric, not cotton balls
         float crevice = tex.b;
         float r2 = min(dot(vQ, vQ), 1.0);
         vec3 n = normalize(vec3(vQ * 0.78 + lobeN, sqrt(1.0 - r2) + 0.32));
@@ -1656,7 +1663,7 @@ export function createVFX(THREE, env) {
         float rimEdge = (1.0 - smoothstep(0.08, 0.58, a)) * smoothstep(0.04, 0.16, a) * (0.35 + 0.65 * vH);
         float rimBloom = (hg(cosT, 0.86) * 0.35 + pow(max(cosT, 0.0), 16.0) * 0.60) * rimEdge;
         col += min(uSunCol * rimBloom * clamp(uGain, 0.0, 1.2), vec3(1.55));
-        gl_FragColor = vec4(col, a * uOpacity * vAlpha * near);
+        gl_FragColor = vec4(col, a * smoothstep(0.06, 0.22, a) * uOpacity * vAlpha * near);   // feathered puff edge
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
         #ifdef USE_FOG
@@ -1704,7 +1711,8 @@ export function createVFX(THREE, env) {
       b.on = cloudSea ? !!b.sea : !b.sea && b.rank < 0.5 + 0.5 * k;    // CLEAR ~65 %, SCATTERED ~86 %, overcast all
     }
     // Sea mode: the deck drops to 3,500-5,800 ft beyond the arena with a broken-cumulus threshold.
-    deckThr = cloudSea ? 0.28 : 0.6 - 0.4 * k;                          // CLEAR 0.48 / SCATTERED 0.31 / OVERCAST 0.20
+    // v1.2.1: higher thresholds keep ~65-75 % of the sky open blue (CLEAR 0.53 / SCATTERED 0.37 / OVERCAST 0.26).
+    deckThr = cloudSea ? 0.44 : 0.64 - 0.38 * k;
     [deckBase, deckThick] = cloudSea ? DECK_SEA : DECK_HI;
     deckWin.k = cloudSea ? 1 : 0;
     const u = deckMat.uniforms;

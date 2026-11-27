@@ -25,9 +25,11 @@ export const PRESETS = {
   // mist gradient, the same #95b1cc in the lower dome, the fog and the ocean far fade.
   // Warm-white key below the bloom threshold, cool low fill so undersides stay shadowed.
   CLOUD_SEA: {
-    label: 'DAYLIGHT // CLOUD SEA', sunEl: 42, lightEl: 42, az: 332, moon: false, window: [10 * 60 + 30, 13 * 60 + 30],
-    horizon: 0x9ec2e2, mid: 0x356cb0, zenith: 0x143870, mie: 0xffe4bc, mieK: 0.72, disc: 0xfff6e6, discK: 1.0, discSize: 0.99990,
-    light: 0xfff4e0, lightI: 3.35, hemiSky: 0x5f86b4, hemiGround: 0x161f2b, hemiI: 0.62, amb: 0x5c7596, ambI: 0.11,
+    // v1.2.1 Flyout look: a blazing low sun (20 deg) up-left of the opening heading (az 342),
+    // crisp cobalt zenith -> vibrant azure -> luminous pale cyan horizon, strong creamy Mie.
+    label: 'DAYLIGHT // CLOUD SEA', sunEl: 20, lightEl: 20, az: 342, moon: false, window: [10 * 60 + 30, 13 * 60 + 30],
+    horizon: 0xbad6ee, mid: 0x286ec8, zenith: 0x0c3478, mie: 0xffe4bc, mieK: 0.9,   // 1.25 milked out the sun-side sky in captures disc: 0xfff6e6, discK: 1.0, discSize: 0.99990,
+    light: 0xfff4e0, lightI: 3.65, hemiSky: 0x5f86b4, hemiGround: 0x111a26, hemiI: 0.55, amb: 0x5c7596, ambI: 0.09,
     exposure: 1.02, fogK: 0.72, stars: 0, corona: 1.05,
     oceanSun: 0xffe8c4, oceanSunK: 1.05, oceanSky: 0x4b709c, oceanLevel: 1.0, glitter: 1.05,
     cloudTop: 0xf7faff, cloudBelly: 0x3d5575, env: 1.12, nvgGain: 2.1, nav: 0.0, exact: 1
@@ -41,9 +43,9 @@ export const PRESETS = {
     cloudTop: 0xffd2be, cloudBelly: 0x5f6288, env: 0.90, nvgGain: 3.2, nav: 0.45
   },
   DAYLIGHT: {
-    label: 'CLEAR DAYLIGHT', sunEl: 46, lightEl: 46, moon: false, window: [11 * 60 + 20, 14 * 60 + 10],
-    horizon: 0xa4d0f8, mid: 0x2670d8, zenith: 0x0b316b, mie: 0xffd69e, mieK: 0.95, disc: 0xfff3dc, discK: 1.0, discSize: 0.99990,
-    light: 0xfff0d4, lightI: 3.85, hemiSky: 0x8eb8e0, hemiGround: 0x18212b, hemiI: 0.78, amb: 0x708ca8, ambI: 0.14,
+    label: 'CLEAR DAYLIGHT', sunEl: 28, lightEl: 28, moon: false, window: [11 * 60 + 20, 14 * 60 + 10],   // raking, not flat noon (v1.2.1)
+    horizon: 0xa4d0f8, mid: 0x2670d8, zenith: 0x0b316b, mie: 0xffd69e, mieK: 1.15, disc: 0xfff3dc, discK: 1.0, discSize: 0.99990,
+    light: 0xfff0d4, lightI: 3.85, hemiSky: 0x8eb8e0, hemiGround: 0x18212b, hemiI: 0.65, amb: 0x708ca8, ambI: 0.11,
     exposure: 1.02, fogK: 0.96, stars: 0, corona: 1.05,
     oceanSun: 0xffe2b6, oceanSunK: 1.1, oceanSky: 0x456998, oceanLevel: 1.0, glitter: 1.1,
     cloudTop: 0xffffff, cloudBelly: 0x466387, env: 1.22, nvgGain: 2.1, nav: 0.0
@@ -457,7 +459,7 @@ export function createAtmosphere(THREE, env) {
     const inFront = _n.z < 1 && skyDir.dot(_fwd) > 0;
     if (bound.setSunGlare) {
       const glare = !moon && !nvg && inFront
-        ? Math.pow(lookSun, 2.0) * (0.35 + 0.65 * rawTarget) * (0.55 + 0.45 * cloudSunVis) * cur.mieK * 0.42
+        ? Math.pow(lookSun, 2.0) * (0.35 + 0.65 * rawTarget) * (0.55 + 0.45 * cloudSunVis) * Math.min(cur.mieK, 1.0) * 0.6   // v1.2.1 creamy veil (mieK capped: a 1.25 Mie preset x 0.68 milked out the whole frame)
         : 0;
       bound.setSunGlare(_n.x * 0.5 + 0.5, _n.y * 0.5 + 0.5, Math.min(1, glare), cur.mie.r, cur.mie.g, cur.mie.b);
     }
