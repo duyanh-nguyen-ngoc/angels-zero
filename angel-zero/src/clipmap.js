@@ -14,8 +14,8 @@
 // the exact twin of terrainpack.js createSampler().heightAt (CPU).
 // 8 draw calls; ~200k visible triangles; zero allocations in update().
 
-import { CRAG_AMP } from './geography.js?v=s10ter2';
-import { CRAG_FADE } from './terrainpack.js?v=s10ter2';
+import { CRAG_AMP } from './geography.js?v=s10ter6';
+import { CRAG_FADE } from './terrainpack.js?v=s10ter6';
 
 export const CM_LEVELS = 8, CM_M = 128, CM_SPACING0 = 8;
 
@@ -35,10 +35,20 @@ export const TERRAIN_HEIGHT_GLSL = `
       + 1300.0 * pow(hzSS(inland, 2200.0, 5600.0), 1.1) * (0.55 + 0.45 * r);
     return inland < 0.0 ? sea : land;
   }
+  // Twin of geography.horizonDetail: ridged relief beyond the baked core (0 at its edge).
+  float horizonDetail(vec2 p, float inland) {
+    float hs = 0.5 * (uCore.w - 1.0) * uCore.z;
+    vec2 c = uCore.xy + hs;
+    float e = max(abs(p.x - c.x), abs(p.y - c.y)) - hs;
+    float k = hzSS(e, 0.0, 3000.0) * hzSS(inland, 1800.0, 5200.0);
+    float r1 = 1.0 - abs(sin(p.x * 0.0021 + sin(p.y * 0.0013) * 1.9) * sin(p.y * 0.0019 + sin(p.x * 0.0011) * 2.3));
+    float r2 = 1.0 - abs(sin(p.x * 0.0053 + sin(p.y * 0.0037) * 1.4) * sin(p.y * 0.0047 - sin(p.x * 0.0029) * 1.7));
+    return k * (260.0 * r1 * r1 + 90.0 * r2 * r2 - 150.0);
+  }
   float horizonHeight(vec2 p) {
     float r = horizonRidge(p);
     float inland = uMapId > 1.5 ? abs(p.x) - 5600.0 : hzSmax(-12900.0 - p.y, p.x - 11900.0, 1500.0);
-    return alpineProfile(inland, r);
+    return alpineProfile(inland, r) + horizonDetail(p, inland);
   }
   float cragNoise(vec2 p) { return sin(p.x * 0.173 + sin(p.y * 0.061) * 2.3) * sin(p.y * 0.157 + sin(p.x * 0.047) * 1.9); }
   float decodeQ(ivec2 t) { vec2 rg = texelFetch(uHeight, t, 0).rg; return floor(rg.r * 255.0 + 0.5) * 256.0 + floor(rg.g * 255.0 + 0.5); }

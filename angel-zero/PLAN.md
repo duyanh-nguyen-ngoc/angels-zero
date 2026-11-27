@@ -163,6 +163,8 @@ Status legend: `[x]` implemented and verified Â· `[ ]` open — gaps listed.
   - Geography: northern + eastern mainland alpine range (peaks ~1,716 m, snowline
     950-1,250 m), gorge massif + dam valley around the unchanged trench, strait walls
     1,100-1,550 m; analytic `horizonHeight` ring outside the core (JS + GLSL twins).
+    v1.2.6: `horizonDetail` adds ridged sine relief beyond the core (0 at the core edge, so the
+    seam and the baker apron are unchanged; GPU probe still <= 2.5 cm out to 45 km).
   - Rendering: 8-level clipmap (M = 128, 8 m -> 1,024 m spacing, 131 km), one shared
     grid, coarse-level triangles under the finer level collapsed, CDLOD morph; 8 draw
     calls, <= 262k triangles. Per-pixel normals (RG8) + splat in the fragment stage;

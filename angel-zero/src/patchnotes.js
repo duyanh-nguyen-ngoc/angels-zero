@@ -3,6 +3,10 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.2.6', title: 'DISTANT RANGES WITH REAL RELIEF', bullets: [
+    'The far mountain ranges beyond the 40 km battle area now rise in ridged spurs and valleys instead of one smooth snowfield, so high-altitude and clear-sky views read as real mountains all the way to the horizon.',
+    'Crash, missile and CCIP heights still match the rendered ground exactly out there.'
+  ] },
   { version: 'v1.2.5', title: 'AERODYNAMIC VAPOR, WIND & THERMAL VFX', bullets: [
     'Replaced dotty over-wing vapor sprites with conformal 3D wing/LERX condensation shells and spiral LEX vortex tubes with scrolling turbulence and sun shading.',
     'Added depth-occluded exhaust heat shimmer (tail/wings never warp behind plumes), buoyant-to-supersonic plume drift, nozzle thermal heat-soak glow and hot-runway asphalt mirage.',

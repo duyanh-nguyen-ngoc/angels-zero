@@ -55,10 +55,21 @@ function alpineProfile(inland, ridge) {
   return 3 + 38 * ss(inland, 30, 1200) + 170 * ss(inland, 900, 3200)
     + 1300 * Math.pow(ss(inland, 2200, 5600), 1.1) * (0.55 + 0.45 * ridge);
 }
+// Ridged sine relief for the ring beyond the baked core only: exactly 0 at the core edge, so
+// the baked seam and the baker's apron blend (always inside the core) are unchanged.
+// GLSL twin: horizonDetail() in clipmap.js.
+export function horizonDetail(x, z, inland) {
+  const e = Math.max(Math.abs(x - CORE.CX), Math.abs(z - CORE.CZ)) - CORE.SIZE / 2;
+  const k = ss(e, 0, 3000) * ss(inland, 1800, 5200);
+  if (k <= 0) return 0;
+  const r1 = 1 - Math.abs(Math.sin(x * 0.0021 + Math.sin(z * 0.0013) * 1.9) * Math.sin(z * 0.0019 + Math.sin(x * 0.0011) * 2.3));
+  const r2 = 1 - Math.abs(Math.sin(x * 0.0053 + Math.sin(z * 0.0037) * 1.4) * Math.sin(z * 0.0047 - Math.sin(x * 0.0029) * 1.7));
+  return k * (260 * r1 * r1 + 90 * r2 * r2 - 150);
+}
 export function horizonHeight(x, z, mapId) {
   const r = horizonRidge(x, z);
-  if (mapId === 2) return alpineProfile(Math.abs(x) - 5600, r);
-  return alpineProfile(smax(-12900 - z, x - 11900, 1500), r);
+  const inland = mapId === 2 ? Math.abs(x) - 5600 : smax(-12900 - z, x - 11900, 1500);
+  return alpineProfile(inland, r) + horizonDetail(x, z, inland);
 }
 // Close-range rock displacement (m, before the slope / protect gate): +/-1.
 export function cragNoise(x, z) {

@@ -12,7 +12,7 @@
 //   outside the core       : horizonHeight(x, z, mapId) (GLSL twin in clipmap.js).
 // Zero allocations per query.
 
-import { CORE, horizonHeight, cragNoise, cragGate, CRAG_AMP, MAP_IDS, ss } from './geography.js?v=s10ter2';
+import { CORE, horizonHeight, cragNoise, cragGate, CRAG_AMP, MAP_IDS, ss } from './geography.js?v=s10ter6';
 
 export const CRAG_FADE = [1500, 2500];                     // m from the viewer (CPU == GPU)
 

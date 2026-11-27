@@ -32,14 +32,14 @@
 // (same Uint16 bilinear + crag + horizon), so crashes, missiles, bombs and props agree with
 // what is on screen (scripts/terrain_parity.mjs checks it).
 
-export { WORLD, RWY, CORE } from './geography.js?v=s10ter2';
+export { WORLD, RWY, CORE } from './geography.js?v=s10ter6';
 const FT = 0.3048;
-import { WORLD, RWY, CORE, createGeography } from './geography.js?v=s10ter2';
+import { WORLD, RWY, CORE, createGeography } from './geography.js?v=s10ter6';
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { loadTerrainPack, createSampler } from './terrainpack.js?v=s10ter2';
-import { createClipmap, CM_VERTEX_PARS, CM_VERTEX_BODY, TERRAIN_HEIGHT_GLSL } from './clipmap.js?v=s10ter2';
-import { createClutter } from './clutter.js?v=s10ter3';
+import { loadTerrainPack, createSampler } from './terrainpack.js?v=s10ter6';
+import { createClipmap, CM_VERTEX_PARS, CM_VERTEX_BODY, TERRAIN_HEIGHT_GLSL } from './clipmap.js?v=s10ter6';
+import { createClutter } from './clutter.js?v=s10ter6';
 import { gorgeCentreX, gorgeSlope, gorgeHeading, gorgeDist, GORGE_FLOOR_Y, GORGE_RIM_Y, GORGE_CRATER_R,
   GORGE_CRATER_WALL_Y, GORGE_CRATER_Z, GORGE_GATE_Z, GORGE_GATE_N, GORGE_FORT, CEIL_M,
   GORGE_BBOX, GORGE_HALF_W, GORGE_RAMP_W, SEA_FLOOR_Y, RUNWAY_BBOX,

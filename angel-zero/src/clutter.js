@@ -94,7 +94,7 @@ export function createClutter(THREE, env) {
     x.fillStyle = g; x.fillRect(0, 0, 32, 32);
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
   })();
-  const lightMat = new THREE.PointsMaterial({ size: 7, map: dotTex, vertexColors: true, transparent: true, opacity: 0,
+  const lightMat = new THREE.PointsMaterial({ size: 13, map: dotTex, vertexColors: true, transparent: true, opacity: 0,
     depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true, fog: false });
 
   /* ------------------------------------------------------------ streamed instance layers */
@@ -257,7 +257,8 @@ export function createClutter(THREE, env) {
         const base = lo - 0.4, h = hi - base + hgt;
         houses.push([x, base, z, yaw, w, h, d, hash(vi, tries, 10)]);
         auditPts.push([x, z, base, hi + hgt, 'house']);
-        if (hash(vi, tries, 11) < 0.7) winLights.push(x, hi + hgt * 0.45, z, 1.0, 0.78, 0.45);
+        // window glow just outside the front facade (local +Z), at ground-floor window height
+        if (hash(vi, tries, 11) < 0.75) winLights.push(x + Math.sin(yaw) * (d / 2 + 0.5), hi + 2.2, z + Math.cos(yaw) * (d / 2 + 0.5), 1.0, 0.78, 0.45);
         k++;
       }
     });
@@ -505,7 +506,7 @@ export function createClutter(THREE, env) {
       lightPos[l + 3] = x - fx * 2.4; lightPos[l + 4] = y + 0.3; lightPos[l + 5] = z - fz * 2.4;
     }
     if (nc) { carMesh.instanceMatrix.needsUpdate = true; lightGeo.attributes.position.needsUpdate = true; }
-    lightMat.opacity = Math.min(1, Math.max(0, (night - 0.25) * 1.6));
+    lightMat.opacity = ss(night, 0.1, 0.4);                  // town + traffic lights come on through dusk
     lights.visible = lightMat.opacity > 0.01;
   }
 
