@@ -646,6 +646,7 @@
           <button class="mute" id="muteBtn" type="button">MUTE [M]</button>
           <button class="mute music-btn" id="musicBtn" type="button" aria-pressed="true">[ MUSIC: ON ] K</button>
           <button class="mute" id="cinematicBtn" type="button" aria-pressed="true">[ CINEMATIC: ON ]</button>
+          <button class="mute" id="gfxBtn" type="button" title="AUTO adapts resolution, sky rays and water reflections to hold the frame rate">[ GRAPHICS: AUTO ]</button>
         </div>
         <div class="btns">
           <button class="secondary-btn" id="restartBtn" type="button">[ RESTART MISSION ]</button>
@@ -836,7 +837,7 @@ import { createAmbient } from './src/ambient.js?v=s9ex';
 import { createStormFX } from './src/stormfx.js?v=s9ex';
 import { createWetDeck } from './src/wetdeck.js?v=s9ex';
 import { createBlastFX } from './src/blastfx.js?v=s10vfx1';
-import { createHUD } from './src/hud.js?v=s10gp1';
+import { createHUD } from './src/hud.js?v=s11gfx1';
 import { createCockpit3D } from './src/cockpit3d.js?v=s9ex';
 import { createCockpitF22 } from './src/cockpit_f22.js?v=s9ex';
 import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s11wat1';
@@ -845,12 +846,12 @@ import { createAudio } from './src/audio.js?v=s9ex';
 import { createYouTubeMusic } from './src/ytmusic.js?v=s10fly7';
 import { createRadio } from './src/radio.js?v=s9ex';
 import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9ex';
-import { createLivery } from './src/livery.js?v=s9ex';
+import { createLivery } from './src/livery.js?v=s11gfx1';
 import { createGear, GEAR_H, GEAR_PTS, GEAR_UNITS, setGearPoints } from './src/gear.js?v=s9ex';
 import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s11wat1';
 import { createCanopyFX } from './src/canopy.js?v=s9ex';
-import { createNVG } from './src/nvg.js?v=s11wat1';
-import { createWorld, WORLD, CORE } from './src/world.js?v=s10ter7';
+import { createNVG } from './src/nvg.js?v=s11gfx1';
+import { createWorld, WORLD, CORE } from './src/world.js?v=s11gfx1';
 import { mulberry32, createNoise2D, fbm } from './src/noise.js?v=s10ter2';
 import { loadTerrainPack } from './src/terrainpack.js?v=s10ter7';
 import { createSurfaces } from './src/surfaces.js?v=s9ex';
@@ -859,7 +860,7 @@ import { createFreeLook } from './src/freelook.js?v=s9ex';
 import { createCanopyGlass } from './src/canopyglass.js?v=s9ex';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9ex';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9ex';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s11wat1';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s11gfx1';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9ex';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9ex';
 import { createRadioQueue } from './src/radioQueue.js?v=s9ex';
@@ -2449,6 +2450,7 @@ async function startSortie() {
   if (hintEl) hintEl.textContent = 'LOADING CARRIER…';
   await world.prepare(MAPS[m.mapTag] || MAPS.ARCHIPELAGO);   // lazy terrain pack (memoised)
   await loadMissionScene(m);
+  setTimeout(applyTextureQuality, 1500);                     // carrier GLB / mission props: capped anisotropy once
   radioReset(); preloadRadioOnce();
   audio.canopyClose();
   if (m.launch === 'CATAPULT' || m.launchType === 'CARRIER') await enterCarrierLaunch(m);
@@ -4807,6 +4809,80 @@ blast = createBlastFX(THREE, { scene, camera, terrainHeight, sunDir: SUN_DIR, wi
   setCinematicFx(cinOn);
   if (cinBtn) cinBtn.addEventListener('click', () => setCinematicFx(!cinOn));
 }
+// ---- v1.2.11 GRAPHICS: AUTO / HIGH / LOW + adaptive quality (optimize-threejs-games) ----
+//   HIGH  DPR <= 1.5 (1.25 mobile), planar reflections, 32-sample sky rays, distortion.
+//   LOW   DPR 1.0, reflections / sky rays / distortion off.
+//   AUTO  starts at HIGH; a 60-frame rolling frame-time ring (Float32Array, zero allocation)
+//         steps down when avg > 26 ms (render scale 1.0 -> 0.85 -> 0.72, sky rays 32 -> 18,
+//         then planar reflections off) and back up when avg < 15 ms, with cooldowns.
+const GFX_KEY = 'angelsZero_gfx', GFX_MODES = ['AUTO', 'HIGH', 'LOW'];
+const GFX_MOBILE = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+const GFX_DPR_CAP = GFX_MOBILE ? 1.25 : 1.5, GFX_SCALES = [1.0, 0.85, 0.72];
+const gfx = { mode: 'AUTO', level: 0, ring: new Float32Array(60), idx: 0, n: 0, sum: 0, cool: 0, steps: 0, scale: 1, dpr: 1 };
+try { const sv = localStorage.getItem(GFX_KEY); if (GFX_MODES.includes(sv)) gfx.mode = sv; } catch (e) { /* ignore */ }
+if (DEBUG && Q.has('gfx') && GFX_MODES.includes(String(Q.get('gfx')).toUpperCase())) gfx.mode = String(Q.get('gfx')).toUpperCase();
+function applyGfx() {
+  const low = gfx.mode === 'LOW', lv = gfx.mode === 'AUTO' ? gfx.level : 0;
+  gfx.scale = low ? 1 : GFX_SCALES[Math.min(lv, 2)];
+  gfx.dpr = (low ? 1 : Math.min(window.devicePixelRatio || 1, GFX_DPR_CAP)) * gfx.scale;
+  if (Math.abs(renderer.getPixelRatio() - gfx.dpr) > 1e-3) { renderer.setPixelRatio(gfx.dpr); renderer.setSize(innerWidth, innerHeight, false); nvg.setSize(); }
+  nvg.setRayQuality(low ? 0 : (lv >= 2 ? 18 : 32));
+  nvg.setDistortion(!low);
+  oceanReflAllowed = !low && lv < 3;
+  const b = document.getElementById('gfxBtn');
+  if (b) b.textContent = `[ GRAPHICS: ${gfx.mode} ]`;
+}
+function resetGfxRing() { gfx.ring.fill(0); gfx.idx = 0; gfx.n = 0; gfx.sum = 0; }
+function setGfxMode(m) {
+  gfx.mode = GFX_MODES.includes(m) ? m : 'AUTO'; gfx.level = 0; gfx.cool = 90; resetGfxRing();
+  try { localStorage.setItem(GFX_KEY, gfx.mode); } catch (e) { /* ignore */ }
+  applyGfx();
+}
+function gfxTick(realDtSec) {
+  if (gfx.mode !== 'AUTO' || appMode !== 'PLAY' || document.hidden) return;
+  const ms = Math.min(100, realDtSec * 1000), r = gfx.ring;
+  gfx.sum += ms - r[gfx.idx]; r[gfx.idx] = ms; gfx.idx = (gfx.idx + 1) % 60;
+  if (gfx.n < 60) { gfx.n++; return; }
+  if (gfx.cool > 0) { gfx.cool--; return; }
+  const avg = gfx.sum / 60;
+  if (avg > 26 && gfx.level < 3) { gfx.level++; gfx.cool = 120; gfx.steps++; applyGfx(); }
+  else if (avg < 15 && gfx.level > 0) { gfx.level--; gfx.cool = 300; gfx.steps++; applyGfx(); }
+}
+document.getElementById('gfxBtn')?.addEventListener('click', () => setGfxMode(GFX_MODES[(GFX_MODES.indexOf(gfx.mode) + 1) % GFX_MODES.length]));
+applyGfx();
+
+// ---- v1.2.11 hi-res texture sampling (3d-high-resolution-textures) ----
+// Capped anisotropic filtering on every mipmapped scene texture (terrain detail atlas, runway
+// asphalt + markings, carrier deck, liveries, cockpit), data maps forced to NoColorSpace.
+// Runs once per texture (WeakSet), after boot and after each mission scene / carrier mount.
+const MAX_ANISO = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+const _texSeen = new WeakSet(), TEX_DATA_SLOTS = ['normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'bumpMap', 'displacementMap'];
+const TEX_SLOTS = ['map', 'emissiveMap', ...TEX_DATA_SLOTS];
+const texStats = { textures: 0, aniso: 0, colorFix: 0, estMiB: 0 };
+function tuneTexture(t, isData) {
+  if (!t || !t.isTexture || t.isRenderTargetTexture || _texSeen.has(t)) return;
+  _texSeen.add(t);
+  const img = t.image, w = img && (img.width || img.videoWidth), h = img && (img.height || img.videoHeight);
+  if (!w || !h) return;
+  texStats.textures++; texStats.estMiB += w * h * 4 * (t.generateMipmaps !== false ? 1.333 : 1) / 1048576;
+  let dirty = false;
+  if (isData && t.colorSpace !== THREE.NoColorSpace) { t.colorSpace = THREE.NoColorSpace; dirty = true; texStats.colorFix++; }
+  const mip = t.minFilter === THREE.LinearMipmapLinearFilter || t.minFilter === THREE.LinearMipmapNearestFilter;
+  if (mip && t.magFilter !== THREE.NearestFilter && t.anisotropy !== MAX_ANISO) { t.anisotropy = MAX_ANISO; dirty = true; texStats.aniso++; }
+  if (dirty) t.needsUpdate = true;
+}
+function applyTextureQuality() {
+  scene.traverse(o => {
+    const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : null;
+    if (!ms) return;
+    for (const m of ms) {
+      for (const k of TEX_SLOTS) tuneTexture(m[k], TEX_DATA_SLOTS.includes(k));
+      if (m.uniforms) for (const k in m.uniforms) { const v = m.uniforms[k] && m.uniforms[k].value; if (v && v.isTexture) tuneTexture(v, false); }
+    }
+  });
+  if (DEBUG) console.log('[ANGELS_ZERO] textures ' + texStats.textures + ' aniso x' + MAX_ANISO + '=' + texStats.aniso + ' colorFix=' + texStats.colorFix + ' estVRAM=' + texStats.estMiB.toFixed(1) + ' MiB gpuTex=' + renderer.info.memory.textures);
+}
+setTimeout(applyTextureQuality, 4000);
 const DIFF_FORCED = DEBUG && Q.has('difficulty') && DIFFICULTY_PRESETS[Q.get('difficulty').toUpperCase()] ? Q.get('difficulty').toUpperCase() : null;
 const tele = createTelemetry();                             // one fixed buffer set for the whole session
 let ambient = null;                                     // set after combatSys exists; onSmoke closure reads it later
@@ -6230,6 +6306,7 @@ function animate() {
   PERF_DEBUG.calls = renderer.info.render.calls;
   PERF_DEBUG.triangles = renderer.info.render.triangles;
   PERF_DEBUG.frameMs = +(performance.now() - t0).toFixed(2);
+  gfxTick(realDt);
   canopyFx.update(dt, appMode === 'PLAY' && flightMode === 'FLY' ? combat.playerCloud || 0 : 0, state.speed, firstPerson, appMode !== 'MENU',
     appMode === 'PLAY' && flightMode === 'FLY' ? weather.rainHere : 0);
   hud.draw();
@@ -6252,7 +6329,7 @@ addEventListener('resize', () => {
   hud.resize();
 });
 if (DEBUG) {
-  window.__az = { oceanSys, nvgRef: nvg, scene, camera, renderer, state, combat, combatSys, ambient, eject, audio, mouse, keys, vfx, blast, get blastShake() { return blastShake; }, flyShake, onFlyby, onWing, wingmen, hud, cockpit, perf, jet, cockpitHidden, terrainHeight, setView, freeLook, world, nvg, setNVG, gpuWarm, mcam, slowMo, get timeScale() { return timeScale; }, triggerSlowMo, get selectedSPW() { return selectedSPW; }, get selectedLivery() { return selectedLivery; }, loadSPW, loadLivery, saveSPW, saveLivery, SQUADRON, SPW, get camMode() { return camMode; }, get firstPerson() { return firstPerson; },
+  window.__az = { oceanSys, nvgRef: nvg, gfxState: gfx, setGfxMode, applyTextureQuality, texStats, scene, camera, renderer, state, combat, combatSys, ambient, eject, audio, mouse, keys, vfx, blast, get blastShake() { return blastShake; }, flyShake, onFlyby, onWing, wingmen, hud, cockpit, perf, jet, cockpitHidden, terrainHeight, setView, freeLook, world, nvg, setNVG, gpuWarm, mcam, slowMo, get timeScale() { return timeScale; }, triggerSlowMo, get selectedSPW() { return selectedSPW; }, get selectedLivery() { return selectedLivery; }, loadSPW, loadLivery, saveSPW, saveLivery, SQUADRON, SPW, get camMode() { return camMode; }, get firstPerson() { return firstPerson; },
     get appMode() { return appMode; },
     // Feel-pass scalars / test hooks (all reads are snapshot objects allocated on demand, never per frame).
     get dbgFeel() { return { spdHold, aoaHoldDeg, aoaHoldT, abatAt, abCD, transK, superK, wrK, wrPhase }; },

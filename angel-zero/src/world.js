@@ -118,7 +118,7 @@ export function createWorld(THREE, env) {
     for (let i = 0; i < N2; i++) { d[i * 4] = R[i] * 255; d[i * 4 + 1] = G[i] * 255; d[i * 4 + 2] = B[i] * 255; d[i * 4 + 3] = 255; }
     const t = new THREE.DataTexture(d, size, size, THREE.RGBAFormat);
     t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter;
-    t.generateMipmaps = true; t.anisotropy = 4; t.needsUpdate = true;
+    t.generateMipmaps = true; t.anisotropy = 8; t.colorSpace = THREE.NoColorSpace; t.needsUpdate = true;   // data atlas; three caps aniso at the device max
     return t;
   }
   const COL = {

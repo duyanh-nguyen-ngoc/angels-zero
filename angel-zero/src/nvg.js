@@ -25,7 +25,7 @@ export function createNVG(THREE, renderer, post) {
   //   afterburner cores, the sun -- cross it), OutputPass applies ACES Filmic +
   //   sRGB exactly once. The 2D HUD canvas sits above WebGL, so it never blurs.
   let composer = null, renderPass = null, distortPass = null, bloom = null, gradePass = null, gPass = null;
-  let cinematic = true;
+  let cinematic = true, distortAllowed = true;      // GRAPHICS LOW turns screen-space distortion off
   const distortScene = new THREE.Scene();
   const distortRT = new THREE.WebGLRenderTarget(Math.max(1, size.x >> 1), Math.max(1, size.y >> 1), {
     format: THREE.RGBAFormat, type: THREE.UnsignedByteType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: true
@@ -398,7 +398,7 @@ export function createNVG(THREE, renderer, post) {
     if (!active) {
       if (!composer) { renderer.render(scene, camera); return; }
       let hasDistort = false;
-      if (cinematic && distortPass && distortScene.children.length > 0) {
+      if (cinematic && distortAllowed && distortPass && distortScene.children.length > 0) {
         for (let i = 0; i < distortScene.children.length; i++) {
           if (distortScene.children[i].visible) { hasDistort = true; break; }
         }
@@ -467,6 +467,7 @@ export function createNVG(THREE, renderer, post) {
     },
     setGain(k) { compMat.uniforms.uGain.value = k; },
     setSkyRays,
+    setDistortion(on) { distortAllowed = !!on; if (!distortAllowed && distortPass) distortPass.enabled = false; },
     setRayQuality(samples) { rayState.samples = samples | 0; rayState.allowed = samples > 0; if (!rayState.allowed) rayPass.enabled = false; },
     get rayQuality() { return rayState.allowed ? rayState.samples : 0; },
     get raysOn() { return rayPass.enabled; },

@@ -1071,48 +1071,81 @@ export function createHUD(THREE, A) {
     ctx.restore();
   }
 
-  // Theatre-aware topography contour sheet, world-aligned and lazily cached per map mode
-  // ('archipelago', 'gorge', 'strait', 'ocean') so radar & debrief match the active map.
+  // Theatre-aware topography sheet (v1.2.11, interactive-topography): world-aligned, baked
+  // ONCE per map mode ('archipelago', 'gorge', 'strait', 'ocean') into a static offscreen
+  // canvas; radar / briefing / debrief only blit it under their dynamic overlays.
+  //   * 512^2 heightAt() samples, low-angle raking hillshade (light from the NW at ~25 deg);
+  //   * marching-triangles isolines, every cell split the same way (no ambiguous saddles),
+  //     edge-interpolated and batched into two anti-aliased strokes: 50 m minor (~0.6 px)
+  //     and 250 m major index contours (~1.0 px), plus the coastline at index weight.
   const topoCache = Object.create(null);
+  const TOPO_N = 512, TOPO_PX = 1024;
   function getTopo() {
     const T = A.terrain, mode = T.getMode ? T.getMode() : 'archipelago';
     if (topoCache[mode]) return topoCache[mode];
-    const N = 384, cv = document.createElement('canvas');
-    cv.width = cv.height = N;
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = TOPO_PX;
     const entry = { cv, x0: T.cx - T.size / 2, z0: T.cz - T.size / 2, size: T.size };
     if (mode === 'ocean') { topoCache[mode] = entry; return entry; }
-    const h = new Float32Array(N * N);
+    const N = TOPO_N, h = new Float32Array(N * N), cell = T.size / (N - 1);
     for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-      h[j * N + i] = T.height(T.cx + ((i + 0.5) / N - 0.5) * T.size, T.cz + ((j + 0.5) / N - 0.5) * T.size);
+      h[j * N + i] = T.height(entry.x0 + i * cell, entry.z0 + j * cell);
     }
-    const ctx = cv.getContext('2d'), img = ctx.createImageData(N, N);
-    const levels = mode === 'gorge'
-      ? [[0, 220], [78, 235], [190, 105], [364, 255], [520, 95], [720, 145]]
-      : mode === 'strait'
-      ? [[0, 255], [120, 95], [280, 115], [460, 135], [640, 155]]
-      : [[0, 255], [100, 80], [250, 100], [500, 120], [750, 140]];
-    for (let j = 0; j < N - 1; j++) for (let i = 0; i < N - 1; i++) {
-      const a = h[j * N + i], b = h[j * N + i + 1], c = h[(j + 1) * N + i];
-      let alpha = 0;
-      for (const [lv, al] of levels) if ((a >= lv) !== (b >= lv) || (a >= lv) !== (c >= lv)) alpha = Math.max(alpha, al);
-      if (mode === 'gorge') {
-        if (a >= 364 && alpha < 34) alpha = 34;          // radar-swept plateau fill
-        else if (a > 0 && a < 110 && alpha < 10) alpha = 10; // low canyon corridor
-        else if (a >= 110 && alpha < 22) alpha = 22;
-      } else if (a > 0 && alpha < 26) {
-        alpha = 26;                                      // subtle land fill so straits / islands read clearly
+    // Raised relief: raking hillshade on land, faint depth tint at sea.
+    const shadeCv = document.createElement('canvas'); shadeCv.width = shadeCv.height = N;
+    const sctx = shadeCv.getContext('2d'), img = sctx.createImageData(N, N);
+    const Lx = -0.62, Ly = 0.42, Lz = -0.66;                 // NW, low sun: slopes read as relief
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const c = h[j * N + i], k = (j * N + i) * 4;
+      if (c <= 0) { img.data[k] = 40; img.data[k + 1] = 140; img.data[k + 2] = 110; img.data[k + 3] = c > -25 ? 14 : 0; continue; }
+      const hl = h[j * N + Math.max(0, i - 1)], hr = h[j * N + Math.min(N - 1, i + 1)];
+      const hu = h[Math.max(0, j - 1) * N + i], hd = h[Math.min(N - 1, j + 1) * N + i];
+      let nx = (hl - hr) / (2 * cell), nz = (hu - hd) / (2 * cell);
+      const inv = 1 / Math.hypot(nx, 1, nz); nx *= inv; nz *= inv;
+      const lam = Math.max(0, nx * Lx + inv * Ly + nz * Lz);     // 0 (away) .. 1 (facing the light)
+      const tone = 0.35 + 0.65 * lam;
+      img.data[k] = 70 * tone; img.data[k + 1] = 255 * tone; img.data[k + 2] = 140 * tone;
+      img.data[k + 3] = 24 + 62 * Math.abs(lam - 0.42);           // relief: both lit and shaded faces lift off
+    }
+    sctx.putImageData(img, 0, 0);
+    const ctx = cv.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(shadeCv, 0, 0, TOPO_PX, TOPO_PX);
+    // Marching triangles: cell (i, j) -> triangles (a, b, d) and (a, d, c), fixed diagonal.
+    const sx = TOPO_PX / (N - 1), minor = new Path2D(), major = new Path2D();
+    const seg = (path, x0, y0, h0, x1, y1, h1, x2, y2, h2, lv) => {
+      let n = 0, ax = 0, ay = 0;
+      const edge = (xa, ya, ha, xb, yb, hb) => {
+        if ((ha < lv) === (hb < lv)) return;
+        const t = (lv - ha) / (hb - ha), px = (xa + (xb - xa) * t) * sx, py = (ya + (yb - ya) * t) * sx;
+        if (n === 0) { ax = px; ay = py; n = 1; } else { path.moveTo(ax, ay); path.lineTo(px, py); n = 2; }
+      };
+      edge(x0, y0, h0, x1, y1, h1); edge(x1, y1, h1, x2, y2, h2); if (n < 2) edge(x2, y2, h2, x0, y0, h0);
+    };
+    const tri = (x0, y0, h0, x1, y1, h1, x2, y2, h2) => {
+      const lo = Math.min(h0, h1, h2), hi = Math.max(h0, h1, h2);
+      if (hi < 0.5) return;                                       // open sea: no isolines
+      for (let lv = Math.max(50, Math.ceil(lo / 50) * 50); lv <= hi; lv += 50) {
+        const isMajor = lv % 250 === 0;
+        seg(isMajor ? major : minor, x0, y0, h0, x1, y1, h1, x2, y2, h2, lv);
       }
-      const k = (j * N + i) * 4;
-      img.data[k] = 82; img.data[k + 1] = 255; img.data[k + 2] = 156; img.data[k + 3] = alpha;
+      if (lo < 0.5 && hi >= 0.5) seg(major, x0, y0, h0, x1, y1, h1, x2, y2, h2, 0.5);   // coastline
+    };
+    for (let j = 0; j < N - 1; j++) for (let i = 0; i < N - 1; i++) {
+      const a = h[j * N + i], b = h[j * N + i + 1], c = h[(j + 1) * N + i], d = h[(j + 1) * N + i + 1];
+      tri(i, j, a, i + 1, j, b, i + 1, j + 1, d);
+      tri(i, j, a, i + 1, j + 1, d, i, j + 1, c);
     }
-    ctx.putImageData(img, 0, 0);
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(82,255,156,0.42)'; ctx.lineWidth = 1.1; ctx.stroke(minor);   // ~0.6 px on the radar / debrief
+    ctx.strokeStyle = 'rgba(150,255,190,0.85)'; ctx.lineWidth = 1.9; ctx.stroke(major);  // ~1.0 px index contours
     // Runway + bridge spans as bright strokes (only where those structures exist on the active map).
     if (mode === 'archipelago' || mode === 'gorge') {
-      const toPx = ([wx, wz]) => [((wx - (T.cx - T.size / 2)) / T.size) * N, ((wz - (T.cz - T.size / 2)) / T.size) * N];
+      const toPx = ([wx, wz]) => [((wx - entry.x0) / T.size) * TOPO_PX, ((wz - entry.z0) / T.size) * TOPO_PX];
       for (const m of T.marks || []) {
         if (mode === 'gorge' && m.kind === 'bridge' && m.pts[0][0] < 0) continue; // west bridge omitted inside gorge bbox
         ctx.strokeStyle = m.kind === 'runway' ? 'rgba(220,255,235,1)' : 'rgba(88,255,154,0.95)';
-        ctx.lineWidth = m.kind === 'runway' ? 2.2 : 1.6;
+        ctx.lineWidth = m.kind === 'runway' ? 5 : 3.6;
         ctx.beginPath(); m.pts.map(toPx).forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke();
       }
     }

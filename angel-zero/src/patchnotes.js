@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.2.11', title: 'GRAPHICS SELECTOR, ADAPTIVE QUALITY, SHARPER TEXTURES & TOPOGRAPHIC MAPS', bullets: [
+    'New [ GRAPHICS: AUTO / HIGH / LOW ] button in Controls & Audio. AUTO watches your frame rate and smoothly trades resolution, sky-ray samples and water reflections to hold it, then steps back up when there is headroom.',
+    'Runway markings, carrier deck lines, terrain detail and airframe decals stay crisp at grazing angles (capped 8x anisotropic filtering), with colour and data textures handled correctly.',
+    'The radar and debrief maps now show raised-relief hillshading with fine 50 m and bold 250 m elevation contours, drawn once per theatre so they cost nothing in flight.'
+  ] },
   { version: 'v1.2.10', title: 'ULTRA-REALISTIC OCEAN, MIRROR REFLECTIONS & CREPUSCULAR SKY RAYS', bullets: [
     'The sea is rebuilt around an 8-wave deep-water swell shaded per pixel: crisp wave faces up close that melt smoothly into the horizon with no shimmer, a turquoise glow through sunlit crests and a sparkling HDR sun path.',
     'Breaking crests now throw lacy, cellular whitecap foam, and the carrier and escorts leave real Kelvin wakes: 19° diverging wave arms, a churned white stern wash and a calm slick behind them.',

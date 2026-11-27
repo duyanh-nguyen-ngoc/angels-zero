@@ -191,6 +191,25 @@ Status legend: `[x]` implemented and verified Â· `[ ]` open — gaps listed.
     (tree base error <= 7 mm); smoke `assertMission` now checks the active pack, clipmap
     budget, clutter audit and RWY height per theatre.
 
+- [x] **5-skill visual & performance overhaul** *(v1.2.10 + v1.2.11, builds `s11wat1` / `s11gfx1`)*
+  - Ocean (`src/ocean.js`): 8-wave deep-water Gerstner spectrum shaded per pixel from analytic
+    derivatives with per-wave footprint fade, CPU float64 phases wrapped relative to the 1 km
+    snap origin, baked 512^2 detail tile, clamped reflection vector, subsurface crest glow, HDR
+    glitter, Jacobian lacy foam, analytic 19.3 deg Kelvin wakes (`combat.fillWakeShips`), and a
+    half-res planar reflection pass (`REFLECT_LAYER` 3: clipmap terrain, `world.props`, carrier +
+    ships; not the jet, whose VFX children are camera-bound). Beer-Lambert shallows, cloud
+    shadows and Mie haze kept.
+  - Sky rays (`src/nvg.js`): half-res sky-energy mask from the composer depth texture (separate
+    depth texture on `renderTarget2`: `RenderTarget.clone()` shares the Source), 32/18-sample
+    radial march, additive linear-HDR composite before bloom with log-depth foreground
+    attenuation; fed by `atmosphere.js` (`setSkyRays`).
+  - GRAPHICS AUTO/HIGH/LOW (`angelsZero_gfx`, debug `?gfx=`), DPR cap 1.5 / 1.25 mobile, 60-frame
+    ring: >26 ms steps render scale 1 -> 0.85 -> 0.72, rays 32 -> 18, reflections off; <15 ms
+    steps back up. `applyTextureQuality()` caps anisotropy at min(8, max) on mipmapped textures
+    and forces data maps to NoColorSpace (debug VRAM estimate).
+  - Topography (`src/hud.js` `getTopo`): 512^2 heightAt samples, raking hillshade, marching-
+    triangles 50 m / 250 m contours + coastline, cached per theatre.
+
 ## Pillar 4 — Combat Loop, Ballistics & VFX (`src/weapons.js`, `src/vfx.js`, `src/audio.js`)
 - [x] **Two-stage targeting** *(build `s24a`)* — APG-63 auto-designates the
   best bandit in the 30 deg / 8 NM forward radar cone (green brackets, type,

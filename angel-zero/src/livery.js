@@ -113,6 +113,7 @@ export function createLivery(THREE, model, LIVERIES, wingMeshes = []) {
   die(74, 62, 40, [[0.25, 0.25], [0.75, 0.25], [0.5, 0.5]]);      // 2
   dc.font = '700 21px sans-serif'; dc.textAlign = 'center'; dc.fillText('32', 64, 124);
   const decalTex = new THREE.CanvasTexture(diceCanvas);
+  decalTex.colorSpace = THREE.SRGBColorSpace; decalTex.anisotropy = 8;      // albedo artwork; grazing-angle airframe decal
   const decalMat = new THREE.MeshBasicMaterial({ map: decalTex, transparent: true, depthWrite: false,
     polygonOffset: true, polygonOffsetFactor: -2, opacity: 0, side: THREE.DoubleSide });
   const decalGeo = new THREE.PlaneGeometry(1.6, 1.6);
