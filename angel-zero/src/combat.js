@@ -6144,14 +6144,14 @@ const _bfmOut = aceBFM.bfmOut, _bfmLos = aceBFM.los, _bfmUp = aceBFM.up, _bfmMat
       if (C.mcfg.freeFlight) { C.flares = 0; C.chaff = 0; C.weapon = 'NONE'; C.comms.length = 0; }
       else {
         C.flares = FLR_MAX; C.chaff = C.chaffMax;
-        if (C.weapon === 'NONE') C.weapon = C.weaponsLock.msl ? 'GUN' : 'MSL';
+        C.weapon = C.weaponsLock.msl ? (C.weaponsLock.gun ? 'NONE' : 'GUN') : 'MSL';
       }
       C.blockedLaunches = 0; C.aceRounds = 0; C.aceHits = 0;
       C.sunT = 0; C.sunCD = 0; C.sunBlinds = 0; C.sunBannerT = 0;
       C.mslIntercepts = 0; C.interceptBannerT = 0; C.interceptSlowCD = 0;
       const stages = C.mcfg.stages;
       if (stages && stages.length) {
-        for (const e of enemies) if (!e.ace && !e.bomber) { e.alive = false; e.wreck = null; if (e.g) e.g.visible = false; }
+        for (const e of enemies) { e.alive = false; e.wreck = null; e.ace = false; e.aceFlight = false; e.duel = false; e.bomber = false; if (e.g) e.g.visible = false; }
         aceFlightDone = false; C.acePair = [];
         spawnStage(0);
       } else {

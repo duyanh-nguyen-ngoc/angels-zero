@@ -840,7 +840,7 @@ import { createBlastFX } from './src/blastfx.js?v=s10vfx1';
 import { createHUD } from './src/hud.js?v=s11gfx1';
 import { createCockpit3D } from './src/cockpit3d.js?v=s9ex';
 import { createCockpitF22 } from './src/cockpit_f22.js?v=s9ex';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s10can5';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s10can7';
 import { createEjection } from './src/eject.js?v=s9ex';
 import { createAudio } from './src/audio.js?v=s9ex';
 import { createYouTubeMusic } from './src/ytmusic.js?v=s10fly7';
@@ -851,7 +851,7 @@ import { createGear, GEAR_H, GEAR_PTS, GEAR_UNITS, setGearPoints } from './src/g
 import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s11wat1';
 import { createCanopyFX } from './src/canopy.js?v=s9ex';
 import { createNVG } from './src/nvg.js?v=s11gfx1';
-import { createWorld, WORLD, CORE } from './src/world.js?v=s10can6';
+import { createWorld, WORLD, CORE } from './src/world.js?v=s10can7';
 import { mulberry32, createNoise2D, fbm } from './src/noise.js?v=s10ter2';
 import { loadTerrainPack, loadTerrainMeta } from './src/terrainpack.js?v=s10ter8';
 import { createSurfaces } from './src/surfaces.js?v=s9ex';
@@ -1733,7 +1733,23 @@ function showMenu(kind) {
   launchBtn.focus({ preventScroll: true });
 }
 function hideMenu() { return hideMenuEl(); }
-function launchSortie() {
+let launchingSortie = false;
+async function launchSortie() {
+  if (appMode !== 'MENU' || !modelReady || launchingSortie) return;
+  launchingSortie = true;
+  const m = mission();
+  const hintEl = document.getElementById('menuHint');
+  const oldHint = hintEl ? hintEl.textContent : '';
+  if (hintEl) hintEl.textContent = 'LOADING MISSION…';
+  launchBtn.disabled = true;
+  try {
+    await world.prepare(MAPS[m.mapTag] || MAPS.ARCHIPELAGO);
+    if (m.launch === 'CATAPULT' || m.launchType === 'CARRIER') await carrierReady;
+  } finally {
+    launchBtn.disabled = false;
+    if (hintEl) hintEl.textContent = oldHint;
+    launchingSortie = false;
+  }
   if (appMode !== 'MENU' || !modelReady) return;
   missionT = 0;
   audio.init();
@@ -1753,7 +1769,7 @@ function launchSortie() {
   } else {
     radioSys.reset();
   }
-  startSortie();
+  return startSortie();
 }
 
 /* ---------------------------------------------------------------------------
@@ -3044,7 +3060,7 @@ function syncSBRoster() {
   const m = typeof mission === 'function' ? mission() : null;
   const ff = !!(m && m.freeFlight);
   const solo = ff || (combat && combat.mcfg && combat.mcfg.wingmen === 'NONE');
-  el.textContent = ff ? 'UNARMED' : (combat && combat.mcfg && combat.mcfg.wingmen === 'NONE' ? 'LEAD ONLY' : selectedSPW);
+  el.textContent = ff ? 'UNARMED' : (combat && combat.mcfg && combat.mcfg.gunsOnly ? 'GUNS ONLY' : selectedSPW);
   el.className = 'spwBadge spw-' + selectedSPW;
   const r2 = document.getElementById('sbRole2'), r3 = document.getElementById('sbRole3');
   if (r2) { r2.textContent = solo ? '—' : selectedRoles.w2; r2.style.display = solo ? 'none' : ''; }

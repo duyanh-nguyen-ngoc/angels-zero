@@ -1770,7 +1770,7 @@ export function createWorld(THREE, env) {
     prepare, set onPackReady(fn) { onPackReady = fn; }, clipmap, geography: G, terrainUniforms: TERRAIN_U, clutter,
     get sampler() { return sampler; }, get packs() { return packs; },
     get terrainStats() {
-      const o = { clipmap: clipmap.stats(), active: sampler.pack.map, packs: {} };
+      const o = { clipmap: clipmap.stats(), active: oceanMode ? 'ocean' : sampler.pack.map, packs: {} };
       for (const k in packs) if (packs[k]) o.packs[k] = { loadMs: packs[k].loadMs || 0, bytes: packs[k].meta.stats.bytes.total, maxH: packs[k].meta.stats.maxH };
       return o;
     },
