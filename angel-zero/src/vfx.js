@@ -23,7 +23,9 @@ function rng(seed) {
 
 export function createVFX(THREE, env) {
   const { scene, camera, jet, renderer, terrainHeight } = env;
+  const distortScene = env.distortScene || null;
   const isF22 = env.aircraft === 'F22A';
+  let cinematic = true;
   // Debug-only overrides (e.g. ?debug&force=cone,vapor,mist) so stills can show transient effects.
   const force = {};
   for (const k of (env.force || [])) force[k] = true;
@@ -84,7 +86,8 @@ export function createVFX(THREE, env) {
       #ifdef CORE
         float shock = pow(0.5 + 0.5 * cos(t * uDiam * 6.2831853), 4.0);
         float osc = 0.78 + 0.22 * sin(uTime * 45.0);
-        vec3 col = mix(vec3(0.88, 0.98, 1.0), vec3(0.22, 0.82, 1.0), smoothstep(0.0, 0.7, t));
+        vec3 col = mix(vec3(1.0, 0.96, 0.88), vec3(1.0, 0.56, 0.22), smoothstep(0.0, 0.72, t))
+          + vec3(0.72, 0.88, 1.0) * shock * 0.45 * (1.0 - t);
         float a = pow(facing, 1.6) * pow(1.0 - t, 1.25) * (0.28 + 1.15 * shock * osc) * smoothstep(0.0, 0.04, t);
       #else
         float flick = 0.74 + 0.26 * sin(t * 21.0 - uTime * 33.0 + vAng * 3.0) * sin(uTime * 9.0 + t * 7.0);
@@ -126,6 +129,35 @@ export function createVFX(THREE, env) {
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false, fog: false
   });
   const glowCoreGeo = new THREE.CircleGeometry(0.46, 32);
+  const heatGeo = new THREE.CylinderGeometry(0.45, 1.45, 1, 16, 12, true);
+  heatGeo.rotateX(Math.PI / 2);
+  heatGeo.translate(0, 0, 0.5);
+  const heatMat = new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uStr: { value: 0 } },
+    vertexShader: `
+      varying vec2 vUv; varying vec3 vN; varying vec3 vV;
+      void main() {
+        vUv = uv;
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vN = normalize(normalMatrix * normal);
+        vV = -mv.xyz;
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      uniform float uTime; uniform float uStr;
+      varying vec2 vUv; varying vec3 vN; varying vec3 vV;
+      void main() {
+        float facing = pow(abs(dot(normalize(vN), normalize(vV))), 1.7);
+        float along = smoothstep(0.0, 0.14, vUv.y) * (1.0 - smoothstep(0.45, 1.0, vUv.y));
+        float w1 = sin(vUv.y * 28.0 - uTime * 34.0 + vUv.x * 12.566);
+        float w2 = cos(vUv.y * 47.0 - uTime * 51.0 - vUv.x * 18.849);
+        vec2 off = vec2(w1 * 0.7 + w2 * 0.3, w2 * 0.7 - w1 * 0.3) * 0.35;
+        float str = facing * along * uStr;
+        gl_FragColor = vec4(0.5 + off.x, 0.5 + off.y, 0.0, clamp(str, 0.0, 0.85));
+      }`,
+    transparent: true, depthWrite: false, side: THREE.DoubleSide
+  });
+  const _hzOff = new THREE.Vector3(), _hzQ = new THREE.Quaternion(), _hzE = new THREE.Euler();
   const plumes = [];
   function attachPlume(localPos) {
     const g = new THREE.Group();
@@ -140,10 +172,17 @@ export function createVFX(THREE, env) {
     outer.renderOrder = 2; core.renderOrder = 3; glow.renderOrder = 2;
     const light = new THREE.PointLight(0xff8a30, 2.5, 26, 2);
     const lightOff = localPos.clone().add(new THREE.Vector3(0, 0, 1.85));
+    let heatMesh = null;
+    if (distortScene) {
+      heatMesh = new THREE.Mesh(heatGeo, heatMat);
+      heatMesh.frustumCulled = false;
+      heatMesh.visible = false;
+      distortScene.add(heatMesh);
+    }
     g.add(outer, core, glow);
     jet.add(g);
     scene.add(light);                                // keep light in scene so hiding plume/jet never changes NUM_POINT_LIGHTS
-    plumes.push({ g, light, lightOff, bx, by });
+    plumes.push({ g, light, lightOff, bx, by, localOff: g.position.clone(), heatMesh });
   }
   const CORE_COOL = new THREE.Color(0.75, 0.30, 0.08),
     CORE_HOT = isF22 ? new THREE.Color(2.4, 1.95, 1.65) : new THREE.Color(2.5, 1.65, 1.05);
@@ -174,10 +213,24 @@ export function createVFX(THREE, env) {
     const shimmer = 1 + ab * 0.08 * (0.6 * Math.sin(now * 2 * Math.PI * 23) + 0.4 * Math.sin(now * 2 * Math.PI * 31));
     glowCoreMat.uniforms.uCol.value.copy(CORE_COOL).multiplyScalar((isF22 ? 0.28 : 0.4) + (isF22 ? 0.48 : 0.6) * t).lerp(CORE_HOT, smooth(ab, 0, 1)).multiplyScalar(shimmer);
     const tvcPitch = isF22 ? THREE.MathUtils.clamp(((s.ctl && s.ctl.pitch) || 0) * 0.28, -0.32, 0.32) : 0;
+    heatMat.uniforms.uTime.value = now;
+    heatMat.uniforms.uStr.value = 0.28 + 0.35 * t + 0.55 * ab;
+    const heatLen = 4.5 + 5.5 * t + 7.5 * ab;
+    const heatRad = 1.0 + 0.35 * ab;
     for (let k = 0; k < plumes.length; k++) {
       const p = plumes[k];
       if (isF22) p.g.rotation.x += (tvcPitch - p.g.rotation.x) * 0.25;
       p.light.position.copy(p.lightOff).applyQuaternion(s.quaternion).add(s.position);
+      if (p.heatMesh) {
+        const showHeat = cinematic && visible && k !== engineOut && (t > 0.08 || ab > 0.01);
+        p.heatMesh.visible = showHeat;
+        if (showHeat) {
+          p.heatMesh.position.copy(p.localOff).applyQuaternion(s.quaternion).add(s.position);
+          _hzQ.setFromEuler(_hzE.set(isF22 ? p.g.rotation.x : 0, 0, 0));
+          p.heatMesh.quaternion.copy(s.quaternion).multiply(_hzQ);
+          p.heatMesh.scale.set(p.bx * heatRad, p.by * heatRad, heatLen);
+        }
+      }
       if (!visible || k === engineOut) { p.light.intensity = 0; continue; }
       p.light.intensity = (0.8 + t * 2.0 + ab * 6.5) * pulse;
       p.light.color.setRGB(1.0, 0.55 + 0.15 * (1 - ab), 0.25 + 0.35 * (1 - ab));
@@ -453,13 +506,15 @@ export function createVFX(THREE, env) {
     st.k = 0.6 + rand() * 0.4;
   }
   for (let i = 0; i < SL; i++) { const st = {}; respawnStreak(st, true, false); streaks.push(st); }
-  function updateSpeedLines(s, dt, fp) {
-    // Supersonic streaks; also peripheral motion streaks during a cockpit-view barrel roll.
-    const k = Math.max(smooth(s.mach, 0.95, 1.25), fp && s.barrelRoll ? 0.65 : 0);
+  function updateSpeedLines(s, dt, fp, cloud = 0) {
+    // In cinematic mode, replace hard arcade speed lines with subtle humid/low-alt moisture motes.
+    const kBase = Math.max(smooth(s.mach, 0.95, 1.25), fp && s.barrelRoll ? 0.65 : 0);
+    const humidAir = Math.max(1 - smooth(s.position.y, 1400, 2800), smooth(cloud, 0.12, 0.45));
+    const k = cinematic ? kBase * humidAir * 0.32 : kBase;
     speedLines.visible = k > 0.01;
     if (!speedLines.visible) return;
     const pos = slGeo.attributes.position.array, col = slGeo.attributes.color.array;
-    const flow = s.speed * 0.85, len = 3 + s.speed * 0.024;
+    const flow = s.speed * 0.85, len = (cinematic ? 1.8 + s.speed * 0.012 : 3 + s.speed * 0.024);
     for (let i = 0; i < SL; i++) {
       const st = streaks[i];
       st.z += flow * st.k * dt;
@@ -521,8 +576,28 @@ export function createVFX(THREE, env) {
   machConeInner.renderOrder = 5; machConeOuter.renderOrder = 4;
   machConeInner.visible = false; machConeOuter.visible = false;
   jet.add(machConeInner, machConeOuter);
+  let machDistortMesh = null;
+  if (distortScene) {
+    const machDistMat = new THREE.ShaderMaterial({
+      uniforms: { uOp: { value: 0 } },
+      vertexShader: `varying vec2 vUv; varying vec3 vN; varying vec3 vV;
+        void main() { vUv = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = -mv.xyz; gl_Position = projectionMatrix * mv; }`,
+      fragmentShader: `uniform float uOp; varying vec2 vUv; varying vec3 vN; varying vec3 vV;
+        void main() {
+          float rim = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 1.4);
+          float band = smoothstep(0.15, 0.55, vUv.y) * (1.0 - smoothstep(0.75, 1.0, vUv.y));
+          vec2 dir = normalize(vN.xy + vec2(1e-4)) * 0.42;
+          gl_FragColor = vec4(0.5 + dir.x, 0.5 + dir.y, 0.0, clamp(uOp * rim * band, 0.0, 0.75));
+        }`,
+      transparent: true, depthWrite: false, side: THREE.DoubleSide
+    });
+    machDistortMesh = new THREE.Mesh(coneGeometry(6.8, 13.0), machDistMat);
+    machDistortMesh.frustumCulled = false;
+    machDistortMesh.visible = false;
+    distortScene.add(machDistortMesh);
+  }
   let coneClock = 0, machPulseK = 0, burnerFlashK = 0;
-  function updateMachCone(dt, mach, isCockpit) {
+  function updateMachCone(dt, mach, isCockpit, s) {
     coneClock += dt;
     machPulseK = Math.max(0, machPulseK - dt / 0.4);
     burnerFlashK = Math.max(0, burnerFlashK - dt / 0.2);
@@ -534,6 +609,15 @@ export function createVFX(THREE, env) {
     machConeOuter.material.uniforms.uOp.value = win * 0.12 + machPulseK * 0.35;
     machConeInner.material.uniforms.uTime.value = coneClock;
     machConeOuter.material.uniforms.uTime.value = coneClock;
+    if (machDistortMesh) {
+      machDistortMesh.visible = cinematic && show;
+      if (machDistortMesh.visible && s) {
+        _hzOff.copy(machConeInner.position).applyQuaternion(s.quaternion).add(s.position);
+        machDistortMesh.position.copy(_hzOff);
+        machDistortMesh.quaternion.copy(s.quaternion);
+        machDistortMesh.material.uniforms.uOp.value = Math.min(1, win * 0.9 + machPulseK * 0.8);
+      }
+    }
   }
 
   /* -------------------------------------------------- low-level sea spray */
@@ -1863,8 +1947,8 @@ export function createVFX(THREE, env) {
       vpMat.uniforms.uScale.value = renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
     }
 
-    updateSpeedLines(s, dt, opts.firstPerson);
-    updateMachCone(dt, s.mach, opts.firstPerson);
+    updateSpeedLines(s, dt, opts.firstPerson, Math.max(opts.cloud || 0, mist));
+    updateMachCone(dt, s.mach, opts.firstPerson, s);
     updateSpray(s, dt, opts.visible);
     catSteam.update(dt);
     aaTracer.update(dt);
@@ -1945,6 +2029,8 @@ export function createVFX(THREE, env) {
     get vaporLevel() { return vaporLevel; },
     // Time-of-day tint for condensation (white at noon, rose at dawn, dim blue-grey at night).
     setVaporTint(c) { vaporTint.copy(c); },
+    setCinematic(on) { cinematic = !!on; },
+    get cinematic() { return cinematic; },
     machPulse(k = 1) { machPulseK = Math.max(0, Math.min(1, k)); },
     get coneOpacity() { return machConeInner.material.uniforms.uOp.value; },
     get sprayCount() { return sprayP.filter(q => q.on).length; },

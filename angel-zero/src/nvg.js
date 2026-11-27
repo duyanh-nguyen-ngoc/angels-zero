@@ -24,16 +24,47 @@ export function createNVG(THREE, renderer, post) {
   //   strength 0.40, radius 0.6: only HDR emissives -- tracers, muzzle flash,
   //   afterburner cores, the sun -- cross it), OutputPass applies ACES Filmic +
   //   sRGB exactly once. The 2D HUD canvas sits above WebGL, so it never blurs.
-  let composer = null, renderPass = null, bloom = null, gradePass = null, gPass = null;
+  let composer = null, renderPass = null, distortPass = null, bloom = null, gradePass = null, gPass = null;
+  let cinematic = true;
+  const distortScene = new THREE.Scene();
+  const distortRT = new THREE.WebGLRenderTarget(Math.max(1, size.x >> 1), Math.max(1, size.y >> 1), {
+    format: THREE.RGBAFormat, type: THREE.UnsignedByteType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false
+  });
+  const distortClearCol = new THREE.Color(0.5, 0.5, 0.0);
+  const _prevClearCol = new THREE.Color();
   if (post) {
     const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 0 });
     composer = new post.EffectComposer(renderer, rt);
     renderPass = new post.RenderPass(new THREE.Scene(), new THREE.PerspectiveCamera());
+    if (post.ShaderPass) {
+      distortPass = new post.ShaderPass({
+        uniforms: {
+          tDiffuse: { value: null },
+          tDistort: { value: distortRT.texture },
+          uScale: { value: 0.022 }
+        },
+        vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+        fragmentShader: `
+          uniform sampler2D tDiffuse;
+          uniform sampler2D tDistort;
+          uniform float uScale;
+          varying vec2 vUv;
+          void main() {
+            vec4 d = texture2D(tDistort, vUv);
+            vec2 off = (d.rg - 0.5) * 2.0 * d.a * uScale;
+            vec2 uv2 = clamp(vUv + off, vec2(0.001), vec2(0.999));
+            gl_FragColor = texture2D(tDiffuse, uv2);
+          }`
+      });
+      distortPass.enabled = false;
+    }
     // Storm Realism Pass: threshold 0.88 (>= 0.85) so sunlit cloud crowns and the sky
     // stay below the knee; afterburners, explosions, deck beacons, tracers and cockpit
     // emissives (all HDR > 1 after the 1.05 exposure trim) are what bloom.
     bloom = new post.UnrealBloomPass(new THREE.Vector2(Math.max(1, Math.floor(size.x * 0.25)), Math.max(1, Math.floor(size.y * 0.25))), 0.40, 0.6, BLOOM_THRESHOLD);
-    composer.addPass(renderPass); composer.addPass(bloom); composer.addPass(new post.OutputPass());
+    composer.addPass(renderPass);
+    if (distortPass) composer.addPass(distortPass);
+    composer.addPass(bloom); composer.addPass(new post.OutputPass());
     if (post.ShaderPass) {
       gradePass = new post.ShaderPass({
         uniforms: {
@@ -41,25 +72,53 @@ export function createNVG(THREE, renderer, post) {
           uSunPos: { value: new THREE.Vector2(0.5, 0.5) },
           uSunGlare: { value: 0 },
           uSunCol: { value: new THREE.Vector3(1.0, 0.88, 0.72) },
-          uAspect: { value: size.x / Math.max(1, size.y) }
+          uAspect: { value: size.x / Math.max(1, size.y) },
+          uTime: { value: 0 },
+          uSpeedBlur: { value: 0 },
+          uGodRay: { value: 0 },
+          uCinematic: { value: 1 }
         },
         vertexShader: gVert(),
         fragmentShader: `
           uniform sampler2D tDiffuse;
           uniform vec2 uSunPos; uniform float uSunGlare; uniform vec3 uSunCol; uniform float uAspect;
+          uniform float uTime; uniform float uSpeedBlur; uniform float uGodRay; uniform float uCinematic;
           varying vec2 vUv;
+          float imaxHash(vec2 p) {
+            vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+            p3 += dot(p3, p3.yzx + 33.33);
+            return fract((p3.x + p3.y) * p3.z);
+          }
           void main() {
+            vec2 centerD = vUv - 0.5;
+            float centerR = length(centerD * vec2(uAspect, 1.0));
             vec4 s = texture2D(tDiffuse, vUv);
             vec3 c = clamp(s.rgb, 0.0, 1.0);
-            // Broad Flyout-style atmospheric solar glare veil (soft radial + gentle anamorphic breath).
-            // Runs after OutputPass in sRGB display space: convert linear uSunCol and use screen-blend rolloff.
+            // Edge-weighted radial motion blur at high Mach / afterburner (zero blur in center HUD reticle).
+            if (uCinematic > 0.5 && uSpeedBlur > 0.005) {
+              float edgeK = smoothstep(0.24, 0.92, centerR * 1.45) * uSpeedBlur * 0.018;
+              if (edgeK > 0.0005) {
+                vec2 dir = centerD * edgeK;
+                vec3 acc = c * 0.34;
+                acc += texture2D(tDiffuse, clamp(vUv - dir * 0.35, 0.001, 0.999)).rgb * 0.24;
+                acc += texture2D(tDiffuse, clamp(vUv - dir * 0.70, 0.001, 0.999)).rgb * 0.20;
+                acc += texture2D(tDiffuse, clamp(vUv - dir * 1.05, 0.001, 0.999)).rgb * 0.14;
+                acc += texture2D(tDiffuse, clamp(vUv - dir * 1.40, 0.001, 0.999)).rgb * 0.08;
+                c = clamp(acc, 0.0, 1.0);
+              }
+            }
+            // Broad atmospheric solar glare veil + subtle anamorphic streak + crepuscular sun shafts.
             if (uSunGlare > 0.002) {
               vec2 d = (vUv - uSunPos) * vec2(uAspect, 1.0);
               float r = length(d);
-              float veil = exp(-r * 1.55) * 0.44 + exp(-r * 5.2) * 0.34;   // v1.2.1: wider veil wraps ridges & cloud edges
-              float anam = exp(-abs(d.y) * 14.0) * exp(-abs(d.x) * 2.4) * 0.14;
+              float veil = exp(-r * 1.55) * 0.44 + exp(-r * 5.2) * 0.34;
+              float anamK = mix(0.14, 0.28, step(0.5, uCinematic));
+              float anam = exp(-abs(d.y) * 14.0) * exp(-abs(d.x) * 2.2) * anamK;
+              float ang = atan(d.y, d.x);
+              float shafts = (0.55 + 0.45 * sin(ang * 13.0 + uTime * 0.08) * cos(ang * 7.0 - uTime * 0.05))
+                * exp(-r * 2.1) * uGodRay * uCinematic * 0.22;
               vec3 sunDisp = pow(clamp(uSunCol, 0.0, 1.0), vec3(1.0 / 2.2));
-              vec3 glareGlow = clamp(sunDisp * uSunGlare * (veil + anam), 0.0, 0.62);   // cap: veil, never a white-out
+              vec3 glareGlow = clamp(sunDisp * uSunGlare * (veil + anam + shafts), 0.0, 0.65);
               c = 1.0 - (1.0 - c) * (1.0 - glareGlow);
             }
             // Filmic shadow-cool / highlight-warm split-tone + subtle contrast knee.
@@ -68,6 +127,12 @@ export function createNVG(THREE, renderer, post) {
             c = mix(c, c * c * (3.0 - 2.0 * c), 0.08);
             vec3 tint = mix(vec3(0.93, 0.97, 1.07), vec3(1.04, 1.01, 0.95), smoothstep(0.14, 0.84, l));
             c *= tint;
+            // Subtle 35mm / IMAX organic film grain (midtone-weighted, faded near center reticle).
+            if (uCinematic > 0.5) {
+              float gMask = smoothstep(0.18, 0.48, centerR * 1.4) * (4.0 * l * (1.0 - l));
+              float grain = (imaxHash(floor(vUv * 1280.0) + fract(uTime * 17.3) * 100.0) - 0.5) * 0.026 * gMask;
+              c = clamp(c + grain, 0.0, 1.0);
+            }
             float v = 1.0 - smoothstep(0.58, 1.44, length((vUv - 0.5) * vec2(1.15, 1.0))) * 0.17;
             gl_FragColor = vec4(max(c * v, 0.0), s.a);
           }`
@@ -200,6 +265,7 @@ export function createNVG(THREE, renderer, post) {
   function setSize() {
     renderer.getDrawingBufferSize(size);
     sceneRT.setSize(size.x, size.y);
+    distortRT.setSize(Math.max(1, size.x >> 1), Math.max(1, size.y >> 1));
     bloomRT.setSize(Math.max(1, size.x >> 2), Math.max(1, size.y >> 2));
     brightMat.uniforms.uTexel.value.set(1 / size.x, 1 / size.y);
     compMat.uniforms.uTexel.value.set(1 / size.x, 1 / size.y);
@@ -215,6 +281,25 @@ export function createNVG(THREE, renderer, post) {
   function render(scene, camera, t, cockpit) {
     if (!active) {
       if (!composer) { renderer.render(scene, camera); return; }
+      let hasDistort = false;
+      if (cinematic && distortPass && distortScene.children.length > 0) {
+        for (let i = 0; i < distortScene.children.length; i++) {
+          if (distortScene.children[i].visible) { hasDistort = true; break; }
+        }
+      }
+      if (distortPass) distortPass.enabled = hasDistort;
+      if (hasDistort) {
+        const prevRT = renderer.getRenderTarget();
+        renderer.getClearColor(_prevClearCol);
+        const prevAlpha = renderer.getClearAlpha();
+        renderer.setRenderTarget(distortRT);
+        renderer.setClearColor(distortClearCol, 0.0);
+        renderer.clear();
+        renderer.render(distortScene, camera);
+        renderer.setClearColor(_prevClearCol, prevAlpha);
+        renderer.setRenderTarget(prevRT);
+      }
+      if (gradePass) gradePass.uniforms.uTime.value = t || 0;
       renderPass.scene = scene; renderPass.camera = camera;
       composer.render();
       return;
@@ -243,8 +328,20 @@ export function createNVG(THREE, renderer, post) {
   return {
     render, setSize,
     target: sceneRT,                                   // pre-allocated HDR target (shader warm-up compiles against it)
+    distortScene,
     get bloom() { return bloom; }, get composer() { return composer; },
     setG, get gPass() { return gPass; }, get gActive() { return gState.active; },
+    setCinematic(on) {
+      cinematic = !!on;
+      if (gradePass) gradePass.uniforms.uCinematic.value = cinematic ? 1 : 0;
+      if (!cinematic && distortPass) distortPass.enabled = false;
+    },
+    get cinematic() { return cinematic; },
+    setMotion(speedBlur, godRay) {
+      if (!gradePass) return;
+      gradePass.uniforms.uSpeedBlur.value = speedBlur;
+      gradePass.uniforms.uGodRay.value = godRay;
+    },
     setSunGlare(nx, ny, g, r, gr, b) {
       if (!gradePass) return;
       const u = gradePass.uniforms;

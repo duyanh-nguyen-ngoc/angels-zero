@@ -27,36 +27,52 @@ const LOG_F = '#include <common>\n#include <logdepthbuf_pars_fragment>\n#include
 
 export function createBlastFX(THREE, env) {
   const { scene, camera, terrainHeight } = env;
+  const distortScene = env.distortScene || null;
+  let cinematic = true;
   const SUN = env.sunDir;                                   // live shared light direction
   const WIND = env.wind || new THREE.Vector3(5.2, 0, -4.6);
   const rand = Math.random;
   const C = hex => new THREE.Color(hex);                    // sRGB hex -> linear
 
-  /* ------------------------------------------------- procedural smoke atlas */
-  // 2x2 tiles, 128 px: multi-octave value-noise billows with a feathered falloff.
+  /* ------------------------------------------------- procedural 4x4 normal+density smoke atlas */
+  // 4x4 tiles (16 unique billows), 128 px each (512x512): RG = tangent normal, B = optical thickness, A = alpha.
   const smokeTex = (() => {
-    const N = 256, T = 128, cv = document.createElement('canvas'); cv.width = cv.height = N;
+    const N = 512, T = 128, cv = document.createElement('canvas'); cv.width = cv.height = N;
     const ctx = cv.getContext('2d', { willReadFrequently: true });
     const img = ctx.createImageData(N, N), d = img.data;
+    const hBuf = new Float32Array(T * T), aBuf = new Float32Array(T * T);
     const hs = (x, y, s) => { const v = Math.sin(x * 127.1 + y * 311.7 + s * 91.3) * 43758.5453; return v - Math.floor(v); };
     const vn = (x, y, s) => {
       const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
       const a = hs(xi, yi, s), b = hs(xi + 1, yi, s), c = hs(xi, yi + 1, s), e = hs(xi + 1, yi + 1, s);
       return a + (b - a) * u + (c - a) * v + (a - b - c + e) * u * v;
     };
-    for (let tile = 0; tile < 4; tile++) {
-      const ox = (tile % 2) * T, oy = (tile >> 1) * T;
+    for (let tile = 0; tile < 16; tile++) {
+      const ox = (tile % 4) * T, oy = (tile >> 2) * T;
       for (let j = 0; j < T; j++) for (let i = 0; i < T; i++) {
         const u = i / T * 2 - 1, v = j / T * 2 - 1;
-        let n = 0, amp = 0.5, f = 2.2, tot = 0;
-        for (let o = 0; o < 5; o++) { n += amp * vn(u * f + tile * 7.1, v * f - tile * 3.3, tile + o); tot += amp; amp *= 0.5; f *= 2.05; }
+        let n = 0, amp = 0.5, f = 2.1 + (tile % 3) * 0.18, tot = 0;
+        for (let o = 0; o < 5; o++) { n += amp * vn(u * f + tile * 5.7, v * f - tile * 3.1, tile * 7 + o); tot += amp; amp *= 0.5; f *= 2.05; }
         n /= tot;
-        const r = Math.hypot(u, v) + (0.5 - n) * 0.55;
-        let a = Math.max(0, Math.min(1, (1 - r) / 0.55));
-        a = a * a * (3 - 2 * a) * (0.55 + 0.6 * n);
-        a *= Math.max(0, Math.min(1, (1 - Math.max(Math.abs(u), Math.abs(v))) / 0.12));   // feather before the tile edge
+        const r = Math.hypot(u, v) + (0.5 - n) * 0.58;
+        let a = Math.max(0, Math.min(1, (1 - r) / 0.56));
+        a = a * a * (3 - 2 * a) * (0.52 + 0.65 * n);
+        a *= Math.max(0, Math.min(1, (1 - Math.max(Math.abs(u), Math.abs(v))) / 0.12));
+        hBuf[j * T + i] = Math.min(1, a * (0.6 + 0.55 * n));
+        aBuf[j * T + i] = Math.min(1, a);
+      }
+      for (let j = 0; j < T; j++) for (let i = 0; i < T; i++) {
+        const i0 = Math.max(0, i - 1), i1 = Math.min(T - 1, i + 1);
+        const j0 = Math.max(0, j - 1), j1 = Math.min(T - 1, j + 1);
+        const dx = (hBuf[j * T + i1] - hBuf[j * T + i0]) * 3.2;
+        const dy = (hBuf[j1 * T + i] - hBuf[j0 * T + i]) * 3.2;
+        const inv = 1 / Math.hypot(dx, dy, 1);
+        const nx = -dx * inv, ny = dy * inv;
         const k = ((oy + j) * N + ox + i) * 4;
-        d[k] = d[k + 1] = d[k + 2] = 255; d[k + 3] = Math.round(Math.min(1, a) * 255);
+        d[k] = Math.round((nx * 0.5 + 0.5) * 255);
+        d[k + 1] = Math.round((ny * 0.5 + 0.5) * 255);
+        d[k + 2] = Math.round(hBuf[j * T + i] * 255);
+        d[k + 3] = Math.round(aBuf[j * T + i] * 255);
       }
     }
     ctx.putImageData(img, 0, 0);
@@ -83,7 +99,7 @@ export function createBlastFX(THREE, env) {
       vQ = position.xy * 2.0;
       mvPosition.xy += mat2(c, s, -s, c) * (position.xy * iA.w);
       float tile = iP.y;
-      vUv = (uv * 0.98 + 0.01) * 0.5 + vec2(mod(tile, 2.0), floor(mod(tile, 4.0) / 2.0)) * 0.5;
+      vUv = (uv * 0.96 + 0.02) * 0.25 + vec2(mod(tile, 4.0), floor(mod(tile, 16.0) / 4.0)) * 0.25;
       vC = iC; vVar = iP.y; vDepth = -mvPosition.z;
       gl_Position = projectionMatrix * mvPosition;
       #include <logdepthbuf_vertex>
@@ -97,18 +113,20 @@ export function createBlastFX(THREE, env) {
     varying vec2 vUv; varying vec2 vQ; varying vec4 vC; varying float vVar; varying float vDepth;
     void main() {
       #include <logdepthbuf_fragment>
-      float a = texture2D(uTex, vUv).a * vC.a * smoothstep(uNear.x, uNear.y, vDepth);
+      vec4 tex = texture2D(uTex, vUv);
+      float a = tex.a * vC.a * smoothstep(uNear.x, uNear.y, vDepth);
       if (a < 0.04) discard;
       float r2 = min(dot(vQ, vQ), 1.0);
-      vec3 n = normalize(vec3(vQ * 0.9, sqrt(1.0 - r2) + 0.3));
+      vec2 tn = (tex.rg * 2.0 - 1.0) * 1.35;
+      vec3 n = normalize(vec3(vQ * 0.65 + tn, sqrt(1.0 - r2) + 0.45));
       float wrap = clamp((dot(n, uSunV) + 0.35) / 1.35, 0.0, 1.0);
       // vC is the authored display tone (e.g. #1c2024 core -> #343b42): lift it to an albedo
       // that lands on those tones under the scene light, soot-dark in the shadowed core.
-      float dens = texture2D(uTex, vUv).a;
-      vec3 base = vC.rgb * uLift * mix(1.15, 0.8, dens);
-      vec3 col = base * (uAmb * 2.2 + uSunCol * wrap * 1.25) + uRim * uSunCol * pow(wrap, 2.5) * (0.18 + 0.25 * (1.0 - dens));
+      float dens = tex.b;
+      vec3 base = vC.rgb * uLift * mix(1.18, 0.76, dens);
+      vec3 col = base * (uAmb * 2.2 + uSunCol * wrap * 1.3) + uRim * uSunCol * pow(wrap, 2.5) * (0.20 + 0.28 * (1.0 - dens));
       // Looking toward the sun: forward-scattered silver-grey fringe on the thin edges.
-      col += uRim * uSunCol * pow(max(0.0, -uSunV.z), 2.0) * pow(1.0 - dens, 2.0) * 0.55;
+      col += uRim * uSunCol * pow(max(0.0, -uSunV.z), 2.0) * pow(1.0 - dens, 2.0) * 0.58;
       float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
       col = mix(col, vec3(lum), uDesat);                  // spray: neutral white, not sky-blue
       if (lum > uCap) col *= uCap / lum;
@@ -122,11 +140,12 @@ export function createBlastFX(THREE, env) {
     varying vec2 vUv; varying vec2 vQ; varying vec4 vC; varying float vVar; varying float vDepth;
     void main() {
       #include <logdepthbuf_fragment>
-      float t = texture2D(uTex, vUv).a;
-      float a = pow(t, 1.25) * vC.a * smoothstep(4.0, 16.0, vDepth);
+      vec4 tex = texture2D(uTex, vUv);
+      float t = tex.b;
+      float a = pow(tex.a, 1.2) * vC.a * smoothstep(4.0, 16.0, vDepth);
       if (a < 0.04) discard;
       // Dense billow cores glow hotter, thin edges cool toward soot (no flat discs).
-      vec3 col = mix(vec3(0.018, 0.018, 0.02), vC.rgb * 1.35, smoothstep(0.12, 0.8, t));
+      vec3 col = mix(vec3(0.018, 0.018, 0.02), vC.rgb * 1.4, smoothstep(0.10, 0.78, t));
       gl_FragColor = vec4(col, a);
       #include <fog_fragment>
     }`;
@@ -257,6 +276,80 @@ export function createBlastFX(THREE, env) {
     return { mesh, it, next: 0, live: 0, wasLive: false, anyOn: false };
   })();
 
+  /* ------------------------------------ refracting blast shockwaves & flash lights */
+  const SW_N = 8;
+  const swGeo = new THREE.SphereGeometry(1, 24, 16);
+  const shockwaves = Array.from({ length: SW_N }, () => {
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { uOp: { value: 0 } },
+      vertexShader: `varying vec3 vN; varying vec3 vV;
+        void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = -mv.xyz; gl_Position = projectionMatrix * mv; }`,
+      fragmentShader: `uniform float uOp; varying vec3 vN; varying vec3 vV;
+        void main() {
+          float f = abs(dot(normalize(vN), normalize(vV)));
+          float rim = smoothstep(0.12, 0.55, 1.0 - f) * (1.0 - smoothstep(0.75, 1.0, 1.0 - f));
+          vec2 dir = normalize(vN.xy + vec2(1e-4)) * 0.45;
+          gl_FragColor = vec4(0.5 + dir.x, 0.5 + dir.y, 0.0, clamp(uOp * rim, 0.0, 0.85));
+        }`,
+      transparent: true, depthWrite: false, side: THREE.FrontSide
+    });
+    const mesh = new THREE.Mesh(swGeo, mat);
+    mesh.frustumCulled = false; mesh.visible = false;
+    if (distortScene) distortScene.add(mesh);
+    return { on: false, t: 0, life: 0.32, r0: 8, r1: 115, mesh, mat };
+  });
+  let swNext = 0;
+  function spawnShockwave(x, y, z, k) {
+    if (!distortScene || !cinematic) return;
+    const sw = shockwaves[swNext]; swNext = (swNext + 1) % SW_N;
+    sw.on = true; sw.t = 0; sw.life = 0.32; sw.r0 = 8 * k; sw.r1 = 115 * k;
+    sw.mesh.position.set(x, y, z);
+    sw.mesh.scale.setScalar(sw.r0);
+    sw.mat.uniforms.uOp.value = 0.85;
+    sw.mesh.visible = true;
+  }
+
+  const FLASH_N = 4;
+  const flashLights = Array.from({ length: FLASH_N }, () => {
+    const light = new THREE.PointLight(0xffaa55, 0, 220, 1.6);
+    scene.add(light);
+    return { on: false, t: 0, life: 0.35, i0: 0, light };
+  });
+  function pulseLight(x, y, z, r, g, b, intensity = 14, range = 240, life = 0.35) {
+    let slot = flashLights[0];
+    for (let i = 0; i < FLASH_N; i++) {
+      if (!flashLights[i].on) { slot = flashLights[i]; break; }
+      if (flashLights[i].light.intensity < slot.light.intensity) slot = flashLights[i];
+    }
+    slot.on = true; slot.t = 0; slot.life = life; slot.i0 = intensity;
+    slot.light.position.set(x, y, z);
+    slot.light.color.setRGB(r, g, b);
+    slot.light.distance = range;
+    slot.light.intensity = intensity;
+  }
+
+  const SHAKE_N = 6;
+  const shakes = Array.from({ length: SHAKE_N }, () => ({ on: false, t: 0, life: 0.45, x: 0, y: 0, z: 0, mag: 0 }));
+  let shakeNext = 0;
+  function addShake(x, y, z, mag) {
+    const sh = shakes[shakeNext]; shakeNext = (shakeNext + 1) % SHAKE_N;
+    sh.on = true; sh.t = 0; sh.life = 0.45; sh.x = x; sh.y = y; sh.z = z; sh.mag = mag;
+  }
+  function shakeAt(camPos) {
+    if (!cinematic) return 0;
+    let sum = 0;
+    for (let i = 0; i < SHAKE_N; i++) {
+      const sh = shakes[i];
+      if (!sh.on) continue;
+      const d = Math.hypot(sh.x - camPos.x, sh.y - camPos.y, sh.z - camPos.z);
+      if (d > 1400) continue;
+      const fall = 1 - Math.min(1, d / 1400);
+      const env = Math.max(0, 1 - sh.t / sh.life);
+      sum += sh.mag * fall * fall * env * env;
+    }
+    return Math.min(1, sum);
+  }
+
   /* ------------------------------------------------------------ colour ramps */
   const HOT = new THREE.Color(2.2, 1.05, 0.25), ORANGE = C(0xff5a12), EMBER = C(0x7a1c08), CHAR = C(0x1e2023);
   const SOOT0 = C(0x1c2024), SOOT1 = C(0x343b42), EARTH = C(0x6e604e), SPRAY = C(0xdce4ea);
@@ -293,7 +386,7 @@ export function createBlastFX(THREE, env) {
       o.x = x + _v.x * off; o.y = y + _v.y * off; o.z = z + _v.z * off;
       o.vx = _v.x * sp + vel.x * 0.12; o.vy = _v.y * sp + vel.y * 0.12; o.vz = _v.z * sp + vel.z * 0.12;
       o.drag = 2.4; o.rise = 4; o.delay = 0.03 + rand() * 0.1; o.life = 0.75 + rand() * 0.3;
-      o.s0 = 8 * k; o.s1 = (26 + rand() * 12) * k; o.rot = rand() * 6.28; o.spin = (rand() - 0.5) * 1.6; o.v = Math.floor(rand() * 4);
+      o.s0 = 8 * k; o.s1 = (26 + rand() * 12) * k; o.rot = rand() * 6.28; o.spin = (rand() - 0.5) * 1.6; o.v = Math.floor(rand() * 16);
       o.a = 0.85 + rand() * 0.3;                                  // per-puff heat jitter
     }
   }
@@ -328,7 +421,7 @@ export function createBlastFX(THREE, env) {
       o.x = x + _v.x * spread * k; o.y = y + _v.y * spread * 0.6 * k; o.z = z + _v.z * spread * k;
       o.vx = _v.x * 7 * k; o.vy = _v.y * 4 * k + rise; o.vz = _v.z * 7 * k;
       o.drag = 0.9; o.rise = 0; o.delay = delay + rand() * 0.25; o.life = life[0] + rand() * (life[1] - life[0]);
-      o.s0 = 12 * k; o.s1 = (38 + rand() * 7) * k; o.rot = rand() * 6.28; o.spin = (rand() - 0.5) * 0.12; o.v = Math.floor(rand() * 4);
+      o.s0 = 12 * k; o.s1 = (38 + rand() * 7) * k; o.rot = rand() * 6.28; o.spin = (rand() - 0.5) * 0.12; o.v = Math.floor(rand() * 16);
       _c.copy(base === 'earth' ? EARTH : SOOT0).lerp(SOOT1, rand() * (base === 'earth' ? 0.4 : 1));
       o.r = _c.r; o.g = _c.g; o.b = _c.b; o.a = 0.66 + rand() * 0.14; o.seed = rand() * 6.28; o.kind = rise;
     }
@@ -341,13 +434,13 @@ export function createBlastFX(THREE, env) {
       o.x = x + Math.cos(a) * r; o.y = 1; o.z = z + Math.sin(a) * r;
       o.vx = Math.cos(a) * (1 + rand() * 3); o.vz = Math.sin(a) * (1 + rand() * 3); o.vy = Math.sqrt(2 * 9.81 * 0.95 * h) * 1.04;
       o.grav = 9.81 * 0.95; o.drag = 0.12; o.delay = rand() * 0.15; o.life = 3.4 + rand() * 1.2;
-      o.s0 = (8 + rand() * 4) * k; o.s1 = (26 + rand() * 12) * k; o.rot = rand() * 6.28; o.spin = (rand() - 0.5) * 0.4; o.v = Math.floor(rand() * 4);
+      o.s0 = (8 + rand() * 4) * k; o.s1 = (26 + rand() * 12) * k; o.rot = rand() * 6.28; o.spin = (rand() - 0.5) * 0.4; o.v = Math.floor(rand() * 16);
       o.r = SPRAY.r; o.g = SPRAY.g; o.b = SPRAY.b; o.a = 0.82;
     }
     for (let i = 0; i < 8; i++) {                                 // low radial mist skirt
       const o = spray.take(), a = rand() * 6.28;
       o.x = x; o.y = 3; o.z = z; o.vx = Math.cos(a) * (18 + rand() * 18) * k; o.vz = Math.sin(a) * (18 + rand() * 18) * k; o.vy = 2 + rand() * 3;
-      o.drag = 0.9; o.delay = 0.1; o.life = 3 + rand() * 1.5; o.s0 = 10 * k; o.s1 = 34 * k; o.rot = rand() * 6.28; o.v = Math.floor(rand() * 4);
+      o.drag = 0.9; o.delay = 0.1; o.life = 3 + rand() * 1.5; o.s0 = 10 * k; o.s1 = 34 * k; o.rot = rand() * 6.28; o.v = Math.floor(rand() * 16);
       o.r = SPRAY.r * 0.92; o.g = SPRAY.g * 0.94; o.b = SPRAY.b * 0.96; o.a = 0.5;
     }
     const f = foam.it[foam.next]; foam.next = (foam.next + 1) % FOAM_N;
@@ -371,6 +464,9 @@ export function createBlastFX(THREE, env) {
     if (kind === 'water') {
       flash(x, 2, z, k * 0.55, 0.8);
       ring(x, 2, z, k * 0.7);
+      spawnShockwave(x, 2, z, k * 0.75);
+      pulseLight(x, 4, z, 1.0, 0.78, 0.45, 9 * k, 180 * k, 0.25);
+      addShake(x, 2, z, 0.65 * k);
       geyser(x, z, Math.min(1.3, k));
       sparkBurst(x, 2, z, 8, ZERO_V, _n.set(0, 1, 0), 0.6);
       return kind;
@@ -381,6 +477,9 @@ export function createBlastFX(THREE, env) {
       const nx = nrm.x, ny = nrm.y, nz = nrm.z;
       flash(x + nx * 2, gy + ny * 2, z + nz * 2, k * 0.9);
       ring(x, gy + 2, z, k * 0.85);
+      spawnShockwave(x, gy + 2, z, k * 0.95);
+      pulseLight(x + nx * 3, gy + ny * 3 + 2, z + nz * 3, 1.0, 0.62, 0.24, 16 * k, 260 * k, 0.36);
+      addShake(x, gy, z, k);
       fireballs(x + nx * 4, gy + ny * 4, z + nz * 4, k * 0.9, 4, ZERO_V, 0, nrm);
       sparkBurst(x + nx, gy + ny, z + nz, 18 + Math.floor(rand() * 6), ZERO_V, nrm, 0.55);
       chunks(x, gy + 1, z, 4, ZERO_V, k, nrm);
@@ -392,7 +491,12 @@ export function createBlastFX(THREE, env) {
     }
     // Mid-air detonation.
     flash(x, y, z, small ? k * 0.6 : k);
-    if (!small) ring(x, y, z, k);
+    if (!small) {
+      ring(x, y, z, k);
+      spawnShockwave(x, y, z, k);
+    }
+    pulseLight(x, y, z, 1.0, 0.64, 0.26, (small ? 8 : 16) * k, (small ? 140 : 250) * k, small ? 0.22 : 0.35);
+    addShake(x, y, z, small ? 0.4 * k : k);
     fireballs(x, y, z, k, small ? 2 : 4 + Math.floor(rand() * 3), vel);
     sparkBurst(x, y, z, small ? 8 : 18 + Math.floor(rand() * 9), vel);
     if (!small) chunks(x, y, z, 4 + Math.floor(rand() * 3), vel, k);
@@ -524,7 +628,7 @@ export function createBlastFX(THREE, env) {
         if (d.t < d.life && d.p.y <= ground + 0.5) {          // impact: a puff of spray or dust where it lands
           const o = (ground <= 0 ? spray : trail).take();
           o.x = d.p.x; o.y = ground + 2; o.z = d.p.z; o.vy = ground <= 0 ? 12 : 4; o.grav = ground <= 0 ? 9 : 0; o.drag = 0.8;
-          o.life = 1.6; o.s0 = 4; o.s1 = 14; o.rot = rand() * 6.28; o.v = Math.floor(rand() * 4); o.a = 0.6;
+          o.life = 1.6; o.s0 = 4; o.s1 = 14; o.rot = rand() * 6.28; o.v = Math.floor(rand() * 16); o.a = 0.6;
           o.r = SPRAY.r; o.g = SPRAY.g; o.b = SPRAY.b;
         }
         d.on = false; _m.makeScale(0, 0, 0); debris.mesh.setMatrixAt(i, _m); continue;
@@ -540,7 +644,7 @@ export function createBlastFX(THREE, env) {
         d.emit = 0.06;
         const o = trail.take();
         o.x = d.p.x; o.y = d.p.y; o.z = d.p.z; o.vx = d.v.x * 0.05; o.vy = d.v.y * 0.05 + 1; o.vz = d.v.z * 0.05; o.drag = 1.2;
-        o.life = 1.2 + rand() * 0.4; o.s0 = 1.6 * d.s; o.s1 = (5 + rand() * 2) * d.s; o.rot = rand() * 6.28; o.v = Math.floor(rand() * 4);
+        o.life = 1.2 + rand() * 0.4; o.s0 = 1.6 * d.s; o.s1 = (5 + rand() * 2) * d.s; o.rot = rand() * 6.28; o.v = Math.floor(rand() * 16);
         o.a = 0.7 * (1 - d.t / 3.5);
       }
     }
@@ -562,19 +666,46 @@ export function createBlastFX(THREE, env) {
     stepSparks(dt);
     stepFoam(dt);
     stepDebris(dt);
+    for (let i = 0; i < SW_N; i++) {
+      const sw = shockwaves[i];
+      if (!sw.on) continue;
+      sw.t += dt;
+      if (sw.t >= sw.life || !cinematic) { sw.on = false; sw.mesh.visible = false; continue; }
+      const f = sw.t / sw.life;
+      sw.mesh.scale.setScalar(sw.r0 + (sw.r1 - sw.r0) * easeOut(f));
+      sw.mat.uniforms.uOp.value = 0.85 * Math.pow(1 - f, 1.7);
+    }
+    for (let i = 0; i < FLASH_N; i++) {
+      const fl = flashLights[i];
+      if (!fl.on) continue;
+      fl.t += dt;
+      if (fl.t >= fl.life) { fl.on = false; fl.light.intensity = 0; continue; }
+      fl.light.intensity = fl.i0 * Math.exp(-fl.t / (fl.life * 0.28)) * (1 - fl.t / fl.life);
+    }
+    for (let i = 0; i < SHAKE_N; i++) {
+      const sh = shakes[i];
+      if (!sh.on) continue;
+      sh.t += dt;
+      if (sh.t >= sh.life) sh.on = false;
+    }
   }
   function clear() {
     for (const p of [hang, trail, spray, fireP, add]) p.clear();
     for (const s of sparks.it) s.on = false;
     for (const f of foam.it) f.on = false;
     for (const d of debris.it) d.on = false;
+    for (const sw of shockwaves) { sw.on = false; sw.mesh.visible = false; }
+    for (const fl of flashLights) { fl.on = false; fl.light.intensity = 0; }
+    for (const sh of shakes) sh.on = false;
     debris.anyOn = false; debris.live = 0;
   }
   // Warm-up: make every pool visible once so its program compiles with the rest.
   function warm(on) { for (const m of [hang.mesh, trail.mesh, spray.mesh, fireP.mesh, add.mesh, sparks.mesh, foam.mesh, debris.mesh]) m.visible = !!on; }
 
   return {
-    detonate, update, clear, warm,
+    detonate, update, clear, warm, pulseLight, shakeAt,
+    setCinematic(on) { cinematic = !!on; if (!cinematic) for (const sw of shockwaves) { sw.on = false; sw.mesh.visible = false; } },
+    get cinematic() { return cinematic; },
     get stats() {
       return { ...stats, byKind: { ...stats.byKind }, live: { smoke: hang.live, trail: trail.live, spray: spray.live, fire: fireP.live, flash: add.live,
         sparks: sparks.live, debris: debris.live, foam: foam.live },
