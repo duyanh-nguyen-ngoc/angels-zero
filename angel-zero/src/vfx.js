@@ -133,12 +133,16 @@ export function createVFX(THREE, env) {
   heatGeo.rotateX(Math.PI / 2);
   heatGeo.translate(0, 0, 0.5);
   const heatMat = new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uStr: { value: 0 } },
+    uniforms: { uTime: { value: 0 }, uStr: { value: 0 }, uBuoy: { value: 0 } },
     vertexShader: `
+      uniform float uBuoy;
       varying vec2 vUv; varying vec3 vN; varying vec3 vV; varying float vSide;
       void main() {
         vUv = uv;
-        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vec3 p = position;
+        float t = clamp(p.z, 0.0, 1.0);
+        p.y += t * t * uBuoy * 2.2;
+        vec4 mv = modelViewMatrix * vec4(p, 1.0);
         vN = normalize(normalMatrix * normal);
         vV = -mv.xyz;
         vec3 axis = normalize((modelViewMatrix * vec4(0.0, 0.0, 1.0, 0.0)).xyz);
@@ -146,21 +150,61 @@ export function createVFX(THREE, env) {
         gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: `
-      uniform float uTime; uniform float uStr;
+      uniform float uTime; uniform float uStr; uniform float uBuoy;
       varying vec2 vUv; varying vec3 vN; varying vec3 vV; varying float vSide;
       void main() {
         float facing = mix(0.78, pow(abs(dot(normalize(vN), normalize(vV))), 1.5), smoothstep(0.15, 0.6, vSide));
         float along = smoothstep(0.0, 0.14, vUv.y) * (1.0 - smoothstep(0.45, 1.0, vUv.y));
-        float w1 = sin(vUv.y * 28.0 - uTime * 34.0 + vUv.x * 12.566);
-        float w2 = cos(vUv.y * 47.0 - uTime * 51.0 - vUv.x * 18.849);
+        float spd = mix(34.0, 11.0, uBuoy);
+        float w1 = sin(vUv.y * 28.0 - uTime * spd + vUv.x * 12.566);
+        float w2 = cos(vUv.y * 47.0 - uTime * (spd * 1.48) - vUv.x * 18.849);
         vec2 off = vec2(w1 * 0.7 + w2 * 0.3, w2 * 0.7 - w1 * 0.3) * 0.55;
         float str = facing * along * uStr;
         gl_FragColor = vec4(0.5 + off.x, 0.5 + off.y, 0.0, clamp(str, 0.0, 0.92));
       }`,
     transparent: true, depthWrite: false, side: THREE.DoubleSide
   });
+  let jetOcclGroup = null, mirageMesh = null;
+  if (distortScene) {
+    const occlMat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: true, depthTest: true });
+    jetOcclGroup = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 1.15, 16.5, 12, 1), occlMat);
+    body.rotation.x = Math.PI / 2; body.position.set(0, -0.1, -0.5);
+    const wing = new THREE.Mesh(new THREE.BoxGeometry(isF22 ? 13.0 : 12.6, 0.32, 4.6), occlMat);
+    wing.position.set(0, -0.25, 1.2);
+    const finL = new THREE.Mesh(new THREE.BoxGeometry(0.22, 3.2, 2.8), occlMat);
+    finL.position.set(-1.55, 1.4, 5.6); finL.rotation.z = isF22 ? 0.42 : 0.06;
+    const finR = new THREE.Mesh(new THREE.BoxGeometry(0.22, 3.2, 2.8), occlMat);
+    finR.position.set(1.55, 1.4, 5.6); finR.rotation.z = isF22 ? -0.42 : -0.06;
+    for (const m of [body, wing, finL, finR]) { m.renderOrder = -10; m.frustumCulled = false; jetOcclGroup.add(m); }
+    jetOcclGroup.visible = false;
+    distortScene.add(jetOcclGroup);
+
+    if (env.runway) {
+      const mirMat = new THREE.ShaderMaterial({
+        uniforms: { uTime: { value: 0 }, uStr: { value: 0 } },
+        vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+        fragmentShader: `uniform float uTime; uniform float uStr; varying vec2 vUv;
+          void main() {
+            float edge = smoothstep(0.0, 0.18, vUv.x) * (1.0 - smoothstep(0.82, 1.0, vUv.x))
+              * smoothstep(0.0, 0.12, vUv.y) * (1.0 - smoothstep(0.88, 1.0, vUv.y));
+            float w = sin(vUv.y * 90.0 - uTime * 7.5 + sin(vUv.x * 24.0) * 2.0);
+            float w2 = cos(vUv.y * 145.0 + uTime * 5.2 - vUv.x * 31.0);
+            gl_FragColor = vec4(0.5 + w2 * 0.08, 0.5 + w * 0.38, 0.0, clamp(edge * uStr, 0.0, 0.65));
+          }`,
+        transparent: true, depthWrite: false, side: THREE.DoubleSide
+      });
+      const rwyLen = Math.max(400, Math.abs(env.runway.z1 - env.runway.z0) * 0.65);
+      mirageMesh = new THREE.Mesh(new THREE.PlaneGeometry(75, rwyLen, 1, 1), mirMat);
+      mirageMesh.rotation.x = -Math.PI / 2;
+      mirageMesh.position.set(env.runway.x, (env.runway.elev || 10) + 1.1, (env.runway.z0 + env.runway.z1) * 0.5);
+      mirageMesh.frustumCulled = false; mirageMesh.visible = false;
+      distortScene.add(mirageMesh);
+    }
+  }
   const _hzOff = new THREE.Vector3(), _hzQ = new THREE.Quaternion(), _hzE = new THREE.Euler();
   const plumes = [];
+  const nozzleHeat = [0, 0];
   function attachPlume(localPos) {
     const g = new THREE.Group();
     g.position.copy(localPos).add(new THREE.Vector3(0, 0, isF22 ? 0.35 : 0.45));
@@ -187,6 +231,7 @@ export function createVFX(THREE, env) {
     plumes.push({ g, light, lightOff, bx, by, localOff: g.position.clone(), heatMesh });
   }
   const CORE_COOL = new THREE.Color(0.75, 0.30, 0.08),
+    CORE_SOAK = new THREE.Color(0.95, 0.24, 0.04),
     CORE_HOT = isF22 ? new THREE.Color(2.4, 1.95, 1.65) : new THREE.Color(2.5, 1.65, 1.05);
   let engineOut = -1;
   function setEngineOut(i) {                         // battle damage: the dead F100's plume + glow go out
@@ -197,7 +242,7 @@ export function createVFX(THREE, env) {
       if (k === i) p.light.intensity = 0;
     });
   }
-  function updatePlumes(s, now, visible = true) {
+  function updatePlumes(s, now, visible = true, dt = 0.016, firstPerson = false) {
     const t = s.throttle, ab = s.afterburner;
     const pulse = 1 + ab * 0.24 * Math.sin(now * 17.0) + ab * 0.08 * Math.sin(now * 41.0);
     const coreLen = 1.5 + 3.2 * t + 4.6 * ab;
@@ -211,20 +256,46 @@ export function createVFX(THREE, env) {
     outerMat.uniforms.uInt.value = ((isF22 ? 0.08 : 0.12) + (isF22 ? 0.22 : 0.3) * t + 1.15 * ab) * pulse;
     coreMat.uniforms.uTime.value = outerMat.uniforms.uTime.value = now;
     coreMat.uniforms.uAB.value = outerMat.uniforms.uAB.value = ab;
-    // Incandescent core: warm orange scaled by throttle below the burner, HDR white-peach in AB.
+    // Per-engine thermal heat-soak (heats fast under thrust, cools gradually on idle).
+    const heatTarget = 0.35 * t + 0.65 * ab;
+    for (let k = 0; k < 2; k++) {
+      const tgt = k === engineOut ? 0 : heatTarget;
+      nozzleHeat[k] += (tgt - nozzleHeat[k]) * Math.min(1, dt / (tgt > nozzleHeat[k] ? 2.2 : 5.5));
+    }
+    const maxSoak = Math.max(nozzleHeat[0], nozzleHeat[1]);
+    // Incandescent core: warm orange + thermal heat-soak, HDR white-peach in AB.
     const shimmer = 1 + ab * 0.08 * (0.6 * Math.sin(now * 2 * Math.PI * 23) + 0.4 * Math.sin(now * 2 * Math.PI * 31));
-    glowCoreMat.uniforms.uCol.value.copy(CORE_COOL).multiplyScalar((isF22 ? 0.28 : 0.4) + (isF22 ? 0.48 : 0.6) * t).lerp(CORE_HOT, smooth(ab, 0, 1)).multiplyScalar(shimmer);
+    glowCoreMat.uniforms.uCol.value.copy(CORE_COOL).multiplyScalar((isF22 ? 0.28 : 0.4) + (isF22 ? 0.48 : 0.6) * t)
+      .lerp(CORE_SOAK, maxSoak * 0.45 * (1 - ab)).lerp(CORE_HOT, smooth(ab, 0, 1)).multiplyScalar(shimmer);
     const tvcPitch = isF22 ? THREE.MathUtils.clamp(((s.ctl && s.ctl.pitch) || 0) * 0.28, -0.32, 0.32) : 0;
+    const buoy = 1 - smooth(s.speed || 0, 10, 85);
     heatMat.uniforms.uTime.value = now;
-    heatMat.uniforms.uStr.value = 0.42 + 0.45 * t + 0.65 * ab;
+    heatMat.uniforms.uBuoy.value = buoy;
+    heatMat.uniforms.uStr.value = Math.max(0.42 + 0.45 * t + 0.65 * ab, maxSoak * 0.45);
     const heatLen = 4.5 + 5.5 * t + 7.5 * ab;
     const heatRad = 1.25 + 0.45 * ab;
+    if (jetOcclGroup) {
+      jetOcclGroup.visible = cinematic && visible && !firstPerson;
+      if (jetOcclGroup.visible) {
+        jetOcclGroup.position.copy(s.position);
+        jetOcclGroup.quaternion.copy(s.quaternion);
+      }
+    }
+    if (mirageMesh) {
+      const showMir = cinematic && env.runway && s.position.y < (env.runway.elev || 10) + 45 && env.sunDir && env.sunDir.y > 0.12;
+      mirageMesh.visible = showMir;
+      if (showMir) {
+        mirageMesh.material.uniforms.uTime.value = now;
+        mirageMesh.material.uniforms.uStr.value = 0.28 * smooth(env.sunDir.y, 0.12, 0.55) * (1 - smooth(s.position.y, (env.runway.elev || 10) + 5, (env.runway.elev || 10) + 45));
+      }
+    }
     for (let k = 0; k < plumes.length; k++) {
       const p = plumes[k];
       if (isF22) p.g.rotation.x += (tvcPitch - p.g.rotation.x) * 0.25;
       p.light.position.copy(p.lightOff).applyQuaternion(s.quaternion).add(s.position);
       if (p.heatMesh) {
-        const showHeat = cinematic && visible && k !== engineOut && (t > 0.08 || ab > 0.01);
+        const hk = nozzleHeat[k] || 0;
+        const showHeat = cinematic && visible && k !== engineOut && (t > 0.08 || ab > 0.01 || hk > 0.12);
         p.heatMesh.visible = showHeat;
         if (showHeat) {
           p.heatMesh.position.copy(p.localOff).applyQuaternion(s.quaternion).add(s.position);
@@ -488,6 +559,135 @@ export function createVFX(THREE, env) {
   buildVapor();
   let vaporLevel = 0;
 
+  /* ---------------- conformal 3D wing/LERX vapor shells & spiral LEX vortices */
+  function buildWingVaporGeo(sgn) {
+    const nx = 14, nz = 10, pos = [], uvs = [], idx = [];
+    for (let j = 0; j <= nz; j++) {
+      const v = j / nz;
+      for (let i = 0; i <= nx; i++) {
+        const u = i / nx;
+        const x = sgn * THREE.MathUtils.lerp(1.25, isF22 ? 4.85 : 4.35, u);
+        const leZ = (isF22 ? -3.4 : -2.3) + u * (isF22 ? 3.5 : 3.2);
+        const teZ = (isF22 ? 1.8 : 2.9) + u * (isF22 ? 1.5 : 1.1);
+        const z = THREE.MathUtils.lerp(leZ, teZ, v);
+        const arch = Math.sin(v * Math.PI) * (0.28 + 0.18 * (1 - u));
+        const y = (isF22 ? -0.92 : -0.18) - u * 0.18 + arch;
+        pos.push(x, y, z); uvs.push(u, v);
+      }
+    }
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+      const a = j * (nx + 1) + i, b = a + 1, c = a + (nx + 1), d = c + 1;
+      idx.push(a, c, b, b, c, d);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    g.setIndex(idx); g.computeVertexNormals();
+    return g;
+  }
+  const vaporShellMat = new THREE.ShaderMaterial({
+    uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
+      uTime: { value: 0 }, uLevel: { value: 0 }, uCol: { value: new THREE.Color(1, 1, 1) }
+    }]),
+    vertexShader: LOG_V + `#include <fog_pars_vertex>
+      varying vec2 vUv; varying vec3 vN; varying vec3 vV;
+      void main() { vUv = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = -mv.xyz;
+        gl_Position = projectionMatrix * mv;
+        #include <logdepthbuf_vertex>
+        #include <fog_vertex>
+      }`,
+    fragmentShader: LOG_F + `#include <fog_pars_fragment>
+      uniform float uTime; uniform float uLevel; uniform vec3 uCol;
+      varying vec2 vUv; varying vec3 vN; varying vec3 vV;
+      float vh(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(vh(i), vh(i + vec2(1.0, 0.0)), f.x), mix(vh(i + vec2(0.0, 1.0)), vh(i + vec2(1.0, 1.0)), f.x), f.y); }
+      void main() {
+        #include <logdepthbuf_fragment>
+        float edge = smoothstep(0.0, 0.22, vUv.x) * (1.0 - smoothstep(0.75, 1.0, vUv.x))
+          * smoothstep(0.0, 0.14, vUv.y) * (1.0 - smoothstep(0.45, 1.0, vUv.y));
+        float chord = 1.0 - smoothstep(0.25 + uLevel * 0.72, 1.0, vUv.y);
+        vec2 uvF = vec2(vUv.x * 5.0, vUv.y * 4.5 - uTime * (2.6 + 1.8 * uLevel));
+        float turb = vn(uvF) * 0.6 + vn(uvF * 2.3 + 4.1) * 0.4;
+        float facing = pow(abs(dot(normalize(vN), normalize(vV))), 0.85);
+        float a = uLevel * edge * chord * (0.35 + 0.85 * turb) * (0.55 + 0.45 * facing) * 0.72;
+        if (a < 0.005) discard;
+        gl_FragColor = vec4(uCol * (0.9 + 0.18 * turb), clamp(a, 0.0, 0.78));
+        #include <fog_fragment>
+      }`,
+    transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: true
+  });
+  const vaporShellL = new THREE.Mesh(buildWingVaporGeo(-1), vaporShellMat);
+  const vaporShellR = new THREE.Mesh(buildWingVaporGeo(1), vaporShellMat);
+  vaporShellL.frustumCulled = vaporShellR.frustumCulled = false;
+  vaporShellL.renderOrder = vaporShellR.renderOrder = 4;
+  vaporShellL.visible = vaporShellR.visible = false;
+  jet.add(vaporShellL, vaporShellR);
+
+  const lexVortexGeo = new THREE.ConeGeometry(0.42, 7.5, 16, 8, true);
+  lexVortexGeo.rotateX(-Math.PI / 2); lexVortexGeo.translate(0, 0, 3.75);
+  const lexVortexMat = new THREE.ShaderMaterial({
+    uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
+      uTime: { value: 0 }, uLevel: { value: 0 }, uCol: { value: new THREE.Color(1, 1, 1) }
+    }]),
+    vertexShader: LOG_V + `#include <fog_pars_vertex>
+      varying vec2 vUv; varying vec3 vN; varying vec3 vV;
+      void main() { vUv = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = -mv.xyz;
+        gl_Position = projectionMatrix * mv;
+        #include <logdepthbuf_vertex>
+        #include <fog_vertex>
+      }`,
+    fragmentShader: LOG_F + `#include <fog_pars_fragment>
+      uniform float uTime; uniform float uLevel; uniform vec3 uCol;
+      varying vec2 vUv; varying vec3 vN; varying vec3 vV;
+      void main() {
+        #include <logdepthbuf_fragment>
+        float along = smoothstep(0.0, 0.18, vUv.y) * (1.0 - smoothstep(0.45, 1.0, vUv.y));
+        float spiral = 0.5 + 0.5 * sin(vUv.x * 18.849 + vUv.y * 22.0 - uTime * 18.0);
+        float limb = pow(abs(dot(normalize(vN), normalize(vV))), 1.2);
+        float a = uLevel * along * (0.25 + 0.75 * spiral) * limb * 0.48;
+        if (a < 0.005) discard;
+        gl_FragColor = vec4(uCol, clamp(a, 0.0, 0.65));
+        #include <fog_fragment>
+      }`,
+    transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: true
+  });
+  const lexVortexL = new THREE.Mesh(lexVortexGeo, lexVortexMat);
+  const lexVortexR = new THREE.Mesh(lexVortexGeo, lexVortexMat);
+  lexVortexL.position.set(-1.35, isF22 ? -0.78 : -0.1, isF22 ? -2.2 : -1.4);
+  lexVortexR.position.set(1.35, isF22 ? -0.78 : -0.1, isF22 ? -2.2 : -1.4);
+  lexVortexL.frustumCulled = lexVortexR.frustumCulled = false;
+  lexVortexL.renderOrder = lexVortexR.renderOrder = 4;
+  lexVortexL.visible = lexVortexR.visible = false;
+  jet.add(lexVortexL, lexVortexR);
+
+  const brakeWakeGeo = new THREE.PlaneGeometry(2.4, 4.8, 1, 6);
+  brakeWakeGeo.rotateX(-Math.PI / 2); brakeWakeGeo.translate(0, 0, 2.4);
+  const brakeWakeMat = new THREE.ShaderMaterial({
+    uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uTime: { value: 0 }, uOp: { value: 0 } }]),
+    vertexShader: LOG_V + `#include <fog_pars_vertex>
+      varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        #include <logdepthbuf_vertex>
+        #include <fog_vertex>
+      }`,
+    fragmentShader: LOG_F + `#include <fog_pars_fragment>
+      uniform float uTime; uniform float uOp; varying vec2 vUv;
+      void main() {
+        #include <logdepthbuf_fragment>
+        float e = smoothstep(0.0, 0.3, vUv.x) * (1.0 - smoothstep(0.7, 1.0, vUv.x)) * smoothstep(0.0, 0.15, vUv.y) * (1.0 - smoothstep(0.4, 1.0, vUv.y));
+        float w = 0.55 + 0.45 * sin(vUv.y * 24.0 - uTime * 26.0 + sin(vUv.x * 12.0) * 1.5);
+        float a = uOp * e * w * 0.24;
+        if (a < 0.004) discard;
+        gl_FragColor = vec4(0.86, 0.90, 0.95, a);
+        #include <fog_fragment>
+      }`,
+    transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: true
+  });
+  const brakeWakeMesh = new THREE.Mesh(brakeWakeGeo, brakeWakeMat);
+  brakeWakeMesh.position.set(0, isF22 ? 0.55 : 0.72, 1.2);
+  brakeWakeMesh.frustumCulled = false; brakeWakeMesh.visible = false;
+  jet.add(brakeWakeMesh);
+
   /* -------------------------------------------- supersonic speed streaks */
   scene.add(camera);
   const SL = 110;
@@ -551,10 +751,12 @@ export function createVFX(THREE, env) {
         void main() {
           #include <logdepthbuf_fragment>
           float facing = abs(dot(normalize(vN), normalize(vV)));
-          float along = smoothstep(0.0, 0.45, vUv.y) * (1.0 - smoothstep(0.80, 1.0, vUv.y));
-          float streak = 0.78 + 0.22 * sin(vUv.x * 92.0 + uTime * 2.5) * sin(vUv.x * 31.0 - uTime * 1.3);
-          float a = uOp * along * (0.75 + 0.25 * pow(1.0 - facing, 1.3)) * streak;
-          vec3 c = min(vec3(0.97, 0.98, 1.0), vec3(0.85));
+          float ring1 = exp(-pow((vUv.y - 0.58) / 0.13, 2.0));
+          float ring2 = exp(-pow((vUv.y - 0.80) / 0.08, 2.0)) * 0.65;
+          float along = smoothstep(0.0, 0.32, vUv.y) * (1.0 - smoothstep(0.84, 1.0, vUv.y));
+          float streak = 0.74 + 0.26 * sin(vUv.x * 112.0 + uTime * 3.1) * sin(vUv.x * 37.0 - uTime * 1.6);
+          float a = uOp * along * (0.45 + 0.65 * (ring1 + ring2)) * (0.7 + 0.3 * pow(1.0 - facing, 1.3)) * streak;
+          vec3 c = min(vec3(0.97, 0.98, 1.0), vec3(0.88));
           gl_FragColor = vec4(c, clamp(a, 0.0, 0.85));
         }`,
       transparent: true, depthWrite: false, side: THREE.DoubleSide, toneMapped: true
@@ -1885,10 +2087,146 @@ export function createVFX(THREE, env) {
   }
 
   /* ------------------------------------------------------------- update */
+  /* ---------------- jet-blast ground kick-up & ambient ridge/ocean spindrift */
+  const JB_N = 96;
+  const jbGeo = new THREE.BufferGeometry();
+  const jbPos = new Float32Array(JB_N * 3), jbAlpha = new Float32Array(JB_N), jbSize = new Float32Array(JB_N), jbCol = new Float32Array(JB_N * 3);
+  jbGeo.setAttribute('position', new THREE.BufferAttribute(jbPos, 3));
+  jbGeo.setAttribute('aAlpha', new THREE.BufferAttribute(jbAlpha, 1));
+  jbGeo.setAttribute('aSize', new THREE.BufferAttribute(jbSize, 1));
+  jbGeo.setAttribute('aCol', new THREE.BufferAttribute(jbCol, 3));
+  const jbMat = new THREE.ShaderMaterial({
+    uniforms: { uScale: { value: 400 } },
+    vertexShader: LOG_V + `attribute float aAlpha; attribute float aSize; attribute vec3 aCol; uniform float uScale; varying float vA; varying vec3 vC;
+      void main() { vA = aAlpha; vC = aCol; vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = aSize * uScale / max(1.0, -mv.z);
+        gl_Position = projectionMatrix * mv;
+        #include <logdepthbuf_vertex>
+      }`,
+    fragmentShader: LOG_F + `varying float vA; varying vec3 vC;
+      void main() {
+        #include <logdepthbuf_fragment>
+        float d = length(gl_PointCoord - 0.5) * 2.0; float a = vA * pow(clamp(1.0 - d, 0.0, 1.0), 1.6);
+        if (a < 0.004) discard; gl_FragColor = vec4(vC, a); }`,
+    transparent: true, depthWrite: false
+  });
+  const jbMesh = new THREE.Points(jbGeo, jbMat); jbMesh.frustumCulled = false; jbMesh.visible = false; scene.add(jbMesh);
+  const jbP = Array.from({ length: JB_N }, () => ({ on: false, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, age: 0, life: 1, s0: 2, s1: 12, r: 0.7, g: 0.65, b: 0.55 }));
+  let jbAcc = 0, jbNext = 0;
+  const _jbAft = new THREE.Vector3();
+  function updateJetBlast(s, dt, visible) {
+    const p = s.position;
+    const gnd = terrainHeight(p.x, p.z);
+    const surf = Math.max(gnd, 0);
+    const agl = p.y - surf;
+    const thrust = Math.max(s.throttle || 0, s.afterburner || 0);
+    const k = (visible && agl < 45 && thrust > 0.2) ? (1 - agl / 45) * (0.4 + 0.6 * thrust) : 0;
+    jbAcc += 55 * k * dt;
+    _jbAft.set(0, 0, 1).applyQuaternion(s.quaternion);
+    const onRwy = env.runway && Math.abs(p.x - env.runway.x) < 42 && p.z >= env.runway.z0 - 80 && p.z <= env.runway.z1 + 80;
+    const overSea = gnd < -0.5;
+    while (jbAcc >= 1) {
+      jbAcc -= 1;
+      const q = jbP[jbNext]; jbNext = (jbNext + 1) % JB_N;
+      const d = 10 + rand() * 14, lat = (rand() - 0.5) * 6;
+      q.on = true; q.age = 0; q.life = 1.1 + rand() * 0.7;
+      q.x = p.x + _jbAft.x * d + _jbAft.z * lat;
+      q.z = p.z + _jbAft.z * d - _jbAft.x * lat;
+      q.y = surf + 0.6 + rand() * 1.2;
+      const sp = 28 + thrust * 38;
+      q.vx = _jbAft.x * sp + (rand() - 0.5) * 8 + WIND.x;
+      q.vz = _jbAft.z * sp + (rand() - 0.5) * 8 + WIND.z;
+      q.vy = 2.5 + rand() * 5.0;
+      q.s0 = 2.5 + rand() * 2; q.s1 = 12 + rand() * 10;
+      if (overSea) { q.r = 0.88; q.g = 0.93; q.b = 0.98; }
+      else if (onRwy) { q.r = 0.62; q.g = 0.62; q.b = 0.60; }
+      else { q.r = 0.66; q.g = 0.58; q.b = 0.46; }
+    }
+    let live = 0;
+    jbMat.uniforms.uScale.value = renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+    for (let i = 0; i < JB_N; i++) {
+      const q = jbP[i];
+      if (!q.on) { jbAlpha[i] = 0; continue; }
+      q.age += dt;
+      if (q.age >= q.life) { q.on = false; jbAlpha[i] = 0; continue; }
+      const f = q.age / q.life;
+      q.x += q.vx * dt; q.y += q.vy * dt; q.z += q.vz * dt;
+      q.vx *= 1 - 1.6 * dt; q.vz *= 1 - 1.6 * dt; q.vy = Math.max(0.2, q.vy * (1 - 1.2 * dt));
+      jbPos[i * 3] = q.x; jbPos[i * 3 + 1] = q.y; jbPos[i * 3 + 2] = q.z;
+      jbCol[i * 3] = q.r; jbCol[i * 3 + 1] = q.g; jbCol[i * 3 + 2] = q.b;
+      jbSize[i] = q.s0 + (q.s1 - q.s0) * f;
+      jbAlpha[i] = Math.sin(Math.PI * f) * 0.24;
+      live++;
+    }
+    jbMesh.visible = live > 0;
+    if (live > 0) {
+      jbGeo.attributes.position.needsUpdate = true;
+      jbGeo.attributes.aAlpha.needsUpdate = true;
+      jbGeo.attributes.aSize.needsUpdate = true;
+      jbGeo.attributes.aCol.needsUpdate = true;
+    }
+  }
+
+  const WS_N = 48;
+  const wsGeo = new THREE.BufferGeometry();
+  const wsPos = new Float32Array(WS_N * 3), wsAlpha = new Float32Array(WS_N), wsSize = new Float32Array(WS_N);
+  wsGeo.setAttribute('position', new THREE.BufferAttribute(wsPos, 3));
+  wsGeo.setAttribute('aAlpha', new THREE.BufferAttribute(wsAlpha, 1));
+  wsGeo.setAttribute('aSize', new THREE.BufferAttribute(wsSize, 1));
+  const wsMat = new THREE.ShaderMaterial({
+    uniforms: { uScale: { value: 400 } },
+    vertexShader: LOG_V + `attribute float aAlpha; attribute float aSize; uniform float uScale; varying float vA;
+      void main() { vA = aAlpha; vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = aSize * uScale / max(1.0, -mv.z);
+        gl_Position = projectionMatrix * mv;
+        #include <logdepthbuf_vertex>
+      }`,
+    fragmentShader: LOG_F + `varying float vA;
+      void main() {
+        #include <logdepthbuf_fragment>
+        float d = length(gl_PointCoord - 0.5) * 2.0; float a = vA * pow(clamp(1.0 - d, 0.0, 1.0), 1.8);
+        if (a < 0.004) discard; gl_FragColor = vec4(0.88, 0.93, 0.98, a); }`,
+    transparent: true, depthWrite: false
+  });
+  const wsMesh = new THREE.Points(wsGeo, wsMat); wsMesh.frustumCulled = false; wsMesh.visible = false; scene.add(wsMesh);
+  const wsP = Array.from({ length: WS_N }, () => ({ on: false, x: 0, y: 0, z: 0, age: 0, life: 2.5, size: 18 }));
+  let wsAcc = 0, wsNext = 0;
+  function updateWindSpindrift(dt, visible) {
+    if (!visible || !cinematic) { wsMesh.visible = false; return; }
+    const cam = camera.position;
+    wsAcc += 14 * dt;
+    while (wsAcc >= 1) {
+      wsAcc -= 1;
+      const sx = cam.x + (rand() - 0.5) * 1800, sz = cam.z + (rand() - 0.5) * 1800;
+      const h = terrainHeight(sx, sz);
+      const isRidge = h > 280;
+      const isSea = h < -1 && cam.y < 180;
+      if (!isRidge && !isSea) continue;
+      const q = wsP[wsNext]; wsNext = (wsNext + 1) % WS_N;
+      q.on = true; q.age = 0; q.life = 2.2 + rand() * 1.4;
+      q.x = sx; q.z = sz; q.y = isRidge ? h + 4 + rand() * 16 : 3 + rand() * 14;
+      q.size = isRidge ? 22 + rand() * 18 : 14 + rand() * 12;
+    }
+    let live = 0;
+    wsMat.uniforms.uScale.value = renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+    for (let i = 0; i < WS_N; i++) {
+      const q = wsP[i];
+      if (!q.on) { wsAlpha[i] = 0; continue; }
+      q.age += dt;
+      if (q.age >= q.life) { q.on = false; wsAlpha[i] = 0; continue; }
+      const f = q.age / q.life;
+      q.x += WIND.x * 2.2 * dt; q.z += WIND.z * 2.2 * dt; q.y += 1.2 * dt;
+      wsPos[i * 3] = q.x; wsPos[i * 3 + 1] = q.y; wsPos[i * 3 + 2] = q.z;
+      wsSize[i] = q.size * (0.7 + 0.6 * f);
+      wsAlpha[i] = Math.sin(Math.PI * f) * 0.14;
+      live++;
+    }
+    wsMesh.visible = live > 0;
+    if (live > 0) { wsGeo.attributes.position.needsUpdate = true; wsGeo.attributes.aAlpha.needsUpdate = true; wsGeo.attributes.aSize.needsUpdate = true; }
+  }
+
   const _w = new THREE.Vector3();
   function update(dt, now, s, opts) {
     const q = s.quaternion;
-    updatePlumes(s, now, opts.visible);
+    updatePlumes(s, now, opts.visible, dt, opts.firstPerson);
 
     // Wingtip condensation: brisk pulls / banks (> 2 G, |AoA| > 7.5 deg, |roll| > 1.2 rad/s)
     // above 160 kt; +40 % in humid / overcast / rain air or inside cloud; dries out above 22,000 ft.
@@ -1917,41 +2255,39 @@ export function createVFX(THREE, env) {
     lexR.emit(_w.copy(lexPR).applyQuaternion(q).add(s.position), lexTarget, now);
     for (const r of ribbons) r.update(camera.position, now);
 
-    // Over-wing condensation puffs: above 4.8 G / 14 deg AoA, below 12,000 ft, denser in thick air.
+    // Over-wing condensation: conformal 3D wing/LERX vapor shells + spiral LEX vortex tubes.
     const rhoRatio = Math.exp(-s.position.y / 8500);
     const gTrig = Math.max(smooth(s.gLoad, 4.8, 8.0), smooth(aoaDeg, 14, 26)) + (s.highG && s.gLoad > 4.8 ? 0.25 : 0);
     const vTarget = force.vapor ? 1 : opts.visible
       ? Math.min(1, gTrig) * (1 - smooth(altFt, 10000, 12000)) * (0.55 + 0.45 * rhoRatio) * smooth(s.speed, 110, 190) : 0;
     vaporLevel += (vTarget - vaporLevel) * Math.min(1, dt * (vTarget > vaporLevel ? 6 : 2.2));
-    if (vaporLevel < 0.004) {
-      vaporPoints.visible = false;
-    } else {
-      vaporPoints.visible = true;
-      const drift = 0.9 + 1.6 * vaporLevel;                       // stronger pull -> faster aft streaming
-      const turb = 0.06 + 0.12 * vaporLevel;
-      for (let i = 0; i < vapor.length; i++) {
-        const v = vapor[i];
-        v.u += dt * v.speed * drift * 0.55;
-        if (v.u > 1) v.u -= 1;
-        const z = THREE.MathUtils.lerp(v.zf, v.za, v.u);
-        vpPos[i * 3] = v.x + Math.sin(now * 7 + v.wob) * turb;
-        vpPos[i * 3 + 1] = v.y + Math.sin(now * 11 + v.phase) * turb * 0.6 + v.u * 0.25;
-        vpPos[i * 3 + 2] = z;
-        const life = Math.sin(Math.PI * v.u);                     // fade in at the lane front, out aft
-        const flick = 0.75 + 0.25 * Math.sin(now * 13 + v.phase) * Math.sin(now * 5.3 + v.phase * 2);
-        vpAlpha[i] = vaporLevel * flick * life * 0.75;
-        vpSize[i] = v.base * (0.7 + 0.5 * v.u) * (0.85 + 0.35 * vaporLevel);
-      }
-      vpGeo.attributes.position.needsUpdate = true;
-      vpGeo.attributes.aAlpha.needsUpdate = true;
-      vpGeo.attributes.aSize.needsUpdate = true;
-      vpMat.uniforms.uCol.value.copy(vaporTint);
-      vpMat.uniforms.uScale.value = renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+    vaporPoints.visible = false;
+    const showShell = vaporLevel >= 0.008 && opts.visible;
+    vaporShellL.visible = vaporShellR.visible = showShell;
+    if (showShell) {
+      vaporShellMat.uniforms.uTime.value = now;
+      vaporShellMat.uniforms.uLevel.value = vaporLevel;
+      vaporShellMat.uniforms.uCol.value.copy(vaporTint);
+    }
+    const showLex = lexTarget >= 0.01 && opts.visible;
+    lexVortexL.visible = lexVortexR.visible = showLex;
+    if (showLex) {
+      lexVortexMat.uniforms.uTime.value = now;
+      lexVortexMat.uniforms.uLevel.value = lexTarget;
+      lexVortexMat.uniforms.uCol.value.copy(vaporTint);
+    }
+    const brakeK = opts.visible ? Math.max((s.ctl && s.ctl.airbrake > 0.15) ? s.ctl.airbrake : 0, smooth(aoaDeg, 32, 55)) : 0;
+    brakeWakeMesh.visible = brakeK > 0.05;
+    if (brakeWakeMesh.visible) {
+      brakeWakeMat.uniforms.uTime.value = now;
+      brakeWakeMat.uniforms.uOp.value = brakeK;
     }
 
     updateSpeedLines(s, dt, opts.firstPerson, Math.max(opts.cloud || 0, mist));
     updateMachCone(dt, s.mach, opts.firstPerson, s);
     updateSpray(s, dt, opts.visible);
+    updateJetBlast(s, dt, opts.visible);
+    updateWindSpindrift(dt, opts.visible);
     catSteam.update(dt);
     aaTracer.update(dt);
     rooster.update(dt);
@@ -1964,7 +2300,7 @@ export function createVFX(THREE, env) {
   return {
     attachPlume,
     setWingtips(l, r) { tipL.copy(l); tipR.copy(r); buildVapor(); },
-    clearTrails() { for (const r of ribbons) r.clear(); for (const r of contrails) r.clear(); contrailStats.active = contrailStats.live = 0; vaporTarget = lexTarget = 0; for (const q of sprayP) q.on = false; vaporLevel = 0; vaporPoints.visible = false; catSteam.reset(); rooster.reset(); wake.reset(); samFx.clear(); dmgTrails.resetAll(); aaTracer.reset(); flagBeam.hide(); },
+    clearTrails() { for (const r of ribbons) r.clear(); for (const r of contrails) r.clear(); contrailStats.active = contrailStats.live = 0; vaporTarget = lexTarget = 0; for (const q of sprayP) q.on = false; for (const q of jbP) q.on = false; jbMesh.visible = false; for (const q of wsP) q.on = false; wsMesh.visible = false; vaporLevel = 0; vaporPoints.visible = false; vaporShellL.visible = vaporShellR.visible = false; lexVortexL.visible = lexVortexR.visible = false; brakeWakeMesh.visible = false; catSteam.reset(); rooster.reset(); wake.reset(); samFx.clear(); dmgTrails.resetAll(); aaTracer.reset(); flagBeam.hide(); },
     catSteam, aaTracer, spray: rooster, wake, samFx, dmgTrails, flagBeam, launchPuff,
     burnerFlash(k) { burnerFlashK = Math.max(burnerFlashK, k || 1); },
     updateContrails,

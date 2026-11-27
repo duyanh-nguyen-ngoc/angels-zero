@@ -28,7 +28,7 @@ export function createNVG(THREE, renderer, post) {
   let cinematic = true;
   const distortScene = new THREE.Scene();
   const distortRT = new THREE.WebGLRenderTarget(Math.max(1, size.x >> 1), Math.max(1, size.y >> 1), {
-    format: THREE.RGBAFormat, type: THREE.UnsignedByteType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false
+    format: THREE.RGBAFormat, type: THREE.UnsignedByteType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: true
   });
   const distortClearCol = new THREE.Color(0.5, 0.5, 0.0);
   const _prevClearCol = new THREE.Color();
@@ -294,7 +294,7 @@ export function createNVG(THREE, renderer, post) {
         const prevAlpha = renderer.getClearAlpha();
         renderer.setRenderTarget(distortRT);
         renderer.setClearColor(distortClearCol, 0.0);
-        renderer.clear();
+        renderer.clear(true, true, false);
         renderer.render(distortScene, camera);
         renderer.setClearColor(_prevClearCol, prevAlpha);
         renderer.setRenderTarget(prevRT);

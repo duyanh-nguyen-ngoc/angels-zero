@@ -3,6 +3,17 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.2.5', title: 'AERODYNAMIC VAPOR, WIND & THERMAL VFX', bullets: [
+    'Replaced dotty over-wing vapor sprites with conformal 3D wing/LERX condensation shells and spiral LEX vortex tubes with scrolling turbulence and sun shading.',
+    'Added depth-occluded exhaust heat shimmer (tail/wings never warp behind plumes), buoyant-to-supersonic plume drift, nozzle thermal heat-soak glow and hot-runway asphalt mirage.',
+    'Added < 45 m AGL directional jet-blast dust/mist/spray kick-up, ambient ridge & ocean wind spindrift, speedbrake/post-stall dorsal wake and multi-ring Prandtl-Glauert Mach shock condensation.'
+  ] },
+  { version: 'v1.2.4', title: 'LIVING WORLD — STREAMED FORESTS, VILLAGES, TRAFFIC & HERO LANDMARKS', bullets: [
+    'Up to 30,000 conifers and broadleaf trees now grow where the baked terrain says forest, streamed in around you out to 8 km, with boulder scree on rocky slopes.',
+    'Villages sit in the flat farm valleys, linked by roads with live traffic; at dusk and night their windows, headlights and taillights glow.',
+    'New landmarks: an oil refinery near Port City, early-warning radomes on the high summits, SAM batteries on the hills, and a hydroelectric arch dam and reservoir in the Gorge (all solid to fly into).',
+    'Every prop is anchored to the exact rendered ground, so nothing floats or sinks, and gentle coastal plains now have narrow beaches instead of wide sand.'
+  ] },
   { version: 'v1.2.3', title: 'TERRAIN V2 — BAKED EROSION WORLDS & 131 KM GPU CLIPMAP', bullets: [
     'Every theatre is now a hand-authored 40 x 40 km world, pre-baked offline with hydraulic and thermal erosion at 2048 x 2048: carved gullies, scree fans, braided drainage and razor ridgelines.',
     'A northern and eastern snow-capped alpine mainland (peaks to ~1,700 m) frames the Archipelago, the Gorge rises into a granite massif, and the Strait walls tower 1,100–1,550 m.',
