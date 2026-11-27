@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.2.7', title: 'MOBILE TOUCH CONTROLS OVERHAUL', bullets: [
+    'Replaced the small fixed mobile pad with a floating left-half virtual stick using a smooth precision curve, stick-release damping and optional tilt gyro steering.',
+    'Added a live-fill vertical throttle slider with AB/BRK zones, quick-hold AB & BRK combat buttons, and ◄ YAW / YAW ► rudder buttons.',
+    'Added a bottom-right combat thumb-arc (GUN, MSL, LOCK, WPN, FLR, AB, BRK), top utility rail (CAM, NVG, SYS ▾, PAUSE), collapsible [SYS ▾] drawer (GEAR, ECM, WING, ROLL, PSM, GYRO, INV) and empty-sky drag free-look.'
+  ] },
   { version: 'v1.2.6', title: 'DISTANT RANGES WITH REAL RELIEF', bullets: [
     'The far mountain ranges beyond the 40 km battle area now rise in ridged spurs and valleys instead of one smooth snowfield, so high-altitude and clear-sky views read as real mountains all the way to the horizon.',
     'Crash, missile and CCIP heights still match the rendered ground exactly out there.'
