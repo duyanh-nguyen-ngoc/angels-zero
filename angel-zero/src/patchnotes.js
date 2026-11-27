@@ -3,6 +3,12 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.2.3', title: 'TERRAIN V2 — BAKED EROSION WORLDS & 131 KM GPU CLIPMAP', bullets: [
+    'Every theatre is now a hand-authored 40 x 40 km world, pre-baked offline with hydraulic and thermal erosion at 2048 x 2048: carved gullies, scree fans, braided drainage and razor ridgelines.',
+    'A northern and eastern snow-capped alpine mainland (peaks to ~1,700 m) frames the Archipelago, the Gorge rises into a granite massif, and the Strait walls tower 1,100–1,550 m.',
+    'A seamless 8-level GPU clipmap draws terrain out to 131 km with no popping or tile seams, and crash, missile, bomb and CCIP heights match the rendered ground to the centimetre.',
+    'Runway 18/36, both approach funnels, the canyon trench and gates, and the Strait channel are kept exactly as before.'
+  ] },
   { version: 'v1.2.2', title: 'CINEMATIC VFX OVERHAUL & YOUTUBE MUSIC FIX', bullets: [
     'Added a half-res screen-space distortion pass for animated jet nozzle heat shimmer, Mach shockwave collars and expanding blast pressure waves.',
     'Upgraded afterburner Mach diamonds to warm plasma cores, upgraded explosion & missile smoke to a 4x4 normal-lit thickness atlas, and added pooled dynamic flash lights illuminating the jet, cockpit and ground on detonations and flares.',

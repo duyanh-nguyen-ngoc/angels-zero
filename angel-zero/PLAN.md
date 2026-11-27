@@ -148,7 +148,7 @@ Status legend: `[x]` implemented and verified Â· `[ ]` open — gaps listed.
   *(`src/atmosphere.js`, `src/nvg.js`)*
 - Note: time of day, clouds and NVG are separate modules rather than inside
   `world.js`; no functional gap.
-- [x] **Terrain v2 — baked erosion worlds + GPU clipmap** *(v1.2.2, build `s10ter2`,
+- [x] **Terrain v2 — baked erosion worlds + GPU clipmap** *(v1.2.3, build `s10ter2`,
   `scripts/bake_terrain.mjs`, `src/geography.js`, `src/noise.js`, `src/terrainpack.js`,
   `src/clipmap.js`, `src/world.js`)*
   - Offline baker: `node scripts/bake_terrain.mjs [archipelago|gorge|strait|all] [--preview dir]`
