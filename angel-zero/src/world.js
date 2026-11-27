@@ -1672,7 +1672,6 @@ export function createWorld(THREE, env) {
       for (const b of straitBoxes) boxes.push(b);
       for (const q of straitCyls) cyls.push(q);
     }
-    scArch.visible = mode === 'gorge';
     lightMat.uniforms.uMapId.value = mode === 'gorge' ? 1 : mode === 'strait' ? 2 : 0;
     const mk = lightMat.uniforms.uMask.value;
     if (mode === 'gorge' && def.bbox) mk.set(def.bbox.x[0] - 600, def.bbox.x[1] + 600, def.bbox.z[1] - 600, def.bbox.z[0] + 600);
