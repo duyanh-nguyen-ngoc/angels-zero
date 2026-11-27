@@ -53,6 +53,22 @@ export function createHUD(THREE, A) {
     ['B+SHIFT <290KT', 'PSM: Cobra / Kulbit'],
     ['RUDDER+OPP ROLL @STALL', 'Flat spin (neutral+opp rudder recovers)']
   ];
+  const GP_ROWS_XBOX = [
+    ['L-STICK', 'Pitch / roll'], ['R-STICK', 'Free look'], ['A', 'Gun'],
+    ['B (HOLD)', 'Missile / Cam'], ['Y', 'Lock target'], ['X', 'Switch weapon'],
+    ['RT', 'Throttle+ / AB'], ['LT', 'Brake / High-G'], ['LT+RT <290KT', 'PSM: Cobra / Kulbit'],
+    ['LB / RB', 'Rudder yaw'], ['LB+RB', 'Barrel roll'], ['L3 / R3', 'Flares / Chaff'],
+    ['D-UP', 'NVG'], ['D-DOWN', 'Gear / Autoland'], ['D-LEFT', 'Wingmen'],
+    ['D-RIGHT', 'ECM Jammer'], ['VIEW (TAP/HOLD)', 'Camera / Cheat'], ['MENU', 'Pause']
+  ];
+  const GP_ROWS_PS = [
+    ['L-STICK', 'Pitch / roll'], ['R-STICK', 'Free look'], ['✕ CROSS', 'Gun'],
+    ['○ CIRCLE', 'Missile / Cam'], ['△ TRIANGLE', 'Lock target'], ['□ SQUARE', 'Switch weapon'],
+    ['R2', 'Throttle+ / AB'], ['L2', 'Brake / High-G'], ['L2+R2 <290KT', 'PSM: Cobra / Kulbit'],
+    ['L1 / R1', 'Rudder yaw'], ['L1+R1', 'Barrel roll'], ['L3 / R3', 'Flares / Chaff'],
+    ['D-UP', 'NVG'], ['D-DOWN', 'Gear / Autoland'], ['D-LEFT', 'Wingmen'],
+    ['D-RIGHT', 'ECM Jammer'], ['SHARE (TAP/HOLD)', 'Camera / Cheat'], ['OPTIONS', 'Pause']
+  ];
   let promptKey = '', promptT = 0, lastPromptText = '';
   let radarZoom = 1, radarPulseT = 99;
   try { const rz = Number(localStorage.getItem('angelsZero_radarZoom')); if (Number.isInteger(rz) && rz >= 0 && rz < 3) radarZoom = rz; } catch (e) { /* storage unavailable */ }
@@ -2368,20 +2384,24 @@ export function createHUD(THREE, A) {
   function drawCheat(ctx) {
     if (!C.cheat) return;
     const ff = !!(C.mcfg && C.mcfg.freeFlight);
-    const skip = ff ? new Set(['LMB/F', 'RMB/M', '1-3/R', 'C', 'X', 'Z', 'J', 'G']) : null;
-    const rows = skip ? CHEAT_ROWS.filter(r => !skip.has(r[0])) : CHEAT_ROWS;
-    const w = 320, h = ff ? Math.max(110, 28 + Math.ceil(rows.length / 3) * 34 + 10) : 260, x = 20, y = HH / 2 - h / 2;
+    const gpKind = C.gamepadKind || '';
+    const baseRows = gpKind === 'ps' ? GP_ROWS_PS : gpKind ? GP_ROWS_XBOX : CHEAT_ROWS;
+    const skip = ff ? new Set(['LMB/F', 'RMB/M', '1-3/R', 'C', 'X', 'Z', 'J', 'G', 'A', 'B (HOLD)', 'Y', 'X', '✕ CROSS', '○ CIRCLE', '△ TRIANGLE', '□ SQUARE', 'L3 / R3', 'D-LEFT', 'D-RIGHT']) : null;
+    const rows = skip ? baseRows.filter(r => !skip.has(r[0])) : baseRows;
+    const w = 360, h = Math.max(130, 56 + Math.ceil(rows.length / 3) * 34), x = 20, y = HH / 2 - h / 2;
     ctx.save();
-    noGlow(ctx); ctx.fillStyle = 'rgba(0, 20, 10, 0.62)'; ctx.fillRect(x, y, w, h);
+    noGlow(ctx); ctx.fillStyle = 'rgba(0, 20, 10, 0.72)'; ctx.fillRect(x, y, w, h);
     ctx.strokeStyle = '#00ff66'; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
     ctx.font = f(12); ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    const title = gpKind === 'ps' ? 'PLAYSTATION CONTROLLER' : gpKind ? 'XBOX / GAMEPAD CONTROLS' : 'KEYBOARD & MOUSE CONTROLS';
+    labelText(ctx, title, x + 12, y + 15, AMBER, 3);
     const colW = (w - 24) / 3;
     for (let i = 0; i < rows.length; i++) {
-      const row = rows[i], rx = x + 12 + (i % 3) * colW, ry = y + 28 + Math.floor(i / 3) * 34;
+      const row = rows[i], rx = x + 12 + (i % 3) * colW, ry = y + 40 + Math.floor(i / 3) * 34;
       labelText(ctx, row[0], rx, ry - 7, G, 2);
       labelText(ctx, row[1], rx, ry + 8, GB, 2);
     }
-    labelText(ctx, 'F1 — CLOSE', x + 12, y + h - 16, AMBER, 3);
+    labelText(ctx, gpKind ? 'HOLD VIEW/SHARE or F1 — CLOSE' : 'F1 — CLOSE', x + 12, y + h - 14, AMBER, 3);
     ctx.restore();
   }
 

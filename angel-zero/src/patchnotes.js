@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.2.8', title: 'CONTROLLER FIX & GAMEPAD KEYBIND CHEAT-SHEET', bullets: [
+    'Fixed desktop Xbox / PlayStation / Pro controller flight controls: A/Cross now fires guns cleanly, RT/LT triggers drive throttle, afterburner, airbrake and LT+RT post-stall (PSM), LB/RB control rudder yaw (LB+RB = barrel roll) and D-Pad maps NVG, Gear, Wingmen and ECM.',
+    'Added full controller menu, pause and debrief navigation (D-Pad/Stick + A confirm / B back).',
+    'Added auto-detected Xbox & PlayStation controller keybind cheat-sheets to both the in-flight F1 / Hold-View overlay and the Controls & Audio panel.'
+  ] },
   { version: 'v1.2.7', title: 'MOBILE TOUCH CONTROLS OVERHAUL', bullets: [
     'Replaced the small fixed mobile pad with a floating left-half virtual stick using a smooth precision curve, stick-release damping and optional tilt gyro steering.',
     'Added a live-fill vertical throttle slider with AB/BRK zones, quick-hold AB & BRK combat buttons, and ◄ YAW / YAW ► rudder buttons.',

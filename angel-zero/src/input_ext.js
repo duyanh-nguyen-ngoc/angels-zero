@@ -14,12 +14,19 @@ function curve(v, dz = DZ) {
 export function createInputExt(THREE, env) {
   const _st = { pitch: 0, roll: 0, yaw: 0, throttleDelta: 0, ab: false, brake: false, fire: false, active: false };
   const prev = new Uint8Array(32);
-  let padIndex = -1, hasGamepad = false, touchTest = false;
+  let padIndex = -1, hasGamepad = false, padKind = 'xbox', padName = '', touchTest = false;
   let lookYaw = 0, lookPitch = 0, thrLevel = 0.5, stickPointer = -1, thrPointer = -1, lookPointer = -1;
   let stickCx = 0, stickCy = 0, lookLastX = 0, lookLastY = 0;
   let touchPitch = 0, touchRoll = 0, yawHeld = 0, abHeld = false, brkHeld = false, psmHeld = false;
   let gyroOn = false, gyroBaseBeta = null, gyroBaseGamma = null, gyroPitch = 0, gyroRoll = 0;
   let sysOpen = false, invert = true;
+  let gpFire = false, gpBrake = false, gpPsm = false, gpViewT = 0, gpViewHeld = false, gpCheatFired = false;
+  let gpNavT = 0, gpWasActive = false;
+  function detectPadKind(id) {
+    if (/sony|dualshock|dualsense|playstation|054c/i.test(id)) return 'ps';
+    if (/nintendo|pro controller|joy-con|057e/i.test(id)) return 'nintendo';
+    return 'xbox';
+  }
   try { invert = localStorage.getItem(INVERT_KEY) !== '0'; } catch (e) { /* storage unavailable */ }
   try { gyroOn = localStorage.getItem(GYRO_KEY) === '1'; } catch (e) { /* storage unavailable */ }
 
@@ -47,29 +54,105 @@ export function createInputExt(THREE, env) {
   function edge(i, on) { const now = !!on, was = !!prev[i]; prev[i] = now ? 1 : 0; return now && !was; }
   function press(name) { const fn = env['on' + name]; if (fn) fn(); }
 
+  function releaseGamepad() {
+    if (gpFire) { gpFire = false; _st.fire = false; press('FireUp'); }
+    if (gpBrake) { gpBrake = false; press('BrakeUp'); }
+    if (gpPsm) { gpPsm = false; press('PSMUp'); }
+    if (gpWasActive && env.keys) { env.keys.shift = false; env.keys.ctrl = false; env.keys.q = false; env.keys.e = false; }
+    gpWasActive = false;
+    _st.pitch = 0; _st.roll = 0; _st.yaw = 0; _st.ab = false; _st.brake = false;
+  }
+
   function pollGamepad(dt) {
     if (!navigator.getGamepads) return;
     const pads = navigator.getGamepads();
     let p = null;
     for (let i = 0; i < pads.length; i++) if (pads[i] && pads[i].mapping === 'standard') { p = pads[i]; padIndex = i; break; }
-    if (!p) { hasGamepad = false; _st.active = false; return; }
-    if (!hasGamepad) { hasGamepad = true; toast('GAMEPAD CONNECTED: ' + String(p.id || 'CONTROLLER').slice(0, 32)); }
+    if (!p) {
+      if (hasGamepad) releaseGamepad();
+      hasGamepad = false; padKind = 'xbox'; padName = ''; _st.active = false;
+      return;
+    }
+    if (!hasGamepad) {
+      hasGamepad = true;
+      padName = String(p.id || 'CONTROLLER').slice(0, 36);
+      padKind = detectPadKind(padName);
+      toast('GAMEPAD CONNECTED: ' + padName.slice(0, 28));
+    }
     const ax = p.axes, btn = p.buttons;
+    const appMode = env.getAppMode ? env.getAppMode() : 'PLAY';
+    const bOn = i => !!(btn[i] && (btn[i].pressed || btn[i].value > 0.5));
+
+    // Menu / Paused / Debrief navigation
+    if (appMode !== 'PLAY') {
+      if (gpWasActive) releaseGamepad();
+      gpNavT = Math.max(0, gpNavT - dt);
+      const axY = ax[1] || 0, axX = ax[0] || 0;
+      const up = bOn(12) || axY < -0.55, dn = bOn(13) || axY > 0.55;
+      const lt = bOn(14) || axX < -0.55, rt = bOn(15) || axX > 0.55;
+      if ((up || dn || lt || rt) && gpNavT <= 0) {
+        gpNavT = 0.22;
+        if (up) press('MenuUp');
+        else if (dn) press('MenuDown');
+        else if (lt) press('MenuLeft');
+        else if (rt) press('MenuRight');
+      } else if (!up && !dn && !lt && !rt) gpNavT = 0;
+      if (edge(0, bOn(0))) press('MenuConfirm');
+      if (edge(1, bOn(1))) press('MenuBack');
+      if (edge(8, bOn(8))) press('Cheat');
+      if (edge(9, bOn(9))) press('Pause');
+      _st.active = false;
+      return;
+    }
+
+    // Active flight controls
+    gpWasActive = true;
     _st.roll = curve(ax[0] || 0);
     _st.pitch = (invert ? -1 : 1) * curve(ax[1] || 0);
-    _st.yaw = ((btn[5] && btn[5].value > 0.5 ? 1 : 0) - (btn[4] && btn[4].value > 0.5 ? 1 : 0));
+    const lb = bOn(4), rb = bOn(5);
+    _st.yaw = (rb ? 1 : 0) - (lb ? 1 : 0);
+    if (edge(20, lb && rb)) press('Roll');
     const rt = btn[7] ? (btn[7].value || 0) : 0, lt = btn[6] ? (btn[6].value || 0) : 0;
-    _st.ab = rt > 0.85; _st.brake = lt > 0.75;
+    _st.ab = rt > 0.85; _st.brake = lt > 0.72;
     _st.throttleDelta = rt - lt;
-    _st.fire = !!(btn[0] && btn[0].pressed);
-    if (edge(1, btn[1] && btn[1].pressed)) press('MissileDown');
-    if (prev[1] && !(btn[1] && btn[1].pressed)) { press('MissileUp'); prev[1] = 0; }
-    if (edge(3, btn[3] && btn[3].pressed)) press('Lock');
-    if (edge(2, btn[2] && btn[2].pressed)) press('Weapon');
-    if (edge(10, btn[10] && btn[10].pressed)) press('Flare');
-    if (edge(11, btn[11] && btn[11].pressed)) press('Chaff');
-    if (edge(8, btn[8] && btn[8].pressed)) press('Camera');
-    if (edge(9, btn[9] && btn[9].pressed)) press('Pause');
+
+    // Gun (A / Cross): edge-triggered FireDown / FireUp so desktop gun fires cleanly
+    const fireNow = bOn(0);
+    _st.fire = fireNow;
+    if (fireNow && !gpFire) { gpFire = true; press('FireDown'); }
+    else if (!fireNow && gpFire) { gpFire = false; press('FireUp'); }
+
+    // Brake / PSM triggers
+    const psmNow = lt > 0.72 && rt > 0.72;
+    const brkNow = lt > 0.72 && !psmNow;
+    if (psmNow && !gpPsm) { gpPsm = true; press('PSMDown'); }
+    else if (!psmNow && gpPsm) { gpPsm = false; press('PSMUp'); }
+    if (brkNow && !gpBrake) { gpBrake = true; press('BrakeDown'); }
+    else if (!brkNow && gpBrake) { gpBrake = false; press('BrakeUp'); }
+
+    if (edge(1, bOn(1))) press('MissileDown');
+    if (prev[1] && !bOn(1)) { press('MissileUp'); prev[1] = 0; }
+    if (edge(3, bOn(3))) press('Lock');
+    if (edge(2, bOn(2))) press('Weapon');
+    if (edge(10, bOn(10))) press('Flare');
+    if (edge(11, bOn(11))) press('Chaff');
+    if (edge(12, bOn(12))) press('NVG');
+    if (edge(13, bOn(13))) press('Gear');
+    if (edge(14, bOn(14))) press('Wing');
+    if (edge(15, bOn(15))) press('ECM');
+    if (edge(9, bOn(9))) press('Pause');
+
+    // View / Share button: quick tap = Camera, hold >= 0.35s = Cheat-sheet
+    const viewNow = bOn(8);
+    if (viewNow && !gpViewHeld) { gpViewHeld = true; gpViewT = 0; gpCheatFired = false; }
+    else if (viewNow && gpViewHeld) {
+      gpViewT += dt;
+      if (!gpCheatFired && gpViewT >= 0.35) { gpCheatFired = true; press('Cheat'); }
+    } else if (!viewNow && gpViewHeld) {
+      if (!gpCheatFired) press('Camera');
+      gpViewHeld = false;
+    }
+
     const rx = curve(ax[2] || 0), ry = curve(ax[3] || 0);
     if (Math.abs(rx) > 0.18 || Math.abs(ry) > 0.18) {
       lookYaw += rx * 60 * dt; lookPitch += ry * 60 * dt;
@@ -78,7 +161,7 @@ export function createInputExt(THREE, env) {
       lookYaw = 0; lookPitch = 0;
       if (env.freeLook && env.freeLook.debugHold) env.freeLook.debugHold(false, 0, 0);
     }
-    _st.active = Math.abs(_st.roll) > DZ || Math.abs(_st.pitch) > DZ;
+    _st.active = Math.abs(_st.roll) > DZ || Math.abs(_st.pitch) > DZ || fireNow || rt > 0.1 || lt > 0.1 || lb || rb;
   }
 
   /* ---------------- mobile touch HUD ---------------- */
@@ -394,6 +477,10 @@ export function createInputExt(THREE, env) {
         env.keys.ctrl = _st.brake;
         env.keys.q = _st.yaw < -0.2; env.keys.e = _st.yaw > 0.2;
       }
+    } else if (hasGamepad && env.getAppMode && env.getAppMode() === 'PLAY' && env.keys) {
+      env.keys.shift = _st.ab;
+      env.keys.ctrl = _st.brake;
+      env.keys.q = _st.yaw < -0.2; env.keys.e = _st.yaw > 0.2;
     }
     _st.active = !!hasGamepad || show;
   }
@@ -405,6 +492,8 @@ export function createInputExt(THREE, env) {
     setTouchTest(on) { touchTest = !!on; },
     get invert() { return invert; },
     get hasGamepad() { return hasGamepad; },
+    get padKind() { return padKind; },
+    get padName() { return padName; },
     get state() { return _st; },
     get active() { return _st.active; },
     get touchVisible() { return !!(root && root.style.display === 'block'); }

@@ -769,6 +769,16 @@
       <div class="ctrlHead"><h2 id="ctrlTitle">[ CONTROLS &amp; AUDIO ]</h2><button class="ctrlClose" id="ctrlCloseX" type="button">[ CLOSE ]</button></div>
       <div id="ctrlBody">
         <div id="ctrlBindHost"></div>
+        <div id="ctrlGpHost" style="margin-top:12px;border-top:1px solid rgba(255,255,255,.18);padding-top:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <span style="font-size:13px">[ CONTROLLER / GAMEPAD CHEAT-SHEET ]</span>
+            <span style="display:flex;gap:6px">
+              <button id="ctrlGpXbox" type="button">[ XBOX ]</button>
+              <button id="ctrlGpPs" type="button">[ PLAYSTATION ]</button>
+            </span>
+          </div>
+          <div id="ctrlGpGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:4px 10px;font-size:11px"></div>
+        </div>
         <div id="ctrlAudioHost"></div>
         <div class="ctrlSliderRow">
           <label for="sbMusicVol">MUSIC</label>
@@ -826,7 +836,7 @@ import { createAmbient } from './src/ambient.js?v=s9ex';
 import { createStormFX } from './src/stormfx.js?v=s9ex';
 import { createWetDeck } from './src/wetdeck.js?v=s9ex';
 import { createBlastFX } from './src/blastfx.js?v=s10vfx1';
-import { createHUD } from './src/hud.js?v=s9ex';
+import { createHUD } from './src/hud.js?v=s10gp1';
 import { createCockpit3D } from './src/cockpit3d.js?v=s9ex';
 import { createCockpitF22 } from './src/cockpit_f22.js?v=s9ex';
 import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9ex';
@@ -849,7 +859,7 @@ import { createFreeLook } from './src/freelook.js?v=s9ex';
 import { createCanopyGlass } from './src/canopyglass.js?v=s9ex';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9ex';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9ex';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s10mob1';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s10gp1';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9ex';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9ex';
 import { createRadioQueue } from './src/radioQueue.js?v=s9ex';
@@ -861,7 +871,7 @@ import { encodeReplay, decodeReplay, buildReplayUrl } from './src/replay_share.j
 import { fetchLeaderboard, submitScore } from './src/leaderboard.js?v=s9ex';
 import { collectPilotSnapshot, applyPilotSnapshot, exportPilotCode, importPilotCode, generateSyncId, getSyncId, setSyncId, isSyncEnabled, setSyncEnabled, pushCloudProfile, pullCloudProfile, syncNow, setRefreshCallback } from './src/profile_sync.js?v=s9ex';
 import { createTraining } from './src/training.js?v=s9ex';
-import { createInputExt } from './src/input_ext.js?v=s10mob1';
+import { createInputExt } from './src/input_ext.js?v=s10gp1';
 import { createOcean } from './src/ocean.js?v=s10ter2';
 import { createWingmenFlight } from './src/wingmen.js?v=s9ex';
 import { createFlightPhysics } from './src/flight.js?v=s9ex';
@@ -3303,13 +3313,30 @@ for (const ev of ['wheel', 'touchmove']) {
   ctrlBody.addEventListener(ev, e => e.stopPropagation(), { passive: true });
 }
 const sbMusicSlider = document.getElementById('sbMusicVol');
+let ctrlGpMode = 'xbox';
+function renderCtrlGpGrid() {
+  const grid = document.getElementById('ctrlGpGrid');
+  if (!grid) return;
+  const rows = ctrlGpMode === 'ps'
+    ? [['L-STICK','Pitch / roll'],['R-STICK','Free look'],['✕ CROSS','Gun'],['○ CIRCLE','Missile / Cam'],['△ TRIANGLE','Lock target'],['□ SQUARE','Switch weapon'],['R2','Throttle+ / AB'],['L2','Brake / High-G'],['L2+R2 <290kt','PSM: Cobra / Kulbit'],['L1 / R1','Rudder yaw'],['L1+R1','Barrel roll'],['L3 / R3','Flares / Chaff'],['D-UP / DOWN','NVG / Gear'],['D-LEFT / RIGHT','Wingmen / ECM'],['SHARE (TAP/HOLD)','Camera / Cheat'],['OPTIONS','Pause']]
+    : [['L-STICK','Pitch / roll'],['R-STICK','Free look'],['A','Gun'],['B (HOLD)','Missile / Cam'],['Y','Lock target'],['X','Switch weapon'],['RT','Throttle+ / AB'],['LT','Brake / High-G'],['LT+RT <290kt','PSM: Cobra / Kulbit'],['LB / RB','Rudder yaw'],['LB+RB','Barrel roll'],['L3 / R3','Flares / Chaff'],['D-UP / DOWN','NVG / Gear'],['D-LEFT / RIGHT','Wingmen / ECM'],['VIEW (TAP/HOLD)','Camera / Cheat'],['MENU','Pause']];
+  grid.innerHTML = rows.map(r => `<div style="display:flex;justify-content:space-between;gap:6px;padding:2px 4px;background:rgba(0,255,102,.05);border:1px solid rgba(0,255,102,.15)"><span style="color:#00ff66;font-weight:bold">${r[0]}</span><span style="color:#d4fff0">${r[1]}</span></div>`).join('');
+  const bx = document.getElementById('ctrlGpXbox'), bp = document.getElementById('ctrlGpPs');
+  if (bx) bx.style.borderColor = ctrlGpMode === 'xbox' ? '#00ff66' : 'rgba(255,255,255,.35)';
+  if (bp) bp.style.borderColor = ctrlGpMode === 'ps' ? '#00ff66' : 'rgba(255,255,255,.35)';
+}
+const ctrlGpXboxBtn = document.getElementById('ctrlGpXbox'), ctrlGpPsBtn = document.getElementById('ctrlGpPs');
+if (ctrlGpXboxBtn) ctrlGpXboxBtn.addEventListener('click', () => { ctrlGpMode = 'xbox'; renderCtrlGpGrid(); });
+if (ctrlGpPsBtn) ctrlGpPsBtn.addEventListener('click', () => { ctrlGpMode = 'ps'; renderCtrlGpGrid(); });
 function syncCtrlUI() {
   sbMusicSlider.value = String(Math.round(audio.musicVolume * 100));
   document.getElementById('sbMusicVolVal').textContent = sbMusicSlider.value;
   const gi = document.getElementById('gpInvert');
   if (gi && inputExt) gi.checked = inputExt.invert;
   const gs = document.getElementById('gpStatus');
-  if (gs && inputExt) gs.textContent = inputExt.hasGamepad ? 'GAMEPAD: CONNECTED' : 'GAMEPAD: NONE';
+  if (gs && inputExt) gs.textContent = inputExt.hasGamepad ? 'GAMEPAD: ' + (inputExt.padName || 'CONNECTED') : 'GAMEPAD: NONE';
+  if (inputExt && inputExt.hasGamepad) ctrlGpMode = inputExt.padKind === 'ps' ? 'ps' : 'xbox';
+  renderCtrlGpGrid();
   syncAudioUI();
 }
 const gpInvertEl = document.getElementById('gpInvert');
@@ -4854,7 +4881,19 @@ const inputExt = createInputExt(THREE, {
   onBrakeDown: () => { keys.b = true; state.brakeHeld = true; },
   onBrakeUp: () => { keys.b = false; state.brakeHeld = false; },
   onPSMDown: () => { keys.b = true; state.brakeHeld = true; keys.shift = true; },
-  onPSMUp: () => { keys.b = false; state.brakeHeld = false; keys.shift = false; }
+  onPSMUp: () => { keys.b = false; state.brakeHeld = false; keys.shift = false; },
+  onCheat: () => { combat.cheat = !combat.cheat; },
+  onMenuUp: () => { if (appMode === 'MENU' || appMode === 'PAUSED') sbMove(-1); },
+  onMenuDown: () => { if (appMode === 'MENU' || appMode === 'PAUSED') sbMove(1); },
+  onMenuLeft: () => { if (appMode === 'MENU' || appMode === 'PAUSED') sbCycle(-1); },
+  onMenuRight: () => { if (appMode === 'MENU' || appMode === 'PAUSED') sbCycle(1); },
+  onMenuConfirm: () => { if (appMode === 'MENU' || appMode === 'PAUSED') sbConfirm(); else if (appMode === 'DEBRIEF') replaySortie(dbEquipId); },
+  onMenuBack: () => {
+    if (patchOverlay.classList.contains('open')) setPatchOpen(false);
+    else if (ctrlOverlay.classList.contains('open')) setCtrlOpen(false);
+    else if (appMode === 'PAUSED') resumeSim();
+    else if (appMode === 'DEBRIEF') debriefToBriefing();
+  }
 });
 if (DEBUG && Q.has('touch')) inputExt.setTouchTest(true);
 // Living-world layer: all pools built once here; per-mission flags in configure().
@@ -6096,7 +6135,7 @@ function stepSim(dt) {
   updateBuzz(dt);
   combatSys.update(dt, simTime, { playerActive: flightMode === 'FLY', firing: !freeFlight.active && (keys.fire || DEBUG_FIRE) });
   if (combat.training) training.update(dt);
-  if (inputExt) inputExt.update(dt);
+  if (inputExt) { inputExt.update(dt); combat.gamepadKind = inputExt.hasGamepad ? inputExt.padKind : ''; }
   if (ffAttribEl) ffAttribEl.hidden = !freeFlight.active || appMode === 'DEBRIEF';
   if (freeFlight.active) {
     const rebase = freeFlight.update(state.position.x, state.position.z);
