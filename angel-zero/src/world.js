@@ -1,6 +1,10 @@
-// ANGELS ZERO — Ace Combat-style coastal archipelago, winding canyon fortress & naval fjord strait.
+// ANGELS ZERO — coastal archipelago, winding canyon fortress & naval fjord strait.
 //
-// Deterministic authored heightfields (20 x 20 km, centred on (0, -2500), ~45 m grid):
+// Terrain v2: each theatre is an offline-baked 2048^2 heightfield + splat over a 40 x 40 km
+// core centred on (0, -2500) (scripts/bake_terrain.mjs -> assets/terrain/<map>/, ~19.5 m
+// texels, droplet + thermal erosion, authored gameplay ground protected), surrounded by the
+// analytic horizonHeight ring and drawn by an 8-level GPU clipmap (src/clipmap.js, 131 km).
+// Authored geography (shared with the baker) lives in src/geography.js:
 //   ARCHIPELAGO
 //     MAIN     central-south airbase island: basalt escarpments on the north / east
 //              coasts, jagged NE alpine massif (~720 m) with a carved mountain river,
@@ -21,16 +25,20 @@
 //   STRAIT     9.5 km wide deep-water naval battle channel framed by towering east/west
 //              basalt fjord cliffs, volcanic headlands, sea stacks and cape lighthouses.
 //
-// The rendered mesh and every gameplay height query share one height grid:
-// heightAt() interpolates the same two triangles per quad that the GPU draws,
-// so crashes, missiles, bombs and props agree exactly with what is on screen.
+//   Northern / eastern mainland alpine range (to ~1.7 km) frames every theatre.
+//
+// The clipmap vertex shader and every gameplay height query share one height function:
+// heightAt() (terrainpack.createSampler) is the exact CPU twin of terrainHeight() in GLSL
+// (same Uint16 bilinear + crag + horizon), so crashes, missiles, bombs and props agree with
+// what is on screen (scripts/terrain_parity.mjs checks it).
 
-export const WORLD = { SIZE: 20000, CX: 0, CZ: -2500, SEG: 440 };     // ~45 m grid: crisp cliffs, single draw call
+export { WORLD, RWY, CORE } from './geography.js?v=s10ter2';
 const FT = 0.3048;
-export const RWY = { x: 900, z0: -1400, z1: 1600, width: 50, elev: 10 };       // runway 18/36, 3,000 m
+import { WORLD, RWY, CORE, createGeography } from './geography.js?v=s10ter2';
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { erodeGrid } from './erosion.js?v=s9ter2';
+import { loadTerrainPack, createSampler } from './terrainpack.js?v=s10ter2';
+import { createClipmap, CM_VERTEX_PARS, CM_VERTEX_BODY, TERRAIN_HEIGHT_GLSL } from './clipmap.js?v=s10ter2';
 import { gorgeCentreX, gorgeSlope, gorgeHeading, gorgeDist, GORGE_FLOOR_Y, GORGE_RIM_Y, GORGE_CRATER_R,
   GORGE_CRATER_WALL_Y, GORGE_CRATER_Z, GORGE_GATE_Z, GORGE_GATE_N, GORGE_FORT, CEIL_M,
   GORGE_BBOX, GORGE_HALF_W, GORGE_RAMP_W, SEA_FLOOR_Y, RUNWAY_BBOX,
@@ -45,305 +53,25 @@ export function createWorld(THREE, env) {
   const nCoast = createNoise2D(4242), nHill = createNoise2D(991), nDet = createNoise2D(7);
   const nRidge = createNoise2D(1337), nSea = createNoise2D(2718), nVeg = createNoise2D(31);
 
-  /* -------------------------------------------------------- island shapes */
-  // Shelf just outside a coast (d = 1): turquoise sandbar falling to deep water.
-  const shelf = d => -2.5 - 20 * ss(d, 1.0, 1.2) - 150 * ss(d, 1.2, 1.65);
-  // Domain-warped ellipse distance (1 = coastline): low-frequency warp makes
-  // capes and coves, mid-frequency wobble roughens the shoreline.
-  const warpX = (x, z, seed) => 520 * fbm(nCoast, x * 0.00021 + seed, z * 0.00021, 3);
-  const warpZ = (x, z, seed) => 520 * fbm(nCoast, x * 0.00021 - 17.3, z * 0.00021 + seed, 3);
-  function ellipseD(x, z, cx, cz, rx, rz, rot, wob, seed) {
-    const qx = x + warpX(x, z, seed), qz = z + warpZ(x, z, seed);
-    const dx = qx - cx, dz = qz - cz, c = Math.cos(rot), s = Math.sin(rot);
-    const u = (dx * c + dz * s) / rx, v = (-dx * s + dz * c) / rz;
-    const d = Math.sqrt(u * u + v * v);
-    if (d > 1.9) return d;
-    return d * (1 + wob * fbm(nCoast, x * 0.0009 + seed, z * 0.0009 - seed, 3));
-  }
-  const capsule = (x, z, ax, az, bx, bz) => {
-    const px = x - ax, pz = z - az, ex = bx - ax, ez = bz - az;
-    const t = clamp((px * ex + pz * ez) / (ex * ex + ez * ez), 0, 1);
-    return Math.hypot(px - ex * t, pz - ez * t);
-  };
+  /* ---------------------------------------------- geography (Terrain v2) */
+  // Every theatre's analytic relief lives in src/geography.js (shared with the offline
+  // baker). The runtime renders and collides against the BAKED packs; the analytic
+  // functions remain only for strait / gorge prop placement on erosion-protected sites.
+  const G = createGeography({ createNoise2D, fbm });
+  const { analyticHeight, gorgeHeight, straitHeight, BRIDGES, DECK_TOP, DECK_UNDER, TOWER_TOP, REEF,
+    canyonX, canyonHalf, capsule, ridged, inApproach } = G;
 
-  // Ridged multifractal (0..1, sharp creases at the noise zero-crossings) for jagged crests.
-  const ridged = (x, z, f, oct) => { const n = 1 - Math.abs(fbm(nRidge, x * f, z * f, oct)); return n * n; };
-  // Jagged mountain spine along a segment: core 1 on the line -> 0 at `r` m, crest height `top`.
-  function spine(x, z, ax, az, bx, bz, r, top, seed) {
-    const dd = capsule(x, z, ax, az, bx, bz);
-    if (dd >= r) return 0;
-    const core = Math.pow(ss(dd, r, 0), 1.25);
-    const cr = ridged(x + seed, z - seed, 0.0016, 4), fine = ridged(x - seed, z + seed, 0.0042, 3);
-    return core * top * (0.5 + 0.5 * cr) + 70 * fine * core;
-  }
-
-  // Carved mountain river on Main Island: flows from NE massif valley into the north strait,
-  // well north of ARCHIPELAGO AFB (z < -1900).
-  const RIVER_A = [2020, -1960], RIVER_B = [1160, -2460], RIVER_C = [360, -3180];
-  function riverDist(x, z) {
-    const wx = x + 42 * fbm(nDet, x * 0.0035, z * 0.0035, 2);
-    const wz = z + 42 * fbm(nDet, z * 0.0035 + 9.1, x * 0.0035, 2);
-    return Math.min(capsule(wx, wz, RIVER_A[0], RIVER_A[1], RIVER_B[0], RIVER_B[1]),
-      capsule(wx, wz, RIVER_B[0], RIVER_B[1], RIVER_C[0], RIVER_C[1]));
-  }
-
-  function mainIsland(x, z) {
-    const d = ellipseD(x, z, 0, -1200, 3400, 2300, 0.08, 0.16, 3.1);
-    if (d >= 1) return shelf(d);
-    const t = 1 - d;
-    // Harbour bay on the west side.
-    const bay = ss(Math.hypot(x + 2600 + 220 * fbm(nHill, x * 0.002, z * 0.002, 2), z + 900 + 220 * fbm(nHill, z * 0.002, x * 0.002, 2)), 950, 600);
-    // North / east coasts face the straits: basalt escarpments straight out of the sea.
-    const cliffK = Math.max(ss(z, -1500, -2700), ss(x, 1500, 2500)) * (1 - bay);
-    let h = 2.5 + 38 * ss(t, 0.015, 0.16) + 85 * cliffK * ss(t, 0.006, 0.045);   // beach / escarpment -> plateau
-    h += 95 * (fbm(nHill, x * 0.0006, z * 0.0006, 4) * 0.5 + 0.5) * ss(t, 0.08, 0.45);   // rolling hills
-    // Jagged volcanic ranges clear of the runway, its approaches and the port town:
-    // NE massif (to ~720 m) and NW ridge (to ~520 m).
-    h += spine(x, z, 2150, -3050, 2950, -750, 700, 620, 3.3) * ss(t, 0.02, 0.2);
-    h += spine(x, z, -2950, -2350, -950, -3150, 620, 430, 8.1) * ss(t, 0.02, 0.2);
-    // Scenic river gorge carving down the northern foothills to a coastal estuary.
-    if (x > 100 && x < 2350 && z < -1820 && z > -3450 && h > 1.5) {
-      const rd = riverDist(x, z);
-      if (rd < 165) {
-        const cut = ss(rd, 165, 22);
-        const bed = Math.max(1.2, h * 0.22 - 8);
-        h = h * (1 - cut * 0.86) + bed * (cut * 0.86);
-      }
-    }
-    h = h * (1 - bay) + (-16) * bay;
-    return h;
-  }
-  // Canyon centreline (gorge runs south -> north through the island) and floor half-width
-  // (130-190 m: a 260-380 m navigable water floor between sheer walls).
-  const canyonX = z => -5600 + 380 * Math.sin((z + 8200) * 0.0011) + 120 * Math.sin(z * 0.0031);
-  const canyonHalf = z => 160 + 30 * Math.sin(z * 0.0019 + 1.3);
-  function canyonIsland(x, z) {
-    const d = ellipseD(x, z, -5600, -8200, 2700, 2400, -0.2, 0.14, 7.7);
-    if (d >= 1) return shelf(d);
-    const t = 1 - d;
-    let h = 6 + 320 * ss(t, 0.012, 0.11);                                      // sheer sea cliffs -> high plateau
-    h += 115 * ridged(x, z, 0.0011, 4) * ss(t, 0.05, 0.28);                    // jagged crest creases
-    const dx = Math.abs(x - canyonX(z)), half = canyonHalf(z);
-    h += 80 * Math.exp(-(((dx - half - 150) / 160) ** 2)) * ss(t, 0.03, 0.18);  // twin rim crests
-    // Gorge: water floor, near-vertical walls rising 350-550 m over ~95 m.
-    const wall = ss(dx, half, half + 95);
-    const ledge = 0.1 * ss(dx, half + 40, half + 52) * (1 - ss(dx, half + 60, half + 72));   // striated basalt ledge
-    return h * Math.min(1, wall + ledge) + (-16) * (1 - wall);
-  }
-  function volcano(x, z) {
-    const d = ellipseD(x, z, 5600, -8300, 2700, 2600, 0.3, 0.12, 11.3);
-    if (d >= 1) return shelf(d);
-    const t = 1 - d, rr = d;
-    let h = 4 + 70 * ss(t, 0.006, 0.05) + 800 * Math.pow(ss(rr, 1.0, 0.1), 1.45);   // sea escarpment + main cone
-    h += 60 * ridged(x, z, 0.0021, 3) * ss(t, 0.05, 0.3);                     // lava-ridge creases
-    const ang = Math.atan2(z + 8300, x - 5600);
-    const ridges = 1 - Math.abs(fbm(nRidge, Math.cos(ang) * 2.2 + 40, Math.sin(ang) * 2.2 + rr * 3.0, 4));
-    h += 150 * Math.pow(ridges, 2.2) * ss(t, 0.15, 0.7) * (1 - ss(rr, 0.25, 0.1));
-    h -= 280 * ss(rr, 0.15, 0.05);                                             // caldera crater
-    // Terraced basalt flanks (blend 60 % toward 55 m steps between 120 and 760 m).
-    const q = h / 55, f = q - Math.floor(q);
-    const terr = (Math.floor(q) + ss(f, 0.32, 0.68)) * 55;
-    const band = ss(h, 120, 200) * (1 - ss(h, 700, 780));
-    return h * (1 - 0.6 * band) + terr * 0.6 * band;
-  }
-  function atoll(x, z, cx, cz, R, openAng, seed) {
-    const dx = x - cx, dz = z - cz;
-    if (Math.hypot(dx, dz) > R * 1.9) return -200;
-    const dist = Math.hypot(dx, dz) + 160 * fbm(nCoast, x * 0.0011 + seed, z * 0.0011 - seed, 3);
-    const a = Math.atan2(dz, dx);
-    const crescent = ss(Math.cos(a - openAng), 0.55, 0.05);                    // open on one side
-    const w = 270 * (0.75 + 0.5 * (fbm(nCoast, x * 0.001 + seed, z * 0.001, 2) * 0.5 + 0.5));
-    const rr = Math.abs(dist - R) / w;
-    if (dist < R && rr > 1) return -3.5 - 2 * fbm(nSea, x * 0.003, z * 0.003, 2);   // lagoon shoal
-    const d = rr / Math.max(crescent, 0.001);
-    if (d >= 1) return dist < R ? -4 : shelf(1 + (d - 1) * 0.6);
-    const t = 1 - d;
-    const outer = dist > R ? 1 : 0.4;                                          // rugged cliffs seaward
-    let h = 3 + 58 * ss(t, 0.02, 0.1 / outer) * crescent;
-    const hillA = openAng + Math.PI, da = Math.atan2(Math.sin(a - hillA), Math.cos(a - hillA));
-    h += 70 * Math.exp(-((da * R / 320) ** 2) - ((dist - R) / 160) ** 2);   // radar hill
-    return h;
-  }
-  function spit(x, z, ax, az, bx, bz, top) {
-    const d = capsule(x, z, ax, az, bx, bz) / (260 * (0.8 + 0.45 * (fbm(nCoast, x * 0.0016, z * 0.0016, 3) * 0.5 + 0.5)));
-    if (d >= 1) return shelf(d);
-    return top * ss(1 - d, 0.0, 0.35) + 2;
-  }
-  // Bridge abutments (end of each headland) — span runs between them.
-  const BRIDGES = [
-    { a: [-3400, -3200], b: [-3700, -4550], fromA: [-2300, -2150], fromB: [-4300, -6300] },
-    { a: [3300, -3250], b: [3850, -4600], fromA: [2250, -2300], fromB: [4700, -6250] }
-  ];
-  // Monumental decks: road at 124 m, girder underside 116 m (380 ft) above the strait.
-  const DECK_TOP = 124, DECK_UNDER = 116, TOWER_TOP = 240;
-  const REEF = { a: [3900, 2700], b: [7500, 450] };
-  // RWY 18/36 approach funnels: 3.6 km finals off both thresholds stay low and open.
-  function approachCap(x, z, h) {
-    for (const [zt, dir] of [[RWY.z0, -1], [RWY.z1, 1]]) {
-      const along = (z - zt) * dir;
-      if (along < -250 || along > 3600) continue;
-      const half = 260 + 0.12 * Math.max(0, along);
-      const k = ss(Math.abs(x - RWY.x), half + 350, half) * ss(along, 3600, 3200);
-      if (k > 0) h = h * (1 - k) + Math.min(h, RWY.elev + 0.03 * Math.max(0, along)) * k;
-    }
-    return h;
-  }
-  const inApproach = (x, z, m = 0) => Math.abs(x - RWY.x) < 700 + m && z > RWY.z0 - 3800 - m && z < RWY.z1 + 3800 + m;
-
-  function analyticHeight(x, z) {
-    let h = -150 - 55 * (fbm(nSea, x * 0.00025, z * 0.00025, 2) * 0.5 + 0.5);
-    h = Math.max(h, mainIsland(x, z), canyonIsland(x, z), volcano(x, z),
-      atoll(x, z, 8300, -1900, 1250, Math.PI, 5.5), atoll(x, z, -8300, -2600, 1150, 0, 9.1));
-    for (const b of BRIDGES) h = Math.max(h, spit(x, z, b.fromA[0], b.fromA[1], b.a[0], b.a[1], DECK_TOP), spit(x, z, b.fromB[0], b.fromB[1], b.b[0], b.b[1], DECK_TOP));
-    const reef = capsule(x, z, REEF.a[0], REEF.a[1], REEF.b[0], REEF.b[1]);
-    const reefW = 1 + 0.6 * fbm(nSea, x * 0.0012, z * 0.0012, 3);
-    h = Math.max(h, -6.5 - 40 * ss(reef / reefW, 230, 650));                  // shallow reef bank
-    if (h > 3) h += 5 * fbm(nDet, x * 0.004, z * 0.004, 3) * ss(h, 3, 20);     // small-scale relief on land
-    // Runway peninsula: flatten / raise a pad around runway, taxiway and apron.
-    const px0 = RWY.x - 300, px1 = RWY.x + 470, pz0 = RWY.z0 - 140, pz1 = RWY.z1 + 160;
-    const dxp = Math.max(px0 - x, 0, x - px1), dzp = Math.max(pz0 - z, 0, z - pz1);
-    const pad = ss(Math.hypot(dxp, dzp), 160, 0);
-    if (pad > 0) h = h * (1 - pad) + RWY.elev * pad;
-    h = approachCap(x, z, h);
-    // Fade to open ocean near the map edge.
-    const edge = Math.max(Math.abs(x - WORLD.CX), Math.abs(z - WORLD.CZ)) / (WORLD.SIZE / 2);
-    return h * (1 - ss(edge, 0.9, 1.0)) + (-180) * ss(edge, 0.9, 1.0);
-  }
-
-  // CANYON_RUN trench: 220 m floor, 65 m ramp to the 366 m rim, plateau outside.
-  function gorgeHeight(x, z) {
-    // The AFB strip and everything outside the trench bbox keep ARCHIPELAGO terrain.
-    if ((x >= RUNWAY_BBOX.x[0] && x <= RUNWAY_BBOX.x[1] && z >= RUNWAY_BBOX.z[0] && z <= RUNWAY_BBOX.z[1]) ||
-        x < GORGE_BBOX.x[0] || x > GORGE_BBOX.x[1] || z > GORGE_BBOX.z[0] || z < GORGE_BBOX.z[1]) return analyticHeight(x, z);
-    const crDX = x - gorgeCentreX(GORGE_CRATER_Z), crDZ = z - GORGE_CRATER_Z;
-    const cr = Math.hypot(crDX, crDZ);
-    if (cr < GORGE_CRATER_R * 1.5) {
-      const wall = GORGE_CRATER_WALL_Y * Math.exp(-Math.pow((cr - GORGE_CRATER_R * 0.72) / 190, 2));
-      const cut = gorgeDist(x, z) < GORGE_HALF_W && z > GORGE_CRATER_Z + GORGE_CRATER_R * 0.4;
-      if (cut) return 20 + Math.min(40, wall * 0.06);
-      return 20 + wall;
-    }
-    const d = gorgeDist(x, z);
-    const floor = GORGE_FLOOR_Y + (fbm(nDet, x * 0.012, z * 0.012, 2) * 0.5 + 0.5) * 6;
-    const plateau = GORGE_RIM_Y + 34 * (fbm(nHill, x * 0.0014, z * 0.0014, 3) * 0.5 + 0.5) + 18 * ridged(x, z, 0.0018, 3);
-    const corridor = 1 - ss(d, GORGE_HALF_W, GORGE_RAMP_W);   // 1 on the floor, 0 at the rim
-    let h = floor + (plateau - floor) * (1 - corridor);
-    // Shortcut ravine: a straight chord through the first S bend.
-    if (z < GORGE_SC_ZA + 300 && z > GORGE_SC_ZB - 300) {
-      const dS = Math.abs(x - GORGE_SC_X);
-      const carved = GORGE_SC_FLOOR_Y + (h - GORGE_SC_FLOOR_Y) * ss(dS, GORGE_SC_HALF_W, GORGE_SC_RAMP_W);
-      const fade = ss(z, GORGE_SC_ZB - 300, GORGE_SC_ZB) * ss(z, GORGE_SC_ZA + 300, GORGE_SC_ZA);
-      h += (Math.min(h, carved) - h) * fade;
-    }
-    return h;
-  }
-
-  // NAVAL_BATTLE strait: 9.2 km deep-water battle channel (|x| < 4600 m is 100% open ocean)
-  // flanked by sheer basalt fjord cliffs, volcanic headlands and skerry reefs on East & West.
-  function fjordMassif(x, z, cx, cz, rx, rz, rot, cliffH, peakH, seed) {
-    const d = ellipseD(x, z, cx, cz, rx, rz, rot, 0.15, seed);
-    if (d >= 1) return shelf(d);
-    const t = 1 - d;
-    let h = 5 + cliffH * ss(t, 0.01, 0.09);
-    h += peakH * Math.pow(ss(t, 0.08, 0.65), 1.3) * (0.45 + 0.55 * ridged(x + seed * 37, z - seed * 19, 0.0015, 4));
-    h += 45 * (fbm(nHill, x * 0.0011 + seed, z * 0.0011, 3) * 0.5 + 0.5) * ss(t, 0.05, 0.3);
-    return h;
-  }
-  function straitHeight(x, z) {
-    const ax = Math.abs(x);
-    let h = -155 - 45 * (fbm(nSea, x * 0.00025, z * 0.00025, 2) * 0.5 + 0.5);
-    if (ax < 4450) return h;
-    // Continuous East & West volcanic fjord peninsulas framing the 9 km wide naval channel
-    // from z = +6600 north to z = -11400, with indented fjord bays and snow-dusted peaks.
-    const sgn = x < 0 ? -1 : 1;
-    const coastX = 5250 + 520 * Math.sin(z * 0.00062 + sgn * 1.1) + 340 * fbm(nCoast, z * 0.00045, sgn * 7.3, 3);
-    const inland = ax - coastX;
-    if (inland > -750) {
-      const t = ss(inland, -650, 2600);
-      if (inland < 0) {
-        h = Math.max(h, -150 * (1 - ss(inland, -650, 0)));
-      } else {
-        const ridge = 0.42 + 0.58 * ridged(x + sgn * 410, z * 1.05, 0.00135, 4);
-        // Carve scenic side-fjord inlets every ~4.5 km without breaking the peninsula spine
-        const fjordCut = 1 - 0.55 * ss(Math.sin(z * 0.00135 + sgn * 0.8), 0.72, 0.98) * (1 - ss(inland, 400, 2400));
-        let fh = (18 + 230 * ss(inland, 0, 340) + 590 * Math.pow(ss(inland, 220, 2700), 1.15) * ridge) * fjordCut;
-        fh += 55 * (fbm(nHill, x * 0.0011 + sgn * 3.1, z * 0.0011, 3) * 0.5 + 0.5) * ss(inland, 60, 700);
-        h = Math.max(h, fh);
-      }
-    }
-    if (h > 3) h += 5 * fbm(nDet, x * 0.004, z * 0.004, 3) * ss(h, 3, 20);
-    const chan = ss(ax, 4550, 5050);
-    h = -165 * (1 - chan) + h * chan;
-    // Smoothly taper north/south peninsula tips inside the 20 km terrain square
-    const zEdge = Math.abs(z - WORLD.CZ) / (WORLD.SIZE / 2);
-    const xEdge = Math.abs(x - WORLD.CX) / (WORLD.SIZE / 2);
-    const edge = Math.max(xEdge, ss(zEdge, 0.84, 0.98) > 0 ? zEdge : 0);
-    return h * (1 - ss(edge, 0.88, 0.99)) + (-180) * ss(edge, 0.88, 0.99);
-  }
-
-  let activeHeightFn = null;
-
-  /* ------------------------------------------------------ height grid */
-  const N = WORLD.SEG, STEP = WORLD.SIZE / N, X0 = WORLD.CX - WORLD.SIZE / 2, Z0 = WORLD.CZ - WORLD.SIZE / 2;
-  const grid = new Float32Array((N + 1) * (N + 1));
-  for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) grid[j * (N + 1) + i] = analyticHeight(X0 + i * STEP, Z0 + j * STEP);
-
-  /* ------------------------------------------- erosion (src/erosion.js) */
-  // Droplet hydraulic + thermal erosion runs on the grid itself, before the mesh,
-  // normals, colours and every prop placement, so heightAt() stays exact. Protect
-  // masks (0 = never moves, feathered): runway pad + apron, both 3.8 km approach
-  // funnels, Port City, the four bridge spits, a band either side of the CANYON_RUN
-  // trench bbox edge (gorge mode swaps the inside for the analytic trench), and the
-  // coast itself (beaches / shelves stay put). The sim's flow / deposition analysis
-  // is kept everywhere and shipped to the shader as the aErosion attribute.
-  const NV = N + 1;
-  const GB = GORGE_BBOX;
-  const inTrenchBox = (x, z) => !(x >= RUNWAY_BBOX.x[0] && x <= RUNWAY_BBOX.x[1] && z >= RUNWAY_BBOX.z[0] && z <= RUNWAY_BBOX.z[1]) &&
-    x >= GB.x[0] && x <= GB.x[1] && z <= GB.z[0] && z >= GB.z[1];
-  const rectDist = (x, z, x0, x1, z0, z1) => Math.hypot(Math.max(x0 - x, 0, x - x1), Math.max(z0 - z, 0, z - z1));
-  function protectArch(x, z) {
-    let m = ss(rectDist(x, z, RWY.x - 300, RWY.x + 470, RWY.z0 - 140, RWY.z1 + 160), 250, 650);
-    m = Math.min(m, ss(rectDist(x, z, RWY.x - 700, RWY.x + 700, RWY.z0 - 3800, RWY.z1 + 3800), 0, 400));
-    m = Math.min(m, ss(rectDist(x, z, -2050, -450, -1850, 350), 150, 500));
-    for (const b of BRIDGES) {
-      m = Math.min(m, ss(capsule(x, z, b.fromA[0], b.fromA[1], b.a[0], b.a[1]), 380, 700));
-      m = Math.min(m, ss(capsule(x, z, b.fromB[0], b.fromB[1], b.b[0], b.b[1]), 380, 700));
-    }
-    // Zero on the trench bbox edge itself (continuous both sides).
-    const edge = Math.min(Math.abs(x - GB.x[0]), Math.abs(x - GB.x[1]), Math.abs(z - GB.z[0]), Math.abs(z - GB.z[1]));
-    const nearBox = x > GB.x[0] - 350 && x < GB.x[1] + 350 && z < GB.z[0] + 350 && z > GB.z[1] - 350;
-    if (nearBox) m = Math.min(m, ss(edge, 0, 300));
-    return m;
-  }
-  function buildMask(src, fn) {
-    const m = new Float32Array(NV * NV);
-    for (let j = 0; j < NV; j++) for (let i = 0; i < NV; i++) {
-      const k = j * NV + i, h = src[k];
-      if (h < 0.8) continue;
-      m[k] = fn(X0 + i * STEP, Z0 + j * STEP) * ss(h, 0.8, 7);
-    }
-    return m;
-  }
-  const ERO = { archipelago: { seed: 4242, cellScale: STEP }, strait: { seed: 9137, cellScale: STEP, droplets: 17000 },
-    gorge: { seed: 5521, cellScale: STEP, droplets: 15000, thermalIterations: 0 } };
-  const erosionStats = Object.create(null);
-  const eroArch = erodeGrid(grid, NV, buildMask(grid, protectArch), ERO.archipelago);
-  erosionStats.archipelago = eroArch.stats;
-
-  // Same triangulation as THREE.PlaneGeometry rotated -90 deg about X.
-  function heightAt(x, z) {
-    if (activeHeightFn) return activeHeightFn(x, z);        // exact canyon / ocean surface for collision + SAM masking
-    return gridHeight(x, z);
-  }
-  // CANYON_RUN: the analytic trench inside its bbox, the (eroded) shared grid outside it.
-  const gorgeExact = (x, z) => inTrenchBox(x, z) ? gorgeHeight(x, z) : gridHeight(x, z);
-  function gridHeight(x, z) {
-    const fx = (x - X0) / STEP, fz = (z - Z0) / STEP;
-    if (fx < 0 || fz < 0 || fx >= N || fz >= N) return -180;
-    const i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j;
-    const r = N + 1, ha = grid[j * r + i], hb = grid[(j + 1) * r + i], hc = grid[(j + 1) * r + i + 1], hd = grid[j * r + i + 1];
-    return u + v <= 1 ? ha + (hd - ha) * u + (hb - ha) * v : hc + (hb - hc) * (1 - u) + (hd - hc) * (1 - v);
-  }
+  /* ------------------------------------------- baked terrain packs + heightAt */
+  // packs[mode] = decoded baked pack; samplers[mode] = exact CPU twin of the clipmap VS.
+  const PACK_BASE = env.packBase || 'assets/terrain', PACK_TAG = env.packTag || '';
+  const packs = { archipelago: env.pack };
+  const samplers = { archipelago: createSampler(env.pack) };
+  let sampler = samplers.archipelago, oceanMode = false;
+  sampler.setViewer(1e9, 1e9);                             // no crag while boot props are placed
+  // heightAt(x, z): baked 2048^2 bilinear + crag (near the viewer) + horizon outside the core;
+  // identical to what the clipmap draws. Ocean-only maps answer the open-ocean floor.
+  function heightAt(x, z) { return oceanMode ? SEA_FLOOR_Y : sampler.heightAt(x, z); }
+  const OCEAN_HEIGHT = () => SEA_FLOOR_Y;
 
   /* -------------------------------------------------- terrain mesh */
   // v1.2.1 seamless RGB detail atlas (built once at boot):
@@ -403,101 +131,66 @@ export function createWorld(THREE, env) {
     canyonFloor: new THREE.Color(0x685a49), canyonWall: new THREE.Color(0x784e38),
     canyonRim: new THREE.Color(0x8f744c), crater: new THREE.Color(0x363a40)
   };
-  const geo = new THREE.PlaneGeometry(WORLD.SIZE, WORLD.SIZE, N, N);
-  geo.rotateX(-Math.PI / 2);
-  const pos = geo.attributes.position;
-  const vGrid = new Uint32Array(pos.count);                 // vertex -> grid cell (fixed for the plane's lifetime)
-  for (let i = 0; i < pos.count; i++) {
-    const gi = Math.round((pos.getX(i) + WORLD.SIZE / 2) / STEP), gj = Math.round((pos.getZ(i) + WORLD.SIZE / 2) / STEP);
-    vGrid[i] = gj * (N + 1) + gi;
-    pos.setY(i, grid[vGrid[i]]);
-  }
-  geo.computeVertexNormals();
-  // aErosion = (cavity AO, sediment, flow) per vertex from the erosion analysis.
-  const eroAttr = new THREE.BufferAttribute(new Float32Array(pos.count * 3), 3);
-  function setErosionAttr(data) {
-    const a = eroAttr.array;
-    for (let i = 0; i < pos.count; i++) { const k = vGrid[i] * 3; a[i * 3] = data[k]; a[i * 3 + 1] = data[k + 1]; a[i * 3 + 2] = data[k + 2]; }
-    eroAttr.needsUpdate = true;
-  }
-  setErosionAttr(eroArch.erosion);
-  geo.setAttribute('aErosion', eroAttr);
-  const nrm = geo.attributes.normal, colors = new Float32Array(pos.count * 3);
-  const _vc = new THREE.Color(), _humid = new THREE.Color(), _arid = new THREE.Color();
-
-  function computeTerrainColors(mode, outArr) {
-    for (let i = 0; i < pos.count; i++) {
-      const h = pos.getY(i), slope = 1 - nrm.getY(i);
-      const wx = pos.getX(i) + WORLD.CX, wz = pos.getZ(i) + WORLD.CZ;
-      const v = fbm(nVeg, wx * 0.0018, wz * 0.0018, 3) * 0.5 + 0.5;
-      // Macro climate zoning (after ProceduralTerrains biomeGLSL):
-      // low-frequency moisture & temperature fields create emerald-green humid valleys & foothills
-      // contrasting against warm arid golden-ochre highlands.
-      const moistRaw = fbm(nVeg, wx * 0.00028 + 11.4, wz * 0.00028 - 6.7, 3) * 0.5 + 0.5;
-      const tempRaw = fbm(nHill, wx * 0.00024 - 19.2, wz * 0.00024 + 8.3, 3) * 0.5 + 0.5;
-      const h01 = clamp(h / 780, 0, 1);
-      const valleyMoist = clamp(moistRaw * 1.15 - h01 * 0.42 + (1 - ss(slope, 0.08, 0.34)) * 0.18, 0, 1);
-      const tempEff = clamp(tempRaw * 0.85 + 0.15 - h01 * 0.55, 0, 1);
-      const inGorgeTrench = mode === 'gorge' &&
-        !(wx >= RUNWAY_BBOX.x[0] && wx <= RUNWAY_BBOX.x[1] && wz >= RUNWAY_BBOX.z[0] && wz <= RUNWAY_BBOX.z[1]) &&
-        wx >= GORGE_BBOX.x[0] && wx <= GORGE_BBOX.x[1] && wz <= GORGE_BBOX.z[0] && wz >= GORGE_BBOX.z[1];
-      if (inGorgeTrench) {
-        const cr = Math.hypot(wx - gorgeCentreX(GORGE_CRATER_Z), wz - GORGE_CRATER_Z);
-        _vc.copy(COL.canyonFloor).lerp(COL.canyonRim, ss(h, GORGE_FLOOR_Y + 25, GORGE_RIM_Y - 15));
-        _vc.lerp(COL.canyonWall, ss(slope, 0.17, 0.38));
-        _vc.lerp(COL.basalt, ss(slope, 0.44, 0.70) * 0.45);
-        if (cr < GORGE_CRATER_R * 1.1) _vc.lerp(COL.crater, ss(cr, GORGE_CRATER_R * 1.1, GORGE_CRATER_R * 0.55) * (1 - ss(h, 90, 240)));
-        if (h > 480) _vc.lerp(COL.peak, ss(h, 500, 740) * (1 - 0.5 * ss(slope, 0.40, 0.70)));
-      } else if (h < 0) {
-        _vc.copy(COL.seabed).lerp(COL.coral, ss(-h, 1.2, 8.5) * (1 - ss(-h, 14, 30)))
-          .lerp(COL.basalt, ss(slope, 0.28, 0.48)).lerp(COL.deep, ss(-h, 6, 58));
+  const glslCol = c => `vec3(${c.r.toFixed(4)}, ${c.g.toFixed(4)}, ${c.b.toFixed(4)})`;
+  // GLSL port of the v1.x per-vertex palette (computeTerrainColors): coast / seabed, humid
+  // emerald valleys vs arid ochre highlands, cliffs, weathered peaks, caldera cinder and the
+  // canyon trench, evaluated per pixel from the baked height + normal. Relief scale is set
+  // for the v2 mountains (h01 over 1,400 m).
+  const TERRAIN_BASE_GLSL = `
+    vec3 terrainBase(float h, float slope, vec2 xz) {
+      float v = clamp((texture2D(uDetail, xz * 0.00011 + vec2(0.13, 0.57)).r - 0.15) / 0.7, 0.0, 1.0);
+      float moistRaw = clamp((texture2D(uDetail, xz * 0.000021 + vec2(0.31, 0.17)).r - 0.15) / 0.7, 0.0, 1.0);
+      float tempRaw = clamp((texture2D(uDetail, xz * 0.000017 + vec2(0.61, 0.23)).r - 0.15) / 0.7, 0.0, 1.0);
+      float h01 = clamp(h / 1400.0, 0.0, 1.0);
+      float valleyMoist = clamp(moistRaw * 1.15 - h01 * 0.42 + (1.0 - hzSS(slope, 0.08, 0.34)) * 0.18, 0.0, 1.0);
+      float tempEff = clamp(tempRaw * 0.85 + 0.15 - h01 * 0.55, 0.0, 1.0);
+      bool trench = uMapMode > 0.5 && uMapMode < 1.5
+        && !(xz.x >= ${RUNWAY_BBOX.x[0].toFixed(1)} && xz.x <= ${RUNWAY_BBOX.x[1].toFixed(1)} && xz.y >= ${RUNWAY_BBOX.z[0].toFixed(1)} && xz.y <= ${RUNWAY_BBOX.z[1].toFixed(1)})
+        && xz.x >= ${GORGE_BBOX.x[0].toFixed(1)} && xz.x <= ${GORGE_BBOX.x[1].toFixed(1)} && xz.y <= ${GORGE_BBOX.z[0].toFixed(1)} && xz.y >= ${GORGE_BBOX.z[1].toFixed(1)};
+      vec3 c;
+      if (h < 0.0) {
+        c = mix(${glslCol(COL.seabed)}, ${glslCol(COL.coral)}, hzSS(-h, 1.2, 8.5) * (1.0 - hzSS(-h, 14.0, 30.0)));
+        c = mix(c, ${glslCol(COL.basalt)}, hzSS(slope, 0.28, 0.48));
+        c = mix(c, ${glslCol(COL.deep)}, hzSS(-h, 6.0, 58.0));
+      } else if (trench && h < 900.0) {
+        float cr = length(xz - vec2(${gorgeCentreX(GORGE_CRATER_Z).toFixed(1)}, ${GORGE_CRATER_Z.toFixed(1)}));
+        c = mix(${glslCol(COL.canyonFloor)}, ${glslCol(COL.canyonRim)}, hzSS(h, ${(GORGE_FLOOR_Y + 25).toFixed(1)}, ${(GORGE_RIM_Y - 15).toFixed(1)}));
+        c = mix(c, ${glslCol(COL.canyonWall)}, hzSS(slope, 0.17, 0.38));
+        c = mix(c, ${glslCol(COL.basalt)}, hzSS(slope, 0.44, 0.70) * 0.45);
+        if (cr < ${(GORGE_CRATER_R * 1.1).toFixed(1)}) c = mix(c, ${glslCol(COL.crater)}, hzSS(cr, ${(GORGE_CRATER_R * 1.1).toFixed(1)}, ${(GORGE_CRATER_R * 0.55).toFixed(1)}) * (1.0 - hzSS(h, 90.0, 240.0)));
+        if (h > 480.0) c = mix(c, ${glslCol(COL.peak)}, hzSS(h, 500.0, 740.0) * (1.0 - 0.5 * hzSS(slope, 0.40, 0.70)));
       } else {
-        // Golden-sand beaches on gentle coasts vs dark coastal basalt on steep sea cliffs.
-        _vc.copy(COL.basalt).lerp(COL.sand, (1 - ss(slope, 0.09, 0.24)) * ss(h, 0.3, 2.2) * (1 - ss(h, 8.5, 14)));
-        // Humid emerald valley/foothill lushness vs warm arid golden-ochre highlands.
-        _humid.copy(COL.grass).lerp(COL.forest, clamp(v * 0.85 + (1 - tempEff) * 0.3, 0, 1));
-        _arid.copy(COL.dryGrass).lerp(COL.tundra, ss(h, 210, 440) * 0.72);
-        const aridMix = clamp((1 - ss(valleyMoist, 0.28, 0.66)) * 0.78 + ss(h, 130, 340) * 0.52, 0, 1);
-        _humid.lerp(_arid, aridMix);
-        _vc.lerp(_humid, ss(h, 4.0, 13.0) * (1 - ss(slope, 0.16, 0.30)));
-        // High-altitude ridge transition & crisp slope-gated exposed granite/basalt cliffs.
-        _vc.lerp(COL.ridge, ss(h, 180, 380) * 0.35 * (1 - aridMix * 0.5));
-        _vc.lerp(COL.cliff, ss(slope, 0.17, 0.32) * ss(h, 2.0, 10.0));
-        _vc.lerp(COL.basalt, ss(slope, 0.28, 0.48) * (1 - ss(h, 28, 85)));
-        const weather = ss(fbm(nRidge, wx * 0.004, wz * 0.004, 3) + (h - 440) / 210, -0.22, 0.35);
-        _vc.lerp(COL.peak, ss(h, 330, 510) * (1 - 0.45 * ss(slope, 0.38, 0.68)) * weather);
-        // Volcano caldera cinder + magma tint vs alpine snowcaps clinging to high flat ledges.
-        const vd = mode === 'archipelago' ? Math.hypot(wx - 5600, wz + 8300) : 99999;
-        if (vd < 950) {
-          const cal = ss(vd, 900, 320);
-          _vc.lerp(COL.cinder, cal * ss(h, 460, 680));
-          if (vd < 380 && h < 760) _vc.lerp(COL.lava, ss(vd, 360, 110) * (1 - ss(slope, 0.25, 0.55)) * 0.55);
-        } else if (h > 515) {
-          const snowK = ss(h, 525, 650) * (1 - ss(slope, 0.20, 0.44)) * (0.65 + 0.35 * v);
-          _vc.lerp(COL.snow, snowK * 0.88);
+        c = mix(${glslCol(COL.basalt)}, ${glslCol(COL.sand)}, (1.0 - hzSS(slope, 0.09, 0.24)) * hzSS(h, 0.3, 2.2) * (1.0 - hzSS(h, 8.5, 14.0)));
+        vec3 humid = mix(${glslCol(COL.grass)}, ${glslCol(COL.forest)}, clamp(v * 0.85 + (1.0 - tempEff) * 0.3, 0.0, 1.0));
+        vec3 arid = mix(${glslCol(COL.dryGrass)}, ${glslCol(COL.tundra)}, hzSS(h, 260.0, 700.0) * 0.72);
+        float aridMix = clamp((1.0 - hzSS(valleyMoist, 0.28, 0.66)) * 0.78 + hzSS(h, 220.0, 620.0) * 0.52, 0.0, 1.0);
+        humid = mix(humid, arid, aridMix);
+        c = mix(c, humid, hzSS(h, 4.0, 13.0) * (1.0 - hzSS(slope, 0.16, 0.30)));
+        c = mix(c, ${glslCol(COL.ridge)}, hzSS(h, 280.0, 640.0) * 0.35 * (1.0 - aridMix * 0.5));
+        c = mix(c, ${glslCol(COL.cliff)}, hzSS(slope, 0.17, 0.32) * hzSS(h, 2.0, 10.0));
+        c = mix(c, ${glslCol(COL.basalt)}, hzSS(slope, 0.28, 0.48) * (1.0 - hzSS(h, 28.0, 85.0)));
+        float weather = hzSS(texture2D(uDetail, xz * 0.0008).g * 1.4 - 0.7 + (h - 720.0) / 260.0, -0.22, 0.35);
+        c = mix(c, ${glslCol(COL.peak)}, hzSS(h, 560.0, 860.0) * (1.0 - 0.45 * hzSS(slope, 0.38, 0.68)) * weather);
+        float vd = uMapMode < 0.5 ? length(xz - vec2(5600.0, -8300.0)) : 99999.0;
+        if (vd < 950.0) {
+          c = mix(c, ${glslCol(COL.cinder)}, hzSS(vd, 900.0, 320.0) * hzSS(h, 460.0, 680.0));
+          if (vd < 380.0 && h < 760.0) c = mix(c, ${glslCol(COL.lava)}, hzSS(vd, 360.0, 110.0) * (1.0 - hzSS(slope, 0.25, 0.55)) * 0.55);
         }
-        if (mode !== 'strait' && Math.abs(h - RWY.elev) < 0.6 && Math.abs(wx - RWY.x - 85) < 360 && wz > RWY.z0 - 140 && wz < RWY.z1 + 160) _vc.lerp(COL.pad, 0.6);
+        if (uMapMode < 1.5 && abs(h - ${RWY.elev.toFixed(1)}) < 0.6 && abs(xz.x - ${(RWY.x + 85).toFixed(1)}) < 360.0 && xz.y > ${(RWY.z0 - 140).toFixed(1)} && xz.y < ${(RWY.z1 + 160).toFixed(1)}) c = mix(c, ${glslCol(COL.pad)}, 0.6);
       }
-      outArr[i * 3] = _vc.r; outArr[i * 3 + 1] = _vc.g; outArr[i * 3 + 2] = _vc.b;
-    }
-  }
-  computeTerrainColors('archipelago', colors);
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      return c;
+    }`;
 
-  const gridCache = Object.create(null);
-  gridCache.archipelago = {
-    grid: new Float32Array(grid),
-    normals: new Float32Array(geo.attributes.normal.array),
-    colors: new Float32Array(colors),
-    erosion: eroArch.erosion
-  };
-  let activeTerrainMode = 'archipelago';
-  const OCEAN_HEIGHT = () => SEA_FLOOR_Y;
 
   const _dt0 = performance.now();
   const detail = detailTexture(512, 777);
   const detailMs = +(performance.now() - _dt0).toFixed(1);
-  const terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 });
+  // Shared terrain uniforms (pack textures + core frame), referenced by all 8 level materials.
+  const TERRAIN_U = {
+    uHeight: { value: null }, uNormalTex: { value: null }, uSplat: { value: null },
+    uCore: { value: new THREE.Vector4() }, uHRange: { value: new THREE.Vector2() },
+    uMapId: { value: 0 }, uViewer: { value: new THREE.Vector3(1e9, 0, 1e9) }
+  };
   const lin = hex => new THREE.Color(hex);
   const FARM_U = {
     uPal: { value: [0x4a5935, 0x7e6c47, 0x3a4c2d, 0x42382c, 0x64684a].map(lin) },
@@ -532,7 +225,7 @@ export function createWorld(THREE, env) {
     uniform float uRockSlopeLo, uRockSlopeHi, uSnowSlopeMin, uSnowSlopeMax, uAORidge, uGorgeFloor;
     uniform vec3 uSun; uniform vec3 uMieCol; uniform float uMieK;
     uniform float uMistH; uniform float uMistK; uniform float uCloudShadowK;
-    varying vec3 vEro;                                   // erosion analysis: (cavity AO, sediment, flow)
+    // vEro / vWNrm / vLand / vCore are set per pixel from the baked splat + normal textures (map_fragment).
     // Screen-space micro-normal perturbation (same maths as three.js perturbNormalArb):
     // dHdxy is the screen derivative of a procedural micro-height, no extra texture taps.
     vec3 azPerturbNormal(vec3 surfPos, vec3 surfNorm, vec2 dHdxy, float faceDir) {
@@ -598,15 +291,29 @@ export function createWorld(THREE, env) {
       e = vec3(min(dU, dV), (f2 - f1) * 1200.0, fh12(fid + 2.0) > 0.5 ? uv.x : uv.y);
       return c;
     }`;
-  terrainMat.onBeforeCompile = sh => {
+  function patchTerrainShader(sh, levelU) {
     sh.uniforms.uDetail = { value: detail };
-    Object.assign(sh.uniforms, FARM_U);
+    Object.assign(sh.uniforms, FARM_U, TERRAIN_U, levelU);
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos; varying vec3 vWNrm; attribute vec3 aErosion; varying vec3 vEro;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = (modelMatrix * vec4(position, 1.0)).xyz; vWNrm = normalize(mat3(modelMatrix) * normal); vEro = aErosion;');
+      .replace('#include <common>', '#include <common>\n' + CM_VERTEX_PARS)
+      .replace('#include <beginnormal_vertex>', CM_VERTEX_BODY)
+      .replace('#include <begin_vertex>', 'vec3 transformed = cmPos;');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform sampler2D uDetail; varying vec3 vWPos; varying vec3 vWNrm;\n' + FARM_GLSL)
+      .replace('#include <common>', '#include <common>\nuniform sampler2D uDetail; varying vec3 vWPos; varying vec3 vHN;\nvec3 vWNrm; vec3 vEro; float vLand; float vCore;\n' + TERRAIN_HEIGHT_GLSL + FARM_GLSL + TERRAIN_BASE_GLSL)
       .replace('#include <map_fragment>', `#include <map_fragment>
+        // Terrain v2: per-pixel baked normal + erosion / landUse splat inside the 40 km core,
+        // analytic horizon normal outside it; base palette replaces the old vertex colours.
+        vec2 tcF = (vWPos.xz - uCore.xy) / uCore.z;
+        vCore = inCoreF(tcF) ? 1.0 : 0.0;
+        if (vCore > 0.5) {
+          vec2 nrg = texture2D(uNormalTex, (tcF + 0.5) / uCore.w).rg * 2.0 - 1.0;
+          vWNrm = vec3(nrg.x, sqrt(max(0.0, 1.0 - dot(nrg, nrg))), nrg.y);
+          vec4 spl = texture2D(uSplat, (tcF * 0.5 + 0.5) / (uCore.w * 0.5));
+          vEro = spl.rgb; vLand = spl.a;
+        } else {
+          vWNrm = normalize(vHN); vEro = vec3(0.5, 0.0, 0.0); vLand = vWPos.y > 0.5 ? 0.125 : 0.0;
+        }
+        diffuseColor.rgb = terrainBase(vWPos.y, 1.0 - clamp(vWNrm.y, 0.0, 1.0), vWPos.xz);
         float camD = length(vWPos - cameraPosition);
         // RGB detail atlas: r macro FBM, g ridged rock fractures, b micro-grain (v1.2.1).
         float det = 0.5, d1v = 0.5, d3v = 0.5, rockG = 0.5, microB = 0.5, closeB = 0.5;
@@ -636,7 +343,13 @@ export function createWorld(THREE, env) {
           float allowFarm = (uMapMode > 1.5) ? 0.0 : (1.0 - inGorgeMask);
           float farmK = allowFarm * smoothstep(13.0, 18.0, vWPos.y) * (1.0 - smoothstep(295.0, 315.0, vWPos.y)) * smoothstep(0.78, 0.86, ny)
             * (1.0 - rectMask(vWPos.xz, uAfb, 160.0)) * (1.0 - rectMask(vWPos.xz, uTown, 140.0));
+          // Baked landUse classes (splat A): farmland 64, forest 128. Outside the core: no gating.
+          float luFarm = 1.0 - smoothstep(0.07, 0.16, abs(vLand - 0.251));
+          float luForest = 1.0 - smoothstep(0.07, 0.16, abs(vLand - 0.502));
+          farmK *= mix(1.0, luFarm, vCore);
           vec3 land = diffuseColor.rgb;
+          // Forest canopy: dark conifer / broadleaf mottling where the baker grew woodland.
+          land = mix(land, mix(vec3(0.045, 0.085, 0.040), vec3(0.085, 0.130, 0.055), d1v) * (0.85 + 0.3 * det), luForest * vCore * (1.0 - cliffK) * eroK * 0.62);
           if (farmK > 0.001) {
             vec3 fc;
             if (camD >= 16000.0) {
@@ -665,9 +378,11 @@ export function createWorld(THREE, env) {
             tWet = max(tWet, stream * inGorgeMask);
           }
           // Layered granite / basalt cliff albedo with altitude weathering & bedding bands.
-          float rockBand = 0.5 + 0.5 * sin(vWPos.y * 0.22 + vWPos.x * 0.004 + vWPos.z * 0.003 + det * 2.2);
+          // Bands fade to their mean once a band shrinks below ~1.5 px (no contour moire on big walls).
+          float bandAA = 1.0 - smoothstep(0.35, 1.0, fwidth(vWPos.y) * 0.22);
+          float rockBand = 0.5 + 0.5 * sin(vWPos.y * 0.22 + vWPos.x * 0.004 + vWPos.z * 0.003 + det * 2.2) * bandAA;
           vec3 rock = mix(uRockB, uRockA, clamp(rockBand * 0.72 + d1v * 0.35, 0.0, 1.0));
-          rock = mix(rock, uRockHi, smoothstep(260.0, 560.0, vWPos.y) * (0.45 + 0.35 * det));
+          rock = mix(rock, uRockHi, smoothstep(420.0, 1000.0, vWPos.y) * (0.45 + 0.35 * det));
           if (inGorgeMask > 0.01) {
             // Multi-band sedimentary strata (after dryCanyon.js canyonBeddedRock): rich red-rock
             // sandstone / ochre bands warped by detail noise and dark basalt caprock layers.
@@ -675,7 +390,8 @@ export function createWorld(THREE, env) {
             float cycle = sin(vWPos.y * 0.093 + 1.7 + det * 0.8) * 0.5 + 0.5;
             vec3 sandstone = mix(vec3(0.24, 0.135, 0.082), vec3(0.42, 0.285, 0.175), bedding * 0.45 + det * 0.55);
             vec3 strata = mix(sandstone, vec3(0.085, 0.082, 0.084), smoothstep(0.74, 0.88, cycle));
-            rock = mix(rock, strata, inGorgeMask * 0.86);
+            // Bedded sandstone belongs to the trench walls; the massif above the rim is alpine granite.
+            rock = mix(rock, strata, inGorgeMask * 0.86 * (1.0 - smoothstep(uGorgeFloor + 330.0, uGorgeFloor + 520.0, vWPos.y)));
             // Talus scree aprons at the wall base: moderate slopes just above the floor.
             float talus = smoothstep(0.10, 0.24, slope) * (1.0 - smoothstep(0.42, 0.62, slope))
               * (1.0 - smoothstep(uGorgeFloor + 50.0, uGorgeFloor + 150.0, vWPos.y));
@@ -692,15 +408,16 @@ export function createWorld(THREE, env) {
           land *= 1.0 - 0.32 * chan;
           tWet = max(tWet, chan);
           // Preserve alpine snow & caldera cinder above 540 m; weathered granite on mid-peaks.
-          float midPeak = smoothstep(310.0, 380.0, vWPos.y) * (1.0 - smoothstep(520.0, 610.0, vWPos.y)) * (1.0 - cliffK) * (1.0 - inGorgeMask);
+          float midPeak = smoothstep(560.0, 700.0, vWPos.y) * (1.0 - smoothstep(980.0, 1120.0, vWPos.y)) * (1.0 - cliffK) * (1.0 - inGorgeMask);
           land = mix(land, uPeak, midPeak * 0.72);
           // Per-pixel alpine snowcaps: cling to high flat ledges, shed crisply off steep rock walls,
           // never on the volcano caldera or inside the canyon trench.
           float calderaD = length(vWPos.xz - vec2(5600.0, -8300.0));
-          float snowLine = 545.0 + jit * 65.0;
-          float snow = smoothstep(snowLine, snowLine + 80.0, vWPos.y)
+          // Alpine snowline 950-1250 m (jittered); the gorge massif keeps its high snow.
+          float snowLine = 1100.0 + jit * 300.0;
+          float snow = smoothstep(snowLine, snowLine + 110.0, vWPos.y)
             * (1.0 - smoothstep(uSnowSlopeMin, uSnowSlopeMax, slope + jit * 0.07))
-            * ((uMapMode < 0.5) ? smoothstep(900.0, 1050.0, calderaD) : 1.0) * (1.0 - inGorgeMask);
+            * ((uMapMode < 0.5) ? smoothstep(900.0, 1050.0, calderaD) : 1.0) * (1.0 - inGorgeMask * (1.0 - smoothstep(760.0, 900.0, vWPos.y)));
           land = mix(land, uSnow * (0.94 + 0.12 * d1v), snow);
           tSnow = snow;
           // Main Island carved mountain stream & island highways (ARCHIPELAGO).
@@ -746,7 +463,7 @@ export function createWorld(THREE, env) {
           diffuseColor.rgb = land;
         }
         float steep = smoothstep(0.24, 0.54, 1.0 - clamp(vWNrm.y, 0.0, 1.0));
-        float strata = 0.72 + 0.28 * sin(vWPos.y * 0.62 + det * 7.0);
+        float strata = 0.86 + 0.14 * sin(vWPos.y * 0.62 + det * 7.0) * (1.0 - smoothstep(0.35, 1.0, fwidth(vWPos.y) * 0.62));
         // Wind-synced 2D FBM cloud shadows (1/4096 frequency matches ambient.js 4096 m wrap with zero pop).
         vec2 cUv = (vWPos.xz - uCloudOff) * 0.000244140625;
         float cShad = texture2D(uDetail, cUv).r * 0.62 + texture2D(uDetail, cUv * 2.0 + vec2(0.37, 0.61)).r * 0.38;
@@ -767,6 +484,7 @@ export function createWorld(THREE, env) {
         // Matte 0.95 on dry rock / soil, glossier 0.58 on wet riverbeds, drainage, shore and snow.
         roughnessFactor = mix(0.95, 0.58, clamp(max(tWet, tSnow * 0.82), 0.0, 1.0));`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+        normal = normalize((viewMatrix * vec4(vWNrm, 0.0)).xyz);   // baked per-pixel normal
         {
           // Sharp triplanar micro-normals, faded out cleanly by 10.5 km; strongest on exposed cliffs.
           vec2 dH = vec2(dFdx(microH), dFdy(microH));
@@ -804,11 +522,64 @@ export function createWorld(THREE, env) {
           float fogFactor = clamp(max(distFog, valleyMist), 0.0, 1.0);
           gl_FragColor.rgb = mix(gl_FragColor.rgb, aerialCol, fogFactor);
         #endif`);
+  }
+  // Terrain v2: 8-level nested GPU clipmap; one material per level (same program, own uniforms).
+  const clipmap = createClipmap(THREE, {
+    scene,
+    makeMaterial: levelU => {
+      const m = new THREE.MeshStandardMaterial({ roughness: 0.92, metalness: 0 });
+      m.onBeforeCompile = sh => patchTerrainShader(sh, levelU);
+      return m;
+    }
+  });
+  // Snap the rings + crag viewer right before the first level draws (every render, any mode).
+  clipmap.levels[0].mesh.onBeforeRender = (r, s, cam) => {
+    clipmap.update(cam.position.x, cam.position.z);
+    TERRAIN_U.uViewer.value.copy(cam.position);
+    sampler.setViewer(cam.position.x, cam.position.z);
   };
-  const terrain = new THREE.Mesh(geo, terrainMat);
-  terrain.position.set(WORLD.CX, 0, WORLD.CZ);
-  terrain.receiveShadow = false;
-  scene.add(terrain);
+  const terrain = {                                         // envProps.terrain proxy (applyMapProps toggles .visible)
+    get visible() { return clipmap.visible; }, set visible(v) { clipmap.setVisible(!!v); }
+  };
+  // GPU textures per pack (built once, cached): RG8 hi/lo height (nearest, texelFetch),
+  // RG8 normals and RGBA8 splat (linear + mips).
+  function packTextures(pk) {
+    if (pk.tex) return pk.tex;
+    const c = pk.meta.core, n = c.n, sn = c.splatN, rg = new Uint8Array(n * n * 2), q = pk.q;
+    for (let k = 0; k < n * n; k++) { rg[k * 2] = q[k] >> 8; rg[k * 2 + 1] = q[k] & 255; }
+    const th = new THREE.DataTexture(rg, n, n, THREE.RGFormat, THREE.UnsignedByteType);
+    th.magFilter = th.minFilter = THREE.NearestFilter; th.generateMipmaps = false; th.needsUpdate = true;
+    const tn = new THREE.DataTexture(pk.normal, n, n, THREE.RGFormat, THREE.UnsignedByteType);
+    tn.magFilter = THREE.LinearFilter; tn.minFilter = THREE.LinearMipmapLinearFilter; tn.generateMipmaps = true; tn.needsUpdate = true;
+    const ts = new THREE.DataTexture(pk.splat, sn, sn, THREE.RGBAFormat, THREE.UnsignedByteType);
+    ts.magFilter = THREE.LinearFilter; ts.minFilter = THREE.LinearMipmapLinearFilter; ts.generateMipmaps = true; ts.needsUpdate = true;
+    pk.tex = { th, tn, ts };
+    return pk.tex;
+  }
+  let onPackReady = null, wantMode = 'archipelago';
+  function applyPack(mode) {
+    let pk = packs[mode];
+    if (!pk) {                                              // not fetched yet: show the archipelago, re-apply on arrival
+      pk = packs.archipelago;
+      prepare({ heightFn: mode }).then(() => {
+        if (wantMode === mode) { applyPack(mode); if (onPackReady) onPackReady(mode); }
+      }).catch(e => console.error('[ANGELS_ZERO] terrain pack', mode, e));
+    }
+    sampler = samplers[pk.map] || (samplers[pk.map] = createSampler(pk));
+    const tx = packTextures(pk), c = pk.meta.core;
+    TERRAIN_U.uHeight.value = tx.th; TERRAIN_U.uNormalTex.value = tx.tn; TERRAIN_U.uSplat.value = tx.ts;
+    TERRAIN_U.uCore.value.set(c.cx - c.size / 2, c.cz - c.size / 2, c.step, c.n);
+    TERRAIN_U.uHRange.value.set(c.minH, (c.maxH - c.minH) / 65535);
+    TERRAIN_U.uMapId.value = pk.mapId;
+    return pk;
+  }
+  // Lazy per-mission pack fetch (memoised); call before rebuild() for a seamless switch.
+  async function prepare(def) {
+    const mode = def ? def.heightFn : 'archipelago';
+    if (mode === 'ocean' || packs[mode] || !G.heightFns[mode]) return;
+    packs[mode] = await loadTerrainPack(mode, PACK_BASE, PACK_TAG);
+  }
+  applyPack('archipelago');
 
   /* ---------------------------------------------------- props + lights */
   const props = new THREE.Group(); props.name = 'worldProps'; scene.add(props);
@@ -1591,7 +1362,7 @@ export function createWorld(THREE, env) {
     const srnd = env.mulberry32(9157);
     const bridgeD = (x, z) => Math.min(...BRIDGES.map(b => capsule(x, z, b.a[0], b.a[1], b.b[0], b.b[1])));
     for (let k = 0; k < 6000 && stacks.length < 15; k++) {
-      const x = X0 + 900 + srnd() * (WORLD.SIZE - 1800), z = Z0 + 900 + srnd() * (WORLD.SIZE - 1800);
+      const x = WORLD.CX - WORLD.SIZE / 2 + 900 + srnd() * (WORLD.SIZE - 1800), z = WORLD.CZ - WORLD.SIZE / 2 + 900 + srnd() * (WORLD.SIZE - 1800);
       if (heightAt(x, z) > -12) continue;
       let nearLand = false;
       for (let a = 0; a < 8 && !nearLand; a++) for (const r of [350, 700, 1100]) if (heightAt(x + Math.cos(a * 0.785) * r, z + Math.sin(a * 0.785) * r) > 8) nearLand = true;
@@ -1964,60 +1735,10 @@ export function createWorld(THREE, env) {
     activeMap = def || null;
     const mode = def ? def.heightFn : 'archipelago';
     currentMode = mode;
-    const fn = mode === 'ocean' ? OCEAN_HEIGHT
-      : mode === 'sea' ? (x, z) => -150 - 12 * (fbm(nSea, x * 0.0004, z * 0.0004, 2) * 0.5 + 0.5)
-      : mode === 'strait' ? straitHeight
-      : mode === 'gorge' ? gorgeHeight
-        : analyticHeight;
-    activeHeightFn = mode === 'ocean' ? OCEAN_HEIGHT : mode === 'gorge' ? gorgeExact : null;
     FARM_U.uMapMode.value = mode === 'gorge' ? 1 : mode === 'strait' ? 2 : 0;
-    if (mode !== 'ocean' && mode !== activeTerrainMode) {
-      const cached = gridCache[mode];
-      if (cached) {
-        grid.set(cached.grid);
-        for (let i = 0; i < pos.count; i++) {
-          const gi = Math.round((pos.getX(i) + WORLD.SIZE / 2) / STEP), gj = Math.round((pos.getZ(i) + WORLD.SIZE / 2) / STEP);
-          pos.setY(i, grid[gj * (N + 1) + gi]);
-        }
-        geo.attributes.normal.array.set(cached.normals);
-        geo.attributes.color.array.set(cached.colors);
-        setErosionAttr(cached.erosion);
-      } else {
-        let ero;
-        if (mode === 'gorge') {
-          // Outside the trench bbox: the eroded archipelago grid; inside: the analytic trench
-          // (untouched, analysis-only erosion pass for flow / scree shading on the walls).
-          const base = gridCache.archipelago.grid;
-          for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) {
-            const k = j * NV + i, x = X0 + i * STEP, z = Z0 + j * STEP;
-            grid[k] = inTrenchBox(x, z) ? gorgeHeight(x, z) : base[k];
-          }
-          ero = erodeGrid(grid, NV, new Float32Array(NV * NV), ERO.gorge);
-        } else {
-          for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) grid[j * (N + 1) + i] = fn(X0 + i * STEP, Z0 + j * STEP);
-          const fnMask = mode === 'strait' ? protectStrait : () => 0;
-          ero = erodeGrid(grid, NV, buildMask(grid, fnMask), mode === 'strait' ? ERO.strait : ERO.gorge);
-        }
-        erosionStats[mode] = ero.stats;
-        setErosionAttr(ero.erosion);
-        for (let i = 0; i < pos.count; i++) {
-          const gi = Math.round((pos.getX(i) + WORLD.SIZE / 2) / STEP), gj = Math.round((pos.getZ(i) + WORLD.SIZE / 2) / STEP);
-          pos.setY(i, grid[gj * (N + 1) + gi]);
-        }
-        geo.computeVertexNormals();
-        computeTerrainColors(mode, geo.attributes.color.array);
-        gridCache[mode] = {
-          grid: new Float32Array(grid),
-          normals: new Float32Array(geo.attributes.normal.array),
-          colors: new Float32Array(geo.attributes.color.array),
-          erosion: ero.erosion
-        };
-      }
-      geo.attributes.position.needsUpdate = true;
-      geo.attributes.normal.needsUpdate = true;
-      geo.attributes.color.needsUpdate = true;
-      activeTerrainMode = mode;
-    }
+    oceanMode = mode === 'ocean';
+    wantMode = mode;
+    if (!oceanMode) applyPack(mode);
     boxes.length = 0; cyls.length = 0;
     if (mode === 'archipelago') {
       for (const b of baseBoxes) boxes.push(b);
@@ -2120,7 +1841,14 @@ export function createWorld(THREE, env) {
   }
 
   return {
-    terrain, props, heightAt, analyticHeight, straitHeight, gorgeHeight, erosionStats, detailMs, collide, addBox, update, rebuild, envProps,
+    terrain, props, heightAt, analyticHeight, straitHeight, gorgeHeight, detailMs, collide, addBox, update, rebuild, envProps,
+    prepare, set onPackReady(fn) { onPackReady = fn; }, clipmap, geography: G, terrainUniforms: TERRAIN_U,
+    get sampler() { return sampler; }, get packs() { return packs; },
+    get terrainStats() {
+      const o = { clipmap: clipmap.stats(), active: sampler.pack.map, packs: {} };
+      for (const k in packs) if (packs[k]) o.packs[k] = { loadMs: packs[k].loadMs || 0, bytes: packs[k].meta.stats.bytes.total, maxH: packs[k].meta.stats.maxH };
+      return o;
+    },
     setAtmosphereFog, setCloudOffset,
     get map() { return activeMap; },
     get mode() { return currentMode; },

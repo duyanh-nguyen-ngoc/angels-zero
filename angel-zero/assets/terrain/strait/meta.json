@@ -1,0 +1,97 @@
+{
+ "version": 2,
+ "map": "strait",
+ "mapId": 2,
+ "core": {
+  "size": 40000,
+  "cx": 0,
+  "cz": -2500,
+  "n": 2048,
+  "step": 19.540791402051784,
+  "minH": -260,
+  "maxH": 1950,
+  "splatN": 1024,
+  "apron": [
+   17000,
+   19800
+  ]
+ },
+ "encoding": {
+  "height": "gzip(zigzag(signed gradient residual q - (left+up-upleft)) uint16 -> hi plane, lo plane)",
+  "splat": "gzip(planar uint8: cavity plane, sediment plane, flow plane, landUse plane) -> RGBA8 1024^2",
+  "landUse": {
+   "water": 0,
+   "scrub": 32,
+   "farm": 64,
+   "forest": 128,
+   "rock": 192,
+   "urban": 255
+  }
+ },
+ "rwy": null,
+ "bridges": [],
+ "dam": null,
+ "straitSites": {
+  "lighthouses": [
+   [
+    -5710,
+    3600
+   ],
+   [
+    5350,
+    3400
+   ],
+   [
+    -5620,
+    -4800
+   ],
+   [
+    4990,
+    -4500
+   ]
+  ],
+  "radars": [
+   [
+    -5800,
+    -1200
+   ],
+   [
+    5800,
+    -1600
+   ]
+  ]
+ },
+ "checksums": {
+  "height16": "fd19459072428ccc",
+  "splat": "d3b5c20b332d3323"
+ },
+ "stats": {
+  "minH": -198.5,
+  "maxH": 1538,
+  "landPct": 73.5,
+  "landUse": {
+   "water": 26.4,
+   "farm": 0.6,
+   "forest": 6.9,
+   "rock": 42.7,
+   "urban": 0,
+   "scrub": 23.4
+  },
+  "erosion": {
+   "droplets": 248785,
+   "changed": 2082079,
+   "meanAbs": 30.29,
+   "maxAbs": 70
+  },
+  "bakeMs": {
+   "sample": 4241,
+   "erode": 3373,
+   "total": 12299
+  },
+  "bytes": {
+   "height16": 3740076,
+   "splat": 1084409,
+   "total": 4824485
+  }
+ }
+}

@@ -32,7 +32,7 @@ const oceanUniforms = {
   uTime: { value: 0 },
   uN1: { value: makeNormalMap(256, 1337, 6.0) },
   uN2: { value: makeNormalMap(256, 90210, 13.0) },
-  uDepth: { value: buildDepthTexture(512) },
+  uDepth: { value: buildDepthTexture() },          // size owned by index.html (DEPTH_N over the 40 km core)
   uDeep: { value: new THREE.Color(0x0d2133) },       // abyssal sapphire-navy
   uShallow: { value: new THREE.Color(0x168a84) },    // luminous turquoise-emerald over coastal shelves
   uTerr: { value: new THREE.Vector3(terrainCenter.x, terrainCenter.y, terrainSize) },

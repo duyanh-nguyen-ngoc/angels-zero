@@ -3,6 +3,12 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.2.2', title: 'CINEMATIC VFX OVERHAUL & YOUTUBE MUSIC FIX', bullets: [
+    'Added a half-res screen-space distortion pass for animated jet nozzle heat shimmer, Mach shockwave collars and expanding blast pressure waves.',
+    'Upgraded afterburner Mach diamonds to warm plasma cores, upgraded explosion & missile smoke to a 4x4 normal-lit thickness atlas, and added pooled dynamic flash lights illuminating the jet, cockpit and ground on detonations and flares.',
+    'Added IMAX lens cues (edge-weighted radial speed blur keeping the HUD reticle crisp, horizontal anamorphic sun/flare streaks, crepuscular sun shafts, subtle 35mm film grain) and transonic/explosion camera shake, with a [ CINEMATIC: ON ] toggle in Controls & Audio.',
+    'Replaced dead YouTube Music presets with verified working playlists and fixed clipboard pasting and early-load queuing.'
+  ] },
   { version: 'v1.2.1', title: 'FLYOUT VISUAL REBUILD — CLEAN VOLUMETRIC CLOUDS, SLEEK OCEAN & CRISP TERRAIN', bullets: [
     'Clouds are clean and silky: the grainy stipple and hatching in the volumetric deck are gone, cloud bellies are brighter and airier, low cumulus is softer, and the Cloud Sea now leaves most of the sky open blue.',
     'The ocean reads as deep, sleek sapphire water: no more white-and-navy blotches, gentler swell, softer cloud shadows, a realistic horizon reflection and a crisp glittering sun lane.',

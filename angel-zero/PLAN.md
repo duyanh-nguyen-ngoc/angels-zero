@@ -148,6 +148,31 @@ Status legend: `[x]` implemented and verified Â· `[ ]` open — gaps listed.
   *(`src/atmosphere.js`, `src/nvg.js`)*
 - Note: time of day, clouds and NVG are separate modules rather than inside
   `world.js`; no functional gap.
+- [x] **Terrain v2 — baked erosion worlds + GPU clipmap** *(v1.2.2, build `s10ter2`,
+  `scripts/bake_terrain.mjs`, `src/geography.js`, `src/noise.js`, `src/terrainpack.js`,
+  `src/clipmap.js`, `src/world.js`)*
+  - Offline baker: `node scripts/bake_terrain.mjs [archipelago|gorge|strait|all] [--preview dir]`
+    samples the authored geography (shared pure module `geography.js`, same noise as the
+    browser) over a 40 km core (2048^2, 19.5 m texels), runs droplet + thermal erosion with
+    the runway pad / approach funnels / Port City / bridge spits / gorge trench, crater,
+    shortcut and dam / strait sites protected, and writes `assets/terrain/<map>/`
+    (`height16.bin` gradient-predicted zigzag Uint16 planes, `splat.bin` AO / sediment /
+    flow / landUse planes, `meta.json`). Deterministic. Sizes: archipelago 2.9 MB, gorge
+    3.2 MB, strait 4.8 MB (budget 5 MB each); archipelago is awaited at boot, the other two
+    are prefetched after boot and awaited by `startSortie` via `world.prepare()`.
+  - Geography: northern + eastern mainland alpine range (peaks ~1,716 m, snowline
+    950-1,250 m), gorge massif + dam valley around the unchanged trench, strait walls
+    1,100-1,550 m; analytic `horizonHeight` ring outside the core (JS + GLSL twins).
+  - Rendering: 8-level clipmap (M = 128, 8 m -> 1,024 m spacing, 131 km), one shared
+    grid, coarse-level triangles under the finer level collapsed, CDLOD morph; 8 draw
+    calls, <= 262k triangles. Per-pixel normals (RG8) + splat in the fragment stage;
+    landUse gates farmland and paints forest canopy; strata / rock bands anti-aliased by
+    `fwidth`.
+  - Parity: `heightAt` is the exact CPU twin of the vertex shader (bilinear Uint16 + crag
+    +/-2.5 m faded 1.5-2.5 km from the viewer + horizon). `node scripts/terrain_parity.mjs`
+    -> 22/22 (texel / bilinear error ~1e-11 m, RWY pad 10.02 m, funnels >= 10 m under
+    the 3 deg glide path, gorge floor within 1.5 m of the authored trench, strait
+    channel open). Headless GPU probe: 4,096 points, max |GPU - CPU| 2.5 cm on all maps.
 
 ## Pillar 4 — Combat Loop, Ballistics & VFX (`src/weapons.js`, `src/vfx.js`, `src/audio.js`)
 - [x] **Two-stage targeting** *(build `s24a`)* — APG-63 auto-designates the

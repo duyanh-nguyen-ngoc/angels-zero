@@ -1,0 +1,111 @@
+{
+ "version": 2,
+ "map": "archipelago",
+ "mapId": 0,
+ "core": {
+  "size": 40000,
+  "cx": 0,
+  "cz": -2500,
+  "n": 2048,
+  "step": 19.540791402051784,
+  "minH": -260,
+  "maxH": 1950,
+  "splatN": 1024,
+  "apron": [
+   17000,
+   19800
+  ]
+ },
+ "encoding": {
+  "height": "gzip(zigzag(signed gradient residual q - (left+up-upleft)) uint16 -> hi plane, lo plane)",
+  "splat": "gzip(planar uint8: cavity plane, sediment plane, flow plane, landUse plane) -> RGBA8 1024^2",
+  "landUse": {
+   "water": 0,
+   "scrub": 32,
+   "farm": 64,
+   "forest": 128,
+   "rock": 192,
+   "urban": 255
+  }
+ },
+ "rwy": {
+  "x": 900,
+  "z0": -1400,
+  "z1": 1600,
+  "width": 50,
+  "elev": 10
+ },
+ "bridges": [
+  {
+   "a": [
+    -3400,
+    -3200
+   ],
+   "b": [
+    -3700,
+    -4550
+   ],
+   "fromA": [
+    -2300,
+    -2150
+   ],
+   "fromB": [
+    -4300,
+    -6300
+   ]
+  },
+  {
+   "a": [
+    3300,
+    -3250
+   ],
+   "b": [
+    3850,
+    -4600
+   ],
+   "fromA": [
+    2250,
+    -2300
+   ],
+   "fromB": [
+    4700,
+    -6250
+   ]
+  }
+ ],
+ "dam": null,
+ "straitSites": null,
+ "checksums": {
+  "height16": "5cb5e9044cfef51c",
+  "splat": "f971eed0a8177273"
+ },
+ "stats": {
+  "minH": -179.9,
+  "maxH": 1716.4,
+  "landPct": 44.3,
+  "landUse": {
+   "water": 55.7,
+   "farm": 7.6,
+   "forest": 9.8,
+   "rock": 13.5,
+   "urban": 0.4,
+   "scrub": 13.1
+  },
+  "erosion": {
+   "droplets": 227186,
+   "changed": 1113348,
+   "meanAbs": 13.92,
+   "maxAbs": 70
+  },
+  "bakeMs": {
+   "sample": 15139,
+   "erode": 2664,
+   "total": 20583
+  },
+  "bytes": {
+   "height16": 2230047,
+   "splat": 646903,
+   "total": 2876950
+  }
+ }
+}

@@ -1,0 +1,120 @@
+{
+ "version": 2,
+ "map": "gorge",
+ "mapId": 1,
+ "core": {
+  "size": 40000,
+  "cx": 0,
+  "cz": -2500,
+  "n": 2048,
+  "step": 19.540791402051784,
+  "minH": -260,
+  "maxH": 1950,
+  "splatN": 1024,
+  "apron": [
+   17000,
+   19800
+  ]
+ },
+ "encoding": {
+  "height": "gzip(zigzag(signed gradient residual q - (left+up-upleft)) uint16 -> hi plane, lo plane)",
+  "splat": "gzip(planar uint8: cavity plane, sediment plane, flow plane, landUse plane) -> RGBA8 1024^2",
+  "landUse": {
+   "water": 0,
+   "scrub": 32,
+   "farm": 64,
+   "forest": 128,
+   "rock": 192,
+   "urban": 255
+  }
+ },
+ "rwy": {
+  "x": 900,
+  "z0": -1400,
+  "z1": 1600,
+  "width": 50,
+  "elev": 10
+ },
+ "bridges": [
+  {
+   "a": [
+    -3400,
+    -3200
+   ],
+   "b": [
+    -3700,
+    -4550
+   ],
+   "fromA": [
+    -2300,
+    -2150
+   ],
+   "fromB": [
+    -4300,
+    -6300
+   ]
+  },
+  {
+   "a": [
+    3300,
+    -3250
+   ],
+   "b": [
+    3850,
+    -4600
+   ],
+   "fromA": [
+    2250,
+    -2300
+   ],
+   "fromB": [
+    4700,
+    -6250
+   ]
+  }
+ ],
+ "dam": {
+  "x": -4918.789249802742,
+  "z": -10495,
+  "yaw": -1.2742505177251962,
+  "halfW": 230,
+  "crestY": 255,
+  "lakeY": 238,
+  "toeY": 60,
+  "floorUp": 150
+ },
+ "straitSites": null,
+ "checksums": {
+  "height16": "c43b3b7261ca8b68",
+  "splat": "7ad7b6df0e9db865"
+ },
+ "stats": {
+  "minH": -179.9,
+  "maxH": 1716.4,
+  "landPct": 50.3,
+  "landUse": {
+   "water": 49.6,
+   "farm": 7.9,
+   "forest": 12.9,
+   "rock": 15,
+   "urban": 0.4,
+   "scrub": 14.1
+  },
+  "erosion": {
+   "droplets": 235508,
+   "changed": 1295187,
+   "meanAbs": 14.3,
+   "maxAbs": 70
+  },
+  "bakeMs": {
+   "sample": 14667,
+   "erode": 2863,
+   "total": 20125
+  },
+  "bytes": {
+   "height16": 2480598,
+   "splat": 737708,
+   "total": 3218306
+  }
+ }
+}
