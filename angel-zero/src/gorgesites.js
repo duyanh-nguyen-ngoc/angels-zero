@@ -3,7 +3,7 @@
 // gorgeProbe, same order as gorgeProbePoints), so the citadel, truss-bridge piers and rim
 // casemates sit flush on the real canyon rims without loading the gorge pack at boot.
 import { GORGE_FORT, GORGE_GATE_Z, GORGE_GATE_N, GORGE_RAMP_W, GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_ZB,
-  gorgeCentreX, gorgeSlope, gorgeHeading } from './maps.js?v=s10can1';
+  gorgeCentreX, gorgeSlope, gorgeHeading } from './maps.js?v=s10can8';
 
 export function gorgePropSites() {
   const fx = GORGE_FORT[0], fz = GORGE_FORT[2];

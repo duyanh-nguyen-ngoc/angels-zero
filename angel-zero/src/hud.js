@@ -7,7 +7,7 @@
 // list + F-15C silhouette with per-pylon AIM-9 reload icons (bottom-right),
 // open-corner target brackets, edge pointers, minimal top-left telemetry.
 import { SPW } from './loadout.js?v=s9c2';
-import { GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_FLOOR_Y } from './maps.js?v=s10can1';
+import { GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_FLOOR_Y } from './maps.js?v=s10can8';
 
 export function createHUD(THREE, A) {
   const canvas = A.canvas;

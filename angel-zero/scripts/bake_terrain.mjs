@@ -243,7 +243,7 @@ function applyClearance(map, x, z, hDem, harbour) {
     // Seamless flaring fjord entrance funnel from open sea (z = GORGE_Z0 + 1400) into river estuary (z = GORGE_Z0)
     if (z >= GORGE_Z0 - 200 && z <= GORGE_Z0 + 2200 && Math.abs(x - GORGE_X0) < 1200) {
       const tOut = ss(z, GORGE_Z0, GORGE_Z0 + 1400);
-      const mouthHalf = GORGE_HALF_W * (1 + 2.4 * tOut);
+      const mouthHalf = GORGE_HALF_W * (1 + 2.8 * tOut);
       const mouthRamp = mouthHalf + 220 + 200 * tOut;
       const mouthFloor = -10 * (1 - tOut) - 48 * tOut;
       const kM = (1 - ss(Math.abs(x - GORGE_X0), mouthHalf, mouthRamp)) * ss(z, GORGE_Z0 - 200, GORGE_Z0 + 100) * ss(z, GORGE_Z0 + 2200, GORGE_Z0 + 1600);
@@ -255,14 +255,14 @@ function applyClearance(map, x, z, hDem, harbour) {
       const gN2 = fbm(nGorge2, x * 0.0022, z * 0.0022, 2);
       const sl = gorgeSlope(z), sOff = x - gorgeCentreX(z), sd = sOff / Math.sqrt(1 + sl * sl);
       const outerBend = Math.abs(sl) > 0.05 ? Math.max(0, Math.min(1, 0.5 + 0.5 * Math.sign(sl) * Math.sign(sOff))) : 0.5;
-      const effHalf = GORGE_HALF_W * Math.max(0.94, 1 + 0.24 * gN1);
-      const effRamp = GORGE_RAMP_W * Math.max(0.94, 1 + 0.22 * gN1) * (1 + (1 - outerBend) * 0.28 + 0.10 * gN2);
+      const effHalf = GORGE_HALF_W * Math.max(0.92, 1 + 0.20 * gN1);
+      const effRamp = GORGE_RAMP_W * Math.max(0.92, 1 + 0.20 * gN1) * (1 + (1 - outerBend) * 0.22 + 0.08 * gN2);
       const crDX = x - gorgeCentreX(GORGE_CRATER_Z), crDZ = z - GORGE_CRATER_Z, cr = Math.hypot(crDX, crDZ);
       const d = Math.abs(sd);
       const corridor = 1 - ss(d, effHalf, effRamp);
-      const rivOff = Math.max(-effHalf * 0.45, Math.min(effHalf * 0.45, Math.tanh(sl * 1.4) * 52 + 34 * Math.sin(z * 0.0017 + gN1 * 2.2)));
+      const rivOff = Math.max(-effHalf * 0.42, Math.min(effHalf * 0.42, Math.tanh(sl * 1.4) * 34 + 22 * Math.sin(z * 0.0017 + gN1 * 2.2)));
       const dRiv = Math.abs(sd - rivOff);
-      const rivW = 48 + 26 * (0.5 + 0.5 * gN1) + 10 * gN2;
+      const rivW = 34 + 18 * (0.5 + 0.5 * gN1) + 7 * gN2;
       let floorH;
       if (dRiv < rivW) {
         const u = dRiv / rivW;

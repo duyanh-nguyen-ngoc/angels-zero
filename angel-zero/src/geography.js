@@ -27,7 +27,7 @@ import {
   gorgeCentreX, gorgeDist, GORGE_FLOOR_Y, GORGE_RIM_Y, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_CRATER_Z,
   GORGE_BBOX, GORGE_HALF_W, GORGE_RAMP_W, RUNWAY_BBOX,
   GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_ZB, GORGE_SC_HALF_W, GORGE_SC_RAMP_W, GORGE_SC_FLOOR_Y
-} from './maps.js?v=s10can1';
+} from './maps.js?v=s10can8';
 
 // Legacy 20 km gameplay box (HUD topo, ocean depth texture, sectors) and the new baked core.
 export const WORLD = { SIZE: 20000, CX: 0, CZ: -2500, SEG: 440 };

@@ -16,7 +16,7 @@ import { missionConfig } from './missions.js?v=s10can3';
 import { gorgeCentreX, gorgeSlope, gorgeHeading, gorgeDist, GORGE_GATE_Z, GORGE_GATE_N, GORGE_FLOOR_Y, GORGE_RIM_Y,
   GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_FORT, GORGE_ARC_M, GORGE_SPAWN_Z, GORGE_Z0, GORGE_RAMP_W, CEIL_M,
   GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_ZB, GORGE_SC_HALF_W, GORGE_SC_ARCH_Z, GORGE_SC_ARCH_Y0,
-  GORGE_SC_ARCH_W, GORGE_SC_SKIP, GORGE_SC_SAVE_M } from './maps.js?v=s10can1';
+  GORGE_SC_ARCH_W, GORGE_SC_SKIP, GORGE_SC_SAVE_M } from './maps.js?v=s10can8';
 
 const NM = 1852, FT = 0.3048, G0 = 9.81;
 // Allied CVN model: same 360 m deck as the procedural ship, re-anchored to the GLB.
@@ -2954,7 +2954,7 @@ const _bfmOut = aceBFM.bfmOut, _bfmLos = aceBFM.los, _bfmUp = aceBFM.up, _bfmMat
   }
 
   // Gate frames face down the trench; matrices are static, so they are written once.
-  const _cgM = new THREE.Matrix4(), _cgP = new THREE.Vector3(), _cgQ = new THREE.Quaternion(), _cgS = new THREE.Vector3(85 / 30, 3.4, 85 / 30);
+  const _cgM = new THREE.Matrix4(), _cgP = new THREE.Vector3(), _cgQ = new THREE.Quaternion(), _cgS = new THREE.Vector3(58 / 30, 3.0, 58 / 30);
   let canyonGatesBuilt = false;
   function updateCanyonGates(dt, now) {
     const active = !!(C.mcfg.gatesPath === 'CANYON' && C.mcfg.ceiling);
@@ -2973,7 +2973,7 @@ const _bfmOut = aceBFM.bfmOut, _bfmLos = aceBFM.los, _bfmUp = aceBFM.up, _bfmMat
     // Passing the current gate (guidance only; missing one does not fail). The trench
     // is monotonic in z, so crossing the gate's z line inside the walls counts.
     const gz = C.gateIdx < CANYON_GATE_N ? GORGE_GATE_Z[C.gateIdx] : -1e9;
-    if (C.gateIdx < CANYON_GATE_N && S.position.z < gz && gorgeDist(S.position.x, gz) < 230) {
+    if (C.gateIdx < CANYON_GATE_N && S.position.z < gz && gorgeDist(S.position.x, gz) < 170) {
       C.gateIdx++;
       C.gateBanner = performance.now();
       if (env.debug) console.log('[ANGELS_ZERO] canyon gate', C.gateIdx, '/', CANYON_GATE_N);

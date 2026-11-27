@@ -10,9 +10,9 @@ export const SEA_FLOOR_Y = -40;                                    // open-ocean
 export const GORGE_FLOOR_Y = 40, GORGE_RIM_Y = CEIL_M, GORGE_CRATER_R = 1150,
   GORGE_CRATER_WALL_Y = 720, GORGE_CRATER_Z = -11000;
 export const GORGE_Z0 = 6500;                                       // canyon mouth (entrance)
-// Sweeps: softened S-curves (~2.8-3.2 G at 370 kt) after a 1.5 km straight lead-in.
-export const GORGE_X0 = -8000, GORGE_A1 = 1900, GORGE_L1 = 2200, GORGE_A2 = 220, GORGE_L2 = 1100, GORGE_LEAD = 1500;
-export const GORGE_HALF_W = 170, GORGE_RAMP_W = 260;                // floor half-width / rim, perpendicular metres
+// Sweeps: tight S-curves (~3.8-4.2 G at 370 kt) after a 1.5 km straight lead-in.
+export const GORGE_X0 = -8000, GORGE_A1 = 2350, GORGE_L1 = 1850, GORGE_A2 = 280, GORGE_L2 = 950, GORGE_LEAD = 1500;
+export const GORGE_HALF_W = 105, GORGE_RAMP_W = 170;                // floor half-width / rim, perpendicular metres
 // x(z) centreline. Both harmonics start with zero slope, so the mouth faces due north.
 export const gorgeCentreX = z => {
   const s = Math.max(0, GORGE_Z0 - z - GORGE_LEAD);

@@ -1,7 +1,7 @@
 // ANGELS ZERO — mission registry. One block + one MISSION_ORDER entry adds a mission.
 // Each mission supplies its spawn, waves, targets, map tag and soundtrack scenario.
 
-import { CEIL_M, GORGE_FORT, GORGE_X0, GORGE_Z0 } from './maps.js?v=s10can1';
+import { CEIL_M, GORGE_FORT, GORGE_X0, GORGE_Z0 } from './maps.js?v=s10can8';
 
 export const MISSION_KEY = 'angelsZero_mission';
 
