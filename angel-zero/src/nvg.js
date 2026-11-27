@@ -32,9 +32,123 @@ export function createNVG(THREE, renderer, post) {
   });
   const distortClearCol = new THREE.Color(0.5, 0.5, 0.0);
   const _prevClearCol = new THREE.Color();
+
+  // ---- v1.2.9 occlusion-aware crepuscular sky rays (3d-sky-rays) -------------------------
+  // 1. half-res sky-energy mask: open sky (cleared depth, 4-tap so silhouettes stay crisp)
+  //    x HDR luminance above a threshold (energy-capped);
+  // 2. half-res radial march toward the projected sun (32 / 18 samples, stable interleaved-
+  //    gradient jitter, weights normalised by their sum so sample count never shifts exposure);
+  // 3. additive composite in linear HDR before bloom / OutputPass, strongly attenuated on
+  //    near opaque surfaces (log-depth linearised) so cockpit, terrain and stone keep contrast.
+  // The pass is disabled (zero GPU cost) when the sun is behind the camera, outside the
+  // [-0.25, 1.25] overscan, below the horizon, at night, under NVG or on GRAPHICS LOW.
+  const RAY_MAX = 32;
+  const halfW = () => Math.max(1, size.x >> 1), halfH = () => Math.max(1, size.y >> 1);
+  const rayOpts = { type: THREE.HalfFloatType, depthBuffer: false, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter };
+  const skyRT = new THREE.WebGLRenderTarget(halfW(), halfH(), rayOpts);
+  const rayRT = new THREE.WebGLRenderTarget(halfW(), halfH(), rayOpts);
+  const RQ_VERT = `varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
+  const skyMaskMat = new THREE.ShaderMaterial({
+    uniforms: { tScene: { value: null }, tDepth: { value: null }, uTexel: { value: new THREE.Vector2() }, uThreshold: { value: 0.9 }, uCap: { value: 3.0 } },
+    vertexShader: RQ_VERT,
+    fragmentShader: `
+      uniform sampler2D tScene; uniform sampler2D tDepth; uniform vec2 uTexel; uniform float uThreshold; uniform float uCap;
+      varying vec2 vUv;
+      void main() {
+        vec2 o = uTexel * 0.5;
+        float d = min(min(texture2D(tDepth, vUv + vec2(-o.x, -o.y)).r, texture2D(tDepth, vUv + vec2(o.x, -o.y)).r),
+                      min(texture2D(tDepth, vUv + vec2(-o.x, o.y)).r, texture2D(tDepth, vUv + vec2(o.x, o.y)).r));
+        float sky = step(0.99999, d);
+        float l = dot(texture2D(tScene, vUv).rgb, vec3(0.2126, 0.7152, 0.0722));
+        gl_FragColor = vec4(min(max(l - uThreshold, 0.0), uCap) * sky, sky, 0.0, 1.0);
+      }`,
+    depthTest: false, depthWrite: false, toneMapped: false
+  });
+  const rayMarchMat = new THREE.ShaderMaterial({
+    uniforms: { tSky: { value: skyRT.texture }, uSun: { value: new THREE.Vector2(0.5, 0.5) }, uSamples: { value: 32 },
+      uDensity: { value: 0.92 }, uDecay: { value: 0.965 }, uAspect: { value: 1 } },
+    vertexShader: RQ_VERT,
+    fragmentShader: `
+      uniform sampler2D tSky; uniform vec2 uSun; uniform int uSamples; uniform float uDensity; uniform float uDecay; uniform float uAspect;
+      varying vec2 vUv;
+      void main() {
+        vec2 stepv = (vUv - uSun) * uDensity / float(uSamples);
+        float jit = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));   // stable IGN
+        vec2 suv = vUv - stepv * jit;
+        float sum = 0.0, wsum = 0.0, w = 1.0;
+        for (int i = 0; i < ${RAY_MAX}; i++) {
+          if (i >= uSamples) break;
+          suv -= stepv;
+          if (suv.x > 0.0 && suv.x < 1.0 && suv.y > 0.0 && suv.y < 1.0) sum += texture2D(tSky, suv).r * w;
+          wsum += w; w *= uDecay;
+        }
+        float r = length((vUv - uSun) * vec2(uAspect, 1.0));
+        gl_FragColor = vec4(vec3(sum / max(wsum, 1e-4) * exp(-r * 1.35)), 1.0);
+      }`,
+    depthTest: false, depthWrite: false, toneMapped: false
+  });
+  const rayCompMat = new THREE.ShaderMaterial({
+    uniforms: { tScene: { value: null }, tRays: { value: rayRT.texture }, tDepth: { value: null },
+      uTint: { value: new THREE.Vector3(1.0, 0.86, 0.66) }, uIntensity: { value: 0 }, uLogFar: { value: 20 } },
+    vertexShader: RQ_VERT,
+    fragmentShader: `
+      uniform sampler2D tScene; uniform sampler2D tRays; uniform sampler2D tDepth;
+      uniform vec3 uTint; uniform float uIntensity; uniform float uLogFar;
+      varying vec2 vUv;
+      void main() {
+        vec4 s = texture2D(tScene, vUv);
+        float d = texture2D(tDepth, vUv).r;
+        float viewZ = exp2(d * uLogFar) - 1.0;                         // logarithmic depth -> metres
+        float atten = d >= 0.99999 ? 1.0 : mix(0.1, 0.85, smoothstep(1500.0, 24000.0, viewZ));
+        vec3 rays = texture2D(tRays, vUv).rgb * uTint * uIntensity * atten;
+        gl_FragColor = vec4(s.rgb + rays, s.a);
+      }`,
+    depthTest: false, depthWrite: false, toneMapped: false
+  });
+  const rayQuadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  const rayQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2)); rayQuad.frustumCulled = false;
+  const rayScene = new THREE.Scene(); rayScene.add(rayQuad);
+  const rayState = { k: 0, samples: 32, allowed: true };
+  const rayPass = {
+    enabled: false, needsSwap: true, clear: false, renderToScreen: false,
+    setSize(w, h) { void w; void h; },
+    dispose() { skyRT.dispose(); rayRT.dispose(); },
+    render(r, writeBuffer, readBuffer) {
+      skyMaskMat.uniforms.tScene.value = readBuffer.texture;
+      skyMaskMat.uniforms.tDepth.value = readBuffer.depthTexture;
+      skyMaskMat.uniforms.uTexel.value.set(1 / Math.max(1, readBuffer.width), 1 / Math.max(1, readBuffer.height));
+      rayQuad.material = skyMaskMat; r.setRenderTarget(skyRT); r.render(rayScene, rayQuadCam);
+      rayQuad.material = rayMarchMat; r.setRenderTarget(rayRT); r.render(rayScene, rayQuadCam);
+      rayCompMat.uniforms.tScene.value = readBuffer.texture;
+      rayCompMat.uniforms.tDepth.value = readBuffer.depthTexture;
+      rayQuad.material = rayCompMat; r.setRenderTarget(this.renderToScreen ? null : writeBuffer); r.render(rayScene, rayQuadCam);
+    }
+  };
+  // Called every frame by atmosphere.js with the projected sun (uv) and a 0..1 strength.
+  function setSkyRays(ux, uy, k, r, g, b, far) {
+    const inView = ux > -0.25 && ux < 1.25 && uy > -0.25 && uy < 1.25;
+    const on = rayState.allowed && !active && k > 0.01 && inView && rayState.samples > 0;
+    rayPass.enabled = !!composer && on;
+    if (!on) return;
+    const n = rayState.samples;
+    rayMarchMat.uniforms.uSun.value.set(ux, uy);
+    rayMarchMat.uniforms.uSamples.value = n;
+    rayMarchMat.uniforms.uDecay.value = Math.pow(0.965, 32 / n);   // same falloff length at 18 samples
+    rayMarchMat.uniforms.uAspect.value = size.x / Math.max(1, size.y);
+    rayCompMat.uniforms.uIntensity.value = k;
+    rayCompMat.uniforms.uTint.value.set(r, g, b);
+    rayCompMat.uniforms.uLogFar.value = Math.log2((far || 200000) + 1);
+  }
   if (post) {
     const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 0 });
+    // v1.2.9 sky rays read the scene depth straight after the RenderPass (sky = cleared depth).
+    rt.depthTexture = new THREE.DepthTexture(size.x, size.y);
+    rt.depthTexture.type = THREE.UnsignedIntType;
     composer = new post.EffectComposer(renderer, rt);
+    // RenderTarget.clone() shares the depth texture's Source (same GL texture): give the
+    // ping-pong twin its own, or reading readBuffer depth while writing forms a feedback loop.
+    composer.renderTarget2.depthTexture = new THREE.DepthTexture(size.x, size.y);
+    composer.renderTarget2.depthTexture.type = THREE.UnsignedIntType;
     renderPass = new post.RenderPass(new THREE.Scene(), new THREE.PerspectiveCamera());
     if (post.ShaderPass) {
       distortPass = new post.ShaderPass({
@@ -63,6 +177,7 @@ export function createNVG(THREE, renderer, post) {
     // emissives (all HDR > 1 after the 1.05 exposure trim) are what bloom.
     bloom = new post.UnrealBloomPass(new THREE.Vector2(Math.max(1, Math.floor(size.x * 0.25)), Math.max(1, Math.floor(size.y * 0.25))), 0.40, 0.6, BLOOM_THRESHOLD);
     composer.addPass(renderPass);
+    composer.addPass(rayPass);                       // must follow RenderPass: reads its depth buffer
     if (distortPass) composer.addPass(distortPass);
     composer.addPass(bloom); composer.addPass(new post.OutputPass());
     if (post.ShaderPass) {
@@ -276,6 +391,7 @@ export function createNVG(THREE, renderer, post) {
       if (gradePass) gradePass.uniforms.uAspect.value = size.x / Math.max(1, size.y);
     }
     gRT.setSize(size.x, size.y);
+    skyRT.setSize(halfW(), halfH()); rayRT.setSize(halfW(), halfH());
   }
   // Renders the frame: through the HDR bloom composer in normal vision, through the tubes with NVG.
   function render(scene, camera, t, cockpit) {
@@ -340,7 +456,7 @@ export function createNVG(THREE, renderer, post) {
     setMotion(speedBlur, godRay) {
       if (!gradePass) return;
       gradePass.uniforms.uSpeedBlur.value = speedBlur;
-      gradePass.uniforms.uGodRay.value = godRay;
+      gradePass.uniforms.uGodRay.value = rayPass.enabled ? godRay * 0.25 : godRay;   // real rays replace the fake shafts
     },
     setSunGlare(nx, ny, g, r, gr, b) {
       if (!gradePass) return;
@@ -350,6 +466,10 @@ export function createNVG(THREE, renderer, post) {
       u.uSunCol.value.set(r, gr, b);
     },
     setGain(k) { compMat.uniforms.uGain.value = k; },
+    setSkyRays,
+    setRayQuality(samples) { rayState.samples = samples | 0; rayState.allowed = samples > 0; if (!rayState.allowed) rayPass.enabled = false; },
+    get rayQuality() { return rayState.allowed ? rayState.samples : 0; },
+    get raysOn() { return rayPass.enabled; },
     get gain() { return compMat.uniforms.uGain.value; },
     get active() { return active; },
     set active(v) { active = !!v; }

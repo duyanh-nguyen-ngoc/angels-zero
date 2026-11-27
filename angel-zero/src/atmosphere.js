@@ -463,6 +463,14 @@ export function createAtmosphere(THREE, env) {
         : 0;
       bound.setSunGlare(_n.x * 0.5 + 0.5, _n.y * 0.5 + 0.5, Math.min(1, glare), cur.mie.r, cur.mie.g, cur.mie.b);
     }
+    if (bound.setSkyRays) {
+      // v1.2.9 crepuscular rays: any sun above the horizon in (or just outside) the frame;
+      // strongest low in the sky. Terrain / cloud occlusion is resolved per pixel in the pass.
+      const sunUp = skyDir.y > -0.02 && !moon && !nvg && inFront;
+      const lowSun = 0.55 + 0.45 * (1 - THREE.MathUtils.smoothstep(skyDir.y, 0.08, 0.6));
+      const rayK = sunUp ? (1 - Math.min(1, mist * 1.4)) * cur.corona * (1 - wx.overcast * 0.85) * lowSun * 0.9 : 0;
+      bound.setSkyRays(_n.x * 0.5 + 0.5, _n.y * 0.5 + 0.5, rayK, cur.mie.r, cur.mie.g, cur.mie.b, camera.far);
+    }
     if (bound.setTerrainFog) {
       const mistK = (1 - wx.overcast * 0.4) * (moon ? 0.45 : 1.0);
       const cloudShadK = (1 - wx.overcast * 0.75) * (moon ? 0.35 : 1.0);

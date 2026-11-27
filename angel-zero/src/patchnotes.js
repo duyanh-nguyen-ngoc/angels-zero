@@ -3,6 +3,12 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.2.10', title: 'ULTRA-REALISTIC OCEAN, MIRROR REFLECTIONS & CREPUSCULAR SKY RAYS', bullets: [
+    'The sea is rebuilt around an 8-wave deep-water swell shaded per pixel: crisp wave faces up close that melt smoothly into the horizon with no shimmer, a turquoise glow through sunlit crests and a sparkling HDR sun path.',
+    'Breaking crests now throw lacy, cellular whitecap foam, and the carrier and escorts leave real Kelvin wakes: 19° diverging wave arms, a churned white stern wash and a calm slick behind them.',
+    'Coastlines, islands, ships and the carrier island are mirrored in the water, rippling with the waves.',
+    'Low sun now casts true crepuscular rays that stream through gaps in clouds and around mountain ridges, while the cockpit, terrain and ships keep full contrast.'
+  ] },
   { version: 'v1.2.9', title: 'TERRAIN V3 — REAL-WORLD NORDIC & ALPINE DEM LANDFORMS', bullets: [
     'Replaced procedural oval islands and straight mainland walls with true 1.0x real-world Earth elevation stitched offline from open AWS Terrarium DEM tiles: Lofoten Islands & Vestfjorden (Archipelago), Lysefjord & Aurlandsfjord (Gorge), and Alaska Kenai Fjords (Strait).',
     'Added a 160 x 160 km real-world outer DEM horizon ring (horizon16.bin) so surrounding Norway and Alaska mountain ranges continue seamlessly to the 131 km clipmap horizon.',

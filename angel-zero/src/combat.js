@@ -5980,7 +5980,34 @@ const _bfmOut = aceBFM.bfmOut, _bfmLos = aceBFM.los, _bfmUp = aceBFM.up, _bfmMat
     lastPlayerPos.copy(S.position); lastPlayerValid = playerActive;
   }
 
+  // Ocean Kelvin wakes: write moving vessels (allied carrier + live surface ships) into
+  // preallocated Vector4 arrays A (x, z, fwd.x, fwd.z) / B (length, speed, 1, 0). Zero allocation.
+  function wakeSlot(A, B, n, pos, fwd, vel, len) {
+    const sp = Math.hypot(vel.x, vel.z);
+    if (sp < 0.5) return n;
+    const fl = Math.hypot(fwd.x, fwd.z) || 1;
+    A[n].set(pos.x, pos.z, fwd.x / fl, fwd.z / fl); B[n].set(len, sp, 1, 0);
+    return n + 1;
+  }
+  function fillWakeShips(A, B, max) {
+    let n = 0;
+    const a = C.ally;
+    if (a && a.g && a.g.visible && a.pos && a.vel && a.fwd) n = wakeSlot(A, B, n, a.pos, a.fwd, a.vel, a.len || 330);
+    for (let i = 0; i < surface.length && n < max; i++) {
+      const t = surface[i];
+      if (!t || !t.ship || !t.alive || !t.pos || !t.vel || !t.fwd || (t.g && !t.g.visible)) continue;
+      n = wakeSlot(A, B, n, t.pos, t.fwd, t.vel, t.len || 140);
+    }
+    return n;
+  }
+
+  function forEachShipRoot(fn) {
+    if (C.ally && C.ally.g) fn(C.ally.g);
+    for (let i = 0; i < surface.length; i++) { const t = surface[i]; if (t && t.ship && t.g) fn(t.g); }
+  }
+
   return {
+    fillWakeShips, forEachShipRoot,
     init, update, resetPlayer, pitStop, fireMissile, designateInSight, designate, explosion, splash, say, flyBTT,
     setDifficulty(id) { applyDifficulty(id); director.reset(); return C.difficulty; },
     setSPW,
