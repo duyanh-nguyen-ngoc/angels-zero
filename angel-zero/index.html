@@ -826,9 +826,7 @@ import { createGear, GEAR_H, GEAR_PTS, GEAR_UNITS, setGearPoints } from './src/g
 import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s10fly2';
 import { createCanopyFX } from './src/canopy.js?v=s9ex';
 import { createNVG } from './src/nvg.js?v=s10vfx1';
-import { createWorld, WORLD, CORE } from './src/world.js?v=s10ter1';
-import { mulberry32, createNoise2D, fbm } from './src/noise.js?v=s10ter1';
-import { loadTerrainPack } from './src/terrainpack.js?v=s10ter1';
+import { createWorld, WORLD } from './src/world.js?v=s10fly2';
 import { createSurfaces } from './src/surfaces.js?v=s9ex';
 import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s10fly2';
 import { createFreeLook } from './src/freelook.js?v=s9ex';
@@ -848,7 +846,7 @@ import { fetchLeaderboard, submitScore } from './src/leaderboard.js?v=s9ex';
 import { collectPilotSnapshot, applyPilotSnapshot, exportPilotCode, importPilotCode, generateSyncId, getSyncId, setSyncId, isSyncEnabled, setSyncEnabled, pushCloudProfile, pullCloudProfile, syncNow, setRefreshCallback } from './src/profile_sync.js?v=s9ex';
 import { createTraining } from './src/training.js?v=s9ex';
 import { createInputExt } from './src/input_ext.js?v=s9ter3';
-import { createOcean } from './src/ocean.js?v=s10ter1';
+import { createOcean } from './src/ocean.js?v=s10fly2';
 import { createWingmenFlight } from './src/wingmen.js?v=s9ex';
 import { createFlightPhysics } from './src/flight.js?v=s9ex';
 
@@ -974,7 +972,45 @@ const envTex = (() => {
 /* ============================================================================
    1. SEEDED NOISE
    ============================================================================ */
-// mulberry32 / createNoise2D / fbm live in src/noise.js (shared with the offline terrain baker).
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function createNoise2D(seed) {
+  const rnd = mulberry32(seed);
+  const p = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) p[i] = i;
+  for (let i = 255; i > 0; i--) { const r = Math.floor(rnd() * (i + 1)); const t = p[i]; p[i] = p[r]; p[r] = t; }
+  const perm = new Uint8Array(512), pm12 = new Uint8Array(512);
+  for (let i = 0; i < 512; i++) { perm[i] = p[i & 255]; pm12[i] = perm[i] % 12; }
+  const grad = new Float32Array([1,1, -1,1, 1,-1, -1,-1, 1,0, -1,0, 1,0, -1,0, 0,1, 0,-1, 0,1, 0,-1]);
+  const F2 = 0.5 * (Math.sqrt(3) - 1), G2 = (3 - Math.sqrt(3)) / 6;
+  return function (xin, yin) {
+    const s = (xin + yin) * F2;
+    const i = Math.floor(xin + s), j = Math.floor(yin + s);
+    const t = (i + j) * G2;
+    const x0 = xin - (i - t), y0 = yin - (j - t);
+    const i1 = x0 > y0 ? 1 : 0, j1 = x0 > y0 ? 0 : 1;
+    const x1 = x0 - i1 + G2, y1 = y0 - j1 + G2;
+    const x2 = x0 - 1 + 2 * G2, y2 = y0 - 1 + 2 * G2;
+    const ii = i & 255, jj = j & 255;
+    const g0 = pm12[ii + perm[jj]] * 2, g1 = pm12[ii + i1 + perm[jj + j1]] * 2, g2 = pm12[ii + 1 + perm[jj + 1]] * 2;
+    let n0 = 0, n1 = 0, n2 = 0;
+    let t0 = 0.5 - x0 * x0 - y0 * y0; if (t0 > 0) { t0 *= t0; n0 = t0 * t0 * (grad[g0] * x0 + grad[g0 + 1] * y0); }
+    let t1 = 0.5 - x1 * x1 - y1 * y1; if (t1 > 0) { t1 *= t1; n1 = t1 * t1 * (grad[g1] * x1 + grad[g1 + 1] * y1); }
+    let t2 = 0.5 - x2 * x2 - y2 * y2; if (t2 > 0) { t2 *= t2; n2 = t2 * t2 * (grad[g2] * x2 + grad[g2 + 1] * y2); }
+    return 70 * (n0 + n1 + n2);
+  };
+}
+function fbm(noise, x, y, octaves, lac = 2.0, gain = 0.5) {
+  let amp = 1, freq = 1, sum = 0, norm = 0;
+  for (let o = 0; o < octaves; o++) { sum += amp * noise(x * freq, y * freq); norm += amp; amp *= gain; freq *= lac; }
+  return sum / norm;
+}
 
 /* ============================================================================
    2. ARCHIPELAGO HEIGHT FIELD (20000 x 20000 m)
@@ -985,14 +1021,7 @@ const envTex = (() => {
 const TERRAIN_SIZE = WORLD.SIZE;
 const TERRAIN_CENTER = new THREE.Vector2(WORLD.CX, WORLD.CZ);
 const _wt0 = performance.now();
-// Terrain v2: the archipelago pack (baked 2048^2 heightfield + splat, ~3 MB) is needed before
-// boot-time prop placement; gorge / strait packs are fetched lazily (prefetched after boot,
-// awaited by startSortie) — see world.prepare().
-const TERRAIN_PACK_TAG = 's10ter1';
-const terrainPackArch = await loadTerrainPack('archipelago', 'assets/terrain', TERRAIN_PACK_TAG);
-const world = createWorld(THREE, { scene, createNoise2D, fbm, mulberry32, pack: terrainPackArch, packTag: TERRAIN_PACK_TAG });
-setTimeout(() => { world.prepare({ heightFn: 'gorge' }).catch(() => {}); world.prepare({ heightFn: 'strait' }).catch(() => {}); }, 1200);
-if (DEBUG) console.log('[ANGELS_ZERO] terrain pack archipelago', terrainPackArch.loadMs, 'ms');
+const world = createWorld(THREE, { scene, createNoise2D, fbm, mulberry32 });
 const freeFlight = createFreeFlight(THREE, scene, envTex);
 if (DEBUG) console.log('[ANGELS_ZERO] world built in', Math.round(performance.now() - _wt0), 'ms; obstacles', world.obstacleCount());
 function terrainHeight(x, z) { return freeFlight.active ? freeFlight.heightAt(x, z) : world.heightAt(x, z); }
@@ -1000,8 +1029,7 @@ function groundLevel(x, z) { return Math.max(0, terrainHeight(x, z)); }
 
 // Water-depth texture for turquoise shallows / coral lagoons / surf in the ocean shader.
 // Cached per map mode and copied into a single DataTexture so mission switches allocate 0 GPU textures.
-// Terrain v2: covers the whole 40 km baked core (mainland coasts get shallows too), 39 m texels.
-const DEPTH_N = 1024, DEPTH_SIZE = CORE.SIZE;
+const DEPTH_N = 512;
 const depthBufCache = Object.create(null);
 function getDepthBytes(mode) {
   if (depthBufCache[mode]) return depthBufCache[mode];
@@ -1010,8 +1038,8 @@ function getDepthBytes(mode) {
     for (let p = 0; p < data.length; p += 4) { data[p] = 255; data[p + 3] = 255; }
   } else {
     for (let j = 0; j < DEPTH_N; j++) for (let i = 0; i < DEPTH_N; i++) {
-      const x = TERRAIN_CENTER.x + ((i + 0.5) / DEPTH_N - 0.5) * DEPTH_SIZE;
-      const z = TERRAIN_CENTER.y + ((j + 0.5) / DEPTH_N - 0.5) * DEPTH_SIZE;
+      const x = TERRAIN_CENTER.x + ((i + 0.5) / DEPTH_N - 0.5) * TERRAIN_SIZE;
+      const z = TERRAIN_CENTER.y + ((j + 0.5) / DEPTH_N - 0.5) * TERRAIN_SIZE;
       const h = world.heightAt(x, z);
       const k = (j * DEPTH_N + i) * 4;
       data[k] = Math.round(THREE.MathUtils.clamp(-h / 60, 0, 1) * 255);               // metres below sea level / 60
@@ -1031,9 +1059,6 @@ function buildDepthTexture(n = DEPTH_N) {
   tex.needsUpdate = true;
   return tex;
 }
-// A pack that arrives after rebuild() (debug paths that skip startSortie) re-applies itself:
-// drop that mode's depth bytes and re-sync so the ocean never keeps fallback shallows.
-world.onPackReady = mode => { delete depthBufCache[mode]; if (depthTexMode === mode) depthTexMode = ''; syncOceanDepthTexture(); };
 function syncOceanDepthTexture() {
   const m = world.mode || 'archipelago';
   if (m === depthTexMode) return;
@@ -1057,7 +1082,7 @@ const _wdNozL = new THREE.Vector3(), _wdNozR = new THREE.Vector3();
 
 const { ocean, oceanUniforms, followOcean, OCEAN_SNAP } = createOcean(THREE, {
   scene, camera, createNoise2D, fbm, buildDepthTexture,
-  terrainCenter: TERRAIN_CENTER, terrainSize: DEPTH_SIZE, sunDir: SUN_DIR,
+  terrainCenter: TERRAIN_CENTER, terrainSize: TERRAIN_SIZE, sunDir: SUN_DIR,
   fogColor: scene.fog.color, fogDensity: FOG_DENSITY
 });
 
@@ -2405,7 +2430,6 @@ async function startSortie() {
   const hintEl = document.getElementById('menuHint');
   const oldHint = hintEl ? hintEl.textContent : '';
   if (hintEl) hintEl.textContent = 'LOADING CARRIER…';
-  await world.prepare(MAPS[m.mapTag] || MAPS.ARCHIPELAGO);   // lazy terrain pack (memoised)
   await loadMissionScene(m);
   radioReset(); preloadRadioOnce();
   audio.canopyClose();
