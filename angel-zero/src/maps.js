@@ -1,19 +1,18 @@
 // ANGELS ZERO — map layouts referenced by MISSIONS[].mapTag.
 // `heightFn` is a tag resolved by world.rebuild(); all collision still flows
 // through world.heightAt / world.collide.
-export const FT = 0.3048, CEIL_FT = 1200, CEIL_M = CEIL_FT * FT;   // 365.76 m, one source
+export const FT = 0.3048, CEIL_FT = 1500, CEIL_M = CEIL_FT * FT;   // 457.2 m, one source
 export const SEA_FLOOR_Y = -40;                                    // open-ocean heightfield
 // CANYON_RUN: winding low-altitude trench. Shared height/corridor maths so
 // terrain, gates, ceiling sites and mission logic all agree on the centreline.
 // The trench runs south -> north (z decreasing) through the western half of the
 // map, well clear of the AFB, in sweeping S-curves about 25 km long (centreline arc).
-export const GORGE_FLOOR_Y = 40, GORGE_RIM_Y = CEIL_M, GORGE_CRATER_R = 700,
-  GORGE_CRATER_WALL_Y = 820, GORGE_CRATER_Z = -11000;
+export const GORGE_FLOOR_Y = 40, GORGE_RIM_Y = CEIL_M, GORGE_CRATER_R = 1150,
+  GORGE_CRATER_WALL_Y = 720, GORGE_CRATER_Z = -11000;
 export const GORGE_Z0 = 6500;                                       // canyon mouth (entrance)
-// Sweeps: tightest radius ~790 m (about 4.7 G at 370 kt), after a 1.5 km straight
-// lead-in from the mouth so the pilot settles in before the first curve.
-export const GORGE_X0 = -8000, GORGE_A1 = 2600, GORGE_L1 = 1700, GORGE_A2 = 300, GORGE_L2 = 900, GORGE_LEAD = 1500;
-export const GORGE_HALF_W = 110, GORGE_RAMP_W = 175;                // floor half-width / rim, perpendicular metres
+// Sweeps: softened S-curves (~2.8-3.2 G at 370 kt) after a 1.5 km straight lead-in.
+export const GORGE_X0 = -8000, GORGE_A1 = 1900, GORGE_L1 = 2200, GORGE_A2 = 220, GORGE_L2 = 1100, GORGE_LEAD = 1500;
+export const GORGE_HALF_W = 170, GORGE_RAMP_W = 260;                // floor half-width / rim, perpendicular metres
 // x(z) centreline. Both harmonics start with zero slope, so the mouth faces due north.
 export const gorgeCentreX = z => {
   const s = Math.max(0, GORGE_Z0 - z - GORGE_LEAD);
@@ -29,7 +28,7 @@ export const gorgeSlope = z => {
 export const gorgeHeading = z => Math.atan2(gorgeSlope(z), 1);
 // Perpendicular distance from the centreline (first order in the slope).
 export const gorgeDist = (x, z) => Math.abs(x - gorgeCentreX(z)) / Math.sqrt(1 + gorgeSlope(z) ** 2);
-export const GORGE_BBOX = { x: [-9000, -1400], z: [7000, -12300] };   // z: [south, north]
+export const GORGE_BBOX = { x: [-10200, -1400], z: [7000, -12800] };   // z: [south, north]
 export const GORGE_FORT = [gorgeCentreX(GORGE_CRATER_Z), 0, GORGE_CRATER_Z];
 export const GORGE_SPAWN_Z = GORGE_Z0 - 150;                         // inside the mouth, before gate 1
 // Sequential gates spaced evenly by centreline arc length (computed once at load).
@@ -91,7 +90,9 @@ export const MAPS = {
   },
   GORGE: {
     heightFn: 'gorge', islands: [], canyonAmp: 1, runway: true,
-    carrier: null, fleet: [], cloudSea: null, fogFar: 44000,
+    carrier: { pos: [GORGE_X0, 0, GORGE_Z0 + 5500], hdg: 0, spd: 4.1 },
+    fleet: [{ kind: 'DDG', pos: [GORGE_X0 - 900, 0, GORGE_Z0 + 4900] }, { kind: 'DDG', pos: [GORGE_X0 + 900, 0, GORGE_Z0 + 5000] }],
+    cloudSea: null, fogFar: 44000,
     ceiling: { m: CEIL_M }, cell: 16,
     bbox: GORGE_BBOX,
     crater: { z: GORGE_CRATER_Z, r: GORGE_CRATER_R, wallY: GORGE_CRATER_WALL_Y, floorY: 20 },

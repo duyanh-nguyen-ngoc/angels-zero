@@ -23,7 +23,7 @@ import { fileURLToPath } from 'node:url';
 import { createNoise2D, fbm } from '../src/noise.js';
 import { createGeography, CORE, RWY, MAP_IDS, ss } from '../src/geography.js';
 import {
-  gorgeCentreX, gorgeDist, GORGE_FLOOR_Y, GORGE_RIM_Y, GORGE_CRATER_Z, GORGE_CRATER_R,
+  gorgeCentreX, gorgeSlope, gorgeDist, GORGE_X0, GORGE_Z0, GORGE_FLOOR_Y, GORGE_RIM_Y, GORGE_CRATER_Z, GORGE_CRATER_R,
   GORGE_CRATER_WALL_Y, GORGE_RAMP_W, GORGE_HALF_W, GORGE_BBOX,
   GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_ZB, GORGE_SC_HALF_W, GORGE_SC_RAMP_W, GORGE_SC_FLOOR_Y
 } from '../src/maps.js';
@@ -184,6 +184,8 @@ async function buildDemSampler(cfg, zLevel, halfSpanM) {
 // seawall into a dredged -12 m basin; the town steps up the natural slope behind it.
 const nAfb = createNoise2D(31337);
 const AFB_CORE = [RWY.x - 90, RWY.x + 410, RWY.z0 - 110, RWY.z1 + 130];
+const nGorge1 = createNoise2D(7129), nGorge2 = createNoise2D(7151);
+
 function applyClearance(map, x, z, hDem, harbour) {
   let h = hDem, protect = 1, urban = 0;
   if (map !== 'strait') {
@@ -232,31 +234,46 @@ function applyClearance(map, x, z, hDem, harbour) {
       }
     }
   }
-  if (map === 'gorge' && geo.inGorgeBox(x, z)) {
-    // Blend CANYON_RUN floor, crater, and shortcut smoothly into the real Norwegian granite massif
-    const crDX = x - gorgeCentreX(GORGE_CRATER_Z), crDZ = z - GORGE_CRATER_Z, cr = Math.hypot(crDX, crDZ);
-    const d = gorgeDist(x, z);
-    const corridor = 1 - ss(d, GORGE_HALF_W, GORGE_RAMP_W);
-    if (corridor > 0.001) {
-      h = h * (1 - corridor) + GORGE_FLOOR_Y * corridor;
-    } else if (h < GORGE_RIM_Y * 0.75) {
-      // Ensure canyon walls rise cleanly into the surrounding massif
-      const wallLift = ss(d, GORGE_HALF_W, GORGE_RAMP_W + 250) * (1 - ss(d, GORGE_RAMP_W + 400, GORGE_RAMP_W + 1400));
-      h = Math.max(h, GORGE_RIM_Y * wallLift);
+  if (map === 'gorge') {
+    // Open-sea carrier basin south of the canyon mouth (z > GORGE_Z0 + 300 around GORGE_X0)
+    if (z > GORGE_Z0 + 300 && z < GORGE_Z0 + 10000 && Math.abs(x - GORGE_X0) < 4200) {
+      const seaK = ss(z, GORGE_Z0 + 300, GORGE_Z0 + 1400) * ss(Math.abs(x - GORGE_X0), 4200, 2600);
+      h = h * (1 - seaK) + Math.min(h, -48) * seaK;
     }
-    if (cr < GORGE_CRATER_R * 1.35) {
-      const cut = d < GORGE_HALF_W && z > GORGE_CRATER_Z + GORGE_CRATER_R * 0.4;
-      const bowl = cut ? 20 : (20 + GORGE_CRATER_WALL_Y * Math.exp(-Math.pow((cr - GORGE_CRATER_R * 0.72) / 190, 2)));
-      const ck = ss(cr, GORGE_CRATER_R * 1.35, GORGE_CRATER_R * 0.9);
-      h = h * (1 - ck) + bowl * ck;
+    if (geo.inGorgeBox(x, z)) {
+      // Organic glacial gorge carving: varying width, asymmetric river-bend banks, stepped cliff strata & undulating riverbed
+      const gN1 = fbm(nGorge1, x * 0.00055, z * 0.00055, 3);
+      const gN2 = fbm(nGorge2, x * 0.0022, z * 0.0022, 2);
+      const sl = gorgeSlope(z), sOff = x - gorgeCentreX(z);
+      const outerBend = Math.abs(sl) > 0.05 ? Math.max(0, Math.min(1, 0.5 + 0.5 * Math.sign(sl) * Math.sign(sOff))) : 0.5;
+      const effHalf = GORGE_HALF_W * Math.max(0.94, 1 + 0.24 * gN1);
+      const effRamp = GORGE_RAMP_W * Math.max(0.94, 1 + 0.22 * gN1) * (1 + (1 - outerBend) * 0.28 + 0.10 * gN2);
+      const crDX = x - gorgeCentreX(GORGE_CRATER_Z), crDZ = z - GORGE_CRATER_Z, cr = Math.hypot(crDX, crDZ);
+      const d = gorgeDist(x, z);
+      const corridor = 1 - ss(d, effHalf, effRamp);
+      const floorH = 22 + 10 * (0.5 + 0.5 * gN1) + 5 * gN2;
+      if (corridor > 0.001) {
+        const wallWarp = corridor < 0.95 ? (14 * Math.sin(h * 0.045 + gN1 * 2.0) + 28 * gN2) * (1 - corridor) : 0;
+        h = (h + wallWarp) * (1 - corridor) + floorH * corridor;
+      } else if (h < GORGE_RIM_Y * 0.78) {
+        const wallLift = ss(d, effHalf, effRamp + 260) * (1 - ss(d, effRamp + 420, effRamp + 1500));
+        h = Math.max(h, (GORGE_RIM_Y + 24 * gN1 + 18 * gN2) * wallLift);
+      }
+      if (cr < GORGE_CRATER_R * 1.45) {
+        const crWarp = cr * (1 + 0.14 * gN1 + 0.05 * gN2);
+        const cut = d < effHalf && z > GORGE_CRATER_Z + GORGE_CRATER_R * 0.38;
+        const bowl = cut ? 22 : (22 + GORGE_CRATER_WALL_Y * Math.exp(-Math.pow((crWarp - GORGE_CRATER_R * 0.78) / 240, 2)) + 26 * gN2);
+        const ck = ss(cr, GORGE_CRATER_R * 1.45, GORGE_CRATER_R * 0.92);
+        h = h * (1 - ck) + bowl * ck;
+      }
+      if (z < GORGE_SC_ZA + 300 && z > GORGE_SC_ZB - 300) {
+        const dS = Math.abs(x - GORGE_SC_X);
+        const carved = GORGE_SC_FLOOR_Y + (h - GORGE_SC_FLOOR_Y) * ss(dS, GORGE_SC_HALF_W, GORGE_SC_RAMP_W);
+        const fade = ss(z, GORGE_SC_ZB - 300, GORGE_SC_ZB) * ss(z, GORGE_SC_ZA + 300, GORGE_SC_ZA);
+        h += (Math.min(h, carved) - h) * fade;
+      }
+      protect = 0;
     }
-    if (z < GORGE_SC_ZA + 300 && z > GORGE_SC_ZB - 300) {
-      const dS = Math.abs(x - GORGE_SC_X);
-      const carved = GORGE_SC_FLOOR_Y + (h - GORGE_SC_FLOOR_Y) * ss(dS, GORGE_SC_HALF_W, GORGE_SC_RAMP_W);
-      const fade = ss(z, GORGE_SC_ZB - 300, GORGE_SC_ZB) * ss(z, GORGE_SC_ZA + 300, GORGE_SC_ZA);
-      h += (Math.min(h, carved) - h) * fade;
-    }
-    protect = 0;
   }
   if (map === 'strait') {
     const ax = Math.abs(x);

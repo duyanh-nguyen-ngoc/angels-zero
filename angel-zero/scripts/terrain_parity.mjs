@@ -12,7 +12,7 @@ import { dirname, join } from 'node:path';
 import { assemblePack, createSampler } from '../src/terrainpack.js';
 import { createGeography, RWY, CORE, CRAG_AMP } from '../src/geography.js';
 import { createNoise2D, fbm } from '../src/noise.js';
-import { GORGE_Z0, GORGE_CRATER_Z, GORGE_HALF_W, gorgeCentreX, gorgeDist } from '../src/maps.js';
+import { GORGE_X0, GORGE_Z0, GORGE_CRATER_Z, GORGE_HALF_W, gorgeCentreX, gorgeDist } from '../src/maps.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', 'assets', 'terrain');
 const geo = createGeography({ createNoise2D, fbm });
@@ -77,10 +77,12 @@ for (const map of ['archipelago', 'gorge', 'strait']) {
   }
   if (map === 'gorge') {
     let wallOk = true;
-    for (let z = GORGE_Z0 - 400; z > GORGE_CRATER_Z + 900; z -= 100) for (let x = -9000; x <= -1400; x += 40) {
+    for (let z = GORGE_Z0 - 400; z > GORGE_CRATER_Z + 900; z -= 100) for (let x = -10200; x <= -1400; x += 40) {
       if (gorgeDist(x, z) < GORGE_HALF_W * 0.9 && S.heightAt(x, z) > 80) wallOk = false;
     }
     check(wallOk, 'GORGE: no terrain above 80 m inside the floor half-width');
+    const carrierH = S.heightAt(GORGE_X0, GORGE_Z0 + 5500);
+    check(carrierH < -25, `GORGE: carrier spawn open water (h=${carrierH.toFixed(1)} m)`);
   }
   if (map === 'strait') {
     let worst = -1e9;

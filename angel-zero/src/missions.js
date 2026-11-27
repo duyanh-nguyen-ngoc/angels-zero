@@ -1,7 +1,7 @@
 // ANGELS ZERO — mission registry. One block + one MISSION_ORDER entry adds a mission.
 // Each mission supplies its spawn, waves, targets, map tag and soundtrack scenario.
 
-import { CEIL_M, GORGE_FORT, GORGE_SPAWN_Z, gorgeCentreX } from './maps.js?v=s9dz';
+import { CEIL_M, GORGE_FORT, GORGE_X0, GORGE_Z0 } from './maps.js?v=s10can1';
 
 export const MISSION_KEY = 'angelsZero_mission';
 
@@ -34,15 +34,15 @@ export const MISSIONS = {
   },
   CANYON_RUN: {
     id: 'CANYON_RUN', title: 'CANYON RUN',
-    brief: 'Fly 25 km of winding trench under the 1,200 ft radar ceiling, hit the crater fortress, then climb out over the wall.',
-    mapTag: 'GORGE', launch: 'AIRSTART', rtbType: 'BASE', bgmScenario: '07_canyon', wxOverride: false,
-    spawn: { pos: [gorgeCentreX(GORGE_SPAWN_Z), 0, GORGE_SPAWN_Z], hdg: 0, spd: 180, onDeck: false },
+    brief: 'Catapult from the carrier, enter the glacial gorge under the 1,500 ft radar ceiling, destroy the crater fortress, then climb out and recover aboard ship.',
+    mapTag: 'GORGE', launch: 'CATAPULT', rtbType: 'CARRIER', bgmScenario: '07_canyon', wxOverride: false,
+    spawn: { pos: [GORGE_X0, 18, GORGE_Z0 + 5500], hdg: 0, spd: 160, onDeck: true },
     waves: [],
-    targets: [{ kind: 'FORT', pos: GORGE_FORT, hp: 4 }],
+    targets: [{ kind: 'FORT', pos: GORGE_FORT, hp: 2 }],
     weapons: { gun: true, msl: true, spw: true }, enemyMsl: true, wingmen: 'FLIGHT',
     ceiling: { m: CEIL_M }, gatesPath: 'CANYON', ilsOnRtbOnly: false,
     stages: [
-      { label: 'TRENCH RUN', targets: [{ kind: 'FORT', pos: GORGE_FORT, hp: 4 }], bandits: 0, clear: 'TARGETS' }
+      { label: 'TRENCH RUN', targets: [{ kind: 'FORT', pos: GORGE_FORT, hp: 2 }], bandits: 0, clear: 'TARGETS' }
     ]
   },
   ACE_DUEL: {

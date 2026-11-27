@@ -3,6 +3,12 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.2.13', title: 'CANYON RUN OVERHAUL — CARRIER LAUNCH, GLACIAL GORGE & BREACH AMBUSH', bullets: [
+    'CANYON RUN now launches by catapult from the carrier task force 5.5 km south of the fjord mouth and recovers back aboard ship.',
+    'The gorge is carved as an organic glacial canyon with varying width, asymmetric river-bend banks, cliff ledges, undulating riverbed and a wider 1.2 km target valley.',
+    'Target fortress destruction is intuitive with both MSL (2-hit lock-on from 3.5+ km) and tap-to-drop guided bombs under a 1,500 ft radar ceiling.',
+    'Leaving the canyon or climbing above the ceiling before destroying the fortress triggers a brutal SAM barrage and scrambles 2 pursuing interceptor bandits.'
+  ] },
   { version: 'v1.2.12', title: 'TERRAIN V3.1 — DEM-ALIGNED AIRFIELD, ORGANIC COASTS & REAL-WORLD LANDMARKS', bullets: [
     'Each theatre is re-framed on its real fjord landscape so the airbase sits on a natural coastal lowland with open-water approaches, and Port City now lines a real bay with a quay shelf and seawall.',
     'No more square ground: the airfield blends into the coast with a crisp rock revetment and noise-broken grading, and terrain colours no longer show rectangular patches.',

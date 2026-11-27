@@ -45,7 +45,7 @@ import { gorgeCentreX, gorgeSlope, gorgeHeading, gorgeDist, GORGE_FLOOR_Y, GORGE
   GORGE_CRATER_WALL_Y, GORGE_CRATER_Z, GORGE_GATE_Z, GORGE_GATE_N, GORGE_FORT, CEIL_M,
   GORGE_BBOX, GORGE_HALF_W, GORGE_RAMP_W, SEA_FLOOR_Y, RUNWAY_BBOX,
   GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_ZB, GORGE_SC_HALF_W, GORGE_SC_RAMP_W, GORGE_SC_FLOOR_Y,
-  GORGE_SC_ARCH_Z, GORGE_SC_ARCH_Y0, GORGE_SC_ARCH_Y1, GORGE_SC_ARCH_W, GORGE_SC_ARCH_D } from './maps.js?v=s9dz';
+  GORGE_SC_ARCH_Z, GORGE_SC_ARCH_Y0, GORGE_SC_ARCH_Y1, GORGE_SC_ARCH_W, GORGE_SC_ARCH_D } from './maps.js?v=s10can1';
 
 export function createWorld(THREE, env) {
   const { scene, createNoise2D, fbm } = env;
