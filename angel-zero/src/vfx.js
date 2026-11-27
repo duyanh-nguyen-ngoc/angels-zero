@@ -135,25 +135,27 @@ export function createVFX(THREE, env) {
   const heatMat = new THREE.ShaderMaterial({
     uniforms: { uTime: { value: 0 }, uStr: { value: 0 } },
     vertexShader: `
-      varying vec2 vUv; varying vec3 vN; varying vec3 vV;
+      varying vec2 vUv; varying vec3 vN; varying vec3 vV; varying float vSide;
       void main() {
         vUv = uv;
         vec4 mv = modelViewMatrix * vec4(position, 1.0);
         vN = normalize(normalMatrix * normal);
         vV = -mv.xyz;
+        vec3 axis = normalize((modelViewMatrix * vec4(0.0, 0.0, 1.0, 0.0)).xyz);
+        vSide = length(cross(axis, normalize(-mv.xyz)));
         gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: `
       uniform float uTime; uniform float uStr;
-      varying vec2 vUv; varying vec3 vN; varying vec3 vV;
+      varying vec2 vUv; varying vec3 vN; varying vec3 vV; varying float vSide;
       void main() {
-        float facing = pow(abs(dot(normalize(vN), normalize(vV))), 1.7);
+        float facing = mix(0.78, pow(abs(dot(normalize(vN), normalize(vV))), 1.5), smoothstep(0.15, 0.6, vSide));
         float along = smoothstep(0.0, 0.14, vUv.y) * (1.0 - smoothstep(0.45, 1.0, vUv.y));
         float w1 = sin(vUv.y * 28.0 - uTime * 34.0 + vUv.x * 12.566);
         float w2 = cos(vUv.y * 47.0 - uTime * 51.0 - vUv.x * 18.849);
-        vec2 off = vec2(w1 * 0.7 + w2 * 0.3, w2 * 0.7 - w1 * 0.3) * 0.35;
+        vec2 off = vec2(w1 * 0.7 + w2 * 0.3, w2 * 0.7 - w1 * 0.3) * 0.55;
         float str = facing * along * uStr;
-        gl_FragColor = vec4(0.5 + off.x, 0.5 + off.y, 0.0, clamp(str, 0.0, 0.85));
+        gl_FragColor = vec4(0.5 + off.x, 0.5 + off.y, 0.0, clamp(str, 0.0, 0.92));
       }`,
     transparent: true, depthWrite: false, side: THREE.DoubleSide
   });
@@ -214,9 +216,9 @@ export function createVFX(THREE, env) {
     glowCoreMat.uniforms.uCol.value.copy(CORE_COOL).multiplyScalar((isF22 ? 0.28 : 0.4) + (isF22 ? 0.48 : 0.6) * t).lerp(CORE_HOT, smooth(ab, 0, 1)).multiplyScalar(shimmer);
     const tvcPitch = isF22 ? THREE.MathUtils.clamp(((s.ctl && s.ctl.pitch) || 0) * 0.28, -0.32, 0.32) : 0;
     heatMat.uniforms.uTime.value = now;
-    heatMat.uniforms.uStr.value = 0.28 + 0.35 * t + 0.55 * ab;
+    heatMat.uniforms.uStr.value = 0.42 + 0.45 * t + 0.65 * ab;
     const heatLen = 4.5 + 5.5 * t + 7.5 * ab;
-    const heatRad = 1.0 + 0.35 * ab;
+    const heatRad = 1.25 + 0.45 * ab;
     for (let k = 0; k < plumes.length; k++) {
       const p = plumes[k];
       if (isF22) p.g.rotation.x += (tvcPitch - p.g.rotation.x) * 0.25;

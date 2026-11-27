@@ -41,7 +41,7 @@ export function createNVG(THREE, renderer, post) {
         uniforms: {
           tDiffuse: { value: null },
           tDistort: { value: distortRT.texture },
-          uScale: { value: 0.022 }
+          uScale: { value: 0.045 }
         },
         vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
         fragmentShader: `
@@ -96,7 +96,7 @@ export function createNVG(THREE, renderer, post) {
             vec3 c = clamp(s.rgb, 0.0, 1.0);
             // Edge-weighted radial motion blur at high Mach / afterburner (zero blur in center HUD reticle).
             if (uCinematic > 0.5 && uSpeedBlur > 0.005) {
-              float edgeK = smoothstep(0.24, 0.92, centerR * 1.45) * uSpeedBlur * 0.018;
+              float edgeK = smoothstep(0.24, 0.92, centerR * 1.45) * uSpeedBlur * 0.032;
               if (edgeK > 0.0005) {
                 vec2 dir = centerD * edgeK;
                 vec3 acc = c * 0.34;
@@ -112,11 +112,11 @@ export function createNVG(THREE, renderer, post) {
               vec2 d = (vUv - uSunPos) * vec2(uAspect, 1.0);
               float r = length(d);
               float veil = exp(-r * 1.55) * 0.44 + exp(-r * 5.2) * 0.34;
-              float anamK = mix(0.14, 0.28, step(0.5, uCinematic));
+              float anamK = mix(0.14, 0.38, step(0.5, uCinematic));
               float anam = exp(-abs(d.y) * 14.0) * exp(-abs(d.x) * 2.2) * anamK;
               float ang = atan(d.y, d.x);
               float shafts = (0.55 + 0.45 * sin(ang * 13.0 + uTime * 0.08) * cos(ang * 7.0 - uTime * 0.05))
-                * exp(-r * 2.1) * uGodRay * uCinematic * 0.22;
+                * exp(-r * 2.1) * uGodRay * uCinematic * 0.36;
               vec3 sunDisp = pow(clamp(uSunCol, 0.0, 1.0), vec3(1.0 / 2.2));
               vec3 glareGlow = clamp(sunDisp * uSunGlare * (veil + anam + shafts), 0.0, 0.65);
               c = 1.0 - (1.0 - c) * (1.0 - glareGlow);
