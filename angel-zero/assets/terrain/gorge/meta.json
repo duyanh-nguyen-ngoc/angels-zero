@@ -1,7 +1,15 @@
 {
- "version": 2,
+ "version": 3,
  "map": "gorge",
  "mapId": 1,
+ "dem": {
+  "name": "Lysefjord & Aurlandsfjord, Norway",
+  "lat": 59.03,
+  "lon": 6.42,
+  "rotDeg": -22,
+  "coreZ": 11,
+  "hzZ": 8
+ },
  "core": {
   "size": 40000,
   "cx": 0,
@@ -15,6 +23,15 @@
    17000,
    19800
   ]
+ },
+ "horizon": {
+  "size": 160000,
+  "cx": 0,
+  "cz": -2500,
+  "n": 512,
+  "step": 313.11154598825834,
+  "minH": -260,
+  "maxH": 1950
  },
  "encoding": {
   "height": "gzip(zigzag(signed gradient residual q - (left+up-upleft)) uint16 -> hi plane, lo plane)",
@@ -85,36 +102,38 @@
  },
  "straitSites": null,
  "checksums": {
-  "height16": "c43b3b7261ca8b68",
-  "splat": "7ad7b6df0e9db865"
+  "height16": "7f8c17105ac7c87c",
+  "horizon16": "5db9d99c07b43361",
+  "splat": "22204393a44f6e0e"
  },
  "stats": {
-  "minH": -179.9,
-  "maxH": 1716.4,
-  "landPct": 50.3,
+  "minH": -106.8,
+  "maxH": 1275.8,
+  "landPct": 97.4,
   "landUse": {
-   "water": 49.6,
-   "farm": 7.9,
-   "forest": 12.9,
-   "rock": 15,
+   "water": 2.6,
+   "farm": 5.8,
+   "forest": 38.5,
+   "rock": 15.7,
    "urban": 0.4,
-   "scrub": 14.1
+   "scrub": 37
   },
   "erosion": {
-   "droplets": 235508,
-   "changed": 1295187,
-   "meanAbs": 14.3,
-   "maxAbs": 70
+   "droplets": 50000,
+   "changed": 0,
+   "meanAbs": 0,
+   "maxAbs": 0
   },
   "bakeMs": {
-   "sample": 14667,
-   "erode": 2863,
-   "total": 20125
+   "sample": 5175,
+   "erode": 1041,
+   "total": 14319
   },
   "bytes": {
-   "height16": 2480598,
-   "splat": 737708,
-   "total": 3218306
+   "height16": 2123256,
+   "horizon16": 281434,
+   "splat": 702739,
+   "total": 3107429
   }
  }
 }

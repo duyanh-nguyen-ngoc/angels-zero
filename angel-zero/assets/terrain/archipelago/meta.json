@@ -1,7 +1,15 @@
 {
- "version": 2,
+ "version": 3,
  "map": "archipelago",
  "mapId": 0,
+ "dem": {
+  "name": "Lofoten Islands & Vestfjorden, Norway",
+  "lat": 68.22,
+  "lon": 14.55,
+  "rotDeg": 25,
+  "coreZ": 11,
+  "hzZ": 8
+ },
  "core": {
   "size": 40000,
   "cx": 0,
@@ -15,6 +23,15 @@
    17000,
    19800
   ]
+ },
+ "horizon": {
+  "size": 160000,
+  "cx": 0,
+  "cz": -2500,
+  "n": 512,
+  "step": 313.11154598825834,
+  "minH": -260,
+  "maxH": 1950
  },
  "encoding": {
   "height": "gzip(zigzag(signed gradient residual q - (left+up-upleft)) uint16 -> hi plane, lo plane)",
@@ -76,36 +93,38 @@
  "dam": null,
  "straitSites": null,
  "checksums": {
-  "height16": "5cb5e9044cfef51c",
-  "splat": "f971eed0a8177273"
+  "height16": "6b258f6e5142aff9",
+  "horizon16": "7a93db41b467935d",
+  "splat": "6837a7ea3b76dcef"
  },
  "stats": {
-  "minH": -179.9,
-  "maxH": 1716.4,
-  "landPct": 44.3,
+  "minH": -133.5,
+  "maxH": 1023.8,
+  "landPct": 36.4,
   "landUse": {
-   "water": 55.7,
-   "farm": 7.6,
-   "forest": 9.8,
-   "rock": 13.5,
+   "water": 64.1,
+   "farm": 10.7,
+   "forest": 18.3,
+   "rock": 0.6,
    "urban": 0.4,
-   "scrub": 13.1
+   "scrub": 5.9
   },
   "erosion": {
-   "droplets": 227186,
-   "changed": 1113348,
-   "meanAbs": 13.92,
-   "maxAbs": 70
+   "droplets": 50000,
+   "changed": 0,
+   "meanAbs": 0,
+   "maxAbs": 0
   },
   "bakeMs": {
-   "sample": 15139,
-   "erode": 2664,
-   "total": 20583
+   "sample": 5153,
+   "erode": 81,
+   "total": 12354
   },
   "bytes": {
-   "height16": 2230047,
-   "splat": 646903,
-   "total": 2876950
+   "height16": 1558125,
+   "horizon16": 234672,
+   "splat": 321549,
+   "total": 2114346
   }
  }
 }

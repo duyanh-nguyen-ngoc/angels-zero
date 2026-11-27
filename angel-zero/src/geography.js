@@ -73,7 +73,9 @@ export function horizonHeight(x, z, mapId) {
 }
 // Close-range rock displacement (m, before the slope / protect gate): +/-1.
 export function cragNoise(x, z) {
-  return Math.sin(x * 0.173 + Math.sin(z * 0.061) * 2.3) * Math.sin(z * 0.157 + Math.sin(x * 0.047) * 1.9);
+  const r1 = 1 - Math.abs(Math.sin(x * 0.145 + z * 0.085) * Math.sin(z * 0.145 - x * 0.085));
+  const r2 = 1 - Math.abs(Math.sin(x * 0.27 - z * 0.19) * Math.sin(z * 0.27 + x * 0.19));
+  return (r1 * r1 * 0.65 + r2 * r2 * 0.35) * 2 - 1;
 }
 export const CRAG_AMP = 2.5;
 // slope = 1 - normal.y; protect 0..1 (landUse protected class).

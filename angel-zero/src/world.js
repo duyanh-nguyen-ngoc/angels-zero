@@ -32,13 +32,13 @@
 // (same Uint16 bilinear + crag + horizon), so crashes, missiles, bombs and props agree with
 // what is on screen (scripts/terrain_parity.mjs checks it).
 
-export { WORLD, RWY, CORE } from './geography.js?v=s10ter6';
+export { WORLD, RWY, CORE } from './geography.js?v=s10ter7';
 const FT = 0.3048;
-import { WORLD, RWY, CORE, createGeography } from './geography.js?v=s10ter6';
+import { WORLD, RWY, CORE, createGeography } from './geography.js?v=s10ter7';
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { loadTerrainPack, createSampler } from './terrainpack.js?v=s10ter6';
-import { createClipmap, CM_VERTEX_PARS, CM_VERTEX_BODY, TERRAIN_HEIGHT_GLSL } from './clipmap.js?v=s10ter6';
+import { loadTerrainPack, createSampler } from './terrainpack.js?v=s10ter7';
+import { createClipmap, CM_VERTEX_PARS, CM_VERTEX_BODY, TERRAIN_HEIGHT_GLSL } from './clipmap.js?v=s10ter7';
 import { createClutter } from './clutter.js?v=s10ter6';
 import { gorgeCentreX, gorgeSlope, gorgeHeading, gorgeDist, GORGE_FLOOR_Y, GORGE_RIM_Y, GORGE_CRATER_R,
   GORGE_CRATER_WALL_Y, GORGE_CRATER_Z, GORGE_GATE_Z, GORGE_GATE_N, GORGE_FORT, CEIL_M,
@@ -189,6 +189,7 @@ export function createWorld(THREE, env) {
   // Shared terrain uniforms (pack textures + core frame), referenced by all 8 level materials.
   const TERRAIN_U = {
     uHeight: { value: null }, uNormalTex: { value: null }, uSplat: { value: null },
+    uHorizon: { value: null }, uHCore: { value: new THREE.Vector4() },
     uCore: { value: new THREE.Vector4() }, uHRange: { value: new THREE.Vector2() },
     uMapId: { value: 0 }, uViewer: { value: new THREE.Vector3(1e9, 0, 1e9) }
   };
@@ -461,6 +462,21 @@ export function createWorld(THREE, env) {
           // Raking-light vertical gully darkening along steep hydraulic flow channels (Flyout canyon look).
           float gully = smoothstep(0.28, 0.78, vEro.z) * smoothstep(0.14, 0.42, slope) * eroK;
           land *= mix(1.0, ao * (1.0 - 0.34 * gully), eroK * smoothstep(1.0, 7.5, vWPos.y));
+          // Heightmap raymarch mountain self-shadows (casts long ridge shadows across valleys & fjords).
+          if (vCore > 0.5 && uSun.y > 0.04) {
+            float shOcc = 0.0;
+            float sd[7]; sd[0]=90.0; sd[1]=210.0; sd[2]=420.0; sd[3]=780.0; sd[4]=1300.0; sd[5]=2100.0; sd[6]=3200.0;
+            for (int si = 0; si < 7; si++) {
+              float distM = sd[si];
+              vec2 sf = ((vWPos.xz + uSun.xz * distM) - uCore.xy) / uCore.z;
+              if (inCoreF(sf)) {
+                float rayH = vWPos.y + distM * uSun.y;
+                float occH = coreBaseHeight(sf);
+                shOcc = max(shOcc, clamp((occH - rayH) / (45.0 + distM * 0.06), 0.0, 1.0));
+              }
+            }
+            land *= mix(1.0, 0.42, shOcc * smoothstep(0.04, 0.12, uSun.y));
+          }
           diffuseColor.rgb = land;
         }
         float steep = smoothstep(0.24, 0.54, 1.0 - clamp(vWNrm.y, 0.0, 1.0));
@@ -554,7 +570,14 @@ export function createWorld(THREE, env) {
     tn.magFilter = THREE.LinearFilter; tn.minFilter = THREE.LinearMipmapLinearFilter; tn.generateMipmaps = true; tn.needsUpdate = true;
     const ts = new THREE.DataTexture(pk.splat, sn, sn, THREE.RGBAFormat, THREE.UnsignedByteType);
     ts.magFilter = THREE.LinearFilter; ts.minFilter = THREE.LinearMipmapLinearFilter; ts.generateMipmaps = true; ts.needsUpdate = true;
-    pk.tex = { th, tn, ts };
+    let thz = null;
+    if (pk.hzQ && pk.meta.horizon) {
+      const hn = pk.meta.horizon.n, hrg = new Uint8Array(hn * hn * 2), hq = pk.hzQ;
+      for (let k = 0; k < hn * hn; k++) { hrg[k * 2] = hq[k] >> 8; hrg[k * 2 + 1] = hq[k] & 255; }
+      thz = new THREE.DataTexture(hrg, hn, hn, THREE.RGFormat, THREE.UnsignedByteType);
+      thz.magFilter = thz.minFilter = THREE.NearestFilter; thz.generateMipmaps = false; thz.needsUpdate = true;
+    }
+    pk.tex = { th, tn, ts, thz };
     return pk.tex;
   }
   let onPackReady = null, wantMode = 'archipelago', clutter = null;
@@ -570,8 +593,11 @@ export function createWorld(THREE, env) {
     }
     sampler = samplers[pk.map] || (samplers[pk.map] = createSampler(pk));
     if (clutter) clutter.setMap(pk.map, sampler);
-    const tx = packTextures(pk), c = pk.meta.core;
+    const tx = packTextures(pk), c = pk.meta.core, hc = pk.meta.horizon;
     TERRAIN_U.uHeight.value = tx.th; TERRAIN_U.uNormalTex.value = tx.tn; TERRAIN_U.uSplat.value = tx.ts;
+    TERRAIN_U.uHorizon.value = tx.thz || tx.th;
+    if (hc && tx.thz) TERRAIN_U.uHCore.value.set(hc.cx - hc.size / 2, hc.cz - hc.size / 2, hc.step, hc.n);
+    else TERRAIN_U.uHCore.value.set(0, 0, 1, 0);
     TERRAIN_U.uCore.value.set(c.cx - c.size / 2, c.cz - c.size / 2, c.step, c.n);
     TERRAIN_U.uHRange.value.set(c.minH, (c.maxH - c.minH) / 65535);
     TERRAIN_U.uMapId.value = pk.mapId;

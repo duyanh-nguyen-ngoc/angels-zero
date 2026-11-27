@@ -12,7 +12,7 @@
 //   outside the core       : horizonHeight(x, z, mapId) (GLSL twin in clipmap.js).
 // Zero allocations per query.
 
-import { CORE, horizonHeight, cragNoise, cragGate, CRAG_AMP, MAP_IDS, ss } from './geography.js?v=s10ter6';
+import { CORE, horizonHeight, cragNoise, cragGate, CRAG_AMP, MAP_IDS, ss } from './geography.js?v=s10ter7';
 
 export const CRAG_FADE = [1500, 2500];                     // m from the viewer (CPU == GPU)
 
@@ -56,9 +56,10 @@ export function buildNormals(q, n, step, minH, rangeH) {
   }
   return out;
 }
-export function assemblePack(meta, heightBytes, splatBytes) {
+export function assemblePack(meta, heightBytes, splatBytes, horizonBytes = null) {
   const c = meta.core, q = decodeHeight(heightBytes, c.n);
-  return { meta, map: meta.map, mapId: meta.mapId, q, splat: decodeSplat(splatBytes, c.splatN), normal: buildNormals(q, c.n, c.step, c.minH, c.maxH - c.minH) };
+  const hzQ = horizonBytes && meta.horizon ? decodeHeight(horizonBytes, meta.horizon.n) : null;
+  return { meta, map: meta.map, mapId: meta.mapId, q, hzQ, splat: decodeSplat(splatBytes, c.splatN), normal: buildNormals(q, c.n, c.step, c.minH, c.maxH - c.minH) };
 }
 
 const _packCache = new Map();
@@ -67,12 +68,13 @@ export function loadTerrainPack(map, base = 'assets/terrain', tag = '') {
   const q = tag ? '?v=' + tag : '';
   const p = (async () => {
     const t0 = performance.now();
-    const [meta, hb, sb] = await Promise.all([
+    const [meta, hb, sb, hzb] = await Promise.all([
       fetch(`${base}/${map}/meta.json${q}`).then(r => { if (!r.ok) throw new Error('meta ' + r.status); return r.json(); }),
       fetch(`${base}/${map}/height16.bin${q}`).then(r => { if (!r.ok) throw new Error('height ' + r.status); return r.arrayBuffer(); }).then(gunzipMaybe),
-      fetch(`${base}/${map}/splat.bin${q}`).then(r => { if (!r.ok) throw new Error('splat ' + r.status); return r.arrayBuffer(); }).then(gunzipMaybe)
+      fetch(`${base}/${map}/splat.bin${q}`).then(r => { if (!r.ok) throw new Error('splat ' + r.status); return r.arrayBuffer(); }).then(gunzipMaybe),
+      fetch(`${base}/${map}/horizon16.bin${q}`).then(r => r.ok ? r.arrayBuffer().then(gunzipMaybe) : null).catch(() => null)
     ]);
-    const pack = assemblePack(meta, hb, sb);
+    const pack = assemblePack(meta, hb, sb, hzb);
     pack.loadMs = +(performance.now() - t0).toFixed(1);
     return pack;
   })();
@@ -86,7 +88,9 @@ export const packLoaded = map => _packCache.has(map);
 export function createSampler(pack) {
   const c = pack.meta.core, n = c.n, step = c.step, x0 = c.cx - c.size / 2, z0 = c.cz - c.size / 2;
   const minH = c.minH, scale = (c.maxH - c.minH) / 65535, sn = c.splatN;
-  const q = pack.q, nrm = pack.normal, sp = pack.splat, mapId = pack.mapId;
+  const q = pack.q, hzQ = pack.hzQ, nrm = pack.normal, sp = pack.splat, mapId = pack.mapId;
+  const hc = pack.meta.horizon, hn = hc ? hc.n : 0, hStep = hc ? hc.step : 1;
+  const hx0 = hc ? hc.cx - hc.size / 2 : 0, hz0 = hc ? hc.cz - hc.size / 2 : 0;
   let vx = 0, vz = 0;
   // GPU LINEAR filtering of an n x n texture at uv = (f + 0.5) / n  ==  bilinear at texel coord f.
   function bilin2(arr, stride, off, size, fx, fz) {
@@ -97,14 +101,20 @@ export function createSampler(pack) {
     const d = arr[(z1i * size + x0i) * stride + off], e = arr[(z1i * size + x1i) * stride + off];
     return (a + (b - a) * tx) * (1 - tz) + (d + (e - d) * tx) * tz;
   }
+  function sampleHorizon(x, z) {
+    if (!hzQ || !hc) return horizonHeight(x, z, mapId);
+    const fx = (x - hx0) / hStep, fz = (z - hz0) / hStep;
+    if (fx < 0 || fz < 0 || fx > hn - 1 || fz > hn - 1) return horizonHeight(x, z, mapId);
+    return minH + bilin2(hzQ, 1, 0, hn, fx, fz) * scale;
+  }
   function baseHeight(x, z) {
     const fx = (x - x0) / step, fz = (z - z0) / step;
-    if (fx < 0 || fz < 0 || fx > n - 1 || fz > n - 1) return horizonHeight(x, z, mapId);
+    if (fx < 0 || fz < 0 || fx > n - 1 || fz > n - 1) return sampleHorizon(x, z);
     return minH + bilin2(q, 1, 0, n, fx, fz) * scale;
   }
   function heightAt(x, z) {
     const fx = (x - x0) / step, fz = (z - z0) / step;
-    if (fx < 0 || fz < 0 || fx > n - 1 || fz > n - 1) return horizonHeight(x, z, mapId);
+    if (fx < 0 || fz < 0 || fx > n - 1 || fz > n - 1) return sampleHorizon(x, z);
     let h = minH + bilin2(q, 1, 0, n, fx, fz) * scale;
     const fade = 1 - ss(Math.hypot(x - vx, z - vz), CRAG_FADE[0], CRAG_FADE[1]);
     if (fade > 0) {

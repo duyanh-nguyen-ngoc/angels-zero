@@ -839,7 +839,7 @@ import { createBlastFX } from './src/blastfx.js?v=s10vfx1';
 import { createHUD } from './src/hud.js?v=s10gp1';
 import { createCockpit3D } from './src/cockpit3d.js?v=s9ex';
 import { createCockpitF22 } from './src/cockpit_f22.js?v=s9ex';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9ex';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s11wat1';
 import { createEjection } from './src/eject.js?v=s9ex';
 import { createAudio } from './src/audio.js?v=s9ex';
 import { createYouTubeMusic } from './src/ytmusic.js?v=s10fly7';
@@ -847,19 +847,19 @@ import { createRadio } from './src/radio.js?v=s9ex';
 import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9ex';
 import { createLivery } from './src/livery.js?v=s9ex';
 import { createGear, GEAR_H, GEAR_PTS, GEAR_UNITS, setGearPoints } from './src/gear.js?v=s9ex';
-import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s10fly2';
+import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s11wat1';
 import { createCanopyFX } from './src/canopy.js?v=s9ex';
-import { createNVG } from './src/nvg.js?v=s10vfx3';
-import { createWorld, WORLD, CORE } from './src/world.js?v=s10ter6';
+import { createNVG } from './src/nvg.js?v=s11wat1';
+import { createWorld, WORLD, CORE } from './src/world.js?v=s10ter7';
 import { mulberry32, createNoise2D, fbm } from './src/noise.js?v=s10ter2';
-import { loadTerrainPack } from './src/terrainpack.js?v=s10ter6';
+import { loadTerrainPack } from './src/terrainpack.js?v=s10ter7';
 import { createSurfaces } from './src/surfaces.js?v=s9ex';
 import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s10fly2';
 import { createFreeLook } from './src/freelook.js?v=s9ex';
 import { createCanopyGlass } from './src/canopyglass.js?v=s9ex';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9ex';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9ex';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s10gp1';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s10ter7';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9ex';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9ex';
 import { createRadioQueue } from './src/radioQueue.js?v=s9ex';
@@ -872,7 +872,7 @@ import { fetchLeaderboard, submitScore } from './src/leaderboard.js?v=s9ex';
 import { collectPilotSnapshot, applyPilotSnapshot, exportPilotCode, importPilotCode, generateSyncId, getSyncId, setSyncId, isSyncEnabled, setSyncEnabled, pushCloudProfile, pullCloudProfile, syncNow, setRefreshCallback } from './src/profile_sync.js?v=s9ex';
 import { createTraining } from './src/training.js?v=s9ex';
 import { createInputExt } from './src/input_ext.js?v=s10gp1';
-import { createOcean } from './src/ocean.js?v=s10ter2';
+import { createOcean } from './src/ocean.js?v=s11wat1';
 import { createWingmenFlight } from './src/wingmen.js?v=s9ex';
 import { createFlightPhysics } from './src/flight.js?v=s9ex';
 
@@ -1012,7 +1012,7 @@ const _wt0 = performance.now();
 // Terrain v2: the archipelago pack (baked 2048^2 heightfield + splat, ~3 MB) is needed before
 // boot-time prop placement; gorge / strait packs are fetched lazily (prefetched after boot,
 // awaited by startSortie) — see world.prepare().
-const TERRAIN_PACK_TAG = 's10ter2';
+const TERRAIN_PACK_TAG = 's10ter7';
 const terrainPackArch = await loadTerrainPack('archipelago', 'assets/terrain', TERRAIN_PACK_TAG);
 const world = createWorld(THREE, { scene, createNoise2D, fbm, mulberry32, pack: terrainPackArch, packTag: TERRAIN_PACK_TAG });
 setTimeout(() => { world.prepare({ heightFn: 'gorge' }).catch(() => {}); world.prepare({ heightFn: 'strait' }).catch(() => {}); }, 1200);
@@ -1079,11 +1079,28 @@ let stormOpsAuto = false, stormOpsPrev = 'CLEAR';          // NAVAL phase-3 STOR
 const wetDeck = createWetDeck(THREE, { camera, debug: DEBUG });   // CVN-ALLY damp deck + wet-light streaks (bound on carrier mount)
 const _wdNozL = new THREE.Vector3(), _wdNozR = new THREE.Vector3();
 
-const { ocean, oceanUniforms, followOcean, OCEAN_SNAP } = createOcean(THREE, {
-  scene, camera, createNoise2D, fbm, buildDepthTexture,
+const oceanSys = createOcean(THREE, {
+  scene, camera, renderer, createNoise2D, fbm, buildDepthTexture,
   terrainCenter: TERRAIN_CENTER, terrainSize: DEPTH_SIZE, sunDir: SUN_DIR,
   fogColor: scene.fog.color, fogDensity: FOG_DENSITY
 });
+const { ocean, oceanUniforms, followOcean, OCEAN_SNAP } = oceanSys;
+// v1.2.9 half-res planar ocean reflection: only REFLECT_LAYER objects (coast terrain,
+// island props, carrier, ships) are mirrored (not the jet: its VFX children are camera-bound); clouds / sky / particles / HUD never.
+// Dynamic roots (carrier GLB mount, fleet spawns) are re-marked every ~2 s (no allocation).
+let oceanReflMarkT = 0;
+const _markShipRoot = o => oceanSys.markReflect(o);
+function markOceanReflectables() {
+  oceanSys.markReflect(world.props);
+  for (const lv of world.clipmap.levels) oceanSys.markReflect(lv.mesh);
+  if (typeof combatSys !== 'undefined' && combatSys.forEachShipRoot) combatSys.forEachShipRoot(_markShipRoot);
+}
+let oceanReflAllowed = true;                                  // GRAPHICS / adaptive quality gate
+function renderOceanReflection() {
+  if (!oceanReflAllowed || nvg.active || (typeof freeFlight !== 'undefined' && freeFlight.active) || !ocean.visible) { oceanSys.setReflection(false); return; }
+  oceanSys.setReflection(true);
+  oceanSys.renderReflection(camera);
+}
 
 /* ============================================================================
    5. PLAYER JET (F-15 GLB) + AFTERBURNERS + VORTEX TRAILS
@@ -4128,6 +4145,9 @@ function updateCameraAndVisuals(dt, now) {
   if (blast && !fxHold) blast.update(dt);
   oceanUniforms.uCam.value.copy(camera.position);
   followOcean();
+  oceanUniforms.uShipN.value = combatSys.fillWakeShips(oceanUniforms.uShipA.value, oceanUniforms.uShipB.value, oceanSys.shipSlots);
+  oceanReflMarkT -= dt;
+  if (oceanReflMarkT <= 0) { oceanReflMarkT = 2; markOceanReflectables(); }
 
   vfx.setEngineOut(flightMode === 'FLY' && combat.engineOut ? (combat.engineOut === 'L' ? 0 : 1) : -1);
   vfx.update(dt, now, state, { visible: jet.visible && modelReady && flightMode === 'FLY', firstPerson,
@@ -4558,6 +4578,7 @@ if (DEBUG) window.__frame = (dt = 1 / 60) => {
   simTime += dt; if (appMode === 'PLAY') stepSim(dt); updateCameraAndVisuals(dt, simTime);
   audio.updateMusic(getMusicCtx(), dt);
   syncMusicScenario();
+  renderOceanReflection();
   nvg.render(scene, camera, simTime, firstPerson); hud.draw();
   renderer.getContext().finish();
   return performance.now() - t0;
@@ -4966,6 +4987,7 @@ atmosphere.bind({
   setTerrainFog: world.setAtmosphereFog,
   sampleCloudSun: vfx.sampleCloudSun,
   setSunGlare: nvg.setSunGlare,
+  setSkyRays: nvg.setSkyRays,
   setCloudColors: (top, belly, sun, k) => { vfx.setCloudColors(top, belly, sun, k); vfx.setVaporTint(_vaporTint.setRGB(1, 1, 1).lerp(top, 0.65)); },
   setEnv: k => { for (const m of airframeMats) m.envMapIntensity = k; },
   setNavLights: k => { navLevel = k; },
@@ -6203,6 +6225,7 @@ function animate() {
   oceanUniforms.uTime.value = simTime;
   const t0 = performance.now();
   renderer.info.reset();
+  renderOceanReflection();
   nvg.render(scene, camera, simTime, firstPerson);
   PERF_DEBUG.calls = renderer.info.render.calls;
   PERF_DEBUG.triangles = renderer.info.render.triangles;
@@ -6229,7 +6252,7 @@ addEventListener('resize', () => {
   hud.resize();
 });
 if (DEBUG) {
-  window.__az = { scene, camera, renderer, state, combat, combatSys, ambient, eject, audio, mouse, keys, vfx, blast, get blastShake() { return blastShake; }, flyShake, onFlyby, onWing, wingmen, hud, cockpit, perf, jet, cockpitHidden, terrainHeight, setView, freeLook, world, nvg, setNVG, gpuWarm, mcam, slowMo, get timeScale() { return timeScale; }, triggerSlowMo, get selectedSPW() { return selectedSPW; }, get selectedLivery() { return selectedLivery; }, loadSPW, loadLivery, saveSPW, saveLivery, SQUADRON, SPW, get camMode() { return camMode; }, get firstPerson() { return firstPerson; },
+  window.__az = { oceanSys, nvgRef: nvg, scene, camera, renderer, state, combat, combatSys, ambient, eject, audio, mouse, keys, vfx, blast, get blastShake() { return blastShake; }, flyShake, onFlyby, onWing, wingmen, hud, cockpit, perf, jet, cockpitHidden, terrainHeight, setView, freeLook, world, nvg, setNVG, gpuWarm, mcam, slowMo, get timeScale() { return timeScale; }, triggerSlowMo, get selectedSPW() { return selectedSPW; }, get selectedLivery() { return selectedLivery; }, loadSPW, loadLivery, saveSPW, saveLivery, SQUADRON, SPW, get camMode() { return camMode; }, get firstPerson() { return firstPerson; },
     get appMode() { return appMode; },
     // Feel-pass scalars / test hooks (all reads are snapshot objects allocated on demand, never per frame).
     get dbgFeel() { return { spdHold, aoaHoldDeg, aoaHoldT, abatAt, abCD, transK, superK, wrK, wrPhase }; },

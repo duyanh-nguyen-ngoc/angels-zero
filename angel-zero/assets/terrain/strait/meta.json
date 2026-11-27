@@ -1,7 +1,15 @@
 {
- "version": 2,
+ "version": 3,
  "map": "strait",
  "mapId": 2,
+ "dem": {
+  "name": "Kenai Fjords & Inside Passage, Alaska",
+  "lat": 59.88,
+  "lon": -149.48,
+  "rotDeg": 8,
+  "coreZ": 11,
+  "hzZ": 8
+ },
  "core": {
   "size": 40000,
   "cx": 0,
@@ -15,6 +23,15 @@
    17000,
    19800
   ]
+ },
+ "horizon": {
+  "size": 160000,
+  "cx": 0,
+  "cz": -2500,
+  "n": 512,
+  "step": 313.11154598825834,
+  "minH": -260,
+  "maxH": 1950
  },
  "encoding": {
   "height": "gzip(zigzag(signed gradient residual q - (left+up-upleft)) uint16 -> hi plane, lo plane)",
@@ -62,36 +79,38 @@
   ]
  },
  "checksums": {
-  "height16": "fd19459072428ccc",
-  "splat": "d3b5c20b332d3323"
+  "height16": "2b91d64c726ba8a7",
+  "horizon16": "ab1ddae684eab24f",
+  "splat": "45f869fce32d82d3"
  },
  "stats": {
-  "minH": -198.5,
-  "maxH": 1538,
-  "landPct": 73.5,
+  "minH": -129.7,
+  "maxH": 1949,
+  "landPct": 43.4,
   "landUse": {
-   "water": 26.4,
-   "farm": 0.6,
-   "forest": 6.9,
-   "rock": 42.7,
+   "water": 56.8,
+   "farm": 10.3,
+   "forest": 20.5,
+   "rock": 4.8,
    "urban": 0,
-   "scrub": 23.4
+   "scrub": 7.7
   },
   "erosion": {
-   "droplets": 248785,
-   "changed": 2082079,
-   "meanAbs": 30.29,
-   "maxAbs": 70
+   "droplets": 50000,
+   "changed": 0,
+   "meanAbs": 0,
+   "maxAbs": 0
   },
   "bakeMs": {
-   "sample": 4241,
-   "erode": 3373,
-   "total": 12299
+   "sample": 11588,
+   "erode": 804,
+   "total": 28196
   },
   "bytes": {
-   "height16": 3740076,
-   "splat": 1084409,
-   "total": 4824485
+   "height16": 1419734,
+   "horizon16": 216053,
+   "splat": 363675,
+   "total": 1999462
   }
  }
 }

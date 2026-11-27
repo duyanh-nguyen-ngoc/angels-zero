@@ -1,17 +1,18 @@
-// ANGELS ZERO — offline Terrain v2 baker (Node ESM, zero dependencies).
+// ANGELS ZERO — offline Terrain v3 baker (Real-World AWS Terrarium DEM + Node ESM).
 //
 //   node angel-zero/scripts/bake_terrain.mjs [archipelago|gorge|strait|all] [--preview <dir>]
 //
-// For each map: samples src/geography.js over the 40 x 40 km core at 2048^2 (cross-faded
-// into horizonHeight() over the outer apron), runs 250k-droplet multi-pass hydraulic
-// erosion (brush radius 4 -> 2 -> 1) and 12 thermal talus passes (~48 deg) through a
-// per-cell protect mask (runway pad, approach funnels, Port City, bridge spits, canyon
-// corridor / crater / shortcut / dam, strait prop sites, coastline, horizon apron), then
-// bakes a 1024^2 analysis splat. Writes assets/terrain/<map>/:
-//   height16.bin  gzip( row-delta-coded Uint16 2048^2, split into hi / lo byte planes )
-//   splat.bin     gzip( planar 1024^2 R cavity AO | G sediment | B flow | A landUse class )
-//   meta.json     core frame, encoding, anchors, landmarks, checksums, stats
-// Deterministic: same inputs -> identical bytes (checksums printed and stored).
+// Stitches open AWS Mapzen Terrarium elevation tiles (1.0x true Earth scale, cached in
+// scratch/dem_cache/) for 3 Nordic/Alpine theatres:
+//   * archipelago : Lofoten Islands & Vestfjorden, Norway (68.22N, 14.55E)
+//   * gorge       : Lysefjord / Aurlandsfjord, Norway (59.03N, 6.42E)
+//   * strait      : Alaska Kenai Fjords / Inside Passage (59.85N, 149.65W)
+//
+// Writes assets/terrain/<map>/:
+//   height16.bin   gzip( row-delta Uint16 2048^2, 40 x 40 km core )
+//   horizon16.bin  gzip( row-delta Uint16 512^2, 160 x 160 km outer DEM ring )
+//   splat.bin      gzip( planar 1024^2 R cavity AO | G sediment | B flow | A landUse )
+//   meta.json      core + horizon frame, encoding, anchors, landmarks, checksums, stats
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -20,167 +21,255 @@ import crypto from 'node:crypto';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { createNoise2D, fbm } from '../src/noise.js';
-import { createGeography, CORE, RWY, MAP_IDS, horizonHeight, ss } from '../src/geography.js';
+import { createGeography, CORE, RWY, MAP_IDS, ss } from '../src/geography.js';
 import {
-  gorgeCentreX, gorgeDist, GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_RAMP_W, GORGE_BBOX,
-  GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_ZB, GORGE_SC_RAMP_W
+  gorgeCentreX, gorgeDist, GORGE_FLOOR_Y, GORGE_RIM_Y, GORGE_CRATER_Z, GORGE_CRATER_R,
+  GORGE_CRATER_WALL_Y, GORGE_RAMP_W, GORGE_HALF_W, GORGE_BBOX,
+  GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_ZB, GORGE_SC_HALF_W, GORGE_SC_RAMP_W, GORGE_SC_FLOOR_Y
 } from '../src/maps.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const REPO_ROOT = path.resolve(ROOT, '..');
 const OUT_DIR = path.join(ROOT, 'assets', 'terrain');
+const CACHE_DIR = path.join(REPO_ROOT, 'scratch', 'dem_cache');
 const args = process.argv.slice(2);
 const which = (args.find(a => !a.startsWith('--')) || 'all').toLowerCase();
 const pi = args.indexOf('--preview');
 const PREVIEW_DIR = pi >= 0 ? args[pi + 1] : path.join(os.tmpdir(), 'az_terrain_preview');
 const N = CORE.N, STEP = CORE.STEP, X0 = CORE.X0, Z0 = CORE.Z0;
+const HN = 512, HSIZE = 160000, HSTEP = HSIZE / (HN - 1), HX0 = CORE.CX - HSIZE / 2, HZ0 = CORE.CZ - HSIZE / 2;
 const geo = createGeography({ createNoise2D, fbm });
 
-const EROSION = {
-  passes: [{ droplets: 100000, radius: 4 }, { droplets: 90000, radius: 2 }, { droplets: 60000, radius: 1 }],
-  maxLifetime: 48, inertia: 0.06, sedimentCapacity: 3.4, minSlope: 0.01, depositionRate: 0.26, erosionRate: 0.16,
-  evaporation: 0.02, gravity: 4.2, thermalIterations: 12, thermalStrength: 0.4,
-  talus: Math.tan(48 * Math.PI / 180),                     // cell units (height step / STEP)
-  landMin: 3, maxDelta: 70
+const DEM_THEATRES = {
+  archipelago: { name: 'Lofoten Islands & Vestfjorden, Norway', lat: 68.22, lon: 14.55, rotDeg: 25, coreZ: 11, hzZ: 8 },
+  gorge:       { name: 'Lysefjord & Aurlandsfjord, Norway',     lat: 59.03, lon: 6.42,  rotDeg: -22, coreZ: 11, hzZ: 8 },
+  strait:      { name: 'Kenai Fjords & Inside Passage, Alaska', lat: 59.88, lon: -149.48, rotDeg: 8, coreZ: 11, hzZ: 8 }
 };
 
 function mulberry32(a) { return () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 const rectDist = (x, z, x0, x1, z0, z1) => Math.hypot(Math.max(x0 - x, 0, x - x1), Math.max(z0 - z, 0, z - z1));
 
-/* ------------------------------------------------------------- protect masks */
-// 1 = free to erode, 0 = never moves. `urban` marks flat authored pads (landUse 255).
-function protectAt(map, x, z) {
-  let m = 1, urban = 0;
-  const pad = rectDist(x, z, RWY.x - 300, RWY.x + 470, RWY.z0 - 140, RWY.z1 + 160);
-  const town = rectDist(x, z, -2050, -450, -1850, 350);
-  if (map !== 'strait') {
-    m = Math.min(m, ss(pad, 250, 650));
-    m = Math.min(m, ss(rectDist(x, z, RWY.x - 700, RWY.x + 700, RWY.z0 - 3800, RWY.z1 + 3800), 0, 400));
-    m = Math.min(m, ss(town, 150, 500));
-    for (const b of geo.BRIDGES) {
-      m = Math.min(m, ss(geo.capsule(x, z, b.fromA[0], b.fromA[1], b.a[0], b.a[1]), 380, 700));
-      m = Math.min(m, ss(geo.capsule(x, z, b.fromB[0], b.fromB[1], b.b[0], b.b[1]), 380, 700));
+/* ----------------------------------------------------- PNG decoder + Terrarium */
+function paeth(a, b, c) {
+  const p = a + b - c, pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
+  return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+}
+function decodePng(buf) {
+  let off = 8, w = 0, h = 0, ct = 2, idat = [];
+  while (off < buf.length) {
+    const len = buf.readUInt32BE(off);
+    const type = buf.toString('ascii', off + 4, off + 8);
+    const data = buf.subarray(off + 8, off + 8 + len);
+    if (type === 'IHDR') { w = data.readUInt32BE(0); h = data.readUInt32BE(4); ct = data[9]; }
+    else if (type === 'IDAT') idat.push(data);
+    else if (type === 'IEND') break;
+    off += 12 + len;
+  }
+  const bpp = ct === 6 ? 4 : 3;
+  const raw = zlib.inflateSync(Buffer.concat(idat));
+  const stride = w * bpp, out = new Uint8Array(w * h * bpp);
+  for (let y = 0; y < h; y++) {
+    const f = raw[y * (stride + 1)], src = y * (stride + 1) + 1, dst = y * stride;
+    for (let i = 0; i < stride; i++) {
+      const x = raw[src + i];
+      const a = i >= bpp ? out[dst + i - bpp] : 0;
+      const b = y > 0 ? out[dst - stride + i] : 0;
+      const c = (i >= bpp && y > 0) ? out[dst - stride + i - bpp] : 0;
+      let v = x;
+      if (f === 1) v = (x + a) & 255;
+      else if (f === 2) v = (x + b) & 255;
+      else if (f === 3) v = (x + ((a + b) >> 1)) & 255;
+      else if (f === 4) v = (x + paeth(a, b, c)) & 255;
+      out[dst + i] = v;
     }
+  }
+  return { w, h, bpp, data: out };
+}
+
+const tileCache = new Map();
+async function getTerrariumTile(z, tx, ty) {
+  const n = 1 << z;
+  const wx = ((tx % n) + n) % n;
+  const wy = Math.max(0, Math.min(n - 1, ty));
+  const key = `${z}_${wx}_${wy}`;
+  if (tileCache.has(key)) return tileCache.get(key);
+  fs.mkdirSync(CACHE_DIR, { recursive: true });
+  const fp = path.join(CACHE_DIR, `${key}.png`);
+  let buf;
+  if (fs.existsSync(fp)) {
+    buf = fs.readFileSync(fp);
+  } else {
+    const url = `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${wx}/${wy}.png`;
+    let lastErr;
+    for (let att = 0; att < 4; att++) {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Terrarium ${key}: HTTP ${res.status}`);
+        buf = Buffer.from(await res.arrayBuffer());
+        break;
+      } catch (e) {
+        lastErr = e;
+        await new Promise(r => setTimeout(r, 250 * (att + 1)));
+      }
+    }
+    if (!buf) throw lastErr;
+    fs.writeFileSync(fp, buf);
+  }
+  const pngImg = decodePng(buf);
+  const elev = new Float32Array(pngImg.w * pngImg.h);
+  const d = pngImg.data, bpp = pngImg.bpp;
+  for (let i = 0, k = 0; i < elev.length; i++, k += bpp) {
+    elev[i] = (d[k] * 256 + d[k + 1] + d[k + 2] / 256) - 32768;
+  }
+  const out = { w: pngImg.w, h: pngImg.h, elev };
+  tileCache.set(key, out);
+  return out;
+}
+
+const EARTH_R = 6378137;
+function latLonToMercM(lat, lon) {
+  const x = EARTH_R * lon * Math.PI / 180;
+  const sin = Math.sin(lat * Math.PI / 180);
+  const y = EARTH_R * 0.5 * Math.log((1 + sin) / (1 - sin));
+  return [x, y];
+}
+
+async function buildDemSampler(cfg, zLevel, halfSpanM) {
+  const [mx0, my0] = latLonToMercM(cfg.lat, cfg.lon);
+  const rad = cfg.rotDeg * Math.PI / 180, cs = Math.cos(rad), sn = Math.sin(rad);
+  const mercScale = 1 / Math.cos(cfg.lat * Math.PI / 180);   // Mercator metres per true ground metre
+  const worldSpanMerc = 2 * Math.PI * EARTH_R;
+  const nTiles = 1 << zLevel;
+  const toTileFrac = (wx, wz) => {
+    const dx = wx - CORE.CX, dz = wz - CORE.CZ;
+    const rx = (dx * cs - dz * sn) * mercScale;
+    const rz = (dx * sn + dz * cs) * mercScale;
+    const mx = mx0 + rx, my = my0 - rz;
+    const u = (mx + worldSpanMerc * 0.5) / worldSpanMerc * nTiles;
+    const v = (worldSpanMerc * 0.5 - my) / worldSpanMerc * nTiles;
+    return [u, v];
+  };
+  let minTx = 1e9, maxTx = -1e9, minTy = 1e9, maxTy = -1e9;
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const [u, v] = toTileFrac(CORE.CX + sx * halfSpanM, CORE.CZ + sz * halfSpanM);
+    minTx = Math.min(minTx, Math.floor(u)); maxTx = Math.max(maxTx, Math.floor(u));
+    minTy = Math.min(minTy, Math.floor(v)); maxTy = Math.max(maxTy, Math.floor(v));
+  }
+  const coords = [];
+  for (let ty = minTy; ty <= maxTy; ty++) for (let tx = minTx; tx <= maxTx; tx++) coords.push([tx, ty]);
+  for (let i = 0; i < coords.length; i += 6) {
+    await Promise.all(coords.slice(i, i + 6).map(([tx, ty]) => getTerrariumTile(zLevel, tx, ty)));
+  }
+  return function sampleDem(wx, wz) {
+    const [u, v] = toTileFrac(wx, wz);
+    const tx = Math.floor(u), ty = Math.floor(v);
+    const tile = tileCache.get(`${zLevel}_${((tx % nTiles) + nTiles) % nTiles}_${Math.max(0, Math.min(nTiles - 1, ty))}`);
+    if (!tile) return -120;
+    const fx = (u - tx) * (tile.w - 1), fy = (v - ty) * (tile.h - 1);
+    const ix = Math.max(0, Math.min(tile.w - 2, fx | 0)), iy = Math.max(0, Math.min(tile.h - 2, fy | 0));
+    const sx = fx - ix, sy = fy - iy, i = iy * tile.w + ix;
+    const a = tile.elev[i], b = tile.elev[i + 1], c = tile.elev[i + tile.w], d = tile.elev[i + tile.w + 1];
+    return (a + (b - a) * sx) * (1 - sy) + (c + (d - c) * sx) * sy;
+  };
+}
+
+/* ----------------------------------------------------- gameplay clearance */
+function applyClearance(map, x, z, hDem) {
+  let h = hDem, protect = 1, urban = 0;
+  if (map !== 'strait') {
+    // Runway pad (RWY 18/36 at elev = 10 m) feathered smoothly into coastal terrain
+    const pad = rectDist(x, z, RWY.x - 300, RWY.x + 470, RWY.z0 - 140, RWY.z1 + 160);
+    const kPad = ss(pad, 260, 0);
+    h = h * (1 - kPad) + RWY.elev * kPad;
     if (pad < 1) urban = 1;
-    else if (town < 1) urban = 1;
+    protect = Math.min(protect, ss(pad, 250, 650));
+
+    // Approach funnels (600 m to 5 km north & south of thresholds stay under 3 deg glide path)
+    for (const [zt, dir] of [[RWY.z0, -1], [RWY.z1, 1]]) {
+      const along = (z - zt) * dir;
+      if (along >= 300 && along <= 5600) {
+        const half = 310 + 0.12 * along;
+        const k = ss(Math.abs(x - RWY.x), half + 350, half) * ss(along, 300, 600) * ss(along, 5600, 5050);
+        const ceil = RWY.elev + Math.tan(2.6 * Math.PI / 180) * along - 12;
+        if (k > 0 && h > ceil) h = h * (1 - k) + ceil * k;
+      }
+    }
+    protect = Math.min(protect, ss(rectDist(x, z, RWY.x - 700, RWY.x + 700, RWY.z0 - 3800, RWY.z1 + 3800), 0, 400));
+
+    // Port City flat pad
+    const town = rectDist(x, z, -2050, -450, -1850, 350);
+    const kTown = ss(town, 280, 0);
+    h = h * (1 - kTown) + 14 * kTown;
+    if (town < 1) urban = 1;
+    protect = Math.min(protect, ss(town, 150, 500));
   }
   if (map === 'gorge' && geo.inGorgeBox(x, z)) {
-    const d = gorgeDist(x, z), cr = Math.hypot(x - gorgeCentreX(GORGE_CRATER_Z), z - GORGE_CRATER_Z);
-    m = Math.min(m, ss(d, GORGE_RAMP_W + 260, GORGE_RAMP_W + 900));
-    m = Math.min(m, ss(cr, GORGE_CRATER_R * 1.7, GORGE_CRATER_R * 2.4));
-    if (z < GORGE_SC_ZA + 400 && z > GORGE_SC_ZB - 400) m = Math.min(m, ss(Math.abs(x - GORGE_SC_X), GORGE_SC_RAMP_W + 200, GORGE_SC_RAMP_W + 600));
-    m = Math.min(m, ss(Math.hypot(x - geo.DAM.x, z - geo.DAM.z), 450, 900));
-    // keep the trench bbox edge stable (gorge <-> archipelago seam)
-    const edge = Math.min(Math.abs(x - GORGE_BBOX.x[0]), Math.abs(x - GORGE_BBOX.x[1]), Math.abs(z - GORGE_BBOX.z[0]), Math.abs(z - GORGE_BBOX.z[1]));
-    m = Math.min(m, ss(edge, 0, 300));
+    // Blend CANYON_RUN floor, crater, and shortcut smoothly into the real Norwegian granite massif
+    const crDX = x - gorgeCentreX(GORGE_CRATER_Z), crDZ = z - GORGE_CRATER_Z, cr = Math.hypot(crDX, crDZ);
+    const d = gorgeDist(x, z);
+    const corridor = 1 - ss(d, GORGE_HALF_W, GORGE_RAMP_W);
+    if (corridor > 0.001) {
+      h = h * (1 - corridor) + GORGE_FLOOR_Y * corridor;
+    } else if (h < GORGE_RIM_Y * 0.75) {
+      // Ensure canyon walls rise cleanly into the surrounding massif
+      const wallLift = ss(d, GORGE_HALF_W, GORGE_RAMP_W + 250) * (1 - ss(d, GORGE_RAMP_W + 400, GORGE_RAMP_W + 1400));
+      h = Math.max(h, GORGE_RIM_Y * wallLift);
+    }
+    if (cr < GORGE_CRATER_R * 1.35) {
+      const cut = d < GORGE_HALF_W && z > GORGE_CRATER_Z + GORGE_CRATER_R * 0.4;
+      const bowl = cut ? 20 : (20 + GORGE_CRATER_WALL_Y * Math.exp(-Math.pow((cr - GORGE_CRATER_R * 0.72) / 190, 2)));
+      const ck = ss(cr, GORGE_CRATER_R * 1.35, GORGE_CRATER_R * 0.9);
+      h = h * (1 - ck) + bowl * ck;
+    }
+    if (z < GORGE_SC_ZA + 300 && z > GORGE_SC_ZB - 300) {
+      const dS = Math.abs(x - GORGE_SC_X);
+      const carved = GORGE_SC_FLOOR_Y + (h - GORGE_SC_FLOOR_Y) * ss(dS, GORGE_SC_HALF_W, GORGE_SC_RAMP_W);
+      const fade = ss(z, GORGE_SC_ZB - 300, GORGE_SC_ZB) * ss(z, GORGE_SC_ZA + 300, GORGE_SC_ZA);
+      h += (Math.min(h, carved) - h) * fade;
+    }
+    protect = 0;
   }
-  if (map === 'strait') for (const s of [...geo.STRAIT_SITES.lighthouses, ...geo.STRAIT_SITES.radars]) m = Math.min(m, ss(Math.hypot(x - s[0], z - s[1]), 260, 560));
-  return { m, urban };
+  if (map === 'strait') {
+    const ax = Math.abs(x);
+    if (ax < 5400) {
+      const chK = ss(ax, 5400, 4450);
+      h = h * (1 - chK) + Math.min(h, -45) * chK;
+    }
+    for (const s of [...geo.STRAIT_SITES.lighthouses, ...geo.STRAIT_SITES.radars]) {
+      protect = Math.min(protect, ss(Math.hypot(x - s[0], z - s[1]), 260, 560));
+    }
+  }
+  return { h, protect, urban };
 }
 
-/* ------------------------------------------------------------------ erosion */
-// The strait is ~44 % bare rock wall: weight its 250k droplets toward the broad passes
-// (big carved couloirs, less per-texel speckle) so the pack stays inside 5 MB.
-const EROSION_BY_MAP = {
-  strait: { passes: [{ droplets: 130000, radius: 4 }, { droplets: 95000, radius: 2 }, { droplets: 25000, radius: 1 }], erosionRate: 0.13 }
-};
-function erode(H, mask, seed, mapName) {
-  const p = Object.assign({}, EROSION, EROSION_BY_MAP[mapName] || {}), S = STEP, NN = N * N;
-  const map = new Float32Array(NN);
-  for (let i = 0; i < NN; i++) map[i] = H[i] / S;
-  const flow = new Float32Array(NN), dep = new Float32Array(NN);
-  const rand = mulberry32(seed);
-  const landMin = p.landMin / S;
-  let spawned = 0;
-  for (const pass of p.passes) {
-    const r = pass.radius;
-    const off = [], wt = [];
-    let ws = 0;
-    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
-      const sq = dx * dx + dy * dy; if (r > 1 && sq >= r * r) continue; if (r === 1 && sq > 1) continue;
-      off.push(dx, dy); const w = r === 1 ? (sq === 0 ? 2 : 1) : 1 - Math.sqrt(sq) / r; wt.push(w); ws += w;
-    }
-    const bOff = Int32Array.from(off), bW = Float32Array.from(wt.map(w => w / ws)), bn = bW.length;
-    for (let iter = 0; iter < pass.droplets; iter++) {
-      let posX = 0, posY = 0, ok = false;
-      for (let tries = 0; tries < 8 && !ok; tries++) {
-        posX = 2 + rand() * (N - 5); posY = 2 + rand() * (N - 5);
-        const k = (posY | 0) * N + (posX | 0);
-        ok = map[k] > landMin && mask[k] > 0.02;
-      }
-      if (!ok) continue;
-      spawned++;
-      let dirX = 0, dirY = 0, speed = 1, water = 1, sediment = 0;
-      for (let life = 0; life < p.maxLifetime; life++) {
-        const nodeX = posX | 0, nodeY = posY | 0, ci = nodeY * N + nodeX;
-        const ox = posX - nodeX, oy = posY - nodeY;
-        const hNW = map[ci], hNE = map[ci + 1], hSW = map[ci + N], hSE = map[ci + N + 1];
-        const gx = (hNE - hNW) * (1 - oy) + (hSE - hSW) * oy;
-        const gy = (hSW - hNW) * (1 - ox) + (hSE - hNE) * ox;
-        const h0 = hNW * (1 - ox) * (1 - oy) + hNE * ox * (1 - oy) + hSW * (1 - ox) * oy + hSE * ox * oy;
-        dirX = dirX * p.inertia - gx * (1 - p.inertia);
-        dirY = dirY * p.inertia - gy * (1 - p.inertia);
-        const len = Math.hypot(dirX, dirY);
-        if (len === 0) break;
-        dirX /= len; dirY /= len; posX += dirX; posY += dirY;
-        flow[ci] += water;
-        if (posX < 2 || posX >= N - 3 || posY < 2 || posY >= N - 3) break;
-        const nx = posX | 0, ny = posY | 0, nci = ny * N + nx, fx = posX - nx, fy = posY - ny;
-        const h1 = map[nci] * (1 - fx) * (1 - fy) + map[nci + 1] * fx * (1 - fy) + map[nci + N] * (1 - fx) * fy + map[nci + N + 1] * fx * fy;
-        const dh = h1 - h0;
-        if (h1 < 0) { const d = sediment * 0.5; map[ci] += d; dep[ci] += d; break; }
-        const cap = Math.max(-dh, p.minSlope) * speed * water * p.sedimentCapacity;
-        if (sediment > cap || dh > 0) {
-          const d = dh > 0 ? Math.min(dh, sediment) : (sediment - cap) * p.depositionRate;
-          sediment -= d;
-          map[ci] += d * (1 - ox) * (1 - oy); map[ci + 1] += d * ox * (1 - oy);
-          map[ci + N] += d * (1 - ox) * oy; map[ci + N + 1] += d * ox * oy;
-          dep[ci] += d;
-        } else {
-          const amt = Math.min((cap - sediment) * p.erosionRate, -dh);
-          for (let b = 0; b < bn; b++) {
-            const ex = nodeX + bOff[b * 2], ey = nodeY + bOff[b * 2 + 1];
-            if (ex < 0 || ex >= N || ey < 0 || ey >= N) continue;
-            const ei = ey * N + ex, w = amt * bW[b];
-            const rem = map[ei] - w < 0 ? Math.max(0, map[ei]) : w;
-            map[ei] -= rem; sediment += rem;
-          }
-        }
-        speed = Math.sqrt(Math.max(0, speed * speed - dh * p.gravity));
-        water *= 1 - p.evaporation;
-      }
+/* ------------------------------------------------ light drainage & analysis */
+function traceFlow(H, mask, seed) {
+  const NN = N * N, map = new Float32Array(NN), flow = new Float32Array(NN), dep = new Float32Array(NN);
+  for (let i = 0; i < NN; i++) map[i] = H[i] / STEP;
+  const rand = mulberry32(seed), landMin = 3 / STEP;
+  for (let iter = 0; iter < 50000; iter++) {
+    let posX = 2 + rand() * (N - 5), posY = 2 + rand() * (N - 5);
+    const k0 = (posY | 0) * N + (posX | 0);
+    if (map[k0] <= landMin) continue;
+    let dirX = 0, dirY = 0, water = 1;
+    for (let life = 0; life < 44; life++) {
+      const nx = posX | 0, ny = posY | 0, ci = ny * N + nx;
+      const gx = map[ci + 1] - map[ci], gy = map[ci + N] - map[ci];
+      dirX = dirX * 0.12 - gx * 0.88; dirY = dirY * 0.12 - gy * 0.88;
+      const len = Math.hypot(dirX, dirY); if (len < 1e-5) break;
+      dirX /= len; dirY /= len; posX += dirX; posY += dirY;
+      flow[ci] += water;
+      if (posX < 2 || posX >= N - 3 || posY < 2 || posY >= N - 3) break;
+      const h1 = map[(posY | 0) * N + (posX | 0)];
+      if (h1 < 0) { dep[ci] += 0.4; break; }
+      if (len < 0.08) dep[ci] += 0.15;
+      water *= 0.97;
     }
   }
-  // Thermal talus relaxation.
-  const delta = new Float32Array(NN);
-  for (let it = 0; it < p.thermalIterations; it++) {
-    delta.fill(0);
-    for (let y = 1; y < N - 1; y++) for (let x = 1; x < N - 1; x++) {
-      const i = y * N + x, h = map[i];
-      if (h <= landMin) continue;
-      let md = 0, tg = -1, d;
-      d = h - map[i - 1]; if (d > md) { md = d; tg = i - 1; }
-      d = h - map[i + 1]; if (d > md) { md = d; tg = i + 1; }
-      d = h - map[i - N]; if (d > md) { md = d; tg = i - N; }
-      d = h - map[i + N]; if (d > md) { md = d; tg = i + N; }
-      if (tg >= 0 && md > p.talus) { const mv = (md - p.talus) * 0.5 * p.thermalStrength; delta[i] -= mv; delta[tg] += mv; dep[tg] += mv * 0.5; }
-    }
-    for (let i = 0; i < NN; i++) map[i] += delta[i];
-  }
-  // Masked blend back (clamped), never turning land into sea.
-  let changed = 0, sumAbs = 0, maxAbs = 0;
-  for (let i = 0; i < NN; i++) {
-    const m = mask[i]; if (m <= 0) continue;
-    let dlt = map[i] * S - H[i];
-    if (dlt > p.maxDelta) dlt = p.maxDelta; else if (dlt < -p.maxDelta) dlt = -p.maxDelta;
-    dlt *= m;
-    if (H[i] > 0 && H[i] + dlt < 0.5) dlt = 0.5 - H[i];
-    H[i] += dlt;
-    if (dlt) { changed++; const a = Math.abs(dlt); sumAbs += a; if (a > maxAbs) maxAbs = a; }
-  }
-  return { flow, dep, stats: { droplets: spawned, changed, meanAbs: +(sumAbs / Math.max(1, changed)).toFixed(2), maxAbs: +maxAbs.toFixed(1) } };
+  return { flow, dep, stats: { droplets: 50000, changed: 0, meanAbs: 0, maxAbs: 0 } };
 }
 
-/* ----------------------------------------------------------------- analysis */
+const nForest = createNoise2D(5151);
 function analyse(H, flow, dep, urbanMask) {
   const SN = CORE.SPLAT_N, splat = new Uint8Array(SN * SN * 4);
   let fMax = 1e-6, dMax = 1e-6;
@@ -191,7 +280,6 @@ function analyse(H, flow, dep, urbanMask) {
   for (let sy = 0; sy < SN; sy++) for (let sx = 0; sx < SN; sx++) {
     const x = sx * 2, y = sy * 2, i = y * N + x;
     const h = (at(x, y) + at(x + 1, y) + at(x, y + 1) + at(x + 1, y + 1)) * 0.25;
-    // multi-scale Laplacian cavity (concave < 0.5 < convex)
     const l1 = (at(x - 1, y) + at(x + 1, y) + at(x, y - 1) + at(x, y + 1)) * 0.25 - at(x, y);
     const l4 = (at(x - 4, y) + at(x + 4, y) + at(x, y - 4) + at(x, y + 4)) * 0.25 - at(x, y);
     const l12 = (at(x - 12, y) + at(x + 12, y) + at(x, y - 12) + at(x, y + 12)) * 0.25 - at(x, y);
@@ -200,65 +288,45 @@ function analyse(H, flow, dep, urbanMask) {
     const slope = 1 - 1 / Math.sqrt(1 + gx * gx + gz * gz);
     const f = Math.max(flow[i], flow[i + 1], flow[i + N], flow[i + N + 1]);
     const d = dep[i] + dep[i + 1] + dep[i + N] + dep[i + N + 1];
-    const flowN = Math.log(1 + f) / lf, sedN = Math.min(1, Math.sqrt(d / dMax) * 1.7);
-    // landUse class: 0 water, 32 scrub/grass, 64 farmland, 128 forest, 192 rock/alpine, 255 urban/protected pad
+    const flowN = Math.log(1 + f) / lf, sedN = Math.min(1, Math.sqrt(d / dMax) * 1.5);
     const wx = X0 + x * STEP, wz = Z0 + y * STEP;
     const nz = fbm(nForest, wx * 0.0011, wz * 0.0011, 3);
     let lu;
     if (urbanMask[i]) { lu = 255; counts.urban++; }
     else if (h < 0.6) { lu = 0; counts.water++; }
-    else if (slope > 0.42 || h > 1350 + 120 * nz) { lu = 192; counts.rock++; }
-    else if (h > 4 && h < 190 && slope < 0.07 && flowN < 0.6 && nz < 0.25) { lu = 64; counts.farm++; }
-    else if (h > 15 && h < 880 && slope < 0.34 && nz > -0.35) { lu = 128; counts.forest++; }
+    else if (slope > 0.38 || h > 950 + 120 * nz) { lu = 192; counts.rock++; }
+    else if (h > 4 && h < 160 && slope < 0.08 && flowN < 0.6 && nz < 0.25) { lu = 64; counts.farm++; }
+    else if (h > 12 && h < 720 && slope < 0.34 && nz > -0.35) { lu = 128; counts.forest++; }
     else { lu = 32; counts.scrub++; }
     const k = (sy * SN + sx) * 4;
-    const q6 = v => Math.min(248, Math.round(v * 31) * 8);   // 5-bit shading channels (smooth, compressible)
-    splat[k] = Math.min(240, Math.round(cav * 15) * 16);   // 4-bit cavity AO (16 levels is plenty for AO)
+    const q6 = v => Math.min(248, Math.round(v * 31) * 8);
+    splat[k] = Math.min(240, Math.round(cav * 15) * 16);
     splat[k + 1] = q6(sedN); splat[k + 2] = q6(flowN); splat[k + 3] = lu;
   }
   const tot = SN * SN; for (const c in counts) counts[c] = +(100 * counts[c] / tot).toFixed(1);
   return { splat, landUse: counts };
 }
-const nForest = createNoise2D(5151);
 
 /* ----------------------------------------------------------------- encoding */
-// Precision: full 3.4 cm steps on coasts, the runway / towns and every protected cell;
-// 13.5 cm on open ground above 30 m and 27 cm above 200 m (invisible at 19.5 m spacing,
-// and those low bits are pure noise to the compressor). CPU and GPU decode the same q.
-function encodeHeight(H, mask) {
-  const R = CORE.MAX_H - CORE.MIN_H, q = new Uint16Array(N * N);
-  // Far field (> 12 km from the core centre, only ever seen through haze): ease a 5x5 box
-  // filter in over 12 -> 16 km on free terrain. Gameplay areas keep every gully.
-  {
-    const src = Float32Array.from(H);
-    for (let y = 2; y < N - 2; y++) for (let x = 2; x < N - 2; x++) {
-      const i = y * N + x;
-      const e = Math.max(Math.abs(x * STEP + X0 - CORE.CX), Math.abs(y * STEP + Z0 - CORE.CZ));
-      const w = ss(e, 12000, 16000) * (mask[i] > 0.999 || src[i] < -8 ? 1 : 0);
-      if (w <= 0) continue;
-      let s = 0;
-      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) s += src[i + dy * N + dx];
-      H[i] = src[i] + (s / 25 - src[i]) * w;
-    }
-  }
-  for (let i = 0; i < N * N; i++) {
-    let v = Math.max(0, Math.min(65535, Math.round((H[i] - CORE.MIN_H) / R * 65535)));
-    const free = mask[i] > 0.999 || H[i] < -8;
-    if (free && H[i] > 750) v = Math.min(65504, Math.round(v / 32) * 32);   // 1.08 m on high walls / peaks
-    else if (free && H[i] > 600) v = Math.min(65520, Math.round(v / 16) * 16);   // 54 cm on high rock (crag +/-2.5 m dominates)
+function encodeGrid(H, dim, mask, minH, maxH) {
+  const R = maxH - minH, NN = dim * dim, q = new Uint16Array(NN);
+  for (let i = 0; i < NN; i++) {
+    let v = Math.max(0, Math.min(65535, Math.round((H[i] - minH) / R * 65535)));
+    const free = !mask || mask[i] > 0.999 || H[i] < -8;
+    if (free && H[i] > 750) v = Math.min(65504, Math.round(v / 32) * 32);
+    else if (free && H[i] > 600) v = Math.min(65520, Math.round(v / 16) * 16);
     else if (free && (H[i] > 200 || H[i] < -40)) v = Math.min(65528, Math.round(v / 8) * 8);
     else if (free && H[i] > 30) v = Math.min(65532, Math.round(v / 4) * 4);
     q[i] = v;
-    H[i] = CORE.MIN_H + v / 65535 * R;                     // H now equals exactly what ships
+    H[i] = minH + v / 65535 * R;
   }
-  // 2-D gradient predictor (left + up - up-left, mod 2^16), residual split into byte planes.
-  const hi = new Uint8Array(N * N), lo = new Uint8Array(N * N);
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const i = y * N + x;
-    const l = x > 0 ? q[i - 1] : (y > 0 ? q[i - N] : 0), u = y > 0 ? q[i - N] : l, ul = x > 0 && y > 0 ? q[i - N - 1] : u;
-    let r = (q[i] - (l + u - ul)) & 0xffff;               // residual mod 2^16 ...
-    if (r >= 32768) r -= 65536;                            // ... as a signed value
-    const dv = ((r << 1) ^ (r >> 31)) & 0xffff;            // zigzag: small |r| -> small code, hi plane ~0
+  const hi = new Uint8Array(NN), lo = new Uint8Array(NN);
+  for (let y = 0; y < dim; y++) for (let x = 0; x < dim; x++) {
+    const i = y * dim + x;
+    const l = x > 0 ? q[i - 1] : (y > 0 ? q[i - dim] : 0), u = y > 0 ? q[i - dim] : l, ul = x > 0 && y > 0 ? q[i - dim - 1] : u;
+    let r = (q[i] - (l + u - ul)) & 0xffff;
+    if (r >= 32768) r -= 65536;
+    const dv = ((r << 1) ^ (r >> 31)) & 0xffff;
     hi[i] = dv >> 8; lo[i] = dv & 255;
   }
   const raw = Buffer.concat([Buffer.from(hi.buffer), Buffer.from(lo.buffer)]);
@@ -272,11 +340,11 @@ function png(w, h, rgb) {
   const chunk = (type, data) => { const len = Buffer.alloc(4); len.writeUInt32BE(data.length); const td = Buffer.concat([Buffer.from(type), data]); const c = Buffer.alloc(4); c.writeUInt32BE(crc32(td)); return Buffer.concat([len, td, c]); };
   const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 2; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
   const rows = Buffer.alloc((w * 3 + 1) * h);
-  for (let y = 0; y < h; y++) { rows[y * (w * 3 + 1)] = 0; rgb.copy ? rgb.copy(rows, y * (w * 3 + 1) + 1, y * w * 3, (y + 1) * w * 3) : rows.set(rgb.subarray(y * w * 3, (y + 1) * w * 3), y * (w * 3 + 1) + 1); }
+  for (let y = 0; y < h; y++) { rows[y * (w * 3 + 1)] = 0; rows.set(rgb.subarray(y * w * 3, (y + 1) * w * 3), y * (w * 3 + 1) + 1); }
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(rows)), chunk('IEND', Buffer.alloc(0))]);
 }
 function previews(map, H, splat) {
-  const P = 1024, s = N / P, hs = new Uint8Array(P * P * 3), bio = new Uint8Array(P * P * 3);
+  const P = 1024, s = N / P, hs = new Uint8Array(P * P * 3);
   const at = (x, y) => H[Math.min(N - 1, Math.max(0, y)) * N + Math.min(N - 1, Math.max(0, x))];
   const L = [-0.55, 0.62, -0.56];
   for (let py = 0; py < P; py++) for (let px = 0; px < P; px++) {
@@ -292,79 +360,95 @@ function previews(map, H, splat) {
     else c = [235, 240, 245];
     const k = (py * P + px) * 3, sh = h < 0 ? 1 : 0.35 + 0.9 * nl;
     for (let ch = 0; ch < 3; ch++) hs[k + ch] = Math.max(0, Math.min(255, c[ch] * sh));
-    const sk = ((py >> 0) * CORE.SPLAT_N + (px >> 0)) * 4, lu = splat[sk + 3];
-    const lc = lu === 0 ? [40, 80, 140] : lu === 64 ? [200, 180, 90] : lu === 128 ? [30, 100, 40] : lu === 192 ? [140, 140, 140] : lu === 255 ? [230, 40, 40] : [120, 160, 90];
-    const fl = splat[sk + 2] / 255;
-    for (let ch = 0; ch < 3; ch++) bio[k + ch] = Math.max(0, Math.min(255, lc[ch] * (0.55 + 0.45 * nl) * (1 - 0.5 * fl) + (ch === 2 ? 120 * fl * fl : 0)));
-  }
-  // Runway rectangle outline on the hillshade (clearance check at a glance).
-  const toP = (wx, wz) => [Math.round((wx - X0) / CORE.SIZE * P), Math.round((wz - Z0) / CORE.SIZE * P)];
-  if (map !== 'strait') {
-    const [ax, az] = toP(RWY.x - 25, RWY.z0), [bx, bz] = toP(RWY.x + 25, RWY.z1);
-    for (let y = az; y <= bz; y++) for (let x = ax; x <= bx; x++) { const k = (y * P + x) * 3; hs[k] = 255; hs[k + 1] = 0; hs[k + 2] = 255; }
   }
   fs.mkdirSync(PREVIEW_DIR, { recursive: true });
-  fs.writeFileSync(path.join(PREVIEW_DIR, `preview_${map}.png`), png(P, P, Buffer.from(hs.buffer)));
-  fs.writeFileSync(path.join(PREVIEW_DIR, `biome_${map}.png`), png(P, P, Buffer.from(bio.buffer)));
+  fs.writeFileSync(path.join(PREVIEW_DIR, `dem_preview_${map}.png`), png(P, P, Buffer.from(hs.buffer)));
 }
 
 /* ---------------------------------------------------------------------- bake */
-function bake(map) {
-  const t0 = Date.now(), fn = geo.heightFns[map], mapId = MAP_IDS[map], NN = N * N;
+async function bake(map) {
+  const t0 = Date.now(), cfg = DEM_THEATRES[map], mapId = MAP_IDS[map], NN = N * N;
+  const [sampleCore, sampleHz] = await Promise.all([
+    buildDemSampler(cfg, cfg.coreZ, CORE.SIZE * 0.52),
+    buildDemSampler(cfg, cfg.hzZ, HSIZE * 0.52)
+  ]);
+
+  // 1. Sample 160x160 km outer DEM horizon (512^2)
+  const HZ = new Float32Array(HN * HN);
+  for (let j = 0; j < HN; j++) for (let i = 0; i < HN; i++) {
+    const x = HX0 + i * HSTEP, z = HZ0 + j * HSTEP;
+    let h = sampleHz(x, z);
+    if (h <= 0.4) h = -85 - 55 * (fbm(nForest, x * 0.00015, z * 0.00015, 2) * 0.5 + 0.5);
+    if (map === 'strait' && Math.abs(x) < 5200) {
+      const chK = ss(Math.abs(x), 5200, 4450);
+      h = h * (1 - chK) + Math.min(h, -65) * chK;
+    }
+    HZ[j * HN + i] = h;
+  }
+  const { q: hzQ, gz: hzGz } = encodeGrid(HZ, HN, null, CORE.MIN_H, CORE.MAX_H);
+  const hzBilin = (wx, wz) => {
+    const fx = Math.max(0, Math.min(HN - 1.001, (wx - HX0) / HSTEP));
+    const fz = Math.max(0, Math.min(HN - 1.001, (wz - HZ0) / HSTEP));
+    const ix = fx | 0, iz = fz | 0, tx = fx - ix, tz = fz - iz, i = iz * HN + ix;
+    return (HZ[i] * (1 - tx) + HZ[i + 1] * tx) * (1 - tz) + (HZ[i + HN] * (1 - tx) + HZ[i + HN + 1] * tx) * tz;
+  };
+
+  // 2. Sample 40x40 km core DEM (2048^2) + feathered clearances + horizon apron blend
   const H = new Float32Array(NN), mask = new Float32Array(NN), urban = new Uint8Array(NN);
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
     const x = X0 + i * STEP, z = Z0 + j * STEP, k = j * N + i;
     const edge = Math.max(Math.abs(x - CORE.CX), Math.abs(z - CORE.CZ));
     const ak = ss(edge, CORE.APRON0, CORE.APRON1);
-    const a = ak < 1 ? fn(x, z) : 0;
-    H[k] = a * (1 - ak) + horizonHeight(x, z, mapId) * ak;
-    const pr = protectAt(map, x, z);
-    mask[k] = pr.m * ss(H[k], 0.8, 7) * (1 - ss(edge, CORE.APRON0 - 1500, CORE.APRON0));
-    urban[k] = pr.urban;
+    let hRaw = sampleCore(x, z);
+    if (hRaw <= 0.4) hRaw = -32 - 85 * (fbm(nForest, x * 0.00035, z * 0.00035, 2) * 0.5 + 0.5);
+    const cl = applyClearance(map, x, z, hRaw);
+    H[k] = cl.h * (1 - ak) + hzBilin(x, z) * ak;
+    mask[k] = cl.protect * (1 - ak);
+    urban[k] = cl.urban;
   }
   const tSample = Date.now();
-  const ero = erode(H, mask, 0x5eed + mapId * 977, map);
+  const ero = traceFlow(H, mask, 0x5eed + mapId * 977);
   const tErode = Date.now();
-  const { q, gz } = encodeHeight(H, mask);                 // quantises H in place first
+  const { q, gz } = encodeGrid(H, N, mask, CORE.MIN_H, CORE.MAX_H);
   const { splat, landUse } = analyse(H, ero.flow, ero.dep, urban);
-  // Planar R,G,B,A (each channel's smooth runs stay contiguous for the compressor).
   const SN2 = CORE.SPLAT_N * CORE.SPLAT_N, planar = new Uint8Array(SN2 * 4);
   for (let i = 0; i < SN2; i++) for (let c = 0; c < 4; c++) planar[c * SN2 + i] = splat[i * 4 + c];
   const splatGz = zlib.gzipSync(Buffer.from(planar.buffer), { level: 9 });
+
   let minH = 1e9, maxH = -1e9, land = 0;
   for (let i = 0; i < NN; i++) { if (H[i] < minH) minH = H[i]; if (H[i] > maxH) maxH = H[i]; if (H[i] > 0) land++; }
   const dir = path.join(OUT_DIR, map);
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'height16.bin'), gz);
+  fs.writeFileSync(path.join(dir, 'horizon16.bin'), hzGz);
   fs.writeFileSync(path.join(dir, 'splat.bin'), splatGz);
   const sha = b => crypto.createHash('sha1').update(b).digest('hex').slice(0, 16);
   const meta = {
-    version: 2, map, mapId,
+    version: 3, map, mapId, dem: cfg,
     core: { size: CORE.SIZE, cx: CORE.CX, cz: CORE.CZ, n: N, step: STEP, minH: CORE.MIN_H, maxH: CORE.MAX_H, splatN: CORE.SPLAT_N, apron: [CORE.APRON0, CORE.APRON1] },
+    horizon: { size: HSIZE, cx: CORE.CX, cz: CORE.CZ, n: HN, step: HSTEP, minH: CORE.MIN_H, maxH: CORE.MAX_H },
     encoding: { height: 'gzip(zigzag(signed gradient residual q - (left+up-upleft)) uint16 -> hi plane, lo plane)', splat: 'gzip(planar uint8: cavity plane, sediment plane, flow plane, landUse plane) -> RGBA8 1024^2', landUse: { water: 0, scrub: 32, farm: 64, forest: 128, rock: 192, urban: 255 } },
     rwy: map === 'strait' ? null : RWY,
     bridges: map === 'strait' ? [] : geo.BRIDGES,
     dam: map === 'gorge' ? geo.DAM : null,
     straitSites: map === 'strait' ? geo.STRAIT_SITES : null,
-    checksums: { height16: sha(Buffer.from(q.buffer)), splat: sha(Buffer.from(splat.buffer)) },
+    checksums: { height16: sha(Buffer.from(q.buffer)), horizon16: sha(Buffer.from(hzQ.buffer)), splat: sha(Buffer.from(splat.buffer)) },
     stats: {
       minH: +minH.toFixed(1), maxH: +maxH.toFixed(1), landPct: +(100 * land / NN).toFixed(1), landUse,
       erosion: ero.stats, bakeMs: { sample: tSample - t0, erode: tErode - tSample, total: Date.now() - t0 },
-      bytes: { height16: gz.length, splat: splatGz.length, total: gz.length + splatGz.length }
+      bytes: { height16: gz.length, horizon16: hzGz.length, splat: splatGz.length, total: gz.length + hzGz.length + splatGz.length }
     }
   };
   fs.writeFileSync(path.join(dir, 'meta.json'), JSON.stringify(meta, null, 1));
   previews(map, H, splat);
-  console.log(`[bake] ${map}: h ${meta.stats.minH}..${meta.stats.maxH} m, land ${meta.stats.landPct}%, erosion ${JSON.stringify(ero.stats)}, ` +
-    `${(meta.stats.bytes.total / 1048576).toFixed(2)} MB (height ${(gz.length / 1048576).toFixed(2)} + splat ${(splatGz.length / 1048576).toFixed(2)}), ` +
-    `${meta.stats.bakeMs.total} ms, sha ${meta.checksums.height16}/${meta.checksums.splat}`);
-  console.log(`[bake] ${map}: landUse ${JSON.stringify(landUse)}`);
+  console.log(`[bake v3] ${map} (${cfg.name}): h ${meta.stats.minH}..${meta.stats.maxH} m, land ${meta.stats.landPct}%, ` +
+    `${(meta.stats.bytes.total / 1048576).toFixed(2)} MB (core ${(gz.length / 1048576).toFixed(2)} + hz ${(hzGz.length / 1048576).toFixed(2)} + splat ${(splatGz.length / 1048576).toFixed(2)}), ${meta.stats.bakeMs.total} ms`);
   return meta;
 }
 
 const list = which === 'all' ? ['archipelago', 'gorge', 'strait'] : [which];
 for (const m of list) {
-  if (!geo.heightFns[m]) { console.error('[bake] unknown map ' + m); process.exit(1); }
-  bake(m);
+  if (!DEM_THEATRES[m]) { console.error('[bake] unknown map ' + m); process.exit(1); }
+  await bake(m);
 }
 console.log('[bake] previews in ' + PREVIEW_DIR);

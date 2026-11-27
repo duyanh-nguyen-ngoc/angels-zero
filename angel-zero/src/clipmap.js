@@ -14,14 +14,15 @@
 // the exact twin of terrainpack.js createSampler().heightAt (CPU).
 // 8 draw calls; ~200k visible triangles; zero allocations in update().
 
-import { CRAG_AMP } from './geography.js?v=s10ter6';
-import { CRAG_FADE } from './terrainpack.js?v=s10ter6';
+import { CRAG_AMP } from './geography.js?v=s10ter7';
+import { CRAG_FADE } from './terrainpack.js?v=s10ter7';
 
 export const CM_LEVELS = 8, CM_M = 128, CM_SPACING0 = 8;
 
 // GLSL twins of geography.js horizonHeight / cragNoise and terrainpack.js heightAt.
 export const TERRAIN_HEIGHT_GLSL = `
   uniform sampler2D uHeight; uniform sampler2D uNormalTex; uniform sampler2D uSplat;
+  uniform sampler2D uHorizon; uniform vec4 uHCore;
   uniform vec4 uCore;                 // x0, z0, step, n
   uniform vec2 uHRange;               // minH, metres per uint16 step
   uniform float uMapId;               // 0 archipelago, 1 gorge, 2 strait
@@ -50,9 +51,24 @@ export const TERRAIN_HEIGHT_GLSL = `
     float inland = uMapId > 1.5 ? abs(p.x) - 5600.0 : hzSmax(-12900.0 - p.y, p.x - 11900.0, 1500.0);
     return alpineProfile(inland, r) + horizonDetail(p, inland);
   }
-  float cragNoise(vec2 p) { return sin(p.x * 0.173 + sin(p.y * 0.061) * 2.3) * sin(p.y * 0.157 + sin(p.x * 0.047) * 1.9); }
+  float cragNoise(vec2 p) {
+    float r1 = 1.0 - abs(sin(p.x * 0.145 + p.y * 0.085) * sin(p.y * 0.145 - p.x * 0.085));
+    float r2 = 1.0 - abs(sin(p.x * 0.27 - p.y * 0.19) * sin(p.y * 0.27 + p.x * 0.19));
+    return (r1 * r1 * 0.65 + r2 * r2 * 0.35) * 2.0 - 1.0;
+  }
   float decodeQ(ivec2 t) { vec2 rg = texelFetch(uHeight, t, 0).rg; return floor(rg.r * 255.0 + 0.5) * 256.0 + floor(rg.g * 255.0 + 0.5); }
+  float decodeHzQ(ivec2 t) { vec2 rg = texelFetch(uHorizon, t, 0).rg; return floor(rg.r * 255.0 + 0.5) * 256.0 + floor(rg.g * 255.0 + 0.5); }
   bool inCoreF(vec2 f) { return f.x >= 0.0 && f.y >= 0.0 && f.x <= uCore.w - 1.0 && f.y <= uCore.w - 1.0; }
+  float horizonSample(vec2 p) {
+    if (uHCore.w < 2.0) return horizonHeight(p);
+    vec2 f = (p - uHCore.xy) / uHCore.z;
+    if (f.x < 0.0 || f.y < 0.0 || f.x > uHCore.w - 1.0 || f.y > uHCore.w - 1.0) return horizonHeight(p);
+    vec2 i0 = floor(f), t = f - i0;
+    int nm = int(uHCore.w) - 1;
+    ivec2 a = clamp(ivec2(i0), ivec2(0), ivec2(nm)), b = clamp(ivec2(i0) + 1, ivec2(0), ivec2(nm));
+    float q00 = decodeHzQ(a), q10 = decodeHzQ(ivec2(b.x, a.y)), q01 = decodeHzQ(ivec2(a.x, b.y)), q11 = decodeHzQ(b);
+    return uHRange.x + ((q00 + (q10 - q00) * t.x) * (1.0 - t.y) + (q01 + (q11 - q01) * t.x) * t.y) * uHRange.y;
+  }
   float coreBaseHeight(vec2 f) {
     vec2 i0 = floor(f), t = f - i0;
     int nm = int(uCore.w) - 1;
@@ -69,7 +85,7 @@ export const TERRAIN_HEIGHT_GLSL = `
   float terrainHeight(vec2 p) {
     vec2 f = (p - uCore.xy) / uCore.z;
     float h = 0.0;
-    if (!inCoreF(f)) { h = horizonHeight(p); }
+    if (!inCoreF(f)) { h = horizonSample(p); }
     else {
     h = coreBaseHeight(f);
     float fade = 1.0 - hzSS(length(p - uViewer.xz), ${CRAG_FADE[0].toFixed(1)}, ${CRAG_FADE[1].toFixed(1)});
@@ -98,8 +114,8 @@ export const CM_VERTEX_BODY = `
   float cmH = terrainHeight(cmXZ);
   // Horizon normal (only used outside the baked core; inside, the fragment stage reads uNormalTex).
   float cmE = max(uSpacing, 60.0);
-  vHN = normalize(vec3(horizonHeight(cmXZ - vec2(cmE, 0.0)) - horizonHeight(cmXZ + vec2(cmE, 0.0)), 2.0 * cmE,
-                       horizonHeight(cmXZ - vec2(0.0, cmE)) - horizonHeight(cmXZ + vec2(0.0, cmE))));
+  vHN = normalize(vec3(horizonSample(cmXZ - vec2(cmE, 0.0)) - horizonSample(cmXZ + vec2(cmE, 0.0)), 2.0 * cmE,
+                       horizonSample(cmXZ - vec2(0.0, cmE)) - horizonSample(cmXZ + vec2(0.0, cmE))));
   vec3 cmPos = cmCovered ? vec3(0.0, -99999.0, 0.0) : vec3(cmXZ.x, cmH, cmXZ.y);
   vWPos = cmPos;
   vec3 objectNormal = vec3(0.0, 1.0, 0.0);`;

@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.2.9', title: 'TERRAIN V3 — REAL-WORLD NORDIC & ALPINE DEM LANDFORMS', bullets: [
+    'Replaced procedural oval islands and straight mainland walls with true 1.0x real-world Earth elevation stitched offline from open AWS Terrarium DEM tiles: Lofoten Islands & Vestfjorden (Archipelago), Lysefjord & Aurlandsfjord (Gorge), and Alaska Kenai Fjords (Strait).',
+    'Added a 160 x 160 km real-world outer DEM horizon ring (horizon16.bin) so surrounding Norway and Alaska mountain ranges continue seamlessly to the 131 km clipmap horizon.',
+    'Added heightmap raymarched mountain self-shadows so spires and fjord walls cast long shadows across valleys and water, plus dual-ridged close-range rock relief.'
+  ] },
   { version: 'v1.2.8', title: 'CONTROLLER FIX & GAMEPAD KEYBIND CHEAT-SHEET', bullets: [
     'Fixed desktop Xbox / PlayStation / Pro controller flight controls: A/Cross now fires guns cleanly, RT/LT triggers drive throttle, afterburner, airbrake and LT+RT post-stall (PSM), LB/RB control rudder yaw (LB+RB = barrel roll) and D-Pad maps NVG, Gear, Wingmen and ECM.',
     'Added full controller menu, pause and debrief navigation (D-Pad/Stick + A confirm / B back).',
