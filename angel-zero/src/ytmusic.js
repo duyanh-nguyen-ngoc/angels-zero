@@ -5,12 +5,17 @@
 // site keeps working without throwing.
 
 const STORE_KEY = 'angelsZero_ytPlaylist';
-const DEFAULT_LIST = 'PLbpi6ZahtOH6BlwVjVwlksnJk_HtpcezE';   // curated fighter-jet / Ace Combat OST
+const DEFAULT_LIST = 'PLRBp0Fe2GpgnIh0AiYKh7o7HnYAej-5ph';   // NCS Copyright-Free Music
 const PRESETS = [
-  { label: 'ACE COMBAT OST', id: DEFAULT_LIST },
-  { label: 'JET OST MIX', id: 'PLBmJl4Wgkfd9Hq2XGF8Y8bqf4vVnX8jPl' },
-  { label: 'SHOOTER SOUNDTRACK', id: 'PL0s8V4XQd8lH4YtQZb1J8p3dKq6nFg2Rt' }
+  { label: 'NCS FLIGHT MIX', id: DEFAULT_LIST },
+  { label: 'SYNTHWAVE RADIO', id: '4xDzrJKXOOY' },
+  { label: 'NCS HOUSE MIX', id: 'PLRBp0Fe2GpgmsW46rJyudVFlY6IYjFBIK' }
 ];
+const LEGACY_DEAD_IDS = new Set([
+  'PLbpi6ZahtOH6BlwVjVwlksnJk_HtpcezE',
+  'PLBmJl4Wgkfd9Hq2XGF8Y8bqf4vVnX8jPl',
+  'PL0s8V4XQd8lH4YtQZb1J8p3dKq6nFg2Rt'
+]);
 const MAX_ERRORS = 3;
 
 export function createYouTubeMusic(opts = {}) {
@@ -18,23 +23,42 @@ export function createYouTubeMusic(opts = {}) {
   const info = { ready: false, playing: false, title: '—', artist: '', status: 'OFF',
     playlist: '', video: '', auto: true, shuffle: false, volume: 100, ducked: false, errors: 0 };
   let player = null, apiLoading = false, changeCb = null, wantsPlay = false,
-    duckTimer = null, errorStreak = 0, volume = 100;
-  const listeners = [];
+    duckTimer = null, errorStreak = 0, volume = 100, pending = null, currentSource = null;
 
   // ---------------------------------------------------------------- URL parsing
   function parse(str) {
     if (!str || typeof str !== 'string') return null;
     const s = str.trim();
-    let m = s.match(/[?&]list=([\w-]+)/);
-    if (m) return { kind: 'playlist', id: m[1] };
-    m = s.match(/(?:youtu\.be\/|youtube\.com\/shorts\/|v=)([\w-]{11})/);
-    if (m) return { kind: 'video', id: m[1] };
-    m = s.match(/^https?:\/\/[\w.-]*music\.youtube\.com\/watch\?[\s\S]*v=([\w-]{11})/);
-    if (m) return { kind: 'video', id: m[1] };
-    m = s.match(/^(PL[\w-]{10,}|OLAK5uy_[\w-]+|RDCLAK5uy_[\w-]+)$/);
-    if (m) return { kind: 'playlist', id: m[1] };
+    if (!s) return null;
+    const listMatch = s.match(/[?&]list=([\w-]+)/);
+    const videoMatch = s.match(/(?:youtu\.be\/|youtube\.com\/(?:shorts|live|embed)\/|[?&]v=)([\w-]{11})/);
+    if (listMatch) {
+      const listId = listMatch[1];
+      const videoId = videoMatch ? videoMatch[1] : '';
+      if (/^RD(?!CLAK5uy_)/.test(listId) && videoId) {
+        return { kind: 'video', id: videoId, fallbackList: listId };
+      }
+      return { kind: 'playlist', id: listId, fallbackVideo: videoId };
+    }
+    if (videoMatch) return { kind: 'video', id: videoMatch[1] };
+    if (/^(PL[\w-]{10,}|OLAK5uy_[\w-]+|RDCLAK5uy_[\w-]+|UU[\w-]{10,}|LL[\w-]*)$/.test(s)) {
+      return { kind: 'playlist', id: s };
+    }
     if (/^[\w-]{11}$/.test(s)) return { kind: 'video', id: s };
     return null;
+  }
+
+  function applySource(p) {
+    if (!p || !player || !info.ready) return;
+    currentSource = p;
+    try {
+      if (p.kind === 'playlist') {
+        player.loadPlaylist({ listType: 'playlist', list: p.id, index: 0 });
+      } else {
+        player.loadVideoById(p.id);
+      }
+      if (wantsPlay) player.playVideo();
+    } catch (e) { info.status = 'YT ERROR'; emit(); }
   }
 
   // ---------------------------------------------------------------- API loading
@@ -44,16 +68,26 @@ export function createYouTubeMusic(opts = {}) {
     host.id = 'azYtPlayer';
     host.style.cssText = 'position:fixed;left:-2px;top:-2px;width:2px;height:2px;opacity:0.001;pointer-events:none;z-index:-1;';
     document.body.appendChild(host);
+    const playerVars = { playsinline: 1, controls: 0, modestbranding: 1, rel: 0 };
+    if (location.protocol === 'http:' || location.protocol === 'https:') {
+      playerVars.origin = location.origin;
+    }
     player = new window.YT.Player(host, {
       width: '2', height: '2',
-      playerVars: { playsinline: 1, controls: 0, modestbranding: 1, rel: 0, origin: location.origin },
+      playerVars,
       events: {
         onReady: () => {
           info.ready = true; info.status = info.playing ? 'YT PLAY' : 'YT READY';
           try { player.setShuffle(info.shuffle ? true : false); } catch (e) { /* ignore */ }
           applyVolume();
+          if (pending) {
+            const p = pending;
+            pending = null;
+            applySource(p);
+          } else if (wantsPlay) {
+            play();
+          }
           emit();
-          if (wantsPlay) play();
         },
         onStateChange: e => {
           const YTS = window.YT.PlayerState;
@@ -69,6 +103,16 @@ export function createYouTubeMusic(opts = {}) {
           emit();
         },
         onError: e => {
+          if (currentSource && currentSource.kind === 'playlist' && currentSource.fallbackVideo) {
+            const fallback = { kind: 'video', id: currentSource.fallbackVideo };
+            currentSource.fallbackVideo = '';
+            errorStreak = 0;
+            info.playlist = '';
+            info.video = fallback.id;
+            applySource(fallback);
+            emit();
+            return;
+          }
           info.errors++; errorStreak++;
           if (errorStreak >= MAX_ERRORS) {
             info.status = 'YT ERROR'; info.playing = false;
@@ -84,7 +128,9 @@ export function createYouTubeMusic(opts = {}) {
     });
   }
   function loadApi() {
-    if (noBgm || apiLoading || player || window.YT) { if (window.YT) apiReady(); return; }
+    if (noBgm || player) return;
+    if (window.YT && window.YT.Player) { apiReady(); return; }
+    if (apiLoading) return;
     apiLoading = true;
     const tag = document.createElement('script');
     tag.src = 'https://www.youtube.com/iframe_api';
@@ -137,22 +183,24 @@ export function createYouTubeMusic(opts = {}) {
     info.playlist = p.kind === 'playlist' ? p.id : '';
     info.video = p.kind === 'video' ? p.id : '';
     info.title = p.kind === 'video' ? 'YouTube track ' + p.id : 'YouTube playlist';
-    info.errors = 0; errorStreak = 0;
+    info.errors = 0; errorStreak = 0; wantsPlay = true;
     try { localStorage.setItem(STORE_KEY, str.trim()); } catch (e) { /* ignore */ }
     loadApi();
-    if (!player) { info.status = 'YT LOADING'; emit(); return true; }
-    try {
-      if (p.kind === 'playlist') player.loadPlaylist({ list: p.id, index: 0 });
-      else player.loadVideoById(p.id);
-      player.playVideo();
-    } catch (e) { info.status = 'YT ERROR'; emit(); }
+    if (!player || !info.ready) {
+      pending = p;
+      info.status = 'YT LOADING';
+      emit();
+      return true;
+    }
+    applySource(p);
+    emit();
     return true;
   }
   function resetDefault() { loadInput(DEFAULT_LIST); }
   function restore() {
     let saved = '';
     try { saved = localStorage.getItem(STORE_KEY) || ''; } catch (e) { /* ignore */ }
-    if (saved) loadInput(saved);
+    if (saved && !LEGACY_DEAD_IDS.has(saved.trim())) loadInput(saved);
     else resetDefault();
   }
   function setAuto(on) { info.auto = !!on; if (!info.auto) setShuffle(false); emit(); }

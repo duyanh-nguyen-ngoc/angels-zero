@@ -340,7 +340,7 @@
   #hBadge:hover { background:linear-gradient(180deg, rgba(200,255,228,.2), rgba(120,255,190,.08)); border-color:rgba(130,255,190,.55); }
 
   /* Now-playing DOM overlay: the canvas HUD cannot receive clicks. */
-  #bgmWidget { --bgmTop:50px; position:fixed; top:var(--bgmTop); right:12px; z-index:30; padding:5px 8px;
+  #bgmWidget { --bgmTop:50px; position:fixed; top:var(--bgmTop); right:12px; z-index:60; padding:5px 8px;
     font:12px 'Share Tech Mono',monospace; color:#00ff66; background:rgba(0,0,0,.35); border:1px solid #00ff66;
     pointer-events:auto; user-select:none; white-space:nowrap; }
   #bgmWidget.dim { opacity:.5; }
@@ -350,16 +350,16 @@
     padding:0 5px; margin-left:3px; cursor:pointer; }
   #bgmWidget button:hover { background:rgba(0,255,102,.15); }
   #bgmWidget button.on { background:rgba(0,255,102,.25); }
-  #bgmPicker { --bgmTop:50px; position:fixed; top:calc(var(--bgmTop) + 58px); right:12px; z-index:31; display:none;
-    width:340px; max-height:60vh; overflow:auto; padding:8px 10px; background:rgba(0,0,0,.82); border:1px solid #00ff66;
+  #bgmPicker { --bgmTop:50px; position:fixed; top:calc(var(--bgmTop) + 58px); right:12px; z-index:61; display:none;
+    width:370px; max-height:60vh; overflow:auto; padding:8px 10px; background:rgba(0,0,0,.82); border:1px solid #00ff66;
     color:#00ff66; font:11px 'Share Tech Mono',monospace; pointer-events:auto; }
   #bgmPicker.open { display:block; }
   #bgmPicker ul { list-style:none; margin:6px 0 0; padding:0; }
   #bgmPicker li { padding:2px 4px; cursor:pointer; }
   #bgmPicker li:hover { background:rgba(0,255,102,.16); }
   #bgmPicker li.h { color:#ffb000; cursor:default; font-weight:bold; margin-top:5px; }
-  #bgmPicker input { width:232px; font:11px 'Share Tech Mono',monospace; color:#00ff66; background:rgba(0,20,10,.7);
-    border:1px solid rgba(0,255,102,.5); padding:3px 5px; outline:none; }
+  #bgmPicker input { width:222px; font:11px 'Share Tech Mono',monospace; color:#00ff66; background:rgba(0,20,10,.7);
+    border:1px solid rgba(0,255,102,.5); padding:3px 5px; outline:none; user-select:text; -webkit-user-select:text; }
   #bgmPicker input:focus { border-color:#00ff66; }
   #bgmPicker button { font:11px 'Share Tech Mono',monospace; color:#00ff66; background:transparent;
     border:1px solid rgba(0,255,102,.5); padding:3px 6px; margin-left:4px; cursor:pointer; }
@@ -734,6 +734,7 @@
   </div>
   <div id="bgmPicker">
     <input id="bgmUrl" type="text" placeholder="Paste YouTube / YT Music playlist or video URL..." autocomplete="off" spellcheck="false" />
+    <button id="bgmPaste" type="button" title="Paste URL from clipboard">PASTE</button>
     <button id="bgmLoad" type="button">LOAD</button>
     <div id="bgmPresets"></div>
     <button id="bgmReset" type="button">RESET DEFAULT</button>
@@ -816,7 +817,7 @@ import { createCockpitF22 } from './src/cockpit_f22.js?v=s9ex';
 import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9ex';
 import { createEjection } from './src/eject.js?v=s9ex';
 import { createAudio } from './src/audio.js?v=s9ex';
-import { createYouTubeMusic } from './src/ytmusic.js?v=s9ex';
+import { createYouTubeMusic } from './src/ytmusic.js?v=s10fly4';
 import { createRadio } from './src/radio.js?v=s9ex';
 import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9ex';
 import { createLivery } from './src/livery.js?v=s9ex';
@@ -3224,7 +3225,7 @@ addEventListener('mouseup', e => {
   if (e.button === 0) keys.fire = false; if (e.button === 2) combatSys.pickleUp();
 });
 addEventListener('auxclick', e => { if (e.button === 1) e.preventDefault(); });
-addEventListener('contextmenu', e => e.preventDefault());
+addEventListener('contextmenu', e => { if (!['INPUT', 'TEXTAREA'].includes(e.target?.tagName)) e.preventDefault(); });
 let combatReady = false;
 function clearFlightInput() {
   for (const k in keys) keys[k] = false;
@@ -5073,9 +5074,9 @@ const hud = createHUD(THREE, {
   const toast = () => hud.setMusicToast('♪ ' + (ytMusic.info.title || '—'));
   const paint = q => {
     title.textContent = '♪ ' + (q.title || '—');
-    tag.textContent = '[' + (q.status || 'YT OFF') + '] ' + (q.auto ? 'SHUF' : 'SEQ');
+    tag.textContent = '[' + (q.status || 'YT OFF') + '] ' + (q.shuffle ? 'SHUF' : 'SEQ');
     playBtn.textContent = q.playing ? '❚❚' : '▶';
-    shufBtn.classList.toggle('on', !!q.auto);
+    shufBtn.classList.toggle('on', !!q.shuffle);
   };
   ytMusic.attachChange(paint);
   paint(ytMusic.status());
@@ -5086,11 +5087,29 @@ const hud = createHUD(THREE, {
   bind('bgmAuto', () => { ytMusic.setShuffle(!ytMusic.info.shuffle); toast(); });
   bind('bgmPick', () => {
     const open = picker.classList.toggle('open');
-    if (open && input && !input.value) input.focus();
+    if (open && input) {
+      if (document.pointerLockElement) document.exitPointerLock();
+      input.focus();
+      input.select();
+    }
+  });
+  bind('bgmPaste', async () => {
+    try {
+      const text = (await navigator.clipboard.readText() || '').trim();
+      if (!text) { input.focus(); hud.setMusicToast('CLIPBOARD EMPTY'); return; }
+      input.value = text;
+      input.focus();
+      if (ytMusic.loadInput(text)) { picker.classList.remove('open'); toast(); }
+      else { hud.setMusicToast('BAD YOUTUBE URL'); }
+    } catch (err) {
+      input.focus();
+      hud.setMusicToast('PRESS CTRL+V IN BOX');
+    }
   });
   bind('bgmLoad', () => {
     const ok = ytMusic.loadInput(input.value);
     if (ok) { picker.classList.remove('open'); toast(); }
+    else { hud.setMusicToast('BAD YOUTUBE URL'); input.focus(); }
   });
   bind('bgmReset', () => { ytMusic.resetDefault(); picker.classList.remove('open'); toast(); });
   const presets = document.getElementById('bgmPresets');
@@ -5102,14 +5121,19 @@ const hud = createHUD(THREE, {
   }
   // Typing / pasting in the playlist input must never reach the flight controls.
   for (const el of [picker, input]) {
-    el.addEventListener('mousedown', e => e.stopPropagation());
-    el.addEventListener('keydown', e => e.stopPropagation());
+    for (const ev of ['pointerdown', 'mousedown', 'keydown', 'keyup', 'keypress', 'paste']) {
+      el.addEventListener(ev, e => e.stopPropagation());
+    }
   }
   input.addEventListener('focus', () => { uiModal = true; });
   input.addEventListener('blur', () => { uiModal = ctrlOpen || document.getElementById('patchOverlay').classList.contains('open'); });
   input.addEventListener('keydown', e => {
     e.stopPropagation();
-    if (e.key === 'Enter') { e.preventDefault(); ytMusic.loadInput(input.value); picker.classList.remove('open'); }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (ytMusic.loadInput(input.value)) { picker.classList.remove('open'); toast(); }
+      else { hud.setMusicToast('BAD YOUTUBE URL'); }
+    }
   });
 }
 // Start the external player lazily on the first gesture, never in headless ?nobgm runs.
