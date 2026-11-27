@@ -174,9 +174,16 @@ export function createClutter(THREE, env) {
     if (G.inApproach(x, z, 250)) return true;
     if (mode === 'gorge' && env.inGorgeBox(x, z) && env.gorgeDist(x, z) < 420) return true;   // trench corridor + rims
     if (mode === 'gorge' && Math.hypot(x - G.DAM.x, z - G.DAM.z) < 700) return true;
-    for (const b of G.BRIDGES) if (G.capsule(x, z, b.a[0], b.a[1], b.b[0], b.b[1]) < 260) return true;
+    const L = env.landmarks && env.landmarks[mode];                 // v3.1: the theatre's DEM bridges + harbour
+    if (L) {
+      for (const b of L.bridges || []) if (G.capsule(x, z, b.a[0], b.a[1], b.b[0], b.b[1]) < 260) return true;
+      if (L.harbour && G.capsule(x, z, L.harbour.a[0], L.harbour.a[1], L.harbour.b[0], L.harbour.b[1]) < 260) return true;
+    }
     return false;
   }
+  // Road links may cross the AFB itself; only the approach funnels beyond the thresholds are off limits.
+  const R0 = env.rwy || { x: 900, z0: -1400, z1: 1600 };
+  const inFunnel = (x, z) => Math.abs(x - R0.x) < 700 && (z < R0.z0 - 250 || z > R0.z1 + 250) && G.inApproach(x, z, 0);
 
   function buildVegetation(mode, S) {
     const pk = S.pack, c = pk.meta.core, sn = c.splatN, sp = pk.splat, st2 = c.step * 2;
@@ -263,23 +270,40 @@ export function createClutter(THREE, env) {
       }
     });
 
-    // ---- roads: MST between villages, draped straight segments (rejects steep / wet links)
+    // ---- roads (v3.1): MST over the AFB gate + Port City anchors + villages; each link drapes
+    // straight or detours through one terrain-following waypoint (up to 2 km aside), so the
+    // base, the port and the valley villages visibly connect. Streetlights every ~180 m.
     const roads = [];
     {
-      const nodes = villages.map(v => [v[0], v[1]]);
+      const anchors = [];
+      if (mode !== 'strait') anchors.push([R0.x + 380, -900]);
+      const L = env.landmarks && env.landmarks[mode];
+      if (mode === 'archipelago' && L && L.harbour && env.portCity) anchors.push([env.portCity[0], env.portCity[1]]);
+      const nodes = anchors.concat(villages.map(v => [v[0], v[1]]));
       const linkOk = (a, b) => {
-        const L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L > 9000) return null;
-        const n = Math.ceil(L / 12), pts = [];
+        const Ln = Math.hypot(b[0] - a[0], b[1] - a[1]); if (Ln > 9000 || Ln < 1) return null;
+        const n = Math.ceil(Ln / 12), pts = [];
         let prev = null;
         for (let i = 0; i <= n; i++) {
           const x = a[0] + (b[0] - a[0]) * i / n, z = a[1] + (b[1] - a[1]) * i / n, y = S.baseHeight(x, z);
           if (y < 2.5 || S.slopeAt(x, z) > 0.16) return null;
           if (prev !== null && Math.abs(y - prev) > 2.2) return null;
           if (mode === 'gorge' && env.inGorgeBox(x, z) && env.gorgeDist(x, z) < 400) return null;
-          if (G.inApproach(x, z, 0)) return null;
+          if (inFunnel(x, z)) return null;
           pts.push(x, y, z); prev = y;
         }
         return pts;
+      };
+      const route = (a, b) => {
+        const direct = linkOk(a, b); if (direct) return direct;
+        const dx = b[0] - a[0], dz = b[1] - a[1], Ln = Math.hypot(dx, dz) || 1, px = -dz / Ln, pz = dx / Ln;
+        for (const t of [0.5, 0.35, 0.65]) for (const o of [400, -400, 800, -800, 1300, -1300, 2000, -2000]) {
+          const w = [a[0] + dx * t + px * o, a[1] + dz * t + pz * o];
+          const p1 = linkOk(a, w); if (!p1) continue;
+          const p2 = linkOk(w, b); if (!p2) continue;
+          return p1.concat(p2.slice(3));
+        }
+        return null;
       };
       const inT = new Set([0]), edges = [];
       if (nodes.length) {
@@ -292,7 +316,12 @@ export function createClutter(THREE, env) {
           inT.add(best[1]); edges.push(best);
         }
       }
-      for (const [i, j] of edges) { const p = linkOk(nodes[i], nodes[j]); if (p) roads.push(p); }
+      for (const [i, j] of edges) { const p = route(nodes[i], nodes[j]); if (p) roads.push(p); }
+      let nl = 0;
+      for (const p of roads) for (let k = 0, acc = 0; k + 3 < p.length && nl < 220; k += 3) {
+        acc += Math.hypot(p[k + 3] - p[k], p[k + 5] - p[k + 2]);
+        if (acc > 180) { acc = 0; winLights.push(p[k] + 6, p[k + 1] + 8, p[k + 2] + 6, 1.0, 0.86, 0.6); nl++; }
+      }
     }
     let roadMesh = null;
     if (roads.length) {

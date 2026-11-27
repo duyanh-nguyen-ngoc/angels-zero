@@ -851,16 +851,16 @@ import { createGear, GEAR_H, GEAR_PTS, GEAR_UNITS, setGearPoints } from './src/g
 import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s11wat1';
 import { createCanopyFX } from './src/canopy.js?v=s9ex';
 import { createNVG } from './src/nvg.js?v=s11gfx1';
-import { createWorld, WORLD, CORE } from './src/world.js?v=s11gfx1';
+import { createWorld, WORLD, CORE } from './src/world.js?v=s10ter8';
 import { mulberry32, createNoise2D, fbm } from './src/noise.js?v=s10ter2';
-import { loadTerrainPack } from './src/terrainpack.js?v=s10ter7';
+import { loadTerrainPack, loadTerrainMeta } from './src/terrainpack.js?v=s10ter8';
 import { createSurfaces } from './src/surfaces.js?v=s9ex';
 import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s10fly2';
 import { createFreeLook } from './src/freelook.js?v=s9ex';
 import { createCanopyGlass } from './src/canopyglass.js?v=s9ex';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9ex';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9ex';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s11gfx1';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s10ter8';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9ex';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9ex';
 import { createRadioQueue } from './src/radioQueue.js?v=s9ex';
@@ -1013,9 +1013,12 @@ const _wt0 = performance.now();
 // Terrain v2: the archipelago pack (baked 2048^2 heightfield + splat, ~3 MB) is needed before
 // boot-time prop placement; gorge / strait packs are fetched lazily (prefetched after boot,
 // awaited by startSortie) — see world.prepare().
-const TERRAIN_PACK_TAG = 's10ter7';
-const terrainPackArch = await loadTerrainPack('archipelago', 'assets/terrain', TERRAIN_PACK_TAG);
-const world = createWorld(THREE, { scene, createNoise2D, fbm, mulberry32, pack: terrainPackArch, packTag: TERRAIN_PACK_TAG });
+const TERRAIN_PACK_TAG = 's10ter8';
+const [terrainPackArch, metaGorge, metaStrait] = await Promise.all([
+  loadTerrainPack('archipelago', 'assets/terrain', TERRAIN_PACK_TAG),
+  loadTerrainMeta('gorge', 'assets/terrain', TERRAIN_PACK_TAG), loadTerrainMeta('strait', 'assets/terrain', TERRAIN_PACK_TAG)   // v3.1 DEM landmarks
+]);
+const world = createWorld(THREE, { scene, createNoise2D, fbm, mulberry32, pack: terrainPackArch, packTag: TERRAIN_PACK_TAG, metas: { gorge: metaGorge, strait: metaStrait } });
 setTimeout(() => { world.prepare({ heightFn: 'gorge' }).catch(() => {}); world.prepare({ heightFn: 'strait' }).catch(() => {}); }, 1200);
 if (DEBUG) console.log('[ANGELS_ZERO] terrain pack archipelago', terrainPackArch.loadMs, 'ms');
 const freeFlight = createFreeFlight(THREE, scene, envTex);

@@ -3,6 +3,12 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.2.12', title: 'TERRAIN V3.1 — DEM-ALIGNED AIRFIELD, ORGANIC COASTS & REAL-WORLD LANDMARKS', bullets: [
+    'Each theatre is re-framed on its real fjord landscape so the airbase sits on a natural coastal lowland with open-water approaches, and Port City now lines a real bay with a quay shelf and seawall.',
+    'No more square ground: the airfield blends into the coast with a crisp rock revetment and noise-broken grading, and terrain colours no longer show rectangular patches.',
+    'Bridges now span real water narrows land to land, while ships, oil rigs and the wind farm sit in open water and lighthouses and radar stations crown actual headlands and summits on every map.',
+    'Port City, the airbase and nearby villages are connected by draped roads with traffic and streetlights, and floating leftovers from the old islands are gone.'
+  ] },
   { version: 'v1.2.11', title: 'GRAPHICS SELECTOR, ADAPTIVE QUALITY, SHARPER TEXTURES & TOPOGRAPHIC MAPS', bullets: [
     'New [ GRAPHICS: AUTO / HIGH / LOW ] button in Controls & Audio. AUTO watches your frame rate and smoothly trades resolution, sky-ray samples and water reflections to hold it, then steps back up when there is headroom.',
     'Runway markings, carrier deck lines, terrain detail and airframe decals stay crisp at grazing angles (capped 8x anisotropic filtering), with colour and data textures handled correctly.',

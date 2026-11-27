@@ -4,9 +4,9 @@
  "mapId": 2,
  "dem": {
   "name": "Kenai Fjords & Inside Passage, Alaska",
-  "lat": 59.88,
-  "lon": -149.48,
-  "rotDeg": 8,
+  "lat": 59.7,
+  "lon": -149.41,
+  "rotDeg": -20,
   "coreZ": 11,
   "hzZ": 8
  },
@@ -46,54 +46,119 @@
   }
  },
  "rwy": null,
- "bridges": [],
- "dam": null,
- "straitSites": {
+ "landmarks": {
+  "bridges": [],
+  "harbour": null,
+  "ships": [
+   [
+    -300,
+    -19000,
+    1.571,
+    "cargo"
+   ],
+   [
+    -300,
+    -16000,
+    1.571,
+    "tanker"
+   ],
+   [
+    -300,
+    -13000,
+    1.571,
+    "cargo"
+   ],
+   [
+    -300,
+    -10000,
+    1.571,
+    "tanker"
+   ]
+  ],
+  "windFarm": null,
+  "oilRigs": [
+   [
+    -6200,
+    -3800,
+    -4.437
+   ],
+   [
+    -6200,
+    400,
+    -1.497
+   ],
+   [
+    -6200,
+    4600,
+    -4.84
+   ]
+  ],
   "lighthouses": [
    [
-    -5710,
-    3600
+    -12500,
+    -3000,
+    12.03,
+    14.15
    ],
    [
-    5350,
-    3400
+    -8450,
+    -6000,
+    12.82,
+    16.15
    ],
    [
-    -5620,
-    -4800
+    -13400,
+    5400,
+    16.02,
+    18.41
    ],
    [
-    4990,
-    -4500
+    -13400,
+    -7050,
+    23.29,
+    25.88
+   ],
+   [
+    13000,
+    -16500,
+    31.61,
+    36.65
    ]
   ],
   "radars": [
    [
-    -5800,
-    -1200
+    7300,
+    -18900,
+    410.34,
+    420.2
    ],
    [
-    5800,
-    -1600
+    -9200,
+    -9900,
+    273.88,
+    284.71
    ]
-  ]
+  ],
+  "observatory": null
  },
+ "bridges": [],
+ "dam": null,
  "checksums": {
-  "height16": "2b91d64c726ba8a7",
-  "horizon16": "ab1ddae684eab24f",
-  "splat": "45f869fce32d82d3"
+  "height16": "5c129b19826d6a4c",
+  "horizon16": "8af061ad5aa0052b",
+  "splat": "018ab3434ff6840f"
  },
  "stats": {
-  "minH": -129.7,
+  "minH": -133.7,
   "maxH": 1949,
-  "landPct": 43.4,
+  "landPct": 14.2,
   "landUse": {
-   "water": 56.8,
-   "farm": 10.3,
-   "forest": 20.5,
-   "rock": 4.8,
+   "water": 86,
+   "farm": 5.9,
+   "forest": 5.9,
+   "rock": 0.4,
    "urban": 0,
-   "scrub": 7.7
+   "scrub": 1.8
   },
   "erosion": {
    "droplets": 50000,
@@ -102,15 +167,15 @@
    "maxAbs": 0
   },
   "bakeMs": {
-   "sample": 11588,
-   "erode": 804,
-   "total": 28196
+   "sample": 959,
+   "erode": 112,
+   "total": 5512
   },
   "bytes": {
-   "height16": 1419734,
-   "horizon16": 216053,
-   "splat": 363675,
-   "total": 1999462
+   "height16": 1055292,
+   "horizon16": 190312,
+   "splat": 149541,
+   "total": 1395145
   }
  }
 }

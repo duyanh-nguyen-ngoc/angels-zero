@@ -14,8 +14,8 @@
 // the exact twin of terrainpack.js createSampler().heightAt (CPU).
 // 8 draw calls; ~200k visible triangles; zero allocations in update().
 
-import { CRAG_AMP } from './geography.js?v=s10ter7';
-import { CRAG_FADE } from './terrainpack.js?v=s10ter7';
+import { CRAG_AMP } from './geography.js?v=s10ter8';
+import { CRAG_FADE } from './terrainpack.js?v=s10ter8';
 
 export const CM_LEVELS = 8, CM_M = 128, CM_SPACING0 = 8;
 

@@ -210,6 +210,29 @@ Status legend: `[x]` implemented and verified Â· `[ ]` open — gaps listed.
   - Topography (`src/hud.js` `getTopo`): 512^2 heightAt samples, raking hillshade, marching-
     triangles 50 m / 250 m contours + coastline, cached per theatre.
 
+- [x] **Terrain v3.1 — DEM-aligned airfield, organic coastal grading & correlated landmarks** *(v1.2.12, build `s10ter8`)*
+  - Framing: `bake_terrain.mjs <map> --find-frame` scores (lat, lon, rot) at z10 (RWY lowland +
+    water approaches, Port City N-S shore with deep water west, eastern peaks, land mix /
+    strait channel + cliffs). Chosen: archipelago 68.34N 14.175E rot 45, gorge 59.155N 6.16E
+    rot -45, strait 59.70N -149.41 rot -20.
+  - Grading: tight 10 m AFB core (runway / taxiway / apron / hangars) + domain-warped distance:
+    35-65 m rock revetment to -8 m over water, 220-380 m noise-broken feather on land; oblique
+    120 m quay shelf (3.5 m) on the detected bay shoreline with a seawall to a -12 m basin;
+    jittered land-use thresholds. Shader: noise-broken tarmac tint, warped AFB masks, no town
+    flattening; legacy volcano / island stream / highway overlays retired.
+  - `detectLandmarks` -> `meta.json.landmarks`: bridges (real narrows), harbour (quay line +
+    breakwaters), ships, wind farm, oil rigs, lighthouses, radars, observatory, with ground
+    min/max under each footprint and `gorgeProbe` heights (`src/gorgesites.js` order).
+  - `world.js` builds every theatre's landmarks into `lmArch` / `lmGorge` / `lmStrait` buckets
+    (own collision lists, light map id 3 = archipelago-only), shown only on their map;
+    grounded plinths / piers everywhere; NW arch, volcano plume, fixed strait stacks and the
+    coastal highway traffic removed. `index.html` fetches the gorge / strait `meta.json` at boot
+    (`loadTerrainMeta`), height packs stay lazy.
+  - `clutter.js`: road MST seeded with the AFB gate + Port City, waypoint detours, streetlights;
+    `keepOut` respects DEM bridges + harbour.
+  - Verification: `terrain_parity.mjs` adds the Landmark Correlation Audit (wet / dry / bridge /
+    quay) -> ALL PASS; smoke 18/18; screenshots of airfield, harbour, bridge, gorge.
+
 ## Pillar 4 — Combat Loop, Ballistics & VFX (`src/weapons.js`, `src/vfx.js`, `src/audio.js`)
 - [x] **Two-stage targeting** *(build `s24a`)* — APG-63 auto-designates the
   best bandit in the 30 deg / 8 NM forward radar cone (green brackets, type,

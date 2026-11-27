@@ -27,6 +27,7 @@ import {
   GORGE_CRATER_WALL_Y, GORGE_RAMP_W, GORGE_HALF_W, GORGE_BBOX,
   GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_ZB, GORGE_SC_HALF_W, GORGE_SC_RAMP_W, GORGE_SC_FLOOR_Y
 } from '../src/maps.js';
+import { gorgeProbePoints } from '../src/gorgesites.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REPO_ROOT = path.resolve(ROOT, '..');
@@ -41,9 +42,11 @@ const HN = 512, HSIZE = 160000, HSTEP = HSIZE / (HN - 1), HX0 = CORE.CX - HSIZE 
 const geo = createGeography({ createNoise2D, fbm });
 
 const DEM_THEATRES = {
-  archipelago: { name: 'Lofoten Islands & Vestfjorden, Norway', lat: 68.22, lon: 14.55, rotDeg: 25, coreZ: 11, hzZ: 8 },
-  gorge:       { name: 'Lysefjord & Aurlandsfjord, Norway',     lat: 59.03, lon: 6.42,  rotDeg: -22, coreZ: 11, hzZ: 8 },
-  strait:      { name: 'Kenai Fjords & Inside Passage, Alaska', lat: 59.88, lon: -149.48, rotDeg: 8, coreZ: 11, hzZ: 8 }
+  // v3.1 framing (--find-frame): RWY 18/36 on a natural coastal lowland with water approaches,
+  // Port City on a N-S shore (deep water west), fjord peaks to the east.
+  archipelago: { name: 'Lofoten Islands & Vestfjorden, Norway', lat: 68.34, lon: 14.175, rotDeg: 45, coreZ: 11, hzZ: 8 },
+  gorge:       { name: 'Lysefjord & Aurlandsfjord, Norway',     lat: 59.155, lon: 6.16, rotDeg: -45, coreZ: 11, hzZ: 8 },
+  strait:      { name: 'Kenai Fjords & Inside Passage, Alaska', lat: 59.7, lon: -149.41, rotDeg: -20, coreZ: 11, hzZ: 8 }
 };
 
 function mulberry32(a) { return () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -174,15 +177,31 @@ async function buildDemSampler(cfg, zLevel, halfSpanM) {
 }
 
 /* ----------------------------------------------------- gameplay clearance */
-function applyClearance(map, x, z, hDem) {
+// v3.1: no square pads. A tight 10 m plateau sits only under the runway, parallel taxiway,
+// apron and hangars; outside it a domain-warped distance grades the DEM organically: over
+// water a crisp 35-65 m rock-revetment drop to -8 m, on land a 220-380 m noise-broken feather.
+// Port City gets only a ~120 m quay shelf (3.5 m) along the detected bay shoreline with a
+// seawall into a dredged -12 m basin; the town steps up the natural slope behind it.
+const nAfb = createNoise2D(31337);
+const AFB_CORE = [RWY.x - 90, RWY.x + 410, RWY.z0 - 110, RWY.z1 + 130];
+function applyClearance(map, x, z, hDem, harbour) {
   let h = hDem, protect = 1, urban = 0;
   if (map !== 'strait') {
-    // Runway pad (RWY 18/36 at elev = 10 m) feathered smoothly into coastal terrain
-    const pad = rectDist(x, z, RWY.x - 300, RWY.x + 470, RWY.z0 - 140, RWY.z1 + 160);
-    const kPad = ss(pad, 260, 0);
-    h = h * (1 - kPad) + RWY.elev * kPad;
-    if (pad < 1) urban = 1;
-    protect = Math.min(protect, ss(pad, 250, 650));
+    const core = rectDist(x, z, AFB_CORE[0], AFB_CORE[1], AFB_CORE[2], AFB_CORE[3]);
+    const dWarp = core + fbm(nAfb, x * 0.004, z * 0.004, 3) * 140 * ss(core, 0, 140);
+    if (core < 1) { h = RWY.elev; urban = 1; }
+    else if (hDem < 0) {
+      const t = ss(dWarp, 35, 65), sea = Math.min(-8, hDem);
+      const hs = RWY.elev * (1 - t) + sea * t, k2 = ss(dWarp, 65, 260);
+      h = hs * (1 - k2) + hDem * k2;
+      if (dWarp < 22) urban = 1;
+    } else {
+      const feather = 220 + 160 * (fbm(nAfb, x * 0.0021 + 7.3, z * 0.0021, 2) * 0.5 + 0.5);
+      const k = 1 - ss(dWarp, 0, feather);
+      h = hDem * (1 - k) + RWY.elev * k;
+      if (dWarp < 22) urban = 1;
+    }
+    protect = Math.min(protect, ss(dWarp, 250, 650));
 
     // Approach funnels (600 m to 5 km north & south of thresholds stay under 3 deg glide path)
     for (const [zt, dir] of [[RWY.z0, -1], [RWY.z1, 1]]) {
@@ -196,12 +215,22 @@ function applyClearance(map, x, z, hDem) {
     }
     protect = Math.min(protect, ss(rectDist(x, z, RWY.x - 700, RWY.x + 700, RWY.z0 - 3800, RWY.z1 + 3800), 0, 400));
 
-    // Port City flat pad
-    const town = rectDist(x, z, -2050, -450, -1850, 350);
-    const kTown = ss(town, 280, 0);
-    h = h * (1 - kTown) + 14 * kTown;
-    if (town < 1) urban = 1;
-    protect = Math.min(protect, ss(town, 150, 500));
+    // Port City quay shelf along the real (possibly oblique) bay shoreline, water seaward.
+    if (harbour) {
+      const t = (x - harbour.a[0]) * (harbour.b[0] - harbour.a[0]) / harbour.len + (z - harbour.a[1]) * (harbour.b[1] - harbour.a[1]) / harbour.len;
+      const kz = ss(t, -90, 0) * ss(t, harbour.len + 90, harbour.len);
+      if (kz > 0) {
+        const sl = (x - harbour.a[0]) * harbour.n[0] + (z - harbour.a[1]) * harbour.n[1];   // + landward of the quay face
+        let hq;
+        if (sl >= 0 && sl <= 120) hq = 3.5;
+        else if (sl > 120) { const k = ss(sl, 120, 240); hq = 3.5 * (1 - k) + h * k; }
+        else if (sl > -28) hq = 3.5 + (-12 - 3.5) * ss(sl, 0, -26);
+        else { const k = ss(sl, -28, -260); hq = Math.min(h, -12) * (1 - k) + h * k; }
+        h = h * (1 - kz) + hq * kz;
+        if (sl >= 0 && sl <= 120 && kz > 0.5) urban = 1;
+        protect = Math.min(protect, 1 - kz * (1 - ss(Math.abs(sl - 40), 160, 360)));
+      }
+    }
   }
   if (map === 'gorge' && geo.inGorgeBox(x, z)) {
     // Blend CANYON_RUN floor, crater, and shortcut smoothly into the real Norwegian granite massif
@@ -234,9 +263,6 @@ function applyClearance(map, x, z, hDem) {
     if (ax < 5400) {
       const chK = ss(ax, 5400, 4450);
       h = h * (1 - chK) + Math.min(h, -45) * chK;
-    }
-    for (const s of [...geo.STRAIT_SITES.lighthouses, ...geo.STRAIT_SITES.radars]) {
-      protect = Math.min(protect, ss(Math.hypot(x - s[0], z - s[1]), 260, 560));
     }
   }
   return { h, protect, urban };
@@ -291,12 +317,13 @@ function analyse(H, flow, dep, urbanMask) {
     const flowN = Math.log(1 + f) / lf, sedN = Math.min(1, Math.sqrt(d / dMax) * 1.5);
     const wx = X0 + x * STEP, wz = Z0 + y * STEP;
     const nz = fbm(nForest, wx * 0.0011, wz * 0.0011, 3);
+    const nzHi = fbm(nForest, wx * 0.019 + 3.1, wz * 0.019, 2);      // v3.1: breaks texel-aligned class edges
     let lu;
     if (urbanMask[i]) { lu = 255; counts.urban++; }
     else if (h < 0.6) { lu = 0; counts.water++; }
-    else if (slope > 0.38 || h > 950 + 120 * nz) { lu = 192; counts.rock++; }
-    else if (h > 4 && h < 160 && slope < 0.08 && flowN < 0.6 && nz < 0.25) { lu = 64; counts.farm++; }
-    else if (h > 12 && h < 720 && slope < 0.34 && nz > -0.35) { lu = 128; counts.forest++; }
+    else if (slope > 0.38 + 0.03 * nzHi || h > 950 + 120 * nz) { lu = 192; counts.rock++; }
+    else if (h > 4 + 2 * nzHi && h < 160 + 40 * nzHi && slope < 0.08 + 0.025 * nzHi && flowN < 0.6 && nz < 0.25 + 0.15 * nzHi) { lu = 64; counts.farm++; }
+    else if (h > 12 + 6 * nzHi && h < 720 && slope < 0.34 && nz > -0.35 + 0.2 * nzHi) { lu = 128; counts.forest++; }
     else { lu = 32; counts.scrub++; }
     const k = (sy * SN + sx) * 4;
     const q6 = v => Math.min(248, Math.round(v * 31) * 8);
@@ -343,7 +370,7 @@ function png(w, h, rgb) {
   for (let y = 0; y < h; y++) { rows[y * (w * 3 + 1)] = 0; rows.set(rgb.subarray(y * w * 3, (y + 1) * w * 3), y * (w * 3 + 1) + 1); }
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(rows)), chunk('IEND', Buffer.alloc(0))]);
 }
-function previews(map, H, splat) {
+function previews(map, H, splat, lm) {
   const P = 1024, s = N / P, hs = new Uint8Array(P * P * 3);
   const at = (x, y) => H[Math.min(N - 1, Math.max(0, y)) * N + Math.min(N - 1, Math.max(0, x))];
   const L = [-0.55, 0.62, -0.56];
@@ -361,8 +388,220 @@ function previews(map, H, splat) {
     const k = (py * P + px) * 3, sh = h < 0 ? 1 : 0.35 + 0.9 * nl;
     for (let ch = 0; ch < 3; ch++) hs[k + ch] = Math.max(0, Math.min(255, c[ch] * sh));
   }
+  // v3.1 landmark markers: runway white, harbour yellow, bridges red, lighthouses white dots,
+  // radars magenta, ships orange, rigs black, wind farm cyan, observatory purple.
+  if (lm) {
+    const px = x => Math.round((x - X0) / STEP / s), pz = z => Math.round((z - Z0) / STEP / s);
+    const dot = (x, z, c, r = 4) => { const cx = px(x), cz = pz(z); for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { if (dx * dx + dy * dy > r * r) continue; const X = cx + dx, Y = cz + dy; if (X < 0 || Y < 0 || X >= P || Y >= P) continue; const k = (Y * P + X) * 3; hs[k] = c[0]; hs[k + 1] = c[1]; hs[k + 2] = c[2]; } };
+    const line = (a, b, c, r = 2) => { const L = Math.hypot(b[0] - a[0], b[1] - a[1]); for (let t = 0; t <= L; t += STEP * s * 0.5) dot(a[0] + (b[0] - a[0]) * t / L, a[1] + (b[1] - a[1]) * t / L, c, r); };
+    if (map !== 'strait') line([RWY.x, RWY.z0], [RWY.x, RWY.z1], [255, 255, 255], 2);
+    if (lm.harbour) line(lm.harbour.a, lm.harbour.b, [255, 220, 0], 2);
+    for (const b of lm.bridges) line(b.a, b.b, [230, 30, 30], 2);
+    if (lm.windFarm) line(lm.windFarm.a, lm.windFarm.b, [0, 230, 255], 2);
+    for (const p of lm.lighthouses) dot(p[0], p[1], [255, 255, 255], 5);
+    for (const p of lm.radars) dot(p[0], p[1], [255, 0, 220], 5);
+    for (const p of lm.ships) dot(p[0], p[1], [255, 140, 0], 5);
+    for (const p of lm.oilRigs) dot(p[0], p[1], [0, 0, 0], 5);
+    if (lm.observatory) dot(lm.observatory[0], lm.observatory[1], [150, 60, 255], 6);
+  }
   fs.mkdirSync(PREVIEW_DIR, { recursive: true });
   fs.writeFileSync(path.join(PREVIEW_DIR, `dem_preview_${map}.png`), png(P, P, Buffer.from(hs.buffer)));
+}
+
+/* --------------------------------------------- DEM landmark detection (v3.1) */
+// Harbour shoreline from the raw DEM (before grading): rows z in [-1800, 600], scanning
+// x in [-3600, -900] for deep water (< -10 m) meeting land (> 2 m) within 200 m. The quay
+// runs N-S along the median shoreline over the longest contiguous run of agreeing rows.
+function detectHarbourRaw(map, dem) {
+  if (map === 'strait') return null;
+  const rows = [];
+  for (let z = -1800; z <= 600; z += 50) {
+    let lastDeep = -1e9, xs = null;
+    for (let x = -3600; x <= -900; x += 20) {
+      const h = dem(x, z);
+      if (h < -10) lastDeep = x;
+      else if (h > 2 && x - lastDeep <= 200) { xs = x; break; }
+    }
+    rows.push([z, xs]);
+  }
+  if (process.env.AZ_DEBUG) console.log('[harbour]', map, JSON.stringify(rows.map(r => r[1])));
+  // Longest run of consecutive rows (>= 500 m) whose linear fit x = A + B z stays within 60 m.
+  let best = null;
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i][1] === null) continue;
+    for (let j = i + 10; j < rows.length && rows[j][1] !== null; j++) {
+      const seg = rows.slice(i, j + 1);
+      if (seg.some(r => r[1] === null)) break;
+      const n = seg.length, mz = seg.reduce((a, r) => a + r[0], 0) / n, mx = seg.reduce((a, r) => a + r[1], 0) / n;
+      let sxz = 0, szz = 0; for (const [z, x] of seg) { sxz += (z - mz) * (x - mx); szz += (z - mz) ** 2; }
+      const B = sxz / szz, A = mx - B * mz;
+      if (Math.abs(B) > 1.2 || seg.some(([z, x]) => Math.abs(A + B * z - x) > 60)) break;
+      if (!best || n > best.n) best = { n, A, B, z0: seg[0][0], z1: seg[n - 1][0] };
+    }
+  }
+  if (!best) return null;
+  const a = [best.A + best.B * best.z0, best.z0], b = [best.A + best.B * best.z1, best.z1];
+  const L = Math.hypot(b[0] - a[0], b[1] - a[1]), dx = (b[0] - a[0]) / L, dz = (b[1] - a[1]) / L;
+  const n = [dz, -dx];                                      // landward normal (water lies to the west)
+  if (map === 'gorge' && (geo.inGorgeBox(a[0], a[1]) || geo.inGorgeBox(b[0], b[1]))) return null;   // canyon owns that ground
+  const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], yaw = Math.atan2(dx, dz);
+  const bw = (p, s) => [Math.round(p[0] - n[0] * 210 + dx * 60 * s), Math.round(p[1] - n[1] * 210 + dz * 60 * s), +(yaw + Math.PI / 2).toFixed(3), 380];
+  return { a: a.map(Math.round), b: b.map(Math.round), n: [+n[0].toFixed(4), +n[1].toFixed(4)], len: Math.round(L), yaw: +yaw.toFixed(4),
+    quayX: Math.round(mid[0]), quayZ0: Math.round(a[1]), quayZ1: Math.round(b[1]), waterSide: -1,
+    breakwaters: [bw(a, -1), bw(b, 1)] };
+}
+
+// Landmarks from the final baked grid, written to meta.json (world.js / clutter.js consume them).
+function detectLandmarks(map, H, harbour) {
+  const hAt = (x, z) => {
+    const fx = Math.max(0, Math.min(N - 1.001, (x - X0) / STEP)), fz = Math.max(0, Math.min(N - 1.001, (z - Z0) / STEP));
+    const ix = fx | 0, iz = fz | 0, tx = fx - ix, tz = fz - iz, i = iz * N + ix;
+    return (H[i] * (1 - tx) + H[i + 1] * tx) * (1 - tz) + (H[i + N] * (1 - tx) + H[i + N + 1] * tx) * tz;
+  };
+  const inCore = (x, z, m = 1500) => Math.abs(x - CORE.CX) < CORE.SIZE / 2 - m && Math.abs(z - CORE.CZ) < CORE.SIZE / 2 - m;
+  const appr = (x, z, m = 0) => map !== 'strait' && Math.abs(x - RWY.x) < 700 + m && z > RWY.z0 - 5600 - m && z < RWY.z1 + 5600 + m;
+  const gorgeBox = (x, z, m = 600) => map === 'gorge' && x > GORGE_BBOX.x[0] - m && x < GORGE_BBOX.x[1] + m && z < GORGE_BBOX.z[0] + m && z > GORGE_BBOX.z[1] - m;
+  const nearBase = (x, z, r) => map !== 'strait' && (Math.hypot(x - (RWY.x + 160), z - (RWY.z0 + RWY.z1) / 2) < r || (harbour && Math.hypot(x - (harbour.a[0] + harbour.b[0]) / 2, z - (harbour.a[1] + harbour.b[1]) / 2) < r * 0.8));
+  const clear = (x, z, m) => inCore(x, z) && !appr(x, z, m) && !gorgeBox(x, z);
+  const landWithin = (x, z, R, step = 200, dirs = 12) => {
+    for (let r = step; r <= R; r += step) for (let a = 0; a < dirs; a++) { const t = a / dirs * Math.PI * 2; if (hAt(x + Math.cos(t) * r, z + Math.sin(t) * r) > 0) return true; }
+    return false;
+  };
+  const spaced = (list, x, z, d) => list.every(p => Math.hypot(p[0] - x, p[1] - z) >= d);
+  const out = { bridges: [], harbour: null, ships: [], windFarm: null, oilRigs: [], lighthouses: [], radars: [], observatory: null };
+
+  // bridges: real water narrows 600-2200 m, middle 70 % deep water, both abutments on land 15-110 m
+  if (map !== 'strait') {
+    const cand = [];
+    for (let ax = -16000; ax <= 16000; ax += 400) for (let az = CORE.CZ - 16000; az <= CORE.CZ + 16000; az += 400) {
+      const ha = hAt(ax, az);
+      if (ha < 15 || ha > 110 || !clear(ax, az, 400) || nearBase(ax, az, 2500)) continue;
+      for (let d = 0; d < 16; d++) {
+        const t = d / 16 * Math.PI, dx = Math.cos(t), dz = Math.sin(t);
+        for (let L = 600; L <= 2200; L += 100) {
+          const bx = ax + dx * L, bz = az + dz * L, hb = hAt(bx, bz);
+          if (hb < 15 || hb > 110 || !clear(bx, bz, 400) || nearBase(bx, bz, 2500)) continue;
+          let ok = true;
+          for (let k = 0.15; k <= 0.851 && ok; k += 40 / L) if (hAt(ax + dx * L * k, az + dz * L * k) >= -10) ok = false;
+          if (!ok) continue;
+          let m = true;                                                 // the deck line must not clip appr / gorge
+          for (let k = 0; k <= 1 && m; k += 0.1) if (!clear(ax + dx * L * k, az + dz * L * k, 300)) m = false;
+          if (m) cand.push({ a: [ax, az], b: [bx, bz], L, sc: -Math.abs(L - 1250) });
+          break;                                                        // shortest valid span per direction
+        }
+      }
+    }
+    cand.sort((p, q) => q.sc - p.sc);
+    for (const c of cand) {
+      if (out.bridges.length >= 2) break;
+      const mx = (c.a[0] + c.b[0]) / 2, mz = (c.a[1] + c.b[1]) / 2;
+      if (out.bridges.every(b => Math.hypot((b.a[0] + b.b[0]) / 2 - mx, (b.a[1] + b.b[1]) / 2 - mz) > 4000)) out.bridges.push({ a: c.a.map(Math.round), b: c.b.map(Math.round) });
+    }
+  }
+  // harbour: keep only if the graded quay still separates land from deep water
+  if (harbour) {
+    const mx = (harbour.a[0] + harbour.b[0]) / 2, mz = (harbour.a[1] + harbour.b[1]) / 2;
+    if (hAt(mx - harbour.n[0] * 60, mz - harbour.n[1] * 60) < -6 && hAt(mx + harbour.n[0] * 60, mz + harbour.n[1] * 60) > 2) out.harbour = harbour;
+  }
+  // ships: open deep water, >= 800 m from shore, aligned with the longest open fetch
+  {
+    const c = [];
+    for (let x = -16500; x <= 16500; x += 600) for (let z = CORE.CZ - 16500; z <= CORE.CZ + 16500; z += 600) {
+      if (hAt(x, z) > -25 || !clear(x, z, 600)) continue;
+      let deep = true; for (let a = 0; a < 8 && deep; a++) { const t = a * Math.PI / 4; if (hAt(x + Math.cos(t) * 400, z + Math.sin(t) * 400) > -25) deep = false; }
+      if (!deep || landWithin(x, z, 800)) continue;
+      let bestT = 0, bestR = 0;
+      for (let a = 0; a < 8; a++) { const t = a * Math.PI / 8; let r = 0; while (r < 3000 && hAt(x + Math.cos(t) * r, z + Math.sin(t) * r) < -5 && hAt(x - Math.cos(t) * r, z - Math.sin(t) * r) < -5) r += 150; if (r > bestR) { bestR = r; bestT = t; } }
+      const dAct = map === 'strait' ? Math.abs(x) * 2 : Math.hypot(x - RWY.x, z);   // stay near the action
+      c.push([x, z, Math.atan2(Math.cos(bestT), Math.sin(bestT)), Math.min(bestR, 3000) / 3000 - dAct / 14000]);
+    }
+    c.sort((p, q) => q[3] - p[3]);
+    for (const p of c) { if (out.ships.length >= 4) break; if (spaced(out.ships, p[0], p[1], 3000)) out.ships.push([p[0], p[1], +p[2].toFixed(3), out.ships.length % 2 ? 'tanker' : 'cargo']); }
+  }
+  // wind farm (archipelago): 9 turbines 260 m apart on a shallow-to-mid bank, >= 500 m from land
+  if (map === 'archipelago') {
+    let best = null;
+    for (let x = -15000; x <= 15000; x += 500) for (let z = CORE.CZ - 15000; z <= CORE.CZ + 15000; z += 500) {
+      if (!clear(x, z, 800)) continue;
+      for (let d = 0; d < 8; d++) {
+        const t = d * Math.PI / 8, dx = Math.cos(t) * 260, dz = Math.sin(t) * 260;
+        let ok = true, shallow = 0;
+        for (let k = 0; k < 9 && ok; k++) {
+          const px = x + dx * k, pz = z + dz * k, h = hAt(px, pz);
+          if (h > -8 || !clear(px, pz, 800) || landWithin(px, pz, 500, 250, 8)) ok = false;
+          else if (h > -45) shallow++;
+        }
+        if (ok && (!best || shallow > best.sc)) best = { a: [x, z], b: [Math.round(x + dx * 8), Math.round(z + dz * 8)], n: 9, sc: shallow };
+      }
+    }
+    if (best) out.windFarm = { a: best.a, b: best.b, n: 9 };
+  }
+  // oil rigs (archipelago / strait): deep open water, >= 1200 m from any land
+  if (map !== 'gorge') {
+    const wf = out.windFarm;
+    const rc = [];
+    for (let x = -16000; x <= 16000; x += 700) for (let z = CORE.CZ - 16000; z <= CORE.CZ + 16000; z += 700) {
+      if (hAt(x, z) > -35 || !clear(x, z, 900) || (map === 'strait' && Math.abs(x) < 4800)) continue;
+      rc.push([x, z, map === 'strait' ? Math.abs(Math.abs(x) - 6000) : Math.abs(Math.hypot(x - RWY.x, z) - 9000)]);
+    }
+    rc.sort((p, q) => p[2] - q[2]);
+    for (const [x, z] of rc) {
+      if (out.oilRigs.length >= 3) break;
+      let deep = true; for (let a = 0; a < 8 && deep; a++) { const t = a * Math.PI / 4; if (hAt(x + Math.cos(t) * 500, z + Math.sin(t) * 500) > -35) deep = false; }
+      if (!deep || landWithin(x, z, 1200, 300, 12)) continue;
+      if (!spaced(out.oilRigs, x, z, 4000) || !spaced(out.ships, x, z, 1500)) continue;
+      if (wf && Math.hypot((wf.a[0] + wf.b[0]) / 2 - x, (wf.a[1] + wf.b[1]) / 2 - z) < 2500) continue;
+      out.oilRigs.push([x, z, +(((x * 0.0013 + z * 0.0007) % 6.283)).toFixed(3)]);
+    }
+  }
+  // lighthouses: real headlands (12-95 m, gentle top, >= 3 of 8 probes at 250 m in water)
+  {
+    const c = [];
+    for (let x = -17000; x <= 17000; x += 150) for (let z = CORE.CZ - 17000; z <= CORE.CZ + 17000; z += 150) {
+      const h = hAt(x, z);
+      if (h < 12 || h > 95 || !clear(x, z, 300) || nearBase(x, z, 1500)) continue;
+      const gx = (hAt(x + 20, z) - hAt(x - 20, z)) / 40, gz = (hAt(x, z + 20) - hAt(x, z - 20)) / 40;
+      if (1 - 1 / Math.sqrt(1 + gx * gx + gz * gz) > 0.35) continue;
+      let w = 0; for (let a = 0; a < 8; a++) { const t = a * Math.PI / 4; if (hAt(x + Math.cos(t) * 250, z + Math.sin(t) * 250) < -5) w++; }
+      if (w >= 3) c.push([x, z, w * 100 - h]);
+    }
+    c.sort((p, q) => q[2] - p[2]);
+    for (const p of c) { if (out.lighthouses.length >= 5) break; if (spaced(out.lighthouses, p[0], p[1], 3500)) out.lighthouses.push([p[0], p[1]]); }
+  }
+  // radars: prominent flat-topped summits 220-950 m, >= 5 km apart
+  {
+    const c = [];
+    for (let x = -17000; x <= 17000; x += 300) for (let z = CORE.CZ - 17000; z <= CORE.CZ + 17000; z += 300) {
+      const h = hAt(x, z);
+      if (h < 220 || h > (map === 'strait' ? 1500 : 950) || !clear(x, z, 500) || nearBase(x, z, 2000)) continue;
+      let top = true, lo = h, hi = h;
+      for (let a = 0; a < 8; a++) { const t = a * Math.PI / 4; if (hAt(x + Math.cos(t) * 300, z + Math.sin(t) * 300) > h) top = false; const y = hAt(x + Math.cos(t) * 40, z + Math.sin(t) * 40); lo = Math.min(lo, y); hi = Math.max(hi, y); }
+      if (top && hi - lo < (map === 'strait' ? 22 : 14)) c.push([x, z, h]);
+    }
+    c.sort((p, q) => q[2] - p[2]);
+    for (const p of c) { if (out.radars.length >= 3) break; if (spaced(out.radars, p[0], p[1], 5000)) out.radars.push([p[0], p[1]]); }
+  }
+  // observatory (archipelago): a dramatic ridge peak 350-850 m within 3-8 km of the AFB / Port City
+  if (map === 'archipelago') {
+    let best = null;
+    for (let x = -9000; x <= 11000; x += 200) for (let z = -9000; z <= 8000; z += 200) {
+      const h = hAt(x, z), d = Math.hypot(x - RWY.x, z);
+      if (h < 350 || h > 850 || d < 3000 || d > 8000 || !clear(x, z, 300)) continue;
+      if (out.radars.some(r => Math.hypot(r[0] - x, r[1] - z) < 1500)) continue;
+      let top = true; for (let a = 0; a < 8 && top; a++) { const t = a * Math.PI / 4; if (hAt(x + Math.cos(t) * 200, z + Math.sin(t) * 200) > h) top = false; }
+      if (top && (!best || h > best[2])) best = [x, z, h];
+    }
+    if (best) out.observatory = [best[0], best[1]];
+  }
+  // Ground stats under each built footprint ([x, z, yMin, yMax]) so world.js can place every
+  // theatre's landmarks at boot (only the archipelago pack is loaded then) with zero float.
+  const fp = (x, z, r) => { let lo = hAt(x, z), hi = lo; for (let a = 0; a < 8; a++) { const t = a * Math.PI / 4, y = hAt(x + Math.cos(t) * r, z + Math.sin(t) * r); lo = Math.min(lo, y); hi = Math.max(hi, y); } return [+lo.toFixed(2), +hi.toFixed(2)]; };
+  out.lighthouses = out.lighthouses.map(([x, z]) => [x, z, ...fp(x, z, 10)]);
+  out.radars = out.radars.map(([x, z]) => [x, z, ...fp(x, z, 22)]);
+  if (out.observatory) out.observatory = [...out.observatory, ...fp(out.observatory[0], out.observatory[1], 34)];
+  out.bridges = out.bridges.map(b => ({ ...b, ha: +hAt(b.a[0], b.a[1]).toFixed(2), hb: +hAt(b.b[0], b.b[1]).toFixed(2) }));
+  if (map === 'gorge') out.gorgeProbe = gorgeProbePoints().map(([x, z]) => +hAt(x, z).toFixed(2));
+  return out;
 }
 
 /* ---------------------------------------------------------------------- bake */
@@ -393,15 +632,16 @@ async function bake(map) {
     return (HZ[i] * (1 - tx) + HZ[i + 1] * tx) * (1 - tz) + (HZ[i + HN] * (1 - tx) + HZ[i + HN + 1] * tx) * tz;
   };
 
-  // 2. Sample 40x40 km core DEM (2048^2) + feathered clearances + horizon apron blend
+  // 2. Sample 40x40 km core DEM (2048^2) + organic clearances + horizon apron blend
+  const demAt = (x, z) => { const h = sampleCore(x, z); return h <= 0.4 ? -32 - 85 * (fbm(nForest, x * 0.00035, z * 0.00035, 2) * 0.5 + 0.5) : h; };
+  const harbourRaw = detectHarbourRaw(map, demAt);
   const H = new Float32Array(NN), mask = new Float32Array(NN), urban = new Uint8Array(NN);
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
     const x = X0 + i * STEP, z = Z0 + j * STEP, k = j * N + i;
     const edge = Math.max(Math.abs(x - CORE.CX), Math.abs(z - CORE.CZ));
     const ak = ss(edge, CORE.APRON0, CORE.APRON1);
-    let hRaw = sampleCore(x, z);
-    if (hRaw <= 0.4) hRaw = -32 - 85 * (fbm(nForest, x * 0.00035, z * 0.00035, 2) * 0.5 + 0.5);
-    const cl = applyClearance(map, x, z, hRaw);
+    const hRaw = demAt(x, z);
+    const cl = applyClearance(map, x, z, hRaw, harbourRaw);
     H[k] = cl.h * (1 - ak) + hzBilin(x, z) * ak;
     mask[k] = cl.protect * (1 - ak);
     urban[k] = cl.urban;
@@ -411,6 +651,7 @@ async function bake(map) {
   const tErode = Date.now();
   const { q, gz } = encodeGrid(H, N, mask, CORE.MIN_H, CORE.MAX_H);
   const { splat, landUse } = analyse(H, ero.flow, ero.dep, urban);
+  const landmarks = detectLandmarks(map, H, harbourRaw);
   const SN2 = CORE.SPLAT_N * CORE.SPLAT_N, planar = new Uint8Array(SN2 * 4);
   for (let i = 0; i < SN2; i++) for (let c = 0; c < 4; c++) planar[c * SN2 + i] = splat[i * 4 + c];
   const splatGz = zlib.gzipSync(Buffer.from(planar.buffer), { level: 9 });
@@ -429,9 +670,9 @@ async function bake(map) {
     horizon: { size: HSIZE, cx: CORE.CX, cz: CORE.CZ, n: HN, step: HSTEP, minH: CORE.MIN_H, maxH: CORE.MAX_H },
     encoding: { height: 'gzip(zigzag(signed gradient residual q - (left+up-upleft)) uint16 -> hi plane, lo plane)', splat: 'gzip(planar uint8: cavity plane, sediment plane, flow plane, landUse plane) -> RGBA8 1024^2', landUse: { water: 0, scrub: 32, farm: 64, forest: 128, rock: 192, urban: 255 } },
     rwy: map === 'strait' ? null : RWY,
-    bridges: map === 'strait' ? [] : geo.BRIDGES,
+    landmarks,
+    bridges: landmarks.bridges,
     dam: map === 'gorge' ? geo.DAM : null,
-    straitSites: map === 'strait' ? geo.STRAIT_SITES : null,
     checksums: { height16: sha(Buffer.from(q.buffer)), horizon16: sha(Buffer.from(hzQ.buffer)), splat: sha(Buffer.from(splat.buffer)) },
     stats: {
       minH: +minH.toFixed(1), maxH: +maxH.toFixed(1), landPct: +(100 * land / NN).toFixed(1), landUse,
@@ -440,10 +681,70 @@ async function bake(map) {
     }
   };
   fs.writeFileSync(path.join(dir, 'meta.json'), JSON.stringify(meta, null, 1));
-  previews(map, H, splat);
+  previews(map, H, splat, landmarks);
   console.log(`[bake v3] ${map} (${cfg.name}): h ${meta.stats.minH}..${meta.stats.maxH} m, land ${meta.stats.landPct}%, ` +
     `${(meta.stats.bytes.total / 1048576).toFixed(2)} MB (core ${(gz.length / 1048576).toFixed(2)} + hz ${(hzGz.length / 1048576).toFixed(2)} + splat ${(splatGz.length / 1048576).toFixed(2)}), ${meta.stats.bakeMs.total} ms`);
   return meta;
+}
+
+/* ------------------------------------------------- DEM framing search (v3.1) */
+// node angel-zero/scripts/bake_terrain.mjs <map|all> --find-frame
+// Scores (lat, lon, rotDeg) candidates at z10 so the fixed RWY 18/36 strip lands on a natural
+// coastal lowland with water approaches, Port City sits on a N-S shore with deep water to the
+// west, mountains rise to the east, and the land / water mix fits the theatre.
+const FRAME_SEARCH = {
+  archipelago: { lat: [68.0, 68.4, 0.02], lon: [14.0, 15.0, 0.035], rot: [-45, 45, 15] },
+  gorge:       { lat: [58.9, 59.2, 0.015], lon: [6.1, 6.7, 0.03], rot: [-45, 45, 15] },
+  strait:      { lat: [59.7, 60.1, 0.02], lon: [-149.8, -149.2, 0.03], rot: [-30, 30, 10] }
+};
+function scoreFrame(map, S) {
+  const frac = (pts, f) => { let k = 0; for (const [x, z] of pts) if (f(S(x, z))) k++; return k / pts.length; };
+  const grid = (xs, zs) => { const o = []; for (const x of xs) for (const z of zs) o.push([x, z]); return o; };
+  const rng = (a, b, st) => { const o = []; for (let v = a; v <= b + 1e-6; v += st) o.push(v); return o; };
+  let land = 0, peak = -1e9, n = 0;
+  for (let x = -19000; x <= 19000; x += 2400) for (let z = -21500; z <= 16500; z += 2400) { const h = S(x, z); if (h > 0) land++; if (h > peak) peak = h; n++; }
+  const landFrac = land / n;
+  if (map === 'strait') {
+    const chan = frac(grid(rng(-3500, 3500, 700), rng(-20000, 15000, 2500)), h => h < 0);
+    let cl = 0, cn = 0; for (const x of [-8000, -6500, -5000, 5000, 6500, 8000]) for (const z of rng(-18000, 14000, 2000)) { cl += Math.max(0, Math.min(S(x, z), 1200)); cn++; }
+    return chan * 4 + Math.min(cl / cn / 350, 2) + Math.min(peak / 1000, 1.2);
+  }
+  const rw = grid([800, 900, 1000, 1200], rng(-1800, 1800, 300)).map(([x, z]) => S(x, z));
+  const mean = rw.reduce((a, b) => a + b, 0) / rw.length, sd = Math.sqrt(rw.reduce((a, b) => a + (b - mean) ** 2, 0) / rw.length);
+  const rwLand = rw.filter(h => h > 1).length / rw.length;
+  const appr = frac(grid([600, 900, 1200], [...rng(-5000, -1900, 400), ...rng(1900, 5000, 400)]), h => h < 40);
+  let east = 0, en = 0; for (const x of rng(2500, 7000, 900)) for (const z of rng(-4000, 4000, 1600)) { east += Math.max(0, S(x, z)); en++; }
+  let sc = rwLand * 3 - Math.max(0, mean - 45, 2 - mean) / 20 - sd / 15 + appr * 2 + Math.min(east / en / 400, 1.5) + Math.min(peak / 1000, 1.2);
+  if (map === 'archipelago') {
+    const portW = frac(grid([-2500, -2200, -1950], rng(-1600, 200, 300)), h => h < -15);
+    const portE = frac(grid([-1550, -1200, -850, -550], rng(-1600, 200, 300)), h => h >= 4 && h <= 80);
+    sc += portW * 2 + portE * 2 - Math.max(0, 0.25 - landFrac, landFrac - 0.55) * 8;
+  } else {
+    sc -= Math.max(0, 0.35 - landFrac, landFrac - 0.8) * 6;
+  }
+  return sc;
+}
+async function findFrame(map) {
+  const R = FRAME_SEARCH[map], Z = 10, cfg0 = DEM_THEATRES[map];
+  const cands = [];
+  for (let lat = R.lat[0]; lat <= R.lat[1] + 1e-9; lat += R.lat[2])
+    for (let lon = R.lon[0]; lon <= R.lon[1] + 1e-9; lon += R.lon[2])
+      for (let rot = R.rot[0]; rot <= R.rot[1]; rot += R.rot[2]) cands.push({ ...cfg0, lat: +lat.toFixed(4), lon: +lon.toFixed(4), rotDeg: rot });
+  const t0 = Date.now(); let best = [];
+  for (let i = 0; i < cands.length; i++) {
+    const S = await buildDemSampler(cands[i], Z, 22000);
+    const sc = scoreFrame(map, (x, z) => S(x, z));
+    best.push([sc, cands[i]]);
+    if (i % 500 === 0) process.stdout.write(`\r[frame] ${map} ${i}/${cands.length} tiles=${tileCache.size}   `);
+  }
+  best.sort((a, b) => b[0] - a[0]);
+  console.log(`\n[frame] ${map}: ${cands.length} candidates in ${Date.now() - t0} ms; top 5:`);
+  for (const [sc, c] of best.slice(0, 5)) console.log(`   score ${sc.toFixed(3)}  lat ${c.lat}  lon ${c.lon}  rot ${c.rotDeg}`);
+  return best[0];
+}
+if (args.includes('--find-frame')) {
+  for (const m of which === 'all' ? ['archipelago', 'gorge', 'strait'] : [which]) await findFrame(m);
+  process.exit(0);
 }
 
 const list = which === 'all' ? ['archipelago', 'gorge', 'strait'] : [which];

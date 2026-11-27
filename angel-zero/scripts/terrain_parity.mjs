@@ -87,6 +87,27 @@ for (const map of ['archipelago', 'gorge', 'strait']) {
     for (let z = c.z0 + 2000; z < c.z0 + CORE.SIZE - 2000; z += 100) for (let x = -3000; x <= 3000; x += 100) worst = Math.max(worst, S.heightAt(x, z));
     check(worst < -5, `STRAIT: channel |x|<3000 open water (highest ${worst.toFixed(1)} m)`);
   }
+  // ---- v3.1 Landmark Correlation Audit (meta.landmarks vs the baked ground) ----
+  const LM = meta.landmarks;
+  check(!!LM, `${map}: meta.landmarks present`);
+  if (LM) {
+    S.setViewer(1e9, 1e9);
+    const H = (x, z) => S.heightAt(x, z);
+    const wet = [...LM.ships.map(p => p.slice(0, 2)), ...LM.oilRigs.map(p => p.slice(0, 2))];
+    if (LM.windFarm) for (let k = 0; k < LM.windFarm.n; k++) { const f = k / (LM.windFarm.n - 1); wet.push([LM.windFarm.a[0] + (LM.windFarm.b[0] - LM.windFarm.a[0]) * f, LM.windFarm.a[1] + (LM.windFarm.b[1] - LM.windFarm.a[1]) * f]); }
+    const wetMax = Math.max(-1e9, ...wet.map(([x, z]) => H(x, z)));
+    check(wet.every(([x, z]) => H(x, z) < -8), `${map}: ${wet.length} ships / rigs / turbines in water < -8 m (highest ${wet.length ? wetMax.toFixed(1) : 'n/a'} m)`);
+    const dry = [...LM.lighthouses, ...LM.radars, ...(LM.observatory ? [LM.observatory] : [])].map(p => p.slice(0, 2));
+    const dryMin = Math.min(1e9, ...dry.map(([x, z]) => H(x, z)));
+    check(dry.every(([x, z]) => H(x, z) > 8), `${map}: ${dry.length} lighthouses / radars / observatory on land > 8 m (lowest ${dry.length ? dryMin.toFixed(1) : 'n/a'} m)`);
+    const brOk = LM.bridges.every(b => H(b.a[0], b.a[1]) > 10 && H(b.b[0], b.b[1]) > 10 && H((b.a[0] + b.b[0]) / 2, (b.a[1] + b.b[1]) / 2) < -5);
+    check(brOk, `${map}: ${LM.bridges.length} bridges land-to-land over water`);
+    if (LM.harbour) {
+      const hb = LM.harbour, mx = (hb.a[0] + hb.b[0]) / 2, mz = (hb.a[1] + hb.b[1]) / 2;
+      const shelf = H(mx + hb.n[0] * 60, mz + hb.n[1] * 60), basin = H(mx - hb.n[0] * 60, mz - hb.n[1] * 60);
+      check(Math.abs(shelf - 3.5) < 0.6 && basin < -8, `${map}: harbour quay shelf ${shelf.toFixed(2)} m, basin ${basin.toFixed(1)} m`);
+    }
+  }
 }
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASS');
 process.exit(fails ? 1 : 0);

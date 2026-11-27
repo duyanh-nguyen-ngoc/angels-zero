@@ -12,7 +12,7 @@
 //   outside the core       : horizonHeight(x, z, mapId) (GLSL twin in clipmap.js).
 // Zero allocations per query.
 
-import { CORE, horizonHeight, cragNoise, cragGate, CRAG_AMP, MAP_IDS, ss } from './geography.js?v=s10ter7';
+import { CORE, horizonHeight, cragNoise, cragGate, CRAG_AMP, MAP_IDS, ss } from './geography.js?v=s10ter8';
 
 export const CRAG_FADE = [1500, 2500];                     // m from the viewer (CPU == GPU)
 
@@ -83,6 +83,15 @@ export function loadTerrainPack(map, base = 'assets/terrain', tag = '') {
   return p;
 }
 export const packLoaded = map => _packCache.has(map);
+// v3.1: meta.json alone (~3 KB: frame + DEM landmarks) so world.js can place every theatre's
+// landmarks at boot while the big gorge / strait height packs stay lazy. Memoised; null on error.
+const _metaCache = new Map();
+export function loadTerrainMeta(map, base = 'assets/terrain', tag = '') {
+  if (_metaCache.has(map)) return _metaCache.get(map);
+  const p = fetch(`${base}/${map}/meta.json${tag ? '?v=' + tag : ''}`).then(r => (r.ok ? r.json() : null)).catch(() => null);
+  _metaCache.set(map, p);
+  return p;
+}
 
 /* ------------------------------------------------------------- CPU sampler */
 export function createSampler(pack) {

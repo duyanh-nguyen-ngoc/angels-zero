@@ -32,14 +32,15 @@
 // (same Uint16 bilinear + crag + horizon), so crashes, missiles, bombs and props agree with
 // what is on screen (scripts/terrain_parity.mjs checks it).
 
-export { WORLD, RWY, CORE } from './geography.js?v=s10ter7';
+export { WORLD, RWY, CORE } from './geography.js?v=s10ter8';
 const FT = 0.3048;
-import { WORLD, RWY, CORE, createGeography } from './geography.js?v=s10ter7';
+import { WORLD, RWY, CORE, createGeography } from './geography.js?v=s10ter8';
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { loadTerrainPack, createSampler } from './terrainpack.js?v=s10ter7';
-import { createClipmap, CM_VERTEX_PARS, CM_VERTEX_BODY, TERRAIN_HEIGHT_GLSL } from './clipmap.js?v=s10ter7';
-import { createClutter } from './clutter.js?v=s10ter6';
+import { loadTerrainPack, createSampler } from './terrainpack.js?v=s10ter8';
+import { createClipmap, CM_VERTEX_PARS, CM_VERTEX_BODY, TERRAIN_HEIGHT_GLSL } from './clipmap.js?v=s10ter8';
+import { gorgePropSites } from './gorgesites.js?v=s10ter8';
+import { createClutter } from './clutter.js?v=s10ter8';
 import { gorgeCentreX, gorgeSlope, gorgeHeading, gorgeDist, GORGE_FLOOR_Y, GORGE_RIM_Y, GORGE_CRATER_R,
   GORGE_CRATER_WALL_Y, GORGE_CRATER_Z, GORGE_GATE_Z, GORGE_GATE_N, GORGE_FORT, CEIL_M,
   GORGE_BBOX, GORGE_HALF_W, GORGE_RAMP_W, SEA_FLOOR_Y, RUNWAY_BBOX,
@@ -172,12 +173,14 @@ export function createWorld(THREE, env) {
         c = mix(c, ${glslCol(COL.basalt)}, hzSS(slope, 0.28, 0.48) * (1.0 - hzSS(h, 28.0, 85.0)));
         float weather = hzSS(texture2D(uDetail, xz * 0.0008).g * 1.4 - 0.7 + (h - 720.0) / 260.0, -0.22, 0.35);
         c = mix(c, ${glslCol(COL.peak)}, hzSS(h, 560.0, 860.0) * (1.0 - 0.45 * hzSS(slope, 0.38, 0.68)) * weather);
-        float vd = uMapMode < 0.5 ? length(xz - vec2(5600.0, -8300.0)) : 99999.0;
-        if (vd < 950.0) {
-          c = mix(c, ${glslCol(COL.cinder)}, hzSS(vd, 900.0, 320.0) * hzSS(h, 460.0, 680.0));
-          if (vd < 380.0 && h < 760.0) c = mix(c, ${glslCol(COL.lava)}, hzSS(vd, 360.0, 110.0) * (1.0 - hzSS(slope, 0.25, 0.55)) * 0.55);
+        // v3.1 tarmac / apron tint: tight core under runway, taxiway, apron and hangars, edges
+        // broken by detail noise (no square pad seam); only on the flat 10 m plateau.
+        if (uMapMode < 1.5) {
+          vec2 q = xz + (texture2D(uDetail, xz * 0.0035).rg - 0.5) * 120.0;
+          vec2 dd = max(vec2(${(RWY.x - 90).toFixed(1)} - q.x, ${(RWY.z0 - 110).toFixed(1)} - q.y), vec2(q.x - ${(RWY.x + 410).toFixed(1)}, q.y - ${(RWY.z1 + 130).toFixed(1)}));
+          float tarmac = (1.0 - hzSS(max(dd.x, dd.y), -10.0, 28.0)) * (1.0 - hzSS(abs(h - ${RWY.elev.toFixed(1)}), 0.4, 1.4));
+          c = mix(c, ${glslCol(COL.pad)}, 0.6 * tarmac);
         }
-        if (uMapMode < 1.5 && abs(h - ${RWY.elev.toFixed(1)}) < 0.6 && abs(xz.x - ${(RWY.x + 85).toFixed(1)}) < 360.0 && xz.y > ${(RWY.z0 - 140).toFixed(1)} && xz.y < ${(RWY.z1 + 160).toFixed(1)}) c = mix(c, ${glslCol(COL.pad)}, 0.6);
       }
       return c;
     }`;
@@ -200,7 +203,7 @@ export function createWorld(THREE, env) {
     uShore: { value: lin(0x8e7c58) }, uSand: { value: lin(0xc8b482) },
     uRockA: { value: lin(0x54575c) }, uRockB: { value: lin(0x282d33) }, uRockHi: { value: lin(0x8b877f) },
     uPeak: { value: lin(0x88857d) }, uSnow: { value: lin(0xe8eff7) }, uRiver: { value: lin(0x185258) },
-    uAfb: { value: new THREE.Vector4(RWY.x - 300, RWY.x + 560, RWY.z0 - 450, RWY.z1 + 450) },
+    uAfb: { value: new THREE.Vector4(RWY.x - 140, RWY.x + 460, RWY.z0 - 160, RWY.z1 + 180) },   // v3.1 tight AFB core (noise-warped in the shader)
     uTown: { value: new THREE.Vector4(-2050, -450, -1850, 350) },
     uGorgeBox: { value: new THREE.Vector4(GORGE_BBOX.x[0] - 450, GORGE_BBOX.x[1] + 450, GORGE_BBOX.z[1] - 450, GORGE_BBOX.z[0] + 450) },
     uMapMode: { value: 0 },                             // 0 archipelago, 1 gorge, 2 strait
@@ -238,6 +241,7 @@ export function createWorld(THREE, env) {
       return normalize(abs(fDet) * surfNorm - grad);
     }
     float fh12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+    // v3.1: soft masks are evaluated on noise-warped positions so no square edges show.
     float rectMask(vec2 p, vec4 r, float f) {
       vec2 d = max(vec2(r.x - p.x, r.z - p.y), vec2(p.x - r.y, p.y - r.w));
       return 1.0 - smoothstep(0.0, f, max(d.x, d.y));
@@ -332,9 +336,10 @@ export function createWorld(THREE, env) {
           // Close-range tactile grain (11.8 m tile): flat pads, hills and valley floors stay textured.
           if (camD < 3200.0) closeB = texture2D(uDetail, vWPos.xz * 0.085).b * tw.y + texture2D(uDetail, vWPos.zy * 0.085).b * tw.x + texture2D(uDetail, vWPos.xy * 0.085).b * tw.z;
         }
-        float inGorgeMask = (uMapMode > 0.5 && uMapMode < 1.5) ? rectMask(vWPos.xz, uGorgeBox, 350.0) * (1.0 - rectMask(vWPos.xz, uAfb, 120.0)) : 0.0;
+        vec2 wXZ = vWPos.xz + (vec2(det, d1v) - 0.5) * 180.0;            // noise-warped mask coordinates
+        float inGorgeMask = (uMapMode > 0.5 && uMapMode < 1.5) ? rectMask(vWPos.xz, uGorgeBox, 350.0) * (1.0 - rectMask(wXZ, uAfb, 120.0)) : 0.0;
         // Erosion shading stays off the AFB pad and Port City (flat, authored ground).
-        float eroK = (uMapMode > 1.5) ? 1.0 : (1.0 - rectMask(vWPos.xz, uAfb, 220.0)) * (1.0 - rectMask(vWPos.xz, uTown, 180.0));
+        float eroK = (uMapMode > 1.5) ? 1.0 : (1.0 - rectMask(wXZ, uAfb, 220.0));   // Port City keeps natural coastal detail
         float tWet = 0.0, tRock = 0.0, tSnow = 0.0;      // feed the roughness + micro-normal passes
         if (vWPos.y > 0.0) {
           float ny = clamp(vWNrm.y, 0.0, 1.0);
@@ -344,7 +349,7 @@ export function createWorld(THREE, env) {
           tRock = cliffK;
           float allowFarm = (uMapMode > 1.5) ? 0.0 : (1.0 - inGorgeMask);
           float farmK = allowFarm * smoothstep(13.0, 18.0, vWPos.y) * (1.0 - smoothstep(295.0, 315.0, vWPos.y)) * smoothstep(0.78, 0.86, ny)
-            * (1.0 - rectMask(vWPos.xz, uAfb, 160.0)) * (1.0 - rectMask(vWPos.xz, uTown, 140.0));
+            * (1.0 - rectMask(wXZ, uAfb, 160.0)) * (1.0 - rectMask(wXZ, uTown, 140.0));
           // Baked landUse classes (splat A): farmland 64, forest 128. Outside the core: no gating.
           float luFarm = 1.0 - smoothstep(0.07, 0.16, abs(vLand - 0.251));
           float luForest = 1.0 - smoothstep(0.07, 0.16, abs(vLand - 0.502));
@@ -414,16 +419,16 @@ export function createWorld(THREE, env) {
           land = mix(land, uPeak, midPeak * 0.72);
           // Per-pixel alpine snowcaps: cling to high flat ledges, shed crisply off steep rock walls,
           // never on the volcano caldera or inside the canyon trench.
-          float calderaD = length(vWPos.xz - vec2(5600.0, -8300.0));
           // Alpine snowline 950-1250 m (jittered); the gorge massif keeps its high snow.
           float snowLine = 1100.0 + jit * 300.0;
           float snow = smoothstep(snowLine, snowLine + 110.0, vWPos.y)
             * (1.0 - smoothstep(uSnowSlopeMin, uSnowSlopeMax, slope + jit * 0.07))
-            * ((uMapMode < 0.5) ? smoothstep(900.0, 1050.0, calderaD) : 1.0) * (1.0 - inGorgeMask * (1.0 - smoothstep(760.0, 900.0, vWPos.y)));
+            * (1.0 - inGorgeMask * (1.0 - smoothstep(760.0, 900.0, vWPos.y)));
           land = mix(land, uSnow * (0.94 + 0.12 * d1v), snow);
           tSnow = snow;
-          // Main Island carved mountain stream & island highways (ARCHIPELAGO).
-          if (uMapMode < 0.5) {
+          // v3.1: the v1/v2 fixed-coordinate island stream + highway overlays are retired (they no
+          // longer match the real DEM); roads now come from clutter.js draped DEM roads.
+          if (uMapMode < -0.5) {
             if (vWPos.x > 80.0 && vWPos.x < 2360.0 && vWPos.z < -1820.0 && vWPos.z > -3450.0 && ny > 0.72) {
               float rd = min(segDist(vWPos.xz, vec2(2020.0, -1960.0), vec2(1160.0, -2460.0)),
                              segDist(vWPos.xz, vec2(1160.0, -2460.0), vec2(360.0, -3180.0)));
@@ -509,15 +514,7 @@ export function createWorld(THREE, env) {
           normal = azPerturbNormal(-vViewPosition, normal, dH * bumpK, faceDirection);
         }`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-        if (uMapMode < 0.5 && vWPos.y > 580.0 && vWPos.y < 765.0) {
-          float vd = length(vWPos.xz - vec2(5600.0, -8300.0));
-          if (vd < 360.0) {
-            float crk = texture2D(uDetail, vWPos.xz * 0.0075).r;
-            float crk2 = texture2D(uDetail, vWPos.xz * 0.019 + 0.41).r;
-            float magma = smoothstep(0.64, 0.82, crk * 0.65 + crk2 * 0.45) * (1.0 - smoothstep(140.0, 340.0, vd)) * smoothstep(0.65, 0.9, vWNrm.y);
-            totalEmissiveRadiance += vec3(2.1, 0.44, 0.07) * magma;
-          }
-        }`)
+        `)                                                     // v3.1: legacy volcano magma glow removed
       .replace('#include <fog_fragment>', `
         #ifdef USE_FOG
           vec3 vToP = vWPos - cameraPosition;
@@ -613,11 +610,12 @@ export function createWorld(THREE, env) {
 
   /* ---------------------------------------------------- props + lights */
   const props = new THREE.Group(); props.name = 'worldProps'; scene.add(props);
-  const boxes = [], gorgeBoxes = [], straitBoxes = [];        // collision: { c, hx, hy, hz, yaw }
+  const boxes = [], gorgeBoxes = [], straitBoxes = [], archBoxes = [];   // collision: { c, hx, hy, hz, yaw } (archBoxes: archipelago-only DEM landmarks)
   function addBox(cx, cy, cz, hx, hy, hz, yaw = 0, mapKind = 'arch') {
     const b = { c: new THREE.Vector3(cx, cy, cz), hx, hy, hz, yaw };
-    if (mapKind === 'gorge') gorgeBoxes.push(b);
-    else if (mapKind === 'strait') straitBoxes.push(b);
+    if (mapKind === 'gorge' || mapKind === 'lmGorge') gorgeBoxes.push(b);
+    else if (mapKind === 'strait' || mapKind === 'lmStrait') straitBoxes.push(b);
+    else if (mapKind === 'lmArch') archBoxes.push(b);
     else boxes.push(b);
   }
   const M = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.75, metalness: 0.1, ...extra });
@@ -634,11 +632,12 @@ export function createWorld(THREE, env) {
     if (bucket) o.userData.propBucket = bucket;
     props.add(o); return o;
   };
-  const cyls = [], gorgeCyls = [], straitCyls = [];           // { x, z, y0, y1, r0, r1 }
+  const cyls = [], gorgeCyls = [], straitCyls = [], archCyls = [];   // { x, z, y0, y1, r0, r1 }
   function addCyl(x, z, y0, y1, r0, r1 = r0, mapKind = 'arch') {
     const c = { x, z, y0, y1, r0, r1 };
-    if (mapKind === 'gorge') gorgeCyls.push(c);
-    else if (mapKind === 'strait') straitCyls.push(c);
+    if (mapKind === 'gorge' || mapKind === 'lmGorge') gorgeCyls.push(c);
+    else if (mapKind === 'strait' || mapKind === 'lmStrait') straitCyls.push(c);
+    else if (mapKind === 'lmArch') archCyls.push(c);
     else cyls.push(c);
   }
 
@@ -650,13 +649,16 @@ export function createWorld(THREE, env) {
     out: { box: [], cyl: [], arch: [] },
     in: { box: [], cyl: [], arch: [] },
     gorge: { box: [], cyl: [], arch: [] },
-    strait: { box: [], cyl: [], arch: [] }
+    strait: { box: [], cyl: [], arch: [] },
+    // v3.1 per-theatre DEM landmark buckets (visible only on their own map; see rebuild()).
+    lmArch: { box: [], cyl: [], arch: [] }, lmGorge: { box: [], cyl: [], arch: [] }, lmStrait: { box: [], cyl: [], arch: [] }
   };
   const _bm = new THREE.Matrix4(), _bq = new THREE.Quaternion(), _be = new THREE.Euler(0, 0, 0, 'YXZ');
   const _bp = new THREE.Vector3(), _bs = new THREE.Vector3(), _bc = new THREE.Color();
   const _ba = new THREE.Vector3(), _bb = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
 
   function pickBatch(x, z, mapKind) {
+    if (mapKind === 'lmArch' || mapKind === 'lmGorge' || mapKind === 'lmStrait') return BATCHES[mapKind];
     if (mapKind === 'gorge') return BATCHES.gorge;
     if (mapKind === 'strait') return BATCHES.strait;
     return inGorgeBBox(x, z) ? BATCHES.in : BATCHES.out;
@@ -682,7 +684,8 @@ export function createWorld(THREE, env) {
         if (!list.length) continue;
         const im = new THREE.InstancedMesh(geos[kind], M(0xffffff, { metalness: kind === 'arch' ? 0.05 : 0.3, roughness: kind === 'arch' ? 0.9 : 0.62 }), list.length);
         im.position.copy(off);
-        if (bKey === 'gorge') im.userData.propBucket = 'gorge';
+        if (bKey.startsWith('lm')) im.userData.propBucket = bKey;
+        else if (bKey === 'gorge') im.userData.propBucket = 'gorge';
         else if (bKey === 'strait') im.userData.propBucket = 'strait';
         else if (bKey === 'in') im.userData.propBucket = 'islandsIn';
         else im.userData.propBucket = 'islandsOut';
@@ -729,6 +732,12 @@ export function createWorld(THREE, env) {
   }
 
   const beams = [], radars = [];                       // rotating lighthouse beams / radar antennas ({ g, w })
+  // v3.1: DEM-detected landmarks per theatre (bake_terrain.mjs detectLandmarks -> meta.json).
+  // Archipelago uses its live sampler; gorge / strait use the baked ground stats in meta.
+  const LM0 = { bridges: [], harbour: null, ships: [], windFarm: null, oilRigs: [], lighthouses: [], radars: [], observatory: null, gorgeProbe: null };
+  const lmOf = m => ({ ...LM0, ...((m && m.landmarks) || {}) });
+  const LMK = { archipelago: lmOf(env.pack && env.pack.meta), gorge: lmOf(env.metas && env.metas.gorge), strait: lmOf(env.metas && env.metas.strait) };
+  const LMB = { archipelago: 'lmArch', gorge: 'lmGorge', strait: 'lmStrait' }, LMID = { lmArch: 3, lmGorge: 1, lmStrait: 2 };
   // ---- ARCHIPELAGO AFB ----------------------------------------------------
   const RL = RWY.z1 - RWY.z0, rwyMidZ = (RWY.z0 + RWY.z1) / 2, E = RWY.elev;
   {
@@ -894,76 +903,80 @@ export function createWorld(THREE, env) {
     for (let k = 0; k < 6; k++) light(RWY.x + 210, E + 18, -760 + k * 140, 0xffe6b8, 6.5, 0);               // warm apron floodlights
   }
 
-  // ---- SUSPENSION BRIDGES + LIVE TRAFFIC -----------------------------------
+  // ---- SUSPENSION BRIDGES + LIVE TRAFFIC (v3.1: real DEM water narrows) ------
+  // Spans come from meta.landmarks.bridges (land-to-land over deep water); abutment piers are
+  // grounded on the baked heights (ha / hb). The v2 coastal highway traffic is retired.
   const bridgeInfo = [];
-  for (const b of BRIDGES) {
+  function buildBridge(b, mk) {
+    const mapId = LMID[mk];
     const A = new THREE.Vector3(b.a[0], DECK_TOP, b.a[1]), B = new THREE.Vector3(b.b[0], DECK_TOP, b.b[1]);
     const span = A.distanceTo(B), dir = B.clone().sub(A).normalize(), yaw = Math.atan2(dir.x, dir.z);
     const mid = A.clone().add(B).multiplyScalar(0.5);
-    const bBucket = inGorgeBBox(mid.x, mid.z) ? 'islandsIn' : 'islandsOut';
     const DH = DECK_TOP - DECK_UNDER, deckY = (DECK_TOP + DECK_UNDER) / 2;
-    mesh(new THREE.BoxGeometry(34, DH, span + 160), mat.deck, mid.x, deckY, mid.z, yaw, bBucket);
-    addBox(mid.x, deckY, mid.z, 17, DH / 2, span / 2 + 80, yaw);
+    mesh(new THREE.BoxGeometry(34, DH, span + 60), mat.deck, mid.x, deckY, mid.z, yaw, mk);
+    addBox(mid.x, deckY, mid.z, 17, DH / 2, span / 2 + 30, yaw, mk);
     const side = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
-    for (const s of [-1, 1]) {
-      const e = mid.clone().addScaledVector(side, s * 16.5);
-      inst('box', e.x, DECK_TOP + 1.2, e.z, 1.2, 2.4, span + 160, 0xb8432e, yaw);
+    for (const sg of [-1, 1]) {
+      const e = mid.clone().addScaledVector(side, sg * 16.5);
+      inst('box', e.x, DECK_TOP + 1.2, e.z, 1.2, 2.4, span + 60, 0xb8432e, yaw, 0, 0, mk);
+    }
+    // Grounded abutment piers + approach ramps onto the real shore.
+    for (const [P, hg] of [[A, b.ha], [B, b.hb]]) {
+      const g0 = (typeof hg === 'number' ? hg : 20) - 3;
+      if (g0 < DECK_UNDER) { inst('box', P.x, (g0 + DECK_UNDER) / 2, P.z, 30, DECK_UNDER - g0, 18, 0x8f908a, yaw, 0, 0, mk); addBox(P.x, (g0 + DECK_UNDER) / 2, P.z, 15, (DECK_UNDER - g0) / 2, 9, yaw, mk); }
     }
     const towers = [0.2, 0.8].map(f => A.clone().lerp(B, f));
     const LEG = 19, BANDS = 8, bandH = TOWER_TOP / BANDS;
     for (const T of towers) {
-      for (const s of [-1, 1]) {
-        const p = T.clone().addScaledVector(side, s * LEG);
-        for (let k = 0; k < BANDS; k++) inst('box', p.x, (k + 0.5) * bandH, p.z, 8, bandH + 0.05, 8, (BANDS - 1 - k) % 2 ? 0xf1efe8 : 0xc0281f, yaw);
-        addBox(p.x, TOWER_TOP / 2, p.z, 4.6, TOWER_TOP / 2, 4.6, yaw);
-        light(p.x, TOWER_TOP + 1.5, p.z, 0xff2020, 10, 2, s > 0 ? 0 : 0.5);
-        light(p.x + side.x * s * 4.5, TOWER_TOP * 0.55, p.z + side.z * s * 4.5, 0xff2020, 6, 2, s > 0 ? 0.25 : 0.75);
+      for (const sg of [-1, 1]) {
+        const p = T.clone().addScaledVector(side, sg * LEG);
+        for (let k = 0; k < BANDS; k++) inst('box', p.x, (k + 0.5) * bandH, p.z, 8, bandH + 0.05, 8, (BANDS - 1 - k) % 2 ? 0xf1efe8 : 0xc0281f, yaw, 0, 0, mk);
+        addBox(p.x, TOWER_TOP / 2, p.z, 4.6, TOWER_TOP / 2, 4.6, yaw, mk);
+        light(p.x, TOWER_TOP + 1.5, p.z, 0xff2020, 10, 2, sg > 0 ? 0 : 0.5, mapId);
+        light(p.x + side.x * sg * 4.5, TOWER_TOP * 0.55, p.z + side.z * sg * 4.5, 0xff2020, 6, 2, sg > 0 ? 0.25 : 0.75, mapId);
       }
       for (const yy of [DECK_UNDER - 5, 190, TOWER_TOP - 6]) {
-        inst('box', T.x, yy, T.z, LEG * 2 + 8, 8, 8, 0xc0281f, yaw);
-        addBox(T.x, yy, T.z, LEG + 4, 4.2, 4.2, yaw);
+        inst('box', T.x, yy, T.z, LEG * 2 + 8, 8, 8, 0xc0281f, yaw, 0, 0, mk);
+        addBox(T.x, yy, T.z, LEG + 4, 4.2, 4.2, yaw, mk);
       }
-      inst('box', T.x, -6, T.z, LEG * 2 + 26, 24, 22, 0x8f908a, yaw);
-      addBox(T.x, -6, T.z, LEG + 13, 12, 11, yaw);
+      inst('box', T.x, -6, T.z, LEG * 2 + 26, 24, 22, 0x8f908a, yaw, 0, 0, mk);
+      addBox(T.x, -6, T.z, LEG + 13, 12, 11, yaw, mk);
     }
     const susp = [];
-    for (const s of [-1, 1]) {
+    for (const sg of [-1, 1]) {
       const pts = [];
-      const T0 = towers[0].clone().addScaledVector(side, s * LEG), T1 = towers[1].clone().addScaledVector(side, s * LEG);
-      const A0 = A.clone().addScaledVector(side, s * LEG).setY(DECK_TOP + 2), B0 = B.clone().addScaledVector(side, s * LEG).setY(DECK_TOP + 2);
+      const T0 = towers[0].clone().addScaledVector(side, sg * LEG), T1 = towers[1].clone().addScaledVector(side, sg * LEG);
+      const A0 = A.clone().addScaledVector(side, sg * LEG).setY(DECK_TOP + 2), B0 = B.clone().addScaledVector(side, sg * LEG).setY(DECK_TOP + 2);
       for (let k = 0; k <= 8; k++) pts.push(A0.clone().lerp(T0, k / 8).setY(DECK_TOP + 2 + (TOWER_TOP - DECK_TOP - 2) * Math.pow(k / 8, 1.4)));
       for (let k = 1; k <= 40; k++) { const f = k / 40, p = T0.clone().lerp(T1, f); p.y = TOWER_TOP - (TOWER_TOP - DECK_TOP - 14) * (1 - (2 * f - 1) ** 2); pts.push(p); }
       for (let k = 1; k <= 8; k++) pts.push(T1.clone().lerp(B0, k / 8).setY(TOWER_TOP - (TOWER_TOP - DECK_TOP - 2) * (1 - Math.pow(1 - k / 8, 1.4))));
       const curve = new THREE.CatmullRomCurve3(pts);
       const cableMesh = new THREE.Mesh(new THREE.TubeGeometry(curve, 160, 1.3, 6, false), mat.bridge);
-      cableMesh.userData.propBucket = bBucket;
-      if (bBucket === 'islandsIn') { cableMesh.geometry.translate(-ANC_IN.x, -ANC_IN.y, -ANC_IN.z); cableMesh.position.copy(ANC_IN); }
+      cableMesh.userData.propBucket = mk;
       props.add(cableMesh);
       for (let k = 1; k < 120; k++) { const p = curve.getPointAt(k / 120); if (p.y > DECK_TOP + 4) susp.push(p.x, p.y, p.z, p.x, DECK_TOP, p.z); }
     }
-    const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(susp, 3));
-    const suspLine = new THREE.LineSegments(sg, new THREE.LineBasicMaterial({ color: 0x6a2a20 }));
-    if (bBucket === 'islandsIn') { sg.translate(-ANC_IN.x, -ANC_IN.y, -ANC_IN.z); suspLine.position.copy(ANC_IN); }
-    suspLine.userData.propBucket = bBucket;
+    const sgeo = new THREE.BufferGeometry(); sgeo.setAttribute('position', new THREE.Float32BufferAttribute(susp, 3));
+    const suspLine = new THREE.LineSegments(sgeo, new THREE.LineBasicMaterial({ color: 0x6a2a20 }));
+    suspLine.userData.propBucket = mk;
     props.add(suspLine);
-    for (let k = 0; k <= 16; k++) { const p = A.clone().lerp(B, k / 16); for (const s of [-1, 1]) light(p.x + side.x * s * 15, DECK_TOP + 1.4, p.z + side.z * s * 15, 0xffd08a, 2.6, 0); }
-    addTrafficSegment(A.x, DECK_TOP, A.z, B.x, DECK_TOP, B.z, 8, 0);
-    bridgeInfo.push({ a: A, b: B, towers, under: DECK_UNDER, top: TOWER_TOP });
+    for (let k = 0; k <= 16; k++) { const p = A.clone().lerp(B, k / 16); for (const sg of [-1, 1]) light(p.x + side.x * sg * 15, DECK_TOP + 1.4, p.z + side.z * sg * 15, 0xffd08a, 2.6, 0, 0, mapId); }
+    addTrafficSegment(A.x, DECK_TOP, A.z, B.x, DECK_TOP, B.z, 8, mapId);
+    if (mk === 'lmArch') bridgeInfo.push({ a: A, b: B, towers, under: DECK_UNDER, top: TOWER_TOP });
   }
-  // Coastal highway night traffic linking AFB, Port City and East Bridge.
-  addTrafficSegment(-1320, Math.max(8, heightAt(-1320, -1080)), -1080, -320, Math.max(8, heightAt(-320, -620)), -620, 6, 0);
-  addTrafficSegment(2250, Math.max(12, heightAt(2250, -2300)), -2300, 1560, Math.max(12, heightAt(1560, -1420)), -1420, 5, 0);
+  for (const m of ['archipelago', 'gorge', 'strait']) for (const b of LMK[m].bridges) buildBridge(b, LMB[m]);
 
   // ---- MERCHANT CARGO SHIPS (QUAY + OUTER SEA LANES) ------------------------
-  function placeCargoShip(sx, sz, yaw, kind = 'container') {
+  function placeCargoShip(sx, sz, yaw, kind = 'container', mk = 'lmArch') {
+    const mapId = LMID[mk] !== undefined ? LMID[mk] : 0;
     const c = Math.cos(yaw), s = Math.sin(yaw), P = (ox, oz) => [sx + ox * c + oz * s, sz - ox * s + oz * c];
     const hullCol = kind === 'tanker' ? 0x6e2622 : 0x263544;
     inst('box', sx, 4.5, sz, 28, 12, 176, hullCol, yaw);
     const [bx, bz] = P(0, 62);
-    inst('box', bx, 18, bz, 24, 16, 18, 0xeaece8, yaw);                // aft bridge block
-    inst('box', bx, 28, bz + 2 * c, 18, 5, 10, 0xd8dce0, yaw);
+    inst('box', bx, 18, bz, 24, 16, 18, 0xeaece8, yaw, 0, 0, mk);                // aft bridge block
+    inst('box', bx, 28, bz + 2 * c, 18, 5, 10, 0xd8dce0, yaw, 0, 0, mk);
     const [fx, fz] = P(0, 72);
-    inst('cyl', fx, 28, fz, 4.5, 10, 4.5, 0xc84628);                   // funnel
+    inst('cyl', fx, 28, fz, 4.5, 10, 4.5, 0xc84628, 0, 0, 0, mk);                   // funnel
     if (kind === 'container') {
       const cols = [0x1f4e78, 0xb83b28, 0x2a6f54, 0xd49424, 0xd8dce0];
       for (let row = -3; row <= 1; row++) for (let col = -1; col <= 1; col++) {
@@ -972,316 +985,218 @@ export function createWorld(THREE, env) {
         inst('box', cx2, 10.5 + stackH * 0.5, cz2, 6.8, stackH, 22, cols[Math.abs(row * 7 + col * 3) % 5], yaw);
       }
     } else {
-      inst('box', sx, 11.2, sz, 25, 1.8, 120, 0x3b4248, yaw);
-      for (let k = -2; k <= 1; k++) { const [px, pz] = P(0, k * 28 - 8); inst('cyl', px, 13.5, pz, 5, 3, 5, 0xb8bfc4); }
+      inst('box', sx, 11.2, sz, 25, 1.8, 120, 0x3b4248, yaw, 0, 0, mk);
+      for (let k = -2; k <= 1; k++) { const [px, pz] = P(0, k * 28 - 8); inst('cyl', px, 13.5, pz, 5, 3, 5, 0xb8bfc4, 0, 0, 0, mk); }
     }
-    addBox(sx, 12, sz, 15, 16, 90, yaw);
+    addBox(sx, 12, sz, 15, 16, 90, yaw, mk);
     const [bowX, bowZ] = P(0, -86);
-    light(bowX, 14, bowZ, 0xffffff, 4.2, 0);
-    light(bx, 33, bz, 0xff2020, 5.0, 2, (sx * 0.001) % 1);
+    light(bowX, 14, bowZ, 0xffffff, 4.2, 0, 0, mapId);
+    light(bx, 33, bz, 0xff2020, 5.0, 2, Math.abs(sx * 0.001) % 1, mapId);
   }
 
-  // ---- HARBOUR, CONTAINER PORT, SKYLINE & WATERFRONT TOWN -------------------
-  {
-    const qx = -1755;
-    mesh(new THREE.BoxGeometry(68, 6, 1180), mat.concrete, qx, 0, -900, 0, 'islandsIn');     // quay
-    addBox(qx, 0, -900, 34, 3, 590);
-    for (let k = 0; k < 6; k++) {
-      const wz = -1350 + k * 170, wx = -1650 + (k % 2) * 30, wy = Math.max(3, heightAt(wx, wz));
-      mesh(new THREE.BoxGeometry(48, 16, 110), mat.warehouse, wx, wy + 8, wz, 0, 'islandsIn');
-      addBox(wx, wy + 8, wz, 24, 8, 55);
+  // ---- HARBOUR, CONTAINER PORT, SKYLINE & WATERFRONT TOWN (v3.1: real bay) ---
+  // Everything is laid out in the quay frame of meta.landmarks.harbour: Q(lat, t) with t along
+  // the detected shoreline and lat landward (water at lat < 0). Buildings on the natural slope
+  // behind the 3.5 m quay shelf get grounded plinths (base at the lowest footprint corner).
+  for (const m of ['archipelago', 'gorge', 'strait']) {
+    const mk = LMB[m];
+    for (const [sx, sz, yaw, kind] of LMK[m].ships) placeCargoShip(sx, sz, yaw, kind === 'tanker' ? 'tanker' : 'container', mk);
+  }
+  const HB = LMK.archipelago.harbour;
+  let portCityXZ = null;
+  if (HB) {
+    const mk = 'lmArch', mapId = 3, hy = HB.yaw, dX = Math.sin(hy), dZ = Math.cos(hy), nX = HB.n[0], nZ = HB.n[1], QL = HB.len;
+    const Q = (lat, t) => [HB.a[0] + dX * t + nX * lat, HB.a[1] + dZ * t + nZ * lat];
+    const footY = (x, z, r) => { let lo = heightAt(x, z), hi = lo; for (const [ox, oz] of [[r, 0], [-r, 0], [0, r], [0, -r], [r, r], [-r, -r]]) { const y = heightAt(x + ox, z + oz); lo = Math.min(lo, y); hi = Math.max(hi, y); } return [lo, hi]; };
+    portCityXZ = Q(420, QL / 2);
+    const QY = 4.5;                                                  // quay deck (shelf 3.5 m + 1 m)
+    { const [qx, qz] = Q(-6, QL / 2); mesh(new THREE.BoxGeometry(44, 14, QL), mat.concrete, qx, QY - 7, qz, hy, mk); addBox(qx, QY - 7, qz, 22, 7, QL / 2, hy, mk); }
+    // Warehouses on the shelf.
+    for (let k = 0; k * 170 + 90 < QL; k++) {
+      const [wx, wz] = Q(100 + (k % 2) * 12, 90 + k * 170), [lo] = footY(wx, wz, 30), wy = Math.max(3.5, lo);
+      mesh(new THREE.BoxGeometry(48, 16 + wy - lo + 1, 110), mat.warehouse, wx, (Math.min(lo, wy) - 1 + wy + 16) / 2, wz, hy, mk);
+      addBox(wx, wy + 8, wz, 24, 8, 55, hy, mk);
     }
-    // Stacked intermodal shipping containers along the container apron.
-    {
-      const cCols = [0x1f4e78, 0xb83b28, 0x2a6f54, 0xd49424, 0xcfd4d8, 0x2c4257];
-      const crnd = env.mulberry32(8088);
-      for (let b = 0; b < 14; b++) {
-        const bz = -1390 + b * 74;
-        for (let lane = 0; lane < 3; lane++) {
-          const bx = qx + 8 + lane * 8.5, tiers = 1 + Math.floor(crnd() * 3);
-          for (let t = 0; t < tiers; t++) {
-            inst('box', bx, 3 + 1.4 + t * 2.8, bz, 2.6, 2.7, 12.2, cCols[Math.floor(crnd() * cCols.length)]);
-          }
-        }
+    // Stacked intermodal containers along the apron.
+    { const cCols = [0x1f4e78, 0xb83b28, 0x2a6f54, 0xd49424, 0xcfd4d8, 0x2c4257], crnd = env.mulberry32(8088);
+      for (let t = 40; t < QL - 40; t += 74) for (let lane = 0; lane < 3; lane++) {
+        const [bx, bz] = Q(14 + lane * 8.5, t), tiers = 1 + Math.floor(crnd() * 3);
+        for (let tr = 0; tr < tiers; tr++) inst('box', bx, QY + 1.4 + tr * 2.8, bz, 2.6, 2.7, 12.2, cCols[Math.floor(crnd() * cCols.length)], hy, 0, 0, mk);
+      } }
+    // Berthed vessels alongside the quay face.
+    { const [s1x, s1z] = Q(-48, QL * 0.3), [s2x, s2z] = Q(-48, QL * 0.74); placeCargoShip(s1x, s1z, hy, 'container', mk); placeCargoShip(s2x, s2z, hy + Math.PI, 'tanker', mk); }
+    // Ship-to-shore gantry cranes (booms reach seaward over the berths).
+    const nCr = Math.max(2, Math.min(5, Math.floor(QL / 150)));
+    for (let k = 0; k < nCr; k++) {
+      const t = 70 + k * (QL - 140) / Math.max(1, nCr - 1), Y = QY, PH = 62, col = k % 2 ? 0xd8a21c : 0xc94a1e;
+      const W = (lat, tt, y) => { const [x, z] = Q(lat, tt); return [x, y, z]; };
+      for (const [ol, ot] of [[-13, -11], [13, -11], [-13, 11], [13, 11]]) { const [x, , z] = W(-2 + ol, t + ot, 0); inst('box', x, Y + PH / 2, z, 2.6, PH, 2.6, col, hy, 0, 0, mk); }
+      for (const ot of [-11, 11]) { const [x, , z] = W(-2, t + ot, 0); inst('box', x, Y + 14, z, 28, 2.2, 2.2, col, hy, 0, 0, mk); beam(...W(-15, t + ot, Y + 2), ...W(11, t + ot, Y + PH - 4), 1.4, col, mk); }
+      for (const ol of [-13, 13]) { const [x, , z] = W(-2 + ol, t, 0); inst('box', x, Y + PH, z, 3, 3, 24, col, hy, 0, 0, mk); }
+      for (const ot of [-9, 9]) { const [x, , z] = W(-34, t + ot, 0); inst('box', x, Y + PH + 2, z, 105, 3.2, 2.4, col, hy, 0, 0, mk); }
+      { const [x, , z] = W(6, t, 0); inst('box', x, Y + PH + 7, z, 14, 8, 16, 0xe8e8e2, hy, 0, 0, mk); }
+      for (const ot of [-9, 9]) {
+        beam(...W(-2, t + ot, Y + PH + 3), ...W(2, t + ot, Y + PH + 30), 1.8, col, mk);
+        beam(...W(2, t + ot, Y + PH + 30), ...W(-82, t + ot, Y + PH + 3), 0.7, 0x55585c, mk);
+        beam(...W(2, t + ot, Y + PH + 30), ...W(18, t + ot, Y + PH + 3), 0.7, 0x55585c, mk);
       }
+      { const [x, , z] = W(-2, t, 0); addBox(x, Y + PH / 2, z, 15, PH / 2 + 2, 13, hy, mk); }
+      { const [x, , z] = W(-34, t, 0); addBox(x, Y + PH + 12, z, 54, 14, 11, hy, mk); }
+      { const [x, y, z] = W(-86, t, Y + PH + 3); light(x, y, z, 0xff2020, 5, 2, k * 0.3, mapId); }
+      { const [x, y, z] = W(2, t, Y + PH + 31); light(x, y, z, 0xff2020, 6, 2, k * 0.3 + 0.5, mapId); }
     }
-    // Two berthed cargo vessels along the deep-water quay + 3 outer sea-lane ships.
-    placeCargoShip(qx - 52, -1140, 0, 'container');
-    placeCargoShip(qx - 50, -640, Math.PI, 'tanker');
-    placeCargoShip(4900, 4900, -0.65, 'container');
-    placeCargoShip(8500, -5400, 0.32, 'tanker');
-    placeCargoShip(-8650, -5900, -0.18, 'container');
-
-    // Ship-to-shore container gantry cranes.
-    for (let k = 0; k < 5; k++) {
-      const cz = -1350 + k * 220, cx = qx - 2, Y = 3, PH = 62, col = k % 2 ? 0xd8a21c : 0xc94a1e;
-      for (const [ox, oz] of [[-13, -11], [13, -11], [-13, 11], [13, 11]]) inst('box', cx + ox, Y + PH / 2, cz + oz, 2.6, PH, 2.6, col);
-      for (const oz of [-11, 11]) { inst('box', cx, Y + 14, cz + oz, 28, 2.2, 2.2, col); beam(cx - 13, Y + 2, cz + oz, cx + 13, Y + PH - 4, cz + oz, 1.4, col); }
-      for (const ox of [-13, 13]) inst('box', cx + ox, Y + PH, cz, 3, 3, 24, col);
-      for (const oz of [-9, 9]) inst('box', cx - 32, Y + PH + 2, cz + oz, 105, 3.2, 2.4, col);
-      inst('box', cx + 8, Y + PH + 7, cz, 14, 8, 16, 0xe8e8e2);
-      for (const oz of [-9, 9]) {
-        beam(cx, Y + PH + 3, cz + oz, cx + 4, Y + PH + 30, cz + oz, 1.8, col);
-        beam(cx + 4, Y + PH + 30, cz + oz, cx - 80, Y + PH + 3, cz + oz, 0.7, 0x55585c);
-        beam(cx + 4, Y + PH + 30, cz + oz, cx + 20, Y + PH + 3, cz + oz, 0.7, 0x55585c);
-      }
-      addBox(cx, Y + PH / 2, cz, 15, PH / 2 + 2, 13);
-      addBox(cx - 32, Y + PH + 12, cz, 54, 14, 11);
-      light(cx - 84, Y + PH + 3, cz, 0xff2020, 5, 2, k * 0.3); light(cx + 4, Y + PH + 31, cz, 0xff2020, 6, 2, k * 0.3 + 0.5);
+    // Breakwaters across the harbour mouth (detected seaward of the quay ends).
+    for (const [bx, bz, byaw, blen] of HB.breakwaters || []) {
+      if (heightAt(bx, bz) > -2) continue;
+      mesh(new THREE.BoxGeometry(24, 30, blen), mat.concrete, bx, -11, bz, byaw, mk);
+      addBox(bx, -11, bz, 12, 15, blen / 2, byaw, mk);
+      light(bx + Math.sin(byaw) * blen * 0.5, 6, bz + Math.cos(byaw) * blen * 0.5, 0x30ff60, 5, 2, 0.2, mapId);
     }
-    // White cylindrical fuel-storage tank farm behind the quay.
-    const tanks = [];
-    {
-      const trnd = env.mulberry32(733);
-      for (let k = 0; k < 400 && tanks.length < 10; k++) {
-        const x = -1700 + trnd() * 700, z = -250 + trnd() * 520, r = 13 + trnd() * 7, y = heightAt(x, z);
-        if (y < 3 || y > 60 || tanks.some(t => Math.hypot(t[0] - x, t[1] - z) < t[2] + r + 10)) continue;
-        let flat = true;
-        for (const [ox, oz] of [[r, 0], [-r, 0], [0, r], [0, -r]]) if (Math.abs(heightAt(x + ox, z + oz) - y) > 3) flat = false;
-        if (!flat) continue;
-        const h = 16 + trnd() * 9;
-        tanks.push([x, z, r]);
-        inst('cyl', x, y + h / 2 - 1, z, r * 2, h + 2, r * 2, 0xe9ebe7);
-        inst('cyl', x, y + h + 0.6, z, r * 1.9, 1.2, r * 1.9, 0xb9bdbb);
-        inst('box', x + r * 0.7, y + h / 2, z + r * 0.7, 0.8, h, 0.8, 0x6f7780, Math.PI / 4);
-        addCyl(x, z, y - 2, y + h + 1.5, r + 0.5);
-      }
-    }
-    // Breakwaters across the bay mouth (west).
-    mesh(new THREE.BoxGeometry(24, 8, 620), mat.concrete, -3420, 0, -1350, 0.5, 'islandsIn');
-    mesh(new THREE.BoxGeometry(24, 8, 560), mat.concrete, -3380, 0, -420, -0.55, 'islandsIn');
-    addBox(-3420, 0, -1350, 12, 4, 310, 0.5); addBox(-3380, 0, -420, 12, 4, 280, -0.55);
-    light(-3270, 8, -1080, 0x30ff60, 5, 2, 0.2); light(-3250, 8, -650, 0xff2a2a, 5, 2, 0.7);
-
-    // Port City downtown mid-rise skyline cluster (26 stepped towers behind the harbour).
-    const towersPlaced = [];
-    {
-      const srnd = env.mulberry32(4049);
-      const tPal = [0x9aa6b2, 0xb8b5aa, 0x7a8b99, 0xc7c2b6, 0x687887, 0xa8aeb5];
-      for (let k = 0; k < 500 && towersPlaced.length < 26; k++) {
-        const tx2 = -1520 + srnd() * 540, tz2 = -1260 + srnd() * 880, ty2 = heightAt(tx2, tz2);
-        if (ty2 < 5 || ty2 > 52) continue;
-        if (Math.abs(heightAt(tx2 + 16, tz2) - ty2) > 4.5 || Math.abs(heightAt(tx2, tz2 + 16) - ty2) > 4.5) continue;
-        if (tanks.some(t => Math.hypot(t[0] - tx2, t[1] - tz2) < t[2] + 28)) continue;
-        if (towersPlaced.some(t => Math.hypot(t[0] - tx2, t[1] - tz2) < 46)) continue;
-        const w = 18 + srnd() * 14, d = 18 + srnd() * 14, h = 28 + Math.pow(srnd(), 1.3) * 52, yaw = (Math.floor(srnd() * 4) * 0.5 + 0.08) * Math.PI;
-        const col = tPal[Math.floor(srnd() * tPal.length)];
+    // Fuel tank farm, downtown towers and the waterfront town step up the natural slope.
+    const tanks = [], towersPlaced = [], houses = [];
+    { const trnd = env.mulberry32(733);
+      for (let k = 0; k < 500 && tanks.length < 8; k++) {
+        const [x, z] = Q(180 + trnd() * 420, -150 + trnd() * (QL + 300)), r = 13 + trnd() * 7, [lo, hi] = footY(x, z, r);
+        if (lo < 3 || hi - lo > 6 || hi > 70 || tanks.some(t => Math.hypot(t[0] - x, t[1] - z) < t[2] + r + 10)) continue;
+        const h = 16 + trnd() * 9; tanks.push([x, z, r]);
+        inst('cyl', x, (lo - 1 + hi + h) / 2, z, r * 2, hi + h - lo + 1, r * 2, 0xe9ebe7, 0, 0, 0, mk);
+        inst('cyl', x, hi + h + 0.6, z, r * 1.9, 1.2, r * 1.9, 0xb9bdbb, 0, 0, 0, mk);
+        addCyl(x, z, lo - 2, hi + h + 1.5, r + 0.5, r + 0.5, mk);
+      } }
+    { const srnd = env.mulberry32(4049), tPal = [0x9aa6b2, 0xb8b5aa, 0x7a8b99, 0xc7c2b6, 0x687887, 0xa8aeb5];
+      for (let k = 0; k < 700 && towersPlaced.length < 24; k++) {
+        const [tx2, tz2] = Q(230 + srnd() * 520, srnd() * QL), w = 18 + srnd() * 14, d = 18 + srnd() * 14, [lo, hi] = footY(tx2, tz2, Math.max(w, d) * 0.55);
+        if (lo < 4 || hi > 120 || hi - lo > 14) continue;
+        if (tanks.some(t => Math.hypot(t[0] - tx2, t[1] - tz2) < t[2] + 28) || towersPlaced.some(t => Math.hypot(t[0] - tx2, t[1] - tz2) < 46)) continue;
+        const h = 28 + Math.pow(srnd(), 1.3) * 52, yaw = hy + Math.floor(srnd() * 2) * Math.PI / 2, col = tPal[Math.floor(srnd() * tPal.length)];
         towersPlaced.push([tx2, tz2, Math.max(w, d)]);
-        inst('box', tx2, ty2 + h * 0.5 - 2, tz2, w, h + 4, d, col, yaw);
-        inst('box', tx2, ty2 + h + 2.2, tz2, w * 0.62, 4.5, d * 0.62, 0x5c646c, yaw);
-        addBox(tx2, ty2 + h * 0.5, tz2, w * 0.5, h * 0.5 + 2, d * 0.5, yaw);
-        if (h > 46) light(tx2, ty2 + h + 5.2, tz2, 0xff2020, 4.5, 2, srnd());
-        for (let lv = 0; lv < 3; lv++) {
-          light(tx2 + (srnd() - 0.5) * w * 0.8, ty2 + 8 + srnd() * (h - 12), tz2 + (srnd() - 0.5) * d * 0.8, 0xffd28a, 2.8, 4, srnd());
-        }
+        inst('box', tx2, (lo - 1.5 + hi + h) / 2, tz2, w, hi + h - lo + 1.5, d, col, yaw, 0, 0, mk);
+        inst('box', tx2, hi + h + 2.2, tz2, w * 0.62, 4.5, d * 0.62, 0x5c646c, yaw, 0, 0, mk);
+        addBox(tx2, (lo + hi + h) / 2, tz2, w * 0.5, (hi + h - lo) / 2 + 1, d * 0.5, yaw, mk);
+        if (h > 46) light(tx2, hi + h + 5.2, tz2, 0xff2020, 4.5, 2, srnd(), mapId);
+        for (let lv = 0; lv < 3; lv++) light(tx2 + (srnd() - 0.5) * w * 0.8, hi + 8 + srnd() * (h - 12), tz2 + (srnd() - 0.5) * d * 0.8, 0xffd28a, 2.8, 4, srnd(), mapId);
+      } }
+    { const rnd = env.mulberry32(5150);
+      for (let k = 0; k < 1400 && houses.length < 185; k++) {
+        const [hx, hz] = Q(170 + rnd() * 1100, -350 + rnd() * (QL + 700)), w = 8 + rnd() * 10, hh = 6 + rnd() * 9, d = 8 + rnd() * 10, [lo, hi] = footY(hx, hz, Math.max(w, d) * 0.6);
+        if (lo < 4 || hi > 140 || hi - lo > 6 || Math.abs(hx - RWY.x) < 650) continue;
+        if (tanks.some(t => Math.hypot(t[0] - hx, t[1] - hz) < t[2] + 22) || towersPlaced.some(t => Math.hypot(t[0] - hx, t[1] - hz) < t[2] + 16)) continue;
+        houses.push([hx, lo - 0.5, hz, w, hi - lo + 0.5 + hh, d, hy + rnd() * Math.PI]);
       }
-    }
-
-    // Waterfront town: instanced houses on gentle slopes above the quay (anchored inside GORGE_BBOX so GORGE masks cleanly).
-    const rnd = env.mulberry32(5150), houses = [];
-    for (let k = 0; k < 1050 && houses.length < 185; k++) {
-      const hx = -1650 + (rnd() - 0.2) * 1300, hz = -900 + (rnd() - 0.5) * 1700, hy = heightAt(hx, hz);
-      if (hy < 4 || hy > 80 || Math.abs(heightAt(hx + 12, hz) - hy) > 5 || Math.abs(heightAt(hx, hz + 12) - hy) > 5) continue;
-      if (hx > RWY.x - 400) continue;
-      if (tanks.some(t => Math.hypot(t[0] - hx, t[1] - hz) < t[2] + 22)) continue;
-      if (towersPlaced.some(t => Math.hypot(t[0] - hx, t[1] - hz) < t[2] + 16)) continue;
-      houses.push([hx, hy, hz, 8 + rnd() * 10, 6 + rnd() * 9, 8 + rnd() * 10, rnd() * Math.PI]);
-    }
-    const body = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), M(0xffffff, { roughness: 0.85 }), houses.length);
-    const roofG = new THREE.ConeGeometry(0.75, 1, 4); roofG.rotateY(Math.PI / 4);
-    const roof = new THREE.InstancedMesh(roofG, M(0xffffff, { roughness: 0.8 }), houses.length);
-    body.position.copy(ANC_IN); roof.position.copy(ANC_IN);
-    body.userData.propBucket = 'islandsIn'; roof.userData.propBucket = 'islandsIn';
-    const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), wall = new THREE.Color(), rc = new THREE.Color();
-    houses.forEach(([hx, hy, hz, w, h, d, r], k) => {
-      q4.setFromAxisAngle(_up, r);
-      m4.compose(_bp.set(hx - ANC_IN.x, hy + h / 2, hz - ANC_IN.z), q4, _bs.set(w, h, d)); body.setMatrixAt(k, m4);
-      m4.compose(_bp.set(hx - ANC_IN.x, hy + h + 2.5, hz - ANC_IN.z), q4, _bs.set(w * 1.05, 5, d * 1.05)); roof.setMatrixAt(k, m4);
-      body.setColorAt(k, wall.setHSL(0.08 + rnd() * 0.08, 0.15 + rnd() * 0.2, 0.72 + rnd() * 0.18));
-      roof.setColorAt(k, rc.setHSL(rnd() < 0.6 ? 0.02 : 0.58, 0.45, 0.32 + rnd() * 0.12));
-      if (rnd() < 0.55) light(hx + (rnd() - 0.5) * w, hy + 2 + rnd() * h * 0.6, hz + (rnd() - 0.5) * d, 0xffc46a, 2.4 + rnd() * 1.5, 4, rnd());
-    });
-    body.computeBoundingSphere(); roof.computeBoundingSphere();
-    props.add(body, roof);
+      if (houses.length) {
+        const body = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), M(0xffffff, { roughness: 0.85 }), houses.length);
+        const roofG = new THREE.ConeGeometry(0.75, 1, 4); roofG.rotateY(Math.PI / 4);
+        const roof = new THREE.InstancedMesh(roofG, M(0xffffff, { roughness: 0.8 }), houses.length);
+        body.userData.propBucket = mk; roof.userData.propBucket = mk;
+        const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), wall = new THREE.Color(), rc = new THREE.Color();
+        houses.forEach(([hx, hb, hz, w, h, d, r], k) => {
+          q4.setFromAxisAngle(_up, r);
+          m4.compose(_bp.set(hx, hb + h / 2, hz), q4, _bs.set(w, h, d)); body.setMatrixAt(k, m4);
+          m4.compose(_bp.set(hx, hb + h + 2.5, hz), q4, _bs.set(w * 1.05, 5, d * 1.05)); roof.setMatrixAt(k, m4);
+          body.setColorAt(k, wall.setHSL(0.08 + rnd() * 0.08, 0.15 + rnd() * 0.2, 0.72 + rnd() * 0.18));
+          roof.setColorAt(k, rc.setHSL(rnd() < 0.6 ? 0.02 : 0.58, 0.45, 0.32 + rnd() * 0.12));
+          if (rnd() < 0.55) light(hx + (rnd() - 0.5) * w, hb + 2 + rnd() * h * 0.6, hz + (rnd() - 0.5) * d, 0xffc46a, 2.4 + rnd() * 1.5, 4, rnd(), mapId);
+        });
+        body.computeBoundingSphere(); roof.computeBoundingSphere();
+        props.add(body, roof);
+      } }
   }
 
-  // ---- NW BASALT CANYON NATURAL ARCH, SUMMIT OBSERVATORY & VOLCANO PLUME ----
-  {
-    // Natural sculpted basalt arch spanning high across the NW Canyon gorge at z = -7000
-    // (195 m vertical water clearance below, well clear of strike jammers at -6400 / -7600).
-    const az = -7000, acx = canyonX(az), hw = canyonHalf(az) + 42;
-    const archSpan = hw * 2 + 50;
-    inst('box', acx, 212, az, archSpan, 28, 44, 0x454d54);
-    inst('box', acx - hw - 18, 112, az, 48, 224, 52, 0x3e464d);
-    inst('box', acx + hw + 18, 112, az, 48, 224, 52, 0x3e464d);
-    addBox(acx, 212, az, archSpan * 0.5, 15, 23);
-    addBox(acx - hw - 18, 112, az, 25, 112, 26);
-    addBox(acx + hw + 18, 112, az, 25, 112, 26);
-
-    // High Ridge Space-Track / Weather Observatory atop Main Island NW ridge.
-    const ox = -1550, oz = -2950, oy = Math.max(40, heightAt(ox, oz));
-    inst('cyl', ox, oy + 2, oz, 56, 8, 56, 0x8f928c);
-    inst('box', ox, oy + 9, oz + 8, 28, 8, 16, 0xd8dad6);
+  // ---- SUMMIT OBSERVATORY (v3.1: DEM ridge peak; the v2 basalt arch and volcano plume are retired) ----
+  const steamPuffs = [];                                   // kept for update(); no plume on the real DEM
+  if (LMK.archipelago.observatory) {
+    const [ox, oz, oLo, oHi] = LMK.archipelago.observatory, oy = oHi, mk = 'lmArch';
+    inst('cyl', ox, (oLo - 2 + oy + 6) / 2, oz, 56, oy + 6 - oLo + 2, 56, 0x8f928c, 0, 0, 0, mk);      // grounded plinth
+    inst('box', ox, oy + 9 + 4, oz + 8, 28, 8, 16, 0xd8dad6, 0, 0, 0, mk);
     const obsDome = new THREE.SphereGeometry(10, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.55);
-    mesh(obsDome, mat.dome, ox - 13, oy + 6, oz - 6, 0, 'islandsIn');
-    mesh(obsDome, mat.dome, ox + 13, oy + 6, oz - 6, 0, 'islandsIn');
-    beam(ox, oy + 6, oz + 16, ox, oy + 44, oz + 16, 1.6, 0xb8362a);
-    light(ox, oy + 45.5, oz + 16, 0xff2020, 7, 2, 0.35);
-    addBox(ox, oy + 14, oz, 26, 16, 26);
+    mesh(obsDome, mat.dome, ox - 13, oy + 6, oz - 6, 0, mk);
+    mesh(obsDome, mat.dome, ox + 13, oy + 6, oz - 6, 0, mk);
+    beam(ox, oy + 6, oz + 16, ox, oy + 44, oz + 16, 1.6, 0xb8362a, mk);
+    light(ox, oy + 45.5, oz + 16, 0xff2020, 7, 2, 0.35, 3);
+    addBox(ox, (oLo + oy + 22) / 2, oz, 28, (oy + 22 - oLo) / 2, 28, 0, mk);
   }
 
-  // Rising volcanic fumarole steam plume from NE Volcano caldera (5600, ~740, -8300).
-  const steamPuffs = [];
-  {
-    const cv = document.createElement('canvas'); cv.width = cv.height = 64;
-    const g = cv.getContext('2d'), gr = g.createRadialGradient(32, 32, 2, 32, 32, 30);
-    gr.addColorStop(0, 'rgba(235,238,242,0.52)'); gr.addColorStop(0.55, 'rgba(210,216,224,0.22)'); gr.addColorStop(1, 'rgba(200,208,218,0)');
-    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
-    const stTex = new THREE.CanvasTexture(cv); stTex.colorSpace = THREE.SRGBColorSpace;
-    const volcGroup = new THREE.Group();
-    volcGroup.position.set(5600, 710, -8300);
-    volcGroup.userData.propBucket = 'islandsOut';
-    props.add(volcGroup);
-    for (let i = 0; i < 6; i++) {
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: stTex, color: 0xd8dde4, transparent: true, opacity: 0.28, depthWrite: false, fog: true }));
-      volcGroup.add(sp);
-      steamPuffs.push({ sp, ph: i / 6 });
-    }
-    // Subtle magma glow points deep in the caldera bowl for dusk/night flyovers.
-    for (let i = 0; i < 5; i++) {
-      const a = i * 1.256, r = 70 + (i % 2) * 85;
-      const vx = 5600 + Math.cos(a) * r, vz = -8300 + Math.sin(a) * r;
-      light(vx, heightAt(vx, vz) + 6, vz, 0xff5a18, 18, 6, i * 0.21);
-    }
-  }
-
-  // ---- LIGHTHOUSES (rotating beams) + RADAR STATIONS ------------------------
+  // ---- LIGHTHOUSES (rotating beams) + RADAR STATIONS (v3.1: DEM capes / summits) ----
   const beamG = new THREE.CylinderGeometry(1.5, 34, 1100, 16, 1, true); beamG.translate(0, 550, 0); beamG.rotateZ(-Math.PI / 2);
   const beamMat = new THREE.MeshBasicMaterial({ color: 0xfff2c8, transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
-  // Strait props are placed from the analytic straitHeight before that grid exists, so
-  // their sites are recorded and kept out of the strait erosion (protectStrait).
-  const straitSites = [];
-  const protectStrait = (x, z) => {
-    let m = 1;
-    for (let k = 0; k < straitSites.length; k++) m = Math.min(m, ss(Math.hypot(x - straitSites[k][0], z - straitSites[k][1]), 260, 560));
-    return m;
-  };
-  function lighthouse(x, z, mapKind = 'arch', hFn = heightAt) {
-    if (mapKind === 'strait') straitSites.push([x, z]);
-    const y = Math.max(2, hFn(x, z));
-    const bucket = mapKind === 'strait' ? 'strait' : (inGorgeBBox(x, z) ? 'islandsIn' : 'islandsOut');
-    const mapId = mapKind === 'strait' ? 2 : 0;
-    for (let k = 0; k < 5; k++) mesh(new THREE.CylinderGeometry(3.6 - k * 0.25, 3.8 - k * 0.25, 6, 14), k % 2 ? mat.red : mat.white, x, y + 3 + k * 6, z, 0, bucket);
-    mesh(new THREE.CylinderGeometry(3.4, 3.4, 4, 10), mat.glass, x, y + 33, z, 0, bucket);
-    mesh(new THREE.ConeGeometry(3.8, 4, 10), mat.red, x, y + 37, z, 0, bucket);
-    addBox(x, y + 18, z, 4, 20, 4, 0, mapKind);
-    const pivot = new THREE.Group(); pivot.position.set(x, y + 33, z); pivot.userData.propBucket = bucket; props.add(pivot);
+  // [x, z, yMin, yMax] from meta: a plinth fills from the lowest footprint corner to the top.
+  function lighthouse(x, z, yLo, yHi, mk) {
+    const y = Math.max(2, yHi), mapId = LMID[mk];
+    mesh(new THREE.CylinderGeometry(5.2, 5.6, y - yLo + 2, 14), mat.concrete, x, (yLo - 1 + y + 1) / 2, z, 0, mk);
+    for (let k = 0; k < 5; k++) mesh(new THREE.CylinderGeometry(3.6 - k * 0.25, 3.8 - k * 0.25, 6, 14), k % 2 ? mat.red : mat.white, x, y + 4 + k * 6, z, 0, mk);
+    mesh(new THREE.CylinderGeometry(3.4, 3.4, 4, 10), mat.glass, x, y + 34, z, 0, mk);
+    mesh(new THREE.ConeGeometry(3.8, 4, 10), mat.red, x, y + 38, z, 0, mk);
+    addBox(x, (yLo + y + 40) / 2, z, 4, (y + 40 - yLo) / 2, 4, 0, mk);
+    const pivot = new THREE.Group(); pivot.position.set(x, y + 34, z); pivot.userData.propBucket = mk; props.add(pivot);
     for (const r of [0, Math.PI]) { const bm = new THREE.Mesh(beamG, beamMat); bm.rotation.y = r; pivot.add(bm); }
     beams.push(pivot);
-    light(x, y + 33, z, 0xfff6d0, 10, 0, 0, mapId);
+    light(x, y + 34, z, 0xfff6d0, 10, 0, 0, mapId);
   }
-  function radarStation(x, z, mapKind = 'arch', hFn = heightAt) {
-    if (mapKind === 'strait') straitSites.push([x, z]);
-    const y = Math.max(2, hFn(x, z));
-    const bucket = mapKind === 'strait' ? 'strait' : (inGorgeBBox(x, z) ? 'islandsIn' : 'islandsOut');
-    const mapId = mapKind === 'strait' ? 2 : 0;
-    mesh(new THREE.BoxGeometry(16, 8, 12), mat.concrete, x, y + 4, z, 0, bucket);
-    mesh(new THREE.SphereGeometry(9, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2), mat.dome, x - 14, y + 2, z, 0, bucket);
-    mesh(new THREE.CylinderGeometry(0.8, 1.1, 14, 8), mat.steel, x + 8, y + 15, z, 0, bucket);
-    const ant = new THREE.Group(); ant.position.set(x + 8, y + 23, z);
-    if (mapKind === 'strait') ant.userData.propBucket = 'strait';
+  function radarStation(x, z, yLo, yHi, mk) {
+    const y = Math.max(2, yHi), mapId = LMID[mk];
+    mesh(new THREE.BoxGeometry(40, y - yLo + 2, 26), mat.concrete, x - 4, (yLo - 1 + y + 1) / 2, z, 0, mk);        // grounded pad
+    mesh(new THREE.BoxGeometry(16, 8, 12), mat.concrete, x, y + 5, z, 0, mk);
+    mesh(new THREE.SphereGeometry(9, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2), mat.dome, x - 14, y + 1, z, 0, mk);
+    mesh(new THREE.CylinderGeometry(0.8, 1.1, 14, 8), mat.steel, x + 8, y + 16, z, 0, mk);
+    const ant = new THREE.Group(); ant.position.set(x + 8, y + 24, z); ant.userData.propBucket = mk;
     props.add(ant);
     const dish = new THREE.Mesh(new THREE.BoxGeometry(16, 3, 1), mat.steel); ant.add(dish);
-    radars.push({ g: ant, w: 1.6, strait: mapKind === 'strait' });
-    addBox(x - 3, y + 10, z, 20, 12, 10, 0, mapKind);
-    light(x + 8, y + 25, z, 0xff2020, 5, 2, 0.4, mapId);
+    radars.push({ g: ant, w: 1.6, strait: mk === 'lmStrait', lm: mk });
+    addBox(x - 3, (yLo + y + 22) / 2, z, 20, (y + 22 - yLo) / 2, 13, 0, mk);
+    light(x + 8, y + 26, z, 0xff2020, 5, 2, 0.4, mapId);
   }
-  const atollTip = (cx, cz, R, openAng, side) => [cx + Math.cos(openAng + side * 1.05) * R, cz + Math.sin(openAng + side * 1.05) * R];
-  const atollHill = (cx, cz, R, openAng) => [cx + Math.cos(openAng + Math.PI) * R, cz + Math.sin(openAng + Math.PI) * R];
-  lighthouse(...atollTip(8300, -1900, 1250, Math.PI, 1));
-  lighthouse(...atollTip(-8300, -2600, 1150, 0, -1));
-  lighthouse(-1150, 880);
-  radarStation(...atollHill(8300, -1900, 1250, Math.PI));
-  radarStation(...atollHill(-8300, -2600, 1150, 0));
-
-  // ---- STRAIT FJORD CAPE LIGHTHOUSES & HEADLAND STATIONS (NAVAL_BATTLE) -----
-  function findStraitBluff(xSeed, zSeed, minH, maxH) {
-    let bx = xSeed, bz = zSeed, best = -1e9;
-    const dir = xSeed < 0 ? -1 : 1;
-    for (let i = 0; i <= 24; i++) {
-      const tx = xSeed + dir * i * 90;
-      const h = straitHeight(tx, zSeed);
-      if (h >= minH && h <= maxH) return [tx, zSeed];
-      if (h > best && h <= maxH) { best = h; bx = tx; }
-    }
-    return [bx, bz];
+  for (const m of ['archipelago', 'gorge', 'strait']) {
+    const L = LMK[m], mk = LMB[m];
+    for (const p of L.lighthouses) lighthouse(p[0], p[1], p.length > 2 ? p[2] : heightAt(p[0], p[1]), p.length > 3 ? p[3] : heightAt(p[0], p[1]), mk);
+    for (const p of L.radars) radarStation(p[0], p[1], p.length > 2 ? p[2] : heightAt(p[0], p[1]), p.length > 3 ? p[3] : heightAt(p[0], p[1]), mk);
   }
-  lighthouse(...findStraitBluff(-4900, 3600, 45, 150), 'strait', straitHeight);
-  lighthouse(...findStraitBluff(4900, 3400, 45, 150), 'strait', straitHeight);
-  lighthouse(...findStraitBluff(-4900, -4800, 45, 150), 'strait', straitHeight);
-  lighthouse(...findStraitBluff(4900, -4500, 45, 150), 'strait', straitHeight);
-  radarStation(...findStraitBluff(-5800, -1200, 140, 340), 'strait', straitHeight);
-  radarStation(...findStraitBluff(5800, -1600, 140, 340), 'strait', straitHeight);
 
   // ---- CANYON_RUN FORTRESS CITADEL & HIGH TRUSS BRIDGES (GORGE) -------------
+  // v3.1: heights come from the baked gorge pack (meta.landmarks.gorgeProbe, gorgesites.js order).
   {
-    const fx = GORGE_FORT[0], fz = GORGE_FORT[2], fy = 20;
-    // Octagonal perimeter bastion ring around GORGE_FORT (r = 250 m), open on the south
-    // canyon mouth sector so approach & weapons line-of-sight to FORT at (fx, fy, fz) are clear.
-    for (let s = 0; s < 8; s++) {
-      const a = (s / 8) * Math.PI * 2;
-      const dz = Math.sin(a);
-      if (dz > 0.55) continue;                                                // open south gate facing canyon exit
-      const wx = fx + Math.cos(a) * 255, wz = fz + dz * 255, wy = gorgeHeight(wx, wz);
-      const yaw = -a + Math.PI / 2;
-      inst('box', wx, wy + 9, wz, 12, 18, 92, 0x4b5056, yaw, 0, 0, 'gorge');
-      inst('cyl', wx, wy + 13, wz, 22, 26, 22, 0x5c6268, 0, 0, 0, 'gorge');
+    const GS = gorgePropSites(), probe = LMK.gorge.gorgeProbe || [];
+    let pi = 0;
+    const gy = () => { const v = probe[pi++]; return typeof v === 'number' ? v : 20; };
+    for (const b of GS.bastions) b.y = gy();
+    for (const t of GS.towers) t.y = gy();
+    for (const t of GS.tanks) t.y = gy();
+    for (const br of GS.bridges) for (const p of br.piers) p.y = gy();
+    for (const c of GS.casemates) c.y = gy();
+    for (const { x: wx, z: wz, y: wy, yaw, s } of GS.bastions) {
+      inst('box', wx, wy + 7, wz, 12, 22, 92, 0x4b5056, yaw, 0, 0, 'gorge');
+      inst('cyl', wx, wy + 11, wz, 22, 30, 22, 0x5c6268, 0, 0, 0, 'gorge');
       light(wx, wy + 27.5, wz, 0xff2620, 5.5, 2, s * 0.14, 1);
       addBox(wx, wy + 13, wz, 12, 13, 46, yaw, 'gorge');
     }
-    // Flanking citadel command towers, radar dome & fuel depot inside the crater perimeter.
-    for (const [ox, oz, h] of [[-175, -130, 48], [175, -130, 48], [0, -210, 62]]) {
-      const bx = fx + ox, bz = fz + oz, by = gorgeHeight(bx, bz);
-      inst('box', bx, by + h * 0.5, bz, 26, h, 26, 0x565c63, 0, 0, 0, 'gorge');
+    for (const { x: bx, z: bz, y: by, h, ox } of GS.towers) {
+      inst('box', bx, by + h * 0.5 - 2, bz, 26, h + 4, 26, 0x565c63, 0, 0, 0, 'gorge');
       inst('box', bx, by + h + 3, bz, 18, 6, 18, 0x3b4046, 0, 0, 0, 'gorge');
       beam(bx, by + h + 6, bz, bx, by + h + 24, bz, 1.4, 0xc03226, 'gorge');
       light(bx, by + h + 25, bz, 0xff2020, 7, 2, (ox + 200) * 0.002, 1);
       addBox(bx, by + h * 0.5, bz, 14, h * 0.5 + 3, 14, 0, 'gorge');
     }
-    for (let t = 0; t < 4; t++) {
-      const tx2 = fx - 150 + (t % 2) * 34, tz2 = fz + 45 + Math.floor(t / 2) * 34, ty2 = gorgeHeight(tx2, tz2);
-      inst('cyl', tx2, ty2 + 8, tz2, 20, 16, 20, 0xd4d8d6, 0, 0, 0, 'gorge');
+    for (const { x: tx2, z: tz2, y: ty2 } of GS.tanks) {
+      inst('cyl', tx2, ty2 + 7, tz2, 20, 18, 20, 0xd4d8d6, 0, 0, 0, 'gorge');
       addCyl(tx2, tz2, ty2, ty2 + 17, 10.5, 10.5, 'gorge');
     }
-    // 3 monumental high-altitude steel canyon truss bridges ABOVE the 1,200 ft radar ceiling (y = CEIL_M + 38 m),
-    // framing the trench sky without obstructing low-altitude canyon flight.
-    for (const gi of [2, 7, 11]) {
-      const bz = GORGE_GATE_Z[gi], bcx = gorgeCentreX(bz), sl = gorgeSlope(bz);
-      const perpYaw = gorgeHeading(bz) + Math.PI / 2;
-      const span = (GORGE_RAMP_W + 75) * 2, deckY = CEIL_M + 38;
+    // 3 high-altitude truss bridges above the 1,200 ft radar ceiling; piers on the baked rims.
+    for (const { gi, bz, bcx, nx, nz, yaw: perpYaw, piers } of GS.bridges) {
+      const span = (GORGE_RAMP_W + 75) * 2, deckY = Math.max(CEIL_M + 38, ...piers.map(p => p.y + 24));
       inst('box', bcx, deckY, bz, 16, 5, span, 0x525860, perpYaw, 0, 0, 'gorge');
       inst('box', bcx, deckY + 11, bz, 14, 2.2, span - 20, 0xb23a29, perpYaw, 0, 0, 'gorge');
-      const nx = 1 / Math.sqrt(1 + sl * sl), nz = -sl * nx;
       for (let k = -4; k <= 4; k++) {
         const d = k * 42, px = bcx + nx * d, pz = bz + nz * d;
         beam(px, deckY + 2, pz, px + nx * 21, deckY + 11, pz + nz * 21, 1.3, 0xb23a29, 'gorge');
         beam(px, deckY + 11, pz, px + nx * 21, deckY + 2, pz + nz * 21, 1.3, 0xb23a29, 'gorge');
       }
-      for (const sgn of [-1, 1]) {
-        const px = bcx + nx * sgn * (GORGE_RAMP_W + 32), pz = bz + nz * sgn * (GORGE_RAMP_W + 32);
-        const py = gorgeHeight(px, pz);
-        inst('box', px, (py + deckY) * 0.5, pz, 14, Math.max(12, deckY - py + 8), 14, 0x7e827d, perpYaw, 0, 0, 'gorge');
-        light(bcx + nx * sgn * 80, deckY + 13.5, bz + nz * sgn * 80, 0xff2020, 6.5, 2, gi * 0.17 + (sgn > 0 ? 0.5 : 0), 1);
+      for (const { x: px, z: pz, y: py, sg } of piers) {
+        inst('box', px, (py - 4 + deckY) * 0.5, pz, 14, Math.max(12, deckY - py + 8), 14, 0x7e827d, perpYaw, 0, 0, 'gorge');
+        light(bcx + nx * sg * 80, deckY + 13.5, bz + nz * sg * 80, 0xff2020, 6.5, 2, gi * 0.17 + (sg > 0 ? 0.5 : 0), 1);
       }
       addBox(bcx, deckY + 5, bz, 8, 8, span * 0.5, perpYaw, 'gorge');
     }
-    // Rim concrete observation casemates along the canyon edge.
-    for (let i = 0; i < GORGE_GATE_N; i += 2) {
-      const rz = GORGE_GATE_Z[i], sl = gorgeSlope(rz), inv = 1 / Math.sqrt(1 + sl * sl), side = (i & 2) ? 1 : -1;
-      const rx = gorgeCentreX(rz) + side * (GORGE_RAMP_W + 48) * inv, rzz = rz - side * (GORGE_RAMP_W + 48) * sl * inv;
-      if (Math.abs(rx - GORGE_SC_X) < 170 && rzz < GORGE_SC_ZA + 170 && rzz > GORGE_SC_ZB - 170) continue;
-      const ry = gorgeHeight(rx, rzz);
-      inst('box', rx, ry + 4, rzz, 16, 8, 16, 0x5c605c, 0, 0, 0, 'gorge');
+    for (const { x: rx, z: rzz, y: ry, i } of GS.casemates) {
+      inst('box', rx, ry + 2, rzz, 16, 12, 16, 0x5c605c, 0, 0, 0, 'gorge');
       light(rx, ry + 10, rzz, 0xff3020, 4.5, 2, i * 0.11, 1);
     }
   }
@@ -1296,23 +1211,23 @@ export function createWorld(THREE, env) {
     for (let b = 0; b < 3; b++) rotorParts.push(normTurb(bladeG).rotateZ(b * Math.PI * 2 / 3));
     const rotorG = mergeGeometries(rotorParts, false);
     for (const rp of rotorParts) rp.dispose();
-    const n = 9;
+    const WF = LMK.archipelago.windFarm, n = WF ? WF.n : 0;           // v3.1: DEM shoal line
     for (let k = 0; k < n; k++) {
-      const f = (k + 0.5) / n, x = REEF.a[0] + (REEF.b[0] - REEF.a[0]) * f, z = REEF.a[1] + (REEF.b[1] - REEF.a[1]) * f;
-      mesh(new THREE.CylinderGeometry(4, 4.5, 14, 12), mat.yellow, x, 0, z, 0, 'islandsOut');
-      mesh(towerG, mat.turbine, x, 44, z, 0, 'islandsOut');
-      mesh(nacG, mat.turbine, x, 90, z - 2, 0, 'islandsOut');
-      const rotor = new THREE.Mesh(rotorG, mat.turbine); rotor.position.set(x, 90, z - 8.6); rotor.userData.propBucket = 'islandsOut'; props.add(rotor);
+      const f = k / Math.max(1, n - 1), x = WF.a[0] + (WF.b[0] - WF.a[0]) * f, z = WF.a[1] + (WF.b[1] - WF.a[1]) * f;
+      mesh(new THREE.CylinderGeometry(4, 4.5, 14, 12), mat.yellow, x, 0, z, 0, 'lmArch');
+      mesh(towerG, mat.turbine, x, 44, z, 0, 'lmArch');
+      mesh(nacG, mat.turbine, x, 90, z - 2, 0, 'lmArch');
+      const rotor = new THREE.Mesh(rotorG, mat.turbine); rotor.position.set(x, 90, z - 8.6); rotor.userData.propBucket = 'lmArch'; props.add(rotor);
       rotor.rotation.z = k * 0.7;
       rotors.push({ g: rotor, w: 0.55 + (k % 3) * 0.06 });
-      addBox(x, 45, z, 3, 46, 3);
-      addBox(x, 90, z - 8.6, 44, 44, 3);
-      light(x, 93, z - 2, 0xff2020, 6, 2, (k % 2) * 0.5);
+      addBox(x, 45, z, 3, 46, 3, 0, 'lmArch');
+      addBox(x, 90, z - 8.6, 44, 44, 3, 0, 'lmArch');
+      light(x, 93, z - 2, 0xff2020, 6, 2, (k % 2) * 0.5, 3);
     }
   }
 
   // ---- OFFSHORE OIL PLATFORMS ------------------------------------------------
-  const RIGS = [[-6300, 4300, 0.4], [7700, 5600, -0.7], [-300, -11300, 1.2]];
+  const RIGS = LMK.archipelago.oilRigs.map(r => [r[0], r[1], r[2], 'lmArch']).concat(LMK.strait.oilRigs.map(r => [r[0], r[1], r[2], 'lmStrait']));   // v3.1 DEM deep water
   const flames = [];
   {
     const flameTex = (() => {
@@ -1325,54 +1240,55 @@ export function createWorld(THREE, env) {
     })();
     const flameMat = new THREE.SpriteMaterial({ map: flameTex, color: 0xffffff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, toneMapped: false, fog: false });
     const rot = (ox, oz, c, s) => [ox * c - oz * s, ox * s + oz * c];
-    for (const [rx, rz, ry] of RIGS) {
+    for (const [rx, rz, ry, mk] of RIGS) {
+      const mapId = LMID[mk];
       const c = Math.cos(ry), s = Math.sin(ry), P = (ox, oz) => { const [a, b] = rot(ox, oz, c, s); return [rx + a, rz + b]; };
       const DECK = 38, L = 30, GREY = 0x7a8088, YEL = 0xd9a520;
       const legs = [[-L, -L], [L, -L], [L, L], [-L, L]].map(([ox, oz]) => P(ox, oz));
-      for (const [lx, lz] of legs) { inst('cyl', lx, (DECK - 34) / 2, lz, 5, DECK + 34, 5, YEL); addCyl(lx, lz, -40, DECK, 3.4); }
+      for (const [lx, lz] of legs) { inst('cyl', lx, (DECK - 34) / 2, lz, 5, DECK + 34, 5, YEL, 0, 0, 0, mk); addCyl(lx, lz, -40, DECK, 3.4, 3.4, mk); }
       for (let i = 0; i < 4; i++) {
         const [ax, az] = legs[i], [bx, bz] = legs[(i + 1) % 4];
-        for (const yy of [2, 18, 32]) beam(ax, yy, az, bx, yy, bz, 1.3, GREY);
-        beam(ax, 2, az, bx, 18, bz, 1.1, GREY); beam(bx, 2, bz, ax, 18, az, 1.1, GREY);
-        beam(ax, 18, az, bx, 32, bz, 1.1, GREY); beam(bx, 18, bz, ax, 32, az, 1.1, GREY);
+        for (const yy of [2, 18, 32]) beam(ax, yy, az, bx, yy, bz, 1.3, GREY, mk);
+        beam(ax, 2, az, bx, 18, bz, 1.1, GREY, mk); beam(bx, 2, bz, ax, 18, az, 1.1, GREY, mk);
+        beam(ax, 18, az, bx, 32, bz, 1.1, GREY, mk); beam(bx, 18, bz, ax, 32, az, 1.1, GREY, mk);
       }
-      inst('box', rx, DECK, rz, 90, 4, 90, 0x5c6168, -ry);
-      inst('box', rx, DECK + 14, rz, 74, 3, 66, 0x5c6168, -ry);
+      inst('box', rx, DECK, rz, 90, 4, 90, 0x5c6168, -ry, 0, 0, mk);
+      inst('box', rx, DECK + 14, rz, 74, 3, 66, 0x5c6168, -ry, 0, 0, mk);
       for (const [ox, oz, w, h, d, col] of [[-22, -20, 30, 12, 26, 0xe2e2dc], [16, -24, 26, 12, 20, 0xc9542a], [-24, 18, 26, 10, 30, 0x8c939a],
-        [20, 22, 22, 9, 24, 0xe2e2dc], [0, 0, 18, 22, 18, 0x9aa1a8]]) { const [mx, mz] = P(ox, oz); inst('box', mx, DECK + 2 + h / 2, mz, w, h, d, col, -ry); }
-      addBox(rx, DECK + 12, rz, 46, 14, 46, -ry);
+        [20, 22, 22, 9, 24, 0xe2e2dc], [0, 0, 18, 22, 18, 0x9aa1a8]]) { const [mx, mz] = P(ox, oz); inst('box', mx, DECK + 2 + h / 2, mz, w, h, d, col, -ry, 0, 0, mk); }
+      addBox(rx, DECK + 12, rz, 46, 14, 46, -ry, mk);
       const [dx0, dz0] = P(-20, 14), DB = DECK + 16, DT = DB + 64;
       const corners = [[-6, -6], [6, -6], [6, 6], [-6, 6]];
       for (let i = 0; i < 4; i++) {
         const [ox, oz] = corners[i], [px2, pz2] = corners[(i + 1) % 4];
-        beam(dx0 + ox, DB, dz0 + oz, dx0 + ox * 0.25, DT, dz0 + oz * 0.25, 1.1, 0xd8d8d0);
+        beam(dx0 + ox, DB, dz0 + oz, dx0 + ox * 0.25, DT, dz0 + oz * 0.25, 1.1, 0xd8d8d0, mk);
         for (let k = 0; k < 6; k++) {
           const f0 = k / 6, f1 = (k + 1) / 6, w0 = 1 - 0.75 * f0, w1 = 1 - 0.75 * f1;
-          beam(dx0 + ox * w0, DB + 64 * f0, dz0 + oz * w0, dx0 + px2 * w1, DB + 64 * f1, dz0 + pz2 * w1, 0.5, 0xd8d8d0);
-          beam(dx0 + ox * w1, DB + 64 * f1, dz0 + oz * w1, dx0 + px2 * w1, DB + 64 * f1, dz0 + pz2 * w1, 0.5, 0xd8d8d0);
+          beam(dx0 + ox * w0, DB + 64 * f0, dz0 + oz * w0, dx0 + px2 * w1, DB + 64 * f1, dz0 + pz2 * w1, 0.5, 0xd8d8d0, mk);
+          beam(dx0 + ox * w1, DB + 64 * f1, dz0 + oz * w1, dx0 + px2 * w1, DB + 64 * f1, dz0 + pz2 * w1, 0.5, 0xd8d8d0, mk);
         }
       }
-      addBox(dx0, (DB + DT) / 2, dz0, 7, 32, 7, -ry);
-      light(dx0, DT + 1, dz0, 0xff2020, 7, 2, rx * 0.001);
+      addBox(dx0, (DB + DT) / 2, dz0, 7, 32, 7, -ry, mk);
+      light(dx0, DT + 1, dz0, 0xff2020, 7, 2, rx * 0.001, mapId);
       const [hx, hz] = P(48, 34);
-      inst('cyl', hx, DECK + 20, hz, 30, 1.4, 30, 0xf0f0ea);
-      inst('cyl', hx, DECK + 20.5, hz, 27, 1.4, 27, 0x2f4a36);
-      for (const [ox, oz, w, d] of [[-4, 0, 1.6, 11], [4, 0, 1.6, 11], [0, 0, 8, 1.6]]) { const [a, b] = rot(ox, oz, c, s); inst('box', hx + a, DECK + 21.3, hz + b, w, 0.3, d, 0xf0f0ea, -ry); }
-      beam(...P(30, 30).flatMap((v, i) => (i ? [DECK + 14, v] : [v])), hx, DECK + 19, hz, 2, GREY);
-      addCyl(hx, hz, DECK + 18, DECK + 22, 15);
+      inst('cyl', hx, DECK + 20, hz, 30, 1.4, 30, 0xf0f0ea, 0, 0, 0, mk);
+      inst('cyl', hx, DECK + 20.5, hz, 27, 1.4, 27, 0x2f4a36, 0, 0, 0, mk);
+      for (const [ox, oz, w, d] of [[-4, 0, 1.6, 11], [4, 0, 1.6, 11], [0, 0, 8, 1.6]]) { const [a, b] = rot(ox, oz, c, s); inst('box', hx + a, DECK + 21.3, hz + b, w, 0.3, d, 0xf0f0ea, -ry, 0, 0, mk); }
+      beam(...P(30, 30).flatMap((v, i) => (i ? [DECK + 14, v] : [v])), hx, DECK + 19, hz, 2, GREY, mk);
+      addCyl(hx, hz, DECK + 18, DECK + 22, 15, 15, mk);
       const [cx2, cz2] = P(28, -10);
-      inst('cyl', cx2, DECK + 22, cz2, 3, 16, 3, YEL);
-      beam(cx2, DECK + 30, cz2, ...((v) => [v[0], DECK + 52, v[1]])(P(70, -30)), 1.4, YEL);
+      inst('cyl', cx2, DECK + 22, cz2, 3, 16, 3, YEL, 0, 0, 0, mk);
+      beam(cx2, DECK + 30, cz2, ...((v) => [v[0], DECK + 52, v[1]])(P(70, -30)), 1.4, YEL, mk);
       const [fbx, fbz] = P(-45, -45), [ftx, ftz] = P(-105, -105), FT = DECK + 62;
-      beam(fbx, DECK + 4, fbz, ftx, FT, ftz, 2.2, 0xb0b4b8);
-      beam(fbx + 3, DECK + 4, fbz - 3, ftx, FT, ftz, 1.0, 0xb0b4b8);
-      addCyl(ftx, ftz, FT - 6, FT + 30, 6);
+      beam(fbx, DECK + 4, fbz, ftx, FT, ftz, 2.2, 0xb0b4b8, mk);
+      beam(fbx + 3, DECK + 4, fbz - 3, ftx, FT, ftz, 1.0, 0xb0b4b8, mk);
+      addCyl(ftx, ftz, FT - 6, FT + 30, 6, 6, mk);
       const fl = new THREE.Sprite(flameMat); fl.position.set(ftx, FT + 10, ftz); fl.scale.set(10, 22, 1);
-      fl.userData.propBucket = inGorgeBBox(ftx, ftz) ? 'islandsIn' : 'islandsOut';
+      fl.userData.propBucket = mk;
       props.add(fl);
       flames.push({ s: fl, base: FT, ph: rx * 0.01 });
-      light(ftx, FT + 6, ftz, 0xff8a2a, 16, 6, rz * 0.001);
-      for (const [lx, lz] of legs) light(lx, DECK + 3, lz, 0xff2020, 4, 2, (lx + lz) * 0.001);
+      light(ftx, FT + 6, ftz, 0xff8a2a, 16, 6, rz * 0.001, mapId);
+      for (const [lx, lz] of legs) light(lx, DECK + 3, lz, 0xff2020, 4, 2, (lx + lz) * 0.001, mapId);
     }
   }
 
@@ -1390,7 +1306,8 @@ export function createWorld(THREE, env) {
     }
     g.computeVertexNormals();
     const srnd = env.mulberry32(9157);
-    const bridgeD = (x, z) => Math.min(...BRIDGES.map(b => capsule(x, z, b.a[0], b.a[1], b.b[0], b.b[1])));
+    const bridgeD = (x, z) => Math.min(1e9, ...LMK.archipelago.bridges.map(b => capsule(x, z, b.a[0], b.a[1], b.b[0], b.b[1])));
+    const WFs = LMK.archipelago.windFarm;
     for (let k = 0; k < 6000 && stacks.length < 15; k++) {
       const x = WORLD.CX - WORLD.SIZE / 2 + 900 + srnd() * (WORLD.SIZE - 1800), z = WORLD.CZ - WORLD.SIZE / 2 + 900 + srnd() * (WORLD.SIZE - 1800);
       if (heightAt(x, z) > -12) continue;
@@ -1398,47 +1315,29 @@ export function createWorld(THREE, env) {
       for (let a = 0; a < 8 && !nearLand; a++) for (const r of [350, 700, 1100]) if (heightAt(x + Math.cos(a * 0.785) * r, z + Math.sin(a * 0.785) * r) > 8) nearLand = true;
       if (!nearLand) continue;
       if (inApproach(x, z, 300) || bridgeD(x, z) < 750) continue;
-      if (z > -11400 && z < -5000 && Math.abs(x - canyonX(z)) < 900) continue;
-      if (capsule(x, z, REEF.a[0], REEF.a[1], REEF.b[0], REEF.b[1]) < 700) continue;
+      if (WFs && capsule(x, z, WFs.a[0], WFs.a[1], WFs.b[0], WFs.b[1]) < 700) continue;
+      if (LMK.archipelago.ships.some(sh => Math.hypot(sh[0] - x, sh[1] - z) < 900)) continue;
       if (RIGS.some(([rx, rz]) => Math.hypot(rx - x, rz - z) < 1200)) continue;
       if (stacks.some(st => Math.hypot(st.x - x, st.z - z) < 650)) continue;
       const h = 120 + srnd() * 260, r = 28 + h * 0.1 + srnd() * 18;
       stacks.push({ x, z, h, r, ry: srnd() * Math.PI * 2 });
     }
     const stackMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.96, flatShading: true });
-    const stacksIn = stacks.filter(st => inGorgeBBox(st.x, st.z)), stacksOut = stacks.filter(st => !inGorgeBBox(st.x, st.z));
-    for (const [list, inB] of [[stacksOut, false], [stacksIn, true]]) {
+    for (const list of [stacks]) {
       if (!list.length) continue;
       const sm = new THREE.InstancedMesh(g, stackMat, list.length);
-      const off = inB ? ANC_IN : _ba.set(0, 0, 0);
-      sm.position.copy(off);
-      sm.userData.propBucket = inB ? 'islandsIn' : 'islandsOut';
+      const off = _ba.set(0, 0, 0);
+      sm.userData.propBucket = 'lmArch';
       const sq = new THREE.Quaternion(), sc = new THREE.Color();
       list.forEach((st, k) => {
         sq.setFromAxisAngle(_up, st.ry);
         _bm.compose(_bp.set(st.x - off.x, -30 - off.y, st.z - off.z), sq, _bs.set(st.r, st.h + 30, st.r)); sm.setMatrixAt(k, _bm);
         sm.setColorAt(k, sc.set(0x4a5258).lerp(new THREE.Color(0x5e666c), srnd() * 0.7));
-        addCyl(st.x, st.z, -30, st.h + 4, st.r * 1.2, st.r * 0.6);
+        addCyl(st.x, st.z, -30, st.h + 4, st.r * 1.2, st.r * 0.6, 'lmArch');
       });
       sm.computeBoundingSphere();
       props.add(sm);
     }
-    // Strait Fjord sea stacks (outside |x| < 4800 m naval battle lane).
-    const straitStacks = [
-      [-5150, -5600, 210, 44, 0.8], [-5050, -1400, 175, 38, 2.1], [-5250, 2600, 195, 42, 4.0],
-      [5150, -4900, 225, 46, 1.4], [5080, -900, 165, 36, 3.5], [5220, 2850, 185, 40, 5.1]
-    ];
-    const ssm = new THREE.InstancedMesh(g, stackMat, straitStacks.length);
-    ssm.userData.propBucket = 'strait';
-    const sq = new THREE.Quaternion(), sc = new THREE.Color();
-    straitStacks.forEach(([sx, sz, sh, sr, sry], k) => {
-      sq.setFromAxisAngle(_up, sry);
-      _bm.compose(_bp.set(sx, -30, sz), sq, _bs.set(sr, sh + 30, sr)); ssm.setMatrixAt(k, _bm);
-      ssm.setColorAt(k, sc.set(0x464e55));
-      addCyl(sx, sz, -30, sh + 4, sr * 1.2, sr * 0.6, 'strait');
-    });
-    ssm.computeBoundingSphere();
-    props.add(ssm);
   }
 
   flushBatches();
@@ -1611,7 +1510,7 @@ export function createWorld(THREE, env) {
   {
     const T = FARM_U.uTown.value;
     clutter = createClutter(THREE, { scene, G, coniferGeo: trees.geometry, foliageMat: trees.material,
-      gorgeDist, inGorgeBox: G.inGorgeBox, portCity: [(T.x + T.y) / 2, (T.z + T.w) / 2] });
+      gorgeDist, inGorgeBox: G.inGorgeBox, portCity: portCityXZ || [(T.x + T.y) / 2, (T.z + T.w) / 2], landmarks: LMK, rwy: RWY });
     const _ct = performance.now();
     clutter.setMap(sampler.pack.map, sampler);
     clutter.bootMs = performance.now() - _ct;
@@ -1643,7 +1542,7 @@ export function createWorld(THREE, env) {
         if (aMode > 6.5) wpos += aSpan * fract(uTime * 0.028 + aPhase);
         // Map filter: archipelago (0) shows aMap==0; gorge (1) shows aMap==1 plus aMap==0 outside uMask; strait (2) shows aMap==2.
         if (uMapId < 0.5) {
-          if (aMap > 0.5) on = 0.0;
+          if (aMap > 0.5 && abs(aMap - 3.0) > 0.5) on = 0.0;     // 0 shared, 3 archipelago-only DEM landmarks
         } else if (uMapId < 1.5) {
           if (aMap > 1.5) on = 0.0;
           else if (aMap < 0.5 && wpos.x > uMask.x && wpos.x < uMask.y && wpos.z > uMask.z && wpos.z < uMask.w) on = 0.0;
@@ -1792,6 +1691,8 @@ export function createWorld(THREE, env) {
     if (mode === 'archipelago') {
       for (const b of baseBoxes) boxes.push(b);
       for (const q of baseCyls) cyls.push(q);
+      for (const b of archBoxes) boxes.push(b);
+      for (const q of archCyls) cyls.push(q);
     } else if (mode === 'gorge' && def.bbox) {
       const bb = def.bbox, inBB = (x, z) => x > bb.x[0] - 600 && x < bb.x[1] + 600 && z < bb.z[0] + 600 && z > bb.z[1] - 600;
       for (const b of baseBoxes) if (!inBB(b.c.x, b.c.z)) boxes.push(b);
@@ -1812,6 +1713,8 @@ export function createWorld(THREE, env) {
     else { const cc = clutter.collision(sampler.pack.map); for (const b of cc.boxes) boxes.push(b); for (const q of cc.cyls) cyls.push(q); }
     for (const [ix, iz, r] of (def && def.islands) || []) addCyl(ix, iz, -200, 130, r * 0.85);
     for (const child of props.children) child.visible = !!(def && def.runway);
+    for (const k in lmObjs) { const on = (k === 'lmArch' && mode === 'archipelago') || (k === 'lmGorge' && mode === 'gorge') || (k === 'lmStrait' && mode === 'strait'); for (const o of lmObjs[k]) o.visible = on; }
+
     return def;
   }
 
@@ -1871,8 +1774,12 @@ export function createWorld(THREE, env) {
   }
 
   // Registry of switchable map props, built once at boot.
+  // v3.1: per-theatre DEM landmark objects (shown only on their own map by rebuild()).
+  const lmObjs = { lmArch: [], lmGorge: [], lmStrait: [] };
+  for (const o of props.children) { const b = o.userData.propBucket; if (b && lmObjs[b]) lmObjs[b].push(o); }
   const envProps = { terrain, islands: [], runway: [], baseBldg: [], radar: [], foliage: [trees.mesh], lights: [lightPts], gorge: [], strait: [], clutter: [clutter.group] };
   for (const o of props.children) {
+    if (lmObjs[o.userData.propBucket]) continue;
     if (o.userData.propBucket === 'gorge') envProps.gorge.push(o);
     else if (o.userData.propBucket === 'strait') envProps.strait.push(o);
     else if (radars.some(r => r.g === o && !r.strait)) envProps.radar.push(o);
@@ -1906,7 +1813,7 @@ export function createWorld(THREE, env) {
     forest: trees.mesh, farmEdge: FARM.edge,
     get treeStats() { const { mesh: _m, ...s } = trees; return s; },
     runway: RWY, bridges: bridgeInfo, obstacleCount: () => boxes.length + cyls.length,
-    stacks, rigs: RIGS.map(([x, z]) => ({ x, z })), canyonHalf,
+    stacks, rigs: RIGS.map(([x, z, , mk]) => ({ x, z, map: mk })), canyonHalf, demLandmarks: LMK,
     sectors: SECTORS, sectorAt, isTerrainOccluded, fleetLane: FLEET_LANE, canyonCenter: CANYON_C,
     marks: [
       { kind: 'runway', pts: [[RWY.x, RWY.z0], [RWY.x, RWY.z1]] },
@@ -1915,10 +1822,11 @@ export function createWorld(THREE, env) {
     landmarks: {
       airbase: new THREE.Vector3(RWY.x, RWY.elev, rwyMidZ),
       canyonEntry: new THREE.Vector3(canyonX(-5600), 0, -5600),
-      volcano: new THREE.Vector3(5600, 975, -8300),
-      bridgeA: bridgeInfo[0].a.clone().lerp(bridgeInfo[0].b, 0.5),
-      bridgeB: bridgeInfo[1].a.clone().lerp(bridgeInfo[1].b, 0.5),
-      windFarm: new THREE.Vector3((REEF.a[0] + REEF.b[0]) / 2, 0, (REEF.a[1] + REEF.b[1]) / 2)
+      observatory: LMK.archipelago.observatory ? new THREE.Vector3(LMK.archipelago.observatory[0], LMK.archipelago.observatory[3], LMK.archipelago.observatory[1]) : new THREE.Vector3(5600, 900, -8300),
+      bridgeA: bridgeInfo[0] ? bridgeInfo[0].a.clone().lerp(bridgeInfo[0].b, 0.5) : new THREE.Vector3(RWY.x, DECK_TOP, -6000),
+      bridgeB: bridgeInfo[1] ? bridgeInfo[1].a.clone().lerp(bridgeInfo[1].b, 0.5) : new THREE.Vector3(RWY.x, DECK_TOP, 6000),
+      windFarm: LMK.archipelago.windFarm ? new THREE.Vector3((LMK.archipelago.windFarm.a[0] + LMK.archipelago.windFarm.b[0]) / 2, 0, (LMK.archipelago.windFarm.a[1] + LMK.archipelago.windFarm.b[1]) / 2) : new THREE.Vector3(-6000, 0, -9000),
+      harbour: portCityXZ ? new THREE.Vector3(portCityXZ[0], 20, portCityXZ[1]) : null
     },
     canyonX
   };
