@@ -39,6 +39,7 @@ import { WORLD, RWY, CORE, createGeography } from './geography.js?v=s10ter2';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { loadTerrainPack, createSampler } from './terrainpack.js?v=s10ter2';
 import { createClipmap, CM_VERTEX_PARS, CM_VERTEX_BODY, TERRAIN_HEIGHT_GLSL } from './clipmap.js?v=s10ter2';
+import { createClutter } from './clutter.js?v=s10ter3';
 import { gorgeCentreX, gorgeSlope, gorgeHeading, gorgeDist, GORGE_FLOOR_Y, GORGE_RIM_Y, GORGE_CRATER_R,
   GORGE_CRATER_WALL_Y, GORGE_CRATER_Z, GORGE_GATE_Z, GORGE_GATE_N, GORGE_FORT, CEIL_M,
   GORGE_BBOX, GORGE_HALF_W, GORGE_RAMP_W, SEA_FLOOR_Y, RUNWAY_BBOX,
@@ -447,7 +448,7 @@ export function createWorld(THREE, env) {
           float gentleCoast = (1.0 - smoothstep(0.08, 0.24, slope)) * (1.0 - inGorgeMask) * eroK;
           // Waterline bands jittered by micro-grain + macro noise: organic shores, not vertex sawteeth.
           float shoreY = vWPos.y + (mix(microB, closeB, closeK) - 0.5) * 2.2 + (det - 0.5) * 1.6;
-          float dryBeach = smoothstep(1.2, 3.2, shoreY) * (1.0 - smoothstep(7.5, 13.0, shoreY)) * gentleCoast;
+          float dryBeach = smoothstep(1.2, 3.2, shoreY) * (1.0 - smoothstep(4.5, 7.5, shoreY)) * gentleCoast;   // narrow strand, not whole coastal plains
           land = mix(land, uSand * (0.92 + 0.16 * d1v), dryBeach * 0.72);
           float wetBand = (1.0 - smoothstep(1.2, 4.6, shoreY)) * (1.0 - inGorgeMask);
           land = mix(land, mix(uRockB, uShore, gentleCoast), wetBand * 0.75);
@@ -556,16 +557,19 @@ export function createWorld(THREE, env) {
     pk.tex = { th, tn, ts };
     return pk.tex;
   }
-  let onPackReady = null, wantMode = 'archipelago';
+  let onPackReady = null, wantMode = 'archipelago', clutter = null;
   function applyPack(mode) {
     let pk = packs[mode];
     if (!pk) {                                              // not fetched yet: show the archipelago, re-apply on arrival
       pk = packs.archipelago;
       prepare({ heightFn: mode }).then(() => {
-        if (wantMode === mode) { applyPack(mode); if (onPackReady) onPackReady(mode); }
+        if (wantMode !== mode) return;
+        if (activeMap && activeMap.heightFn === mode) rebuild(activeMap); else applyPack(mode);   // + clutter collision
+        if (onPackReady) onPackReady(mode);
       }).catch(e => console.error('[ANGELS_ZERO] terrain pack', mode, e));
     }
     sampler = samplers[pk.map] || (samplers[pk.map] = createSampler(pk));
+    if (clutter) clutter.setMap(pk.map, sampler);
     const tx = packTextures(pk), c = pk.meta.core;
     TERRAIN_U.uHeight.value = tx.th; TERRAIN_U.uNormalTex.value = tx.tn; TERRAIN_U.uSplat.value = tx.ts;
     TERRAIN_U.uCore.value.set(c.cx - c.size / 2, c.cz - c.size / 2, c.step, c.n);
@@ -1470,7 +1474,10 @@ export function createWorld(THREE, env) {
     const list = [];
     const MAX = 3000;
     let groves = 0;
-    for (let g = 0; g < 12000 && groves < 160 && list.length < 1850; g++) {
+    // Terrain v2: forests are streamed by src/clutter.js from the baked landUse; this block now
+    // only supplies the conifer geometry + aerial-fog foliage material (legacy loops disabled).
+    const LEGACY = false;
+    for (let g = 0; LEGACY && g < 12000 && groves < 160 && list.length < 1850; g++) {
       const cx = WORLD.CX + (rnd() - 0.5) * WORLD.SIZE * 0.92, cz = WORLD.CZ + (rnd() - 0.5) * WORLD.SIZE * 0.92;
       if (fbm(nVeg, cx * 0.0011, cz * 0.0011, 3) < 0.08 || ok(cx, cz) === null) continue;
       groves++;
@@ -1484,7 +1491,7 @@ export function createWorld(THREE, env) {
       }
     }
     const groveTrees = list.length;
-    for (let g = 0; g < 80000 && list.length < MAX; g++) {
+    for (let g = 0; LEGACY && g < 80000 && list.length < MAX; g++) {
       const x = WORLD.CX + (rnd() - 0.5) * WORLD.SIZE * 0.92, z = WORLD.CZ + (rnd() - 0.5) * WORLD.SIZE * 0.92;
       const h0 = heightAt(x, z);
       if (h0 < 16 || h0 > 280) continue;
@@ -1528,7 +1535,7 @@ export function createWorld(THREE, env) {
         .replace('#include <begin_vertex>', `#include <begin_vertex>
         #ifdef USE_INSTANCING
           vec3 tOrg = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
-          transformed *= 1.0 - smoothstep(6000.0, 9000.0, distance(tOrg, cameraPosition));
+          transformed *= 1.0 - smoothstep(6000.0, 7900.0, distance(tOrg, cameraPosition));   // clutter streams to 8 km
           vTWPos = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;
         #else
           vTWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
@@ -1551,6 +1558,10 @@ export function createWorld(THREE, env) {
           gl_FragColor.rgb = mix(gl_FragColor.rgb, tAerial, clamp(tFog, 0.0, 1.0));
         #endif`);
     };
+    if (!LEGACY) {
+      const im = new THREE.InstancedMesh(tg, tm, 1); im.count = 0; im.visible = false; im.name = 'forest-legacy';
+      return { mesh: im, geometry: tg, material: tm, count: 0, groves: 0, groveTrees: 0, lineTrees: 0, tris: tg.attributes.position.count / 3, reject };
+    }
     const im = new THREE.InstancedMesh(tg, tm, list.length);
     const PAL = [0x243620, 0x2d4226, 0x354829, 0x1f2e1c].map(h => new THREE.Color(h));
     const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), e4 = new THREE.Euler(), p4 = new THREE.Vector3(), s4 = new THREE.Vector3(), tc = new THREE.Color();
@@ -1569,6 +1580,17 @@ export function createWorld(THREE, env) {
     scene.add(im);
     return { mesh: im, count: list.length, groves, groveTrees, lineTrees: list.length - groveTrees, tris: tg.attributes.position.count / 3, reject };
   })();
+
+  // ---- TERRAIN V2 CLUTTER: streamed forests / boulders, villages, roads + traffic, landmarks ----
+  {
+    const T = FARM_U.uTown.value;
+    clutter = createClutter(THREE, { scene, G, coniferGeo: trees.geometry, foliageMat: trees.material,
+      gorgeDist, inGorgeBox: G.inGorgeBox, portCity: [(T.x + T.y) / 2, (T.z + T.w) / 2] });
+    const _ct = performance.now();
+    clutter.setMap(sampler.pack.map, sampler);
+    clutter.bootMs = performance.now() - _ct;
+  }
+  const _camW = new THREE.Vector3();
 
   // ---- light-point renderer (archipelago + gorge + strait + drifting traffic) ----
   const lg = new THREE.BufferGeometry();
@@ -1645,6 +1667,7 @@ export function createWorld(THREE, env) {
     for (const b of beams) b.rotation.y = t * 1.1;
     for (const r of radars) r.g.rotation.y = t * r.w;
     for (const r of rotors) r.g.rotation.z += r.w * dt;
+    if (camera) { camera.getWorldPosition(_camW); clutter.update(dt, t, nightLevel, _camW.x, _camW.z); }
     for (const f of flames) {
       const k = 0.85 + 0.15 * Math.sin(t * 17 + f.ph) * Math.sin(t * 6.3 + f.ph * 3) + 0.06 * Math.sin(t * 41 + f.ph);
       f.s.scale.set(16 * (0.9 + 0.1 * Math.sin(t * 13 + f.ph)), 36 * k, 1);
@@ -1759,6 +1782,8 @@ export function createWorld(THREE, env) {
     const mk = lightMat.uniforms.uMask.value;
     if (mode === 'gorge' && def.bbox) mk.set(def.bbox.x[0] - 600, def.bbox.x[1] + 600, def.bbox.z[1] - 600, def.bbox.z[0] + 600);
     else mk.set(1, -1, 1, -1);
+    if (oceanMode) clutter.setMap('ocean', null);
+    else { const cc = clutter.collision(sampler.pack.map); for (const b of cc.boxes) boxes.push(b); for (const q of cc.cyls) cyls.push(q); }
     for (const [ix, iz, r] of (def && def.islands) || []) addCyl(ix, iz, -200, 130, r * 0.85);
     for (const child of props.children) child.visible = !!(def && def.runway);
     return def;
@@ -1820,7 +1845,7 @@ export function createWorld(THREE, env) {
   }
 
   // Registry of switchable map props, built once at boot.
-  const envProps = { terrain, islands: [], runway: [], baseBldg: [], radar: [], foliage: [trees.mesh], lights: [lightPts], gorge: [], strait: [] };
+  const envProps = { terrain, islands: [], runway: [], baseBldg: [], radar: [], foliage: [trees.mesh], lights: [lightPts], gorge: [], strait: [], clutter: [clutter.group] };
   for (const o of props.children) {
     if (o.userData.propBucket === 'gorge') envProps.gorge.push(o);
     else if (o.userData.propBucket === 'strait') envProps.strait.push(o);
@@ -1842,7 +1867,7 @@ export function createWorld(THREE, env) {
 
   return {
     terrain, props, heightAt, analyticHeight, straitHeight, gorgeHeight, detailMs, collide, addBox, update, rebuild, envProps,
-    prepare, set onPackReady(fn) { onPackReady = fn; }, clipmap, geography: G, terrainUniforms: TERRAIN_U,
+    prepare, set onPackReady(fn) { onPackReady = fn; }, clipmap, geography: G, terrainUniforms: TERRAIN_U, clutter,
     get sampler() { return sampler; }, get packs() { return packs; },
     get terrainStats() {
       const o = { clipmap: clipmap.stats(), active: sampler.pack.map, packs: {} };

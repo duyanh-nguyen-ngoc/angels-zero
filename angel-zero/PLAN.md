@@ -173,6 +173,21 @@ Status legend: `[x]` implemented and verified Â· `[ ]` open — gaps listed.
     -> 22/22 (texel / bilinear error ~1e-11 m, RWY pad 10.02 m, funnels >= 10 m under
     the 3 deg glide path, gorge floor within 1.5 m of the authored trench, strait
     channel open). Headless GPU probe: 4,096 points, max |GPU - CPU| 2.5 cm on all maps.
+- [x] **Terrain v2 living world — streamed clutter + landmarks** *(v1.2.4, build `s10ter3`, `src/clutter.js`,
+  `src/world.js`, `index.html`, `scripts/smoke_test.mjs`)*
+  - Streamed vegetation from the baked landUse: conifer (<= 18k) + broadleaf (<= 12k) within
+    8 km, boulders (<= 6k) within 4 km, refilled nearest-chunk-first (1 km chunks) when the
+    camera moves > 160 m; zero per-frame allocation. Only slopes < 0.2 (crag gate 0), so every
+    base equals `heightAt` and the GPU surface.
+  - Villages in flat farm valleys (houses InstancedMesh + window lights), MST road ribbons with
+    traffic (cars + head/tail light Points, night-gated), refinery near Port City, 3 summit
+    radomes, 4 SAM sites, gorge arch dam + reservoir at `geography.DAM`; tall landmarks and
+    the dam add collision boxes / cylinders per map.
+  - Budget: clutter <= 8 draw calls (conifer, broadleaf, boulder, houses, cars, lights, roads,
+    landmarks, reservoir on the gorge), clutter build 80-300 ms per map (memoised).
+  - Verification: `world.clutter.audit()` 0 floating / 0 buried props on all three theatres
+    (tree base error <= 7 mm); smoke `assertMission` now checks the active pack, clipmap
+    budget, clutter audit and RWY height per theatre.
 
 ## Pillar 4 — Combat Loop, Ballistics & VFX (`src/weapons.js`, `src/vfx.js`, `src/audio.js`)
 - [x] **Two-stage targeting** *(build `s24a`)* — APG-63 auto-designates the

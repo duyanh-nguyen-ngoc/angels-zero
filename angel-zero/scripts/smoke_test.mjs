@@ -188,6 +188,20 @@ async function assertMission(id) {
   assert(finite(s.y) && finite(s.speed), `non-finite physics y=${s.y} speed=${s.speed}`);
   if (id === 'ACE_DUEL') assert(s.alive === 1, `ACE_DUEL alive=${s.alive}`);
   if (id === 'FREE_FLIGHT') assert(s.alive === 0, `FREE_FLIGHT alive=${s.alive}`);
+  // Terrain v2: baked pack active for the theatre, 8-level clipmap, grounded clutter, RWY pad.
+  const THEATRE = { AIR_SUPERIORITY: 'archipelago', FURBALL: 'archipelago', NAVAL_BATTLE: 'strait', CANYON_RUN: 'gorge' }[id];
+  if (THEATRE) {
+    const t = await page.evaluate(() => {
+      const w = window.__az.world, ts = w.terrainStats, cs = w.clutter.stats(), au = w.clutter.audit();
+      return { active: ts.active, levels: ts.clipmap.levels, calls: ts.clipmap.drawCalls, tris: ts.clipmap.trisPerLevel * ts.clipmap.levels,
+        clutterCalls: cs.drawCalls, mode: cs.mode, au, rwy: w.heightAt(900, 100) };
+    });
+    assert(t.active === THEATRE, `terrain pack ${t.active} !== ${THEATRE}`);
+    assert(t.levels === 8 && t.calls <= 12 && t.tris <= 280000, `clipmap levels=${t.levels} calls=${t.calls} tris=${t.tris}`);
+    assert(t.mode === THEATRE && t.clutterCalls <= 20, `clutter mode=${t.mode} calls=${t.clutterCalls}`);
+    assert(t.au && t.au.floating === 0 && t.au.buried === 0 && t.au.maxTreeErr < 0.05, `clutter audit ${JSON.stringify(t.au)}`);
+    if (THEATRE !== 'strait') assert(Math.abs(t.rwy - 10) < 0.1, `RWY 18/36 height ${t.rwy}`);
+  }
 }
 
 /* ------------------------------------------------------------------------- scenarios */
