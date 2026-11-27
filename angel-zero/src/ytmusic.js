@@ -5,11 +5,14 @@
 // site keeps working without throwing.
 
 const STORE_KEY = 'angelsZero_ytPlaylist';
-const DEFAULT_LIST = 'PLRBp0Fe2GpgnIh0AiYKh7o7HnYAej-5ph';   // NCS Copyright-Free Music
+const DEFAULT_LIST = 'PL4EJWCM_RXBF8hJVogEkR4nM6oJux6_GL';   // Scott Buckley CC-BY Epic Orchestral
 const PRESETS = [
-  { label: 'NCS FLIGHT MIX', id: DEFAULT_LIST },
-  { label: 'SYNTHWAVE RADIO', id: '4xDzrJKXOOY' },
-  { label: 'ACES SOUNDTRACK MIX', id: 'qd5eXsXd6HE' }
+  { label: 'EPIC ORCHESTRAL', id: DEFAULT_LIST },
+  { label: 'EPIC BATTLE MIX', id: 'PLfP6i5T0-DkLiR-gmzeFGY1S-10Ur0wso' },
+  { label: 'ACTION SORTIE', id: 'PLfP6i5T0-DkIMKdYVGLjX2RhJpBRefkCT' },
+  { label: 'DOGFIGHT ROCK', id: 'PL7pkSK1xbGD5lNtPEBhIl20MA1kmr8kry' },
+  { label: 'ACTION ROCK', id: 'PLfP6i5T0-DkJ0thUypSlonFr1cgJdtiLj' },
+  { label: 'NIGHT SYNTHWAVE', id: 'kANalBOlCOQ' }
 ];
 const LEGACY_DEAD_IDS = new Set([
   'PLbpi6ZahtOH6BlwVjVwlksnJk_HtpcezE',

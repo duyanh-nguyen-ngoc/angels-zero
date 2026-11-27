@@ -818,7 +818,7 @@ import { createCockpitF22 } from './src/cockpit_f22.js?v=s9ex';
 import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9ex';
 import { createEjection } from './src/eject.js?v=s9ex';
 import { createAudio } from './src/audio.js?v=s9ex';
-import { createYouTubeMusic } from './src/ytmusic.js?v=s10fly5';
+import { createYouTubeMusic } from './src/ytmusic.js?v=s10fly6';
 import { createRadio } from './src/radio.js?v=s9ex';
 import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9ex';
 import { createLivery } from './src/livery.js?v=s9ex';
@@ -1735,6 +1735,7 @@ function applyMapProps(mapDef) {
   for (const o of e.baseBldg) o.visible = !!p.islands && !!p.baseBldg && keep(o);
   for (const o of e.radar) o.visible = !!p.islands && !!p.radar && keep(o);
   for (const o of e.foliage) o.visible = !!p.islands && !!p.foliage;
+  for (const o of e.clutter || []) o.visible = !!p.terrain;         // Terrain v2 streamed clutter follows the ground
   for (const o of e.gorge || []) o.visible = !!p.gorge;
   for (const o of e.strait || []) o.visible = !!p.strait;
   // Every runway / approach / bridge / fortress / strait-lighthouse beacon lives in lightPts
