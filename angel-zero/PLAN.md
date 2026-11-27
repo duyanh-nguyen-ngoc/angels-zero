@@ -1723,7 +1723,7 @@ Status legend: `[x]` implemented and verified Â· `[ ]` open — gaps listed.
   - Carrier (NAVAL) and orbiting AWACS (AIR_SUPERIORITY) broadcast a 4.5 km friendly ESM umbrella with hysteresis. Inside: 1.6Ã— lock build, 1.3Ã— missile reload and 1.25Ã— turn on missiles latched at launch. Cyan radar ring, ESM ACTIVE badge and VSD circle show coverage; ACE_DUEL / CANYON never get it.
   - `state.cloudIce` builds in thick cloud (0.45 threshold), melts in clear air and twice as fast on burner. At high ice, pitch/roll authority fades 20 % and drag rises 12 %; `[ ICING ]` banner, master caution, radio call, canopy frost shader and a cached HUD frost vignette make the risk legible. `?esm=0`, `?awacsat=s`, `?icecloud=s`, `?ice=v` provide deterministic tests.
 
-- [x] **Ace Combat feel pass** *(build `s9be`, v1.1.34, `index.html`, `src/combat.js`, `src/hud.js`, `src/audio.js`, `src/vfx.js`, `src/cockpit3d.js`, `src/canopyglass.js`)*
+- [x] **Arcade combat feel pass** *(build `s9be`, v1.1.34, `index.html`, `src/combat.js`, `src/hud.js`, `src/audio.js`, `src/vfx.js`, `src/cockpit3d.js`, `src/canopyglass.js`)*
   - Hold-T padlock springs the chase / cockpit camera onto `C.designated` with neck limits, releasing cleanly without disturbing freelook or the missile cam. Y cycles radar zoom 4/10/25 km with persistence; both views and the F1 sheet show the new keys.
   - Pooled in-world `HIT` / `DESTROYED` stamps (0.8 s, 8 slots) fire from `env.onHitStamp`; `C.shootCue` lights `[ SHOOT ]` on rear/head-on aspects with a 0.25 s hold.
   - `env.onMissionUpdate` + `audio.bgmDip(1.2)` + `hud.radarPulse()` + `[ MISSION UPDATE ]` banner fire on stage escalation, flagship spawn, ambush and intrusion CUT with a 4 s cooldown. Cloud-deck punch flashes the canopy and boosts mist; contrails ease in above 12,000 ft on the existing pooled ribbons (no new draw calls).
@@ -1850,7 +1850,7 @@ Status legend: `[x]` implemented and verified Â· `[ ]` open — gaps listed.
    - `#bgmWidget` now shows the real YouTube title + `[YT PLAY/PAUSED/OFF]` status with ‹ ▶ ›, SHUF and ▾; the picker is a URL input + LOAD + presets + RESET DEFAULT. `K` toggles play/pause, `,` / `.` change track, `/` toggles shuffle; URL-input typing is shielded from the flight key handlers. `?nobgm` skips the external API load for offline headless runs.
    - No per-frame audio nodes from music, no new draw calls; 0 JS/WebGL errors and ~60 FPS in headless verification with `?nobgm`.
 
-## Pillar 5 — Ace Combat 8 HUD & Briefing UI (`src/hud.js`)
+## Pillar 5 — Tactical HUD & Briefing UI (`src/hud.js`)
 - [x] **3rd person** — `-o-` reticle with velocity parallax, pointed SPEED /
   ALT boxes, no ladders or tapes.
 - [x] **1st person** — conformal ladder + tapes clipped to the combiner glass.
@@ -1893,7 +1893,7 @@ Status legend: `[x]` implemented and verified Â· `[ ]` open — gaps listed.
   overlay, runway + bridge marks, bandit / missile blips.
 - [x] **Stores** — bottom-right GUN / MSL / UGB / FLR / DMG list, F-15C
   wireframe with per-pylon AIM-9 reload icons.
-- [x] **Menus** — AC7/AC8 glass briefing + tactical pause menu (volume,
+- [x] **Menus** — Tactical glass briefing + tactical pause menu (volume,
   restart, camera preview, time-of-day selector, patch notes).
 
 ---

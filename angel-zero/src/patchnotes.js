@@ -83,22 +83,22 @@ export const PATCH_NOTES = [
     'Launching or resuming a sortie now automatically engages DOM Fullscreen + full navigator.keyboard.lock() so Ctrl+W, Ctrl+T, Ctrl+N, Ctrl+R, Alt+Left/Right, and Tab no longer trigger browser shortcuts while flying.',
     'Added capture-phase shortcut blocking, F11 DOM-fullscreen shortcut-lock intercept, and a [ KEY LOCK: LOCKED / OFF ] toggle in Standby.'
   ] },
-  { version: 'v1.1.71', title: 'ACE COMBAT 7 DREAMY ATMOSPHERE, BLOOM & HOLOGRAPHIC HUD', bullets: [
-    'Tuned HDR UnrealBloomPass for wide velvety halation on sunlit cloud crowns and solar glare, and added an AC7 filmic split-tone grade + soft lens vignette pass.',
+  { version: 'v1.1.71', title: 'DREAMY ATMOSPHERE, BLOOM & HOLOGRAPHIC HUD', bullets: [
+    'Tuned HDR UnrealBloomPass for wide velvety halation on sunlit cloud crowns and solar glare, and added a filmic split-tone grade + soft lens vignette pass.',
     'Refined the volumetric cloud sea with 24-step silky raymarching, lower cloud-sea threshold for a continuous horizon-to-horizon cloud ocean, backlit sun-glow scattering, and softer cirrus + luminous horizon haze.',
     'Added GPU-composited phosphor bloom to the HUD canvas and translucent holographic glass boxes on the Nose Camera readout.'
   ] },
-  { version: 'v1.1.70', title: 'ACE COMBAT 7 VOLUMETRIC CUMULUS CLOUDS & CIRRUS SKY', bullets: [
+  { version: 'v1.1.70', title: 'VOLUMETRIC CUMULUS CLOUDS & CIRRUS SKY', bullets: [
     'Upgraded the volumetric cloud deck with a 20-step Beer-Powder light marcher, two-tier cumulus congestus turrets rising up to 7,500 ft, and crisper sunlit tops vs deep slate-blue shadowed bellies.',
     'Added procedural 3D cauliflower lobe normals and crevice ambient occlusion to the 3D cumulus puff atlas and shader, plus towering congestus turret banks.',
-    'Added high-altitude wispy cirrus streaks and deeper AC7 cobalt-azure sky gradients to the sky dome, and switched Free Flight default lighting to DAYLIGHT // CLOUD SEA.'
+    'Added high-altitude wispy cirrus streaks and deeper cobalt-azure sky gradients to the sky dome, and switched Free Flight default lighting to DAYLIGHT // CLOUD SEA.'
   ] },
-  { version: 'v1.1.69', title: 'ACE COMBAT 7 NOSE CAMERA HUD', bullets: [
-    'Redesigned the Nose Camera HUD to match the Ace Combat 7 HUD-only nose view: cyan-mint vertical bracket rails with inward end caps, fine scrolling speed and altitude tick marks, boxed SPEED and ALT readouts, an inner-left vertical throttle/AB bar, and a top-left [A/B] indicator.',
+  { version: 'v1.1.69', title: 'HUD-ONLY NOSE CAMERA', bullets: [
+    'Redesigned the Nose Camera HUD as a dedicated HUD-only nose view: cyan-mint vertical bracket rails with inward end caps, fine scrolling speed and altitude tick marks, boxed SPEED and ALT readouts, an inner-left vertical throttle/AB bar, and a top-left [A/B] indicator.',
     'Added the centered dotted compass heading strip with cardinal markers and downward caret, plus a gull-wing boresight symbol and conformal pitch ladder.'
   ] },
   { version: 'v1.1.68', title: 'NOSE CAMERA (HUD-ONLY VIEW)', bullets: [
-    'Added an Ace Combat-style HUD-only Nose Camera view: press Space to cycle Chase -> Cockpit -> Nose -> Chase (or boot directly with ?debug&nose).',
+    'Added a dedicated HUD-only Nose Camera view: press Space to cycle Chase -> Cockpit -> Nose -> Chase (or boot directly with ?debug&nose).',
     'Renders an unobstructed forward nose-mounted camera with centered pitch ladder, heading strip, and vertical speed/altitude tapes.'
   ] },
   { version: 'v1.1.67', title: 'WORLD & THEATRE MAP OVERHAUL', bullets: [
@@ -260,7 +260,7 @@ export const PATCH_NOTES = [
     'Eliminated the multi-second freeze when taking missile hits, igniting an engine, or ejecting: nozzle plume lights and gun muzzle light now stay anchored in the scene so hiding a dead engine or aircraft never changes Three.js point-light shader counts.',
     'Verified 0 mid-flight shader recompiles across engine fire, crash ejection, cockpit cannon fire, and sortie respawn.'
   ] },
-  { version: 'v1.1.34', title: 'ACE COMBAT FEEL', bullets: [
+  { version: 'v1.1.34', title: 'ARCADE COMBAT FEEL', bullets: [
     'Hold T to padlock the designated bandit: the camera smoothly swings onto the target in chase or cockpit view and springs back on release. Y cycles the square radar between 4/10/25 km ranges.',
     'Hits and kills now stamp HIT / DESTROYED in the world, and a green SHOOT cue lights up when you pull into a rear or head-on firing aspect. Mission escalations hit with a short music dip, radar pulse and [ MISSION UPDATE ] banner.',
     'Punching through a cloud deck flashes the canopy and kicks up mist, and high-altitude contrails now ease in above 12,000 ft using the existing pooled ribbons.'

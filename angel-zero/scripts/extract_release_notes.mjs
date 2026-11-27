@@ -45,7 +45,7 @@ if (highlights) {
   for (const h of [
     'F-22A Raptor with a Blender-sculpted 3D cockpit',
     'F-15C Eagle, 6-DOF flight model and G-LOC physiology',
-    'AC7-style Nose Cam HUD and tactical radar',
+    'HUD-only Nose Cam and tactical radar',
     'Volumetric Cloud Sea, storms and carrier operations',
     'Real-World Free Flight over OSM/Esri terrain',
     'YouTube Music Player and procedural radio queue',

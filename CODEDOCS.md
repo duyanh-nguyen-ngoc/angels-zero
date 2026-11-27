@@ -100,7 +100,7 @@ flowchart LR
 ### D. Cockpits, HUD, VFX & Post-Processing
 | Module | Lines | Primary Exports | Responsibility |
 | :--- | ---: | :--- | :--- |
-| `src/hud.js` | 2,905 | `createHUD` | Hi-DPI 2D canvas HUD: Chase reticle, Combiner Cockpit HUD, **AC7 Nose Cam HUD (`drawNoseAC7HUD`)**, tactical radar, target brackets, RWR, training card, multiplayer markers & debrief map |
+| `src/hud.js` | 2,905 | `createHUD` | Hi-DPI 2D canvas HUD: Chase reticle, Combiner Cockpit HUD, **Nose Cam HUD (`drawNoseAC7HUD`)**, tactical radar, target brackets, RWR, training card, multiplayer markers & debrief map |
 | `src/cockpit3d.js` | 1,354 | `createCockpit3D` | Procedural 3D F-15C cockpit with 16 live analog gauges, animated HOTAS & 3-page VSD MFDs (`[` / `]`) |
 | `src/cockpit_f22.js` | 482 | `createCockpitF22` | Blender-modeled F-22A all-glass 3D cockpit (`f22_cockpit.glb`) with 6 live glass displays (`APG-77 AESA`, `TSD`, `ALR-94 EW`, twin `UFDs`, lower stores), ICP & animated HOTAS |
 | `src/canopy.js` | 136 | `createCanopyFX` | 2D canopy condensation / cloud moisture overlay |
@@ -111,7 +111,7 @@ flowchart LR
 | `src/weather.js` | 203 | `WEATHER`, `WEATHER_ORDER`, `createWeather` | Dynamic weather (`CLOUD_SEA`, `CLEAR`, `SCATTERED`, `OVERCAST_RAIN`, `THUNDERSTORM`, `STORM_OPS`), rain, lightning & gusts. `CLOUD_SEA` and `STORM_OPS` are theatres: selecting either on STANDBY → Weather / Time selects the matching lighting preset too; `STORM_OPS` is never rolled at random |
 | `src/stormfx.js` | 118 | `createStormFX` | Three additive axis-locked god-ray shafts rising from the sea toward the moon/sun to the 2,300 m cloud base; strength from the preset's `shafts` (STORM_OPS = 1) |
 | `src/wetdeck.js` | 253 | `createWetDeck` | Wet flight deck for CVN-ALLY *Overlord*: deck roughness / albedo / normal response driven by wetness (NAVAL ops, rain, storm), additive reflection streaks under the amber deck-edge lights, three orange island beacons and the player's nozzles |
-| `src/nvg.js` | 233 | `BLOOM_THRESHOLD`, `createNVG` | Half-float HDR `EffectComposer` (`UnrealBloomPass` at threshold `BLOOM_THRESHOLD` 0.88 so only HDR emissives bloom + `OutputPass` + AC7 filmic `gradePass` + G-LOC `gPass`) and Gen-3 green phosphor AN/AVS-9 Night Vision (`N`) |
+| `src/nvg.js` | 233 | `BLOOM_THRESHOLD`, `createNVG` | Half-float HDR `EffectComposer` (`UnrealBloomPass` at threshold `BLOOM_THRESHOLD` 0.88 so only HDR emissives bloom + `OutputPass` + filmic `gradePass` + G-LOC `gPass`) and Gen-3 green phosphor AN/AVS-9 Night Vision (`N`) |
 | `src/livery.js` | 182 | `createLivery` | Live F-15C squadron livery & unlockable paint shader/material applier |
 
 ### E. Audio, Radio & YouTube Music
@@ -153,7 +153,7 @@ flowchart LR
 1. **Input & Flight:** `inputExt.update(dt)` (gamepad/touch) → `flight.updatePhysics(dt)` (6-DOF/PSM/ground/pit-stop).
 2. **Combat & AI:** `combatSys.update(dt, simTime, opts)` (`ace_bfm.js`, `drones.js`, missiles, countermeasure rolls) → `wingmenFlight.updateWingmanFlight(dt, flags)`.
 3. **Camera & World:** `updateCameraAndVisuals(dt, now)` (Chase/Cockpit/Nose/Missile-Cam/Padlock/Shake) → `ocean.followOcean()` → `world.update(...)` / `freeFlight.update(...)` → `vfx.update(...)` → `atmosphere.update(...)`.
-4. **Render:** `nvg.render(scene, camera, simTime, firstPerson)` (WebGL2 HDR Composer + Bloom + AC7 Grade / NVG) → `hud.draw()` (2D Canvas overlay).
+4. **Render:** `nvg.render(scene, camera, simTime, firstPerson)` (WebGL2 HDR Composer + Bloom + Filmic Grade / NVG) → `hud.draw()` (2D Canvas overlay).
 
 ### Critical Rules
 - **Zero Per-Frame Allocations:** Never allocate `THREE.Vector3`, `Quaternion`, `Matrix4`, arrays, or objects inside `update()` / `draw()` loops; use preallocated module-scope scratches.

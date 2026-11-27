@@ -2,7 +2,7 @@
 
 # ANGELS ZERO
 
-**Ace Combat-inspired 3D F-22A Raptor & F-15C Eagle dogfight, strike & free-flight simulator — playable right in your browser, zero installs.**
+**3D F-22A Raptor & F-15C Eagle dogfight, strike & free-flight simulator — playable right in your browser, zero installs.**
 
 [![Play Live](https://img.shields.io/badge/Play%20Live-angels--zero.pages.dev-00ff66?style=for-the-badge&logo=cloudflarepages&logoColor=white)](https://angels-zero.pages.dev/)
 [![Build](https://img.shields.io/badge/Version-v1.1.87-52ff9c?style=for-the-badge)](angel-zero/src/patchnotes.js)
@@ -24,11 +24,11 @@
   <tr>
     <td width="50%">
       <img src="docs/screenshots/gameplay-dogfight.webp" alt="F-22A Raptor Dogfight Gameplay Footage" />
-      <p align="center"><strong>F-22A Raptor Dogfight &amp; Cloud Sea</strong><br /><sub>2D rectangular TVC plumes, AC7 dreamy HDR bloom, volumetric cumulus sea &amp; cirrus sky</sub></p>
+      <p align="center"><strong>F-22A Raptor Dogfight &amp; Cloud Sea</strong><br /><sub>2D rectangular TVC plumes, dreamy HDR bloom, volumetric cumulus sea &amp; cirrus sky</sub></p>
     </td>
     <td width="50%">
-      <img src="docs/screenshots/gameplay-nose-clouds.webp" alt="Ace Combat 7 Nose Camera Gameplay Footage" />
-      <p align="center"><strong>Ace Combat 7 Nose Camera HUD</strong><br /><sub>Cyan-mint bracketed HUD-only nose view with gull-wing boresight &amp; rolling compass</sub></p>
+      <img src="docs/screenshots/gameplay-nose-clouds.webp" alt="HUD-Only Nose Camera Gameplay Footage" />
+      <p align="center"><strong>HUD-Only Nose Camera</strong><br /><sub>Cyan-mint bracketed HUD-only nose view with gull-wing boresight &amp; rolling compass</sub></p>
     </td>
   </tr>
 </table>
@@ -40,12 +40,12 @@
 | System | Capabilities |
 | :--- | :--- |
 | **Flyable Fighters** | **F-22A Raptor** (supercruise, 2D TVC agility, stealth RCS, APG-77 AESA lock, 29-file F119 soundpack) &amp; **F-15C Eagle** (selectable squadron liveries) |
-| **3-Way Camera &amp; HUD** | Cycle **Chase → 3D Cockpit → Nose Cam (`Space`)** featuring an **Ace Combat 7 HUD-only Nose View** with bracketed tapes, throttle bar &amp; dotted compass |
+| **3-Way Camera &amp; HUD** | Cycle **Chase → 3D Cockpit → Nose Cam (`Space`)** featuring a **HUD-only Nose View** with bracketed tapes, throttle bar &amp; dotted compass |
 | **Sculpted 3D Cockpits** | **F-22A Blender-sculpted all-glass pit** (6 live displays, ICP, animated side-stick &amp; twin throttles) + **F-15C 16-dial analog panel** with cyclable MFDs (`[` / `]`) |
 | **7 Modes &amp; Free Flight** | *Air Superiority, Naval Battle (fjord strait), Canyon Run (Crater Citadel &amp; bridges), Ace Duel, endless Furball,* **Guided 6-Step Training Sortie**, &amp; **Free Flight** with any-city Nominatim search, OSM runways &amp; attribution |
 | **Ace BFM &amp; Wingman BTT** | Real bank-to-turn (`flyBTT`) wingmen (`FORM / COVER / FOCUS`) &amp; **CRIMSON-1 / CRIMSON-2** Ace AI with `HIGH_YOYO`, `BREAK_SCISSORS`, Cobra traps, bracket/drag-and-bag &amp; smart flares/chaff/notch |
 | **Controls &amp; Input** | Desktop **Mouse + Keyboard** (with Auto-Fullscreen Shortcut Lock), **Gamepad API** (Xbox / PS / HOTAS + rumble), &amp; **Mobile Touch HUD** (virtual stick + throttle) |
-| **Volumetric Clouds &amp; HDR** | 24-step Beer-Powder volumetric cloud sea, towering cumulus congestus turrets, high-altitude cirrus streaks, AC7 split-tone filmic grade &amp; AN/AVS-9 Night Vision (`N`) |
+| **Volumetric Clouds &amp; HDR** | 24-step Beer-Powder volumetric cloud sea, towering cumulus congestus turrets, high-altitude cirrus streaks, split-tone filmic grade &amp; AN/AVS-9 Night Vision (`N`) |
 | **Social, Replays &amp; Cloud Sync** | **Shareable Debrief Replay URLs (`?replay=`)**, **Global Mission Leaderboard**, **Pilot Cloud Profile Sync (`AZ-XXXX-XXXX`) &amp; Save Export/Import**, plus live **Boot Progress HUD** |
 | **YouTube / YT Music Player** | Built-in top-right **YouTube &amp; YouTube Music playlist player** (`‹ / ▶ / › / ▾ / SHUF`), custom URL paste &amp; persistence, automatic radio ducking &amp; embed-error skip |
 | **Post-Stall, Carrier &amp; Pit-Stop** | Decoupled AoA for **Cobra / Kulbit** (`B+Shift` &lt; 290 kt), flat spins, Mach-1 cone, **USS Enterprise** catapult/trap, **Runway Landing, Taxi &amp; Mid-Sortie Rearm/Repair Pit-Stop**, &amp; 43 modular ES files |
@@ -67,8 +67,8 @@
   </tr>
   <tr>
     <td width="50%">
-      <img src="docs/screenshots/nose-hud.png" alt="Ace Combat 7 Nose Camera HUD over Cloud Sea" />
-      <p align="center"><strong>AC7 Nose Camera HUD (<code>Space</code>)</strong><br /><sub>Unobstructed forward nose view with cyan-mint brackets, boxed SPEED/ALT, throttle bar &amp; gull-wing boresight</sub></p>
+      <img src="docs/screenshots/nose-hud.png" alt="HUD-Only Nose Camera over Cloud Sea" />
+      <p align="center"><strong>Nose Camera HUD (<code>Space</code>)</strong><br /><sub>Unobstructed forward nose view with cyan-mint brackets, boxed SPEED/ALT, throttle bar &amp; gull-wing boresight</sub></p>
     </td>
     <td width="50%">
       <img src="docs/screenshots/canyon-strike.png" alt="Canyon Run Gorge Strike in F-22A Raptor" />
@@ -130,7 +130,7 @@
 #### Camera, Avionics, Music &amp; Shortcut Lock
 | Input | Action |
 | :--- | :--- |
-| **Space** | Cycle **Chase → 3D Cockpit → AC7 Nose Cam** |
+| **Space** | Cycle **Chase → 3D Cockpit → Nose Cam** |
 | **Alt / Middle-Click** | Free Look (hold + drag mouse; springs back on release) |
 | **[ / ]** | Cycle cockpit VSD MFD page (`TACTICAL RADAR` / `STORES &amp; DMG` / `RWR THREAT SCOPE`) |
 | **N / K** | Toggle Night Vision (`N`) / YouTube Music Play-Pause (`K`) |
