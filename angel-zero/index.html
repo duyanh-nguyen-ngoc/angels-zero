@@ -365,6 +365,11 @@
     border:1px solid rgba(0,255,102,.5); padding:3px 6px; margin-left:4px; cursor:pointer; }
   #bgmPicker button:hover { background:rgba(0,255,102,.15); }
   #bgmPicker .hint { color:#7d9c8b; font-size:10px; margin-top:6px; }
+  #bgmTrackBar { display:flex; align-items:center; justify-content:space-between; margin-top:8px; padding-top:6px; border-top:1px solid rgba(0,255,102,.3); font-size:10px; color:#ffb000; }
+  #bgmTracks { max-height:190px; overflow-y:auto; margin:5px 0 0; padding:0; list-style:none; border-top:1px solid rgba(0,255,102,.18); }
+  #bgmTracks li { padding:3px 5px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-bottom:1px solid rgba(0,255,102,.08); }
+  #bgmTracks li:hover { background:rgba(0,255,102,.15); }
+  #bgmTracks li.active { background:rgba(0,255,102,.25); color:#fff; font-weight:bold; }
 
   /* Centered, high-contrast patch-notes modal (above menu + HUD layers). */
   #patchOverlay { position:fixed; inset:0; z-index:100; display:none; align-items:center; justify-content:center; padding:20px; box-sizing:border-box;
@@ -739,6 +744,15 @@
     <button id="bgmLoad" type="button">LOAD</button>
     <div id="bgmPresets"></div>
     <button id="bgmReset" type="button">RESET DEFAULT</button>
+    <div id="bgmTrackBar">
+      <span id="bgmTrackCount">TRACK —</span>
+      <span>
+        <button id="bgmTrackPrev" type="button" title="Previous song">‹ PREV</button>
+        <button id="bgmTrackRand" type="button" title="Jump to random song">RND</button>
+        <button id="bgmTrackNext" type="button" title="Next song">NEXT ›</button>
+      </span>
+    </div>
+    <ul id="bgmTracks"></ul>
     <div class="hint">, prev · . next · K play/pause · / shuffle. Audio plays from YouTube.</div>
   </div>
   <div id="patchOverlay">
@@ -818,7 +832,7 @@ import { createCockpitF22 } from './src/cockpit_f22.js?v=s9ex';
 import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s9ex';
 import { createEjection } from './src/eject.js?v=s9ex';
 import { createAudio } from './src/audio.js?v=s9ex';
-import { createYouTubeMusic } from './src/ytmusic.js?v=s10fly6';
+import { createYouTubeMusic } from './src/ytmusic.js?v=s10fly7';
 import { createRadio } from './src/radio.js?v=s9ex';
 import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9ex';
 import { createLivery } from './src/livery.js?v=s9ex';
@@ -826,7 +840,7 @@ import { createGear, GEAR_H, GEAR_PTS, GEAR_UNITS, setGearPoints } from './src/g
 import { createAtmosphere, PRESETS } from './src/atmosphere.js?v=s10fly2';
 import { createCanopyFX } from './src/canopy.js?v=s9ex';
 import { createNVG } from './src/nvg.js?v=s10vfx2';
-import { createWorld, WORLD, CORE } from './src/world.js?v=s10ter2';
+import { createWorld, WORLD, CORE } from './src/world.js?v=s10ter3';
 import { mulberry32, createNoise2D, fbm } from './src/noise.js?v=s10ter2';
 import { loadTerrainPack } from './src/terrainpack.js?v=s10ter2';
 import { createSurfaces } from './src/surfaces.js?v=s9ex';
@@ -835,7 +849,7 @@ import { createFreeLook } from './src/freelook.js?v=s9ex';
 import { createCanopyGlass } from './src/canopyglass.js?v=s9ex';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9ex';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9ex';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s10vfx2';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s10ter3';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9ex';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9ex';
 import { createRadioQueue } from './src/radioQueue.js?v=s9ex';
@@ -5083,26 +5097,59 @@ const hud = createHUD(THREE, {
   const title = document.getElementById('bgmTitle'), tag = document.getElementById('bgmTag');
   const playBtn = document.getElementById('bgmPlay'), shufBtn = document.getElementById('bgmAuto');
   const picker = document.getElementById('bgmPicker'), input = document.getElementById('bgmUrl');
+  const trackCountEl = document.getElementById('bgmTrackCount'), tracksEl = document.getElementById('bgmTracks');
   const toast = () => hud.setMusicToast('♪ ' + (ytMusic.info.title || '—'));
+  const renderTracks = q => {
+    if (!picker.classList.contains('open')) return;
+    const list = q.tracks || [];
+    if (list.length > 1) {
+      trackCountEl.textContent = 'TRACK ' + (q.trackIndex >= 0 ? (q.trackIndex + 1) : '?') + ' / ' + list.length;
+    } else if (list.length === 1) {
+      trackCountEl.textContent = 'MIX · ‹ -3M / +3M ›';
+    } else {
+      trackCountEl.textContent = 'LOADING TRACKS...';
+    }
+    tracksEl.textContent = '';
+    const cap = Math.min(list.length, 40);
+    for (let i = 0; i < cap; i++) {
+      const id = list[i];
+      const li = document.createElement('li');
+      if (i === q.trackIndex) li.className = 'active';
+      const titleTxt = ytMusic.getTrackTitle(id) || ('Track ' + (i + 1) + ' (' + id + ')');
+      li.textContent = String(i + 1).padStart(2, '0') + '. ' + titleTxt;
+      li.addEventListener('click', e => {
+        e.stopPropagation();
+        if (list.length > 1) ytMusic.playAt(i);
+        else ytMusic.play();
+        toast();
+      });
+      tracksEl.appendChild(li);
+    }
+    if (list.length > 1) ytMusic.fetchTrackTitles(() => renderTracks(ytMusic.status()));
+  };
   const paint = q => {
     title.textContent = '♪ ' + (q.title || '—');
     tag.textContent = '[' + (q.status || 'YT OFF') + '] ' + (q.shuffle ? 'SHUF' : 'SEQ');
     playBtn.textContent = q.playing ? '❚❚' : '▶';
     shufBtn.classList.toggle('on', !!q.shuffle);
+    renderTracks(q);
   };
   ytMusic.attachChange(paint);
   paint(ytMusic.status());
   const bind = (id, fn) => document.getElementById(id).addEventListener('click', e => { e.stopPropagation(); e.preventDefault(); fn(); });
   bind('bgmPrev', () => { ytMusic.prev(); toast(); });
   bind('bgmNext', () => { ytMusic.next(); toast(); });
+  bind('bgmTrackPrev', () => { ytMusic.prev(); toast(); });
+  bind('bgmTrackNext', () => { ytMusic.next(); toast(); });
+  bind('bgmTrackRand', () => { ytMusic.playRandom(); toast(); });
   bind('bgmPlay', () => { ytMusic.toggle(); toast(); });
   bind('bgmAuto', () => { ytMusic.setShuffle(!ytMusic.info.shuffle); toast(); });
   bind('bgmPick', () => {
     const open = picker.classList.toggle('open');
-    if (open && input) {
+    if (open) {
       if (document.pointerLockElement) document.exitPointerLock();
-      input.focus();
-      input.select();
+      renderTracks(ytMusic.status());
+      if (input) { input.focus(); input.select(); }
     }
   });
   bind('bgmPaste', async () => {
