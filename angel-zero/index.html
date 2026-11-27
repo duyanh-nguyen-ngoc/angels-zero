@@ -1888,14 +1888,18 @@ const WO_BANDITS_MIN = 2, WO_BANDITS_MAX = 3, WO_SPAWN_D = 6000, WO_SPAWN_ALT = 
 const BUZZ_MACH = 1.0, BUZZ_R = 90, BUZZ_CD = 10, BUZZ_TOWER_PTS = 500, BUZZ_JET_PTS = 250;
 const BUZZ_SHAKE = 0.35, BUZZ_SHAKE_CP = 0.12;
 const autoland = { on: false, ph: '', t: 0, T: AL_CAPTURE_T, d: 0, off: new THREE.Vector3(), tdZ: 0, vRel: 0,
-  prevLz: Infinity, q0: new THREE.Quaternion(), p0: new THREE.Vector3(), target: null, used: false };
+  prevLz: Infinity, q0: new THREE.Quaternion(), p0: new THREE.Vector3(), target: null, used: false,
+  side: 1, wpIdx: 0, wpCount: 0, wps: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()],
+  bank: 0, fwd: new THREE.Vector3(0, 0, -1), spd: 0 };
 const waveoff = { used: false, rolled: false, st: 'IDLE', t: 0, n: 0, bannerT: 0, pitchBias: 0, ids: new Int16Array(3).fill(-1) };
 const BUZZ_ANCH = new Float32Array(8 * 3), BUZZ_KIND = new Uint8Array(8), BUZZ_CDV = new Float32Array(8);
 const _bz0 = new THREE.Vector3(), _bz1 = new THREE.Vector3(), _bzSeg = new THREE.Vector3(), _bzLocal = new THREE.Vector3();
 const ISLAND_LOCAL = [24, 30, 20];
 const _alLocal = new THREE.Vector3(), _alW = new THREE.Vector3(), _alPrevW = new THREE.Vector3(), _alDir = new THREE.Vector3(),
   _alQ = new THREE.Quaternion(), _alInv = new THREE.Quaternion(), _alM = new THREE.Matrix4(), _alZero = new THREE.Vector3(),
-  _alFlare = new THREE.Quaternion(), _alStern = new THREE.Vector3();
+  _alFlare = new THREE.Quaternion(), _alStern = new THREE.Vector3(),
+  _alDes = new THREE.Vector3(), _alRight = new THREE.Vector3(), _alUp = new THREE.Vector3(),
+  _alTgtW = new THREE.Vector3(), _alTgtL = new THREE.Vector3(), _alPitchQ = new THREE.Quaternion(), _alBankQ = new THREE.Quaternion();
 const AL_TAN = Math.tan(GS_DEG * D2R);
 // World position -> carrier root frame.
 function alToLocal(a, p, out) { return out.copy(p).sub(a.root.position).applyQuaternion(_alInv.copy(a.root.quaternion).invert()); }
@@ -1936,23 +1940,35 @@ function engageAutoland() {
   autoland.rtbAtEngage = rtbOn();                         // logging only -- never rewrite mission state
   alToLocal(a, state.position, _alLocal);
   const tdZ = a.len / 2 - AL_TD_DZ;
-  let d0 = Math.max(_alLocal.z - tdZ, 0);
-  alSlope(a, d0, autoland.off); autoland.off.subVectors(_alLocal, autoland.off);
-  // Capture time scales with the offset; the slope point must still be behind the
-  // stern when the capture ends, so the glide segment always exists.
-  const T = THREE.MathUtils.clamp(autoland.off.length() / 60, AL_CAPTURE_T, 30);
-  if (d0 < AL_VAPP * T + 300) {
-    d0 = AL_VAPP * T + 300;
-    alSlope(a, d0, autoland.off); autoland.off.subVectors(_alLocal, autoland.off);
+  const dAstern = _alLocal.z - tdZ;
+  autoland.fwd.set(0, 0, -1).applyQuaternion(state.quaternion).normalize();
+  const align = autoland.fwd.dot(a.fwd);
+  const side = _alLocal.x >= 0 ? 1 : -1;
+  const needPattern = dAstern < 1300 || Math.abs(_alLocal.x) > 1000 || align < 0.55;
+  let ph = 'GLIDE', wpCount = 0;
+  if (needPattern) {
+    ph = 'PATTERN';
+    if (dAstern < 1100) {
+      autoland.wps[0].set(side * 1550, 340, tdZ + 800);
+      autoland.wps[1].set(side * 1350, 260, tdZ + 2900);
+      autoland.wps[2].set(0, a.deckY + GEAR_H + 2600 * AL_TAN, tdZ + 2600);
+      wpCount = 3;
+    } else {
+      autoland.wps[0].set(side * 1100, 240, tdZ + Math.max(2500, dAstern + 400));
+      autoland.wps[1].set(0, a.deckY + GEAR_H + 2400 * AL_TAN, tdZ + 2400);
+      wpCount = 2;
+    }
   }
-  Object.assign(autoland, { on: true, ph: 'CAPTURE', t: 0, T, d: d0, tdZ, vRel: AL_VAPP, prevLz: Infinity, used: true });
+  Object.assign(autoland, { on: true, ph, t: 0, T: AL_CAPTURE_T, d: Math.max(dAstern, 0), tdZ,
+    vRel: AL_VAPP, prevLz: Infinity, used: true, side, wpIdx: 0, wpCount, bank: 0,
+    spd: Math.max(AL_VAPP, state.speed) });
   autoland.q0.copy(state.quaternion); autoland.p0.copy(state.position);
   _alPrevW.copy(state.position);
-  state.gearDown = true; gearAutoLock = true; state.afterburner = 0;
+  state.gearDown = (ph !== 'PATTERN'); gearAutoLock = true; state.afterburner = 0;
   state.pitchRate = state.rollRate = state.yawRate = 0;
   combat.allyHold = true;                                    // no carrier turnaround while we are on approach
-  combatSys.say('AUTOLAND ENGAGED — USS ENTERPRISE', 2, '#5fe8ff');
-  if (DEBUG) console.log('[ANGELS_ZERO] autoland engage rtb=' + autoland.rtbAtEngage + ' d0=' + d0.toFixed(0) + ' off=' + autoland.off.length().toFixed(0) + ' T=' + T.toFixed(1));
+  combatSys.say(ph === 'PATTERN' ? 'AUTOPILOT — ENTERING CARRIER PATTERN' : 'AUTOPILOT — ON FINAL GLIDESLOPE', 2.4, '#5fe8ff');
+  if (DEBUG) console.log('[ANGELS_ZERO] autoland engage ph=' + ph + ' dAstern=' + dAstern.toFixed(0) + ' align=' + align.toFixed(2));
 }
 function autolandPhase(ph) {
   if (DEBUG) console.log('[ANGELS_ZERO] autoland ' + autoland.ph + '->' + ph + ' t=' + autoland.t.toFixed(2) +
@@ -2081,14 +2097,73 @@ function finishCarrierTrap(src) {
   if (DEBUG) console.log('[ANGELS_ZERO] pitstop cat → hold');
 }
 
+function alFlyBTT(dt, targetWorld, targetSpd, maxG, maxBankRad, aoaRad, floorCheck) {
+  _alDes.copy(targetWorld).sub(state.position);
+  if (floorCheck) {
+    const minY = Math.max(55, world.heightAt(state.position.x, state.position.z) + 90);
+    if (state.position.y < minY) _alDes.y = Math.max(_alDes.y, (minY - state.position.y) * 2.5);
+  }
+  const dLen = _alDes.length();
+  if (dLen > 0.01) _alDes.divideScalar(dLen);
+  else _alDes.copy(autoland.fwd);
+
+  // Speed & throttle / airbrake controller
+  const spdErr = targetSpd - autoland.spd;
+  const maxDv = (spdErr >= 0 ? 18 : 16) * dt;
+  autoland.spd += THREE.MathUtils.clamp(spdErr, -maxDv, maxDv);
+  state.throttle += (THREE.MathUtils.clamp(0.62 + spdErr * 0.012, 0.28, 0.95) - state.throttle) * Math.min(1, dt * 3);
+  state.airbrake = spdErr < -10 ? THREE.MathUtils.clamp((-spdErr - 10) / 30, 0, 1) : 0;
+
+  // Turn rate limited by maxG, computing physical bank angle from lateral acceleration
+  const spd = Math.max(autoland.spd, 60);
+  const maxTurn = (maxG * 9.81) / spd;
+  const dot = THREE.MathUtils.clamp(autoland.fwd.dot(_alDes), -1, 1);
+  const ang = Math.acos(dot);
+  const stepAng = Math.min(ang, maxTurn * dt);
+  let wantBank = 0;
+  if (ang > 1e-4) {
+    _alRight.crossVectors(autoland.fwd, AX_Y).normalize();
+    const latErr = _alDes.dot(_alRight);
+    const latAccel = THREE.MathUtils.clamp((latErr * spd * 1.4), -maxG * 9.81, maxG * 9.81);
+    wantBank = THREE.MathUtils.clamp(-Math.atan2(latAccel, 9.81), -maxBankRad, maxBankRad);
+    _alUp.crossVectors(autoland.fwd, _alDes);
+    if (_alUp.lengthSq() > 1e-8) {
+      _alUp.normalize();
+      autoland.fwd.applyAxisAngle(_alUp, stepAng).normalize();
+    }
+  }
+  const maxRoll = 1.9 * dt;
+  autoland.bank += THREE.MathUtils.clamp(wantBank - autoland.bank, -maxRoll, maxRoll);
+
+  // Integrate world velocity & position
+  state.velocity.copy(autoland.fwd).multiplyScalar(autoland.spd);
+  state.position.addScaledVector(state.velocity, dt);
+  state.speed = autoland.spd;
+  state.gLoad = 1 + Math.abs(Math.tan(autoland.bank)) * 0.65;
+  state.aoa = aoaRad;
+  state.onGround = false;
+
+  // Pose: forward + physical bank + nose-up AoA
+  _alM.lookAt(_alZero, autoland.fwd, AX_Y);
+  _alQ.setFromRotationMatrix(_alM);
+  _alBankQ.setFromAxisAngle(AX_Z, autoland.bank);
+  _alPitchQ.setFromAxisAngle(AX_X, aoaRad);
+  state.quaternion.copy(_alQ).multiply(_alBankQ).multiply(_alPitchQ);
+}
+
 function updateAutoland(dt) {
   const a = combat.ally;
   if (!a || !a.root || combat.dead) { autoland.on = false; combat.allyHold = false; return; }
   autoland.t += dt;
   const sstep = THREE.MathUtils.smoothstep;
   state.pitchRate = state.rollRate = state.yawRate = 0;     // pilot input is locked out
-  state.gearDown = true; state.gear = Math.min(1, state.gear + dt / GEAR_TRAVEL);
   state.afterburner = 0;
+  state.gearDown = (autoland.ph !== 'PATTERN');
+  if (state.gearDown) state.gear = Math.min(1, state.gear + dt / GEAR_TRAVEL);
+  else state.gear = Math.max(0, state.gear - dt / GEAR_TRAVEL);
+
+  alToLocal(a, state.position, _alLocal);
+  autoland.d = Math.max(0, _alLocal.z - autoland.tdZ);
   const alStern = autoland.d - AL_TD_DZ;
   if (!waveoff.rolled && !waveoff.used && autoland.ph === 'GLIDE' && alStern >= WO_D_MIN && alStern <= WO_D_MAX &&
       combat.carrierVisible !== false && (missionId === 'NAVAL_BATTLE' || missionId === 'AIR_SUPERIORITY') && !carrier.phase) {
@@ -2098,40 +2173,49 @@ function updateAutoland(dt) {
     if (DEBUG) console.log('[ANGELS_ZERO] waveoff roll p=' + chance + ' hit=' + hit);
     if (hit && triggerWaveOff()) return;
   }
-  if (autoland.ph === 'CAPTURE' || autoland.ph === 'GLIDE' || autoland.ph === 'FLARE') {
-    autoland.d -= AL_VAPP * dt;
-    const k = autoland.ph === 'CAPTURE' ? sstep(Math.min(1, autoland.t / autoland.T), 0, 1) : 1;
-    alSlope(a, autoland.d, _alLocal).addScaledVector(autoland.off, 1 - k);
-    alToWorld(a, _alLocal, _alW);
-    // Velocity from the path itself (includes the carrier's own motion).
-    state.velocity.copy(_alW).sub(_alPrevW).divideScalar(Math.max(dt, 1e-4));
-    state.speed = state.velocity.length();
-    state.position.copy(_alW); _alPrevW.copy(_alW);
-    // Nose along the carrier-relative glide path: local (0, -tan, -1).
-    _alDir.set(0, -AL_TAN, -1).applyQuaternion(a.root.quaternion).normalize();
-    if (autoland.ph === 'CAPTURE') {                        // blend in from the actual flight path
-      _alLocal.copy(state.velocity).sub(a.vel);
-      if (_alLocal.lengthSq() > 1) _alDir.lerp(_alLocal.normalize(), 1 - k).normalize();
+  if (autoland.ph === 'PATTERN') {
+    const wp = autoland.wps[autoland.wpIdx];
+    alToWorld(a, wp, _alTgtW);
+    alFlyBTT(dt, _alTgtW, 112, 3.6, 52 * D2R, 3.5 * D2R, true);
+    const hd = Math.hypot(_alTgtW.x - state.position.x, _alTgtW.z - state.position.z);
+    const thresh = autoland.wpIdx === autoland.wpCount - 1 ? 520 : 420;
+    if (hd < thresh) {
+      autoland.wpIdx++;
+      if (autoland.wpIdx >= autoland.wpCount) {
+        autolandPhase('GLIDE');
+        state.gearDown = true;
+        combatSys.say('TURNING FINAL — GEAR DOWN', 2.0, '#5fe8ff');
+      }
     }
-    _alQ.setFromRotationMatrix(_alM.lookAt(_alZero, _alDir, AX_Y));
-    if (autoland.ph === 'FLARE') {
-      _alFlare.setFromAxisAngle(AX_X, (AL_FLARE_DEG + 4) * D2R * sstep(1 - autoland.d / AL_FLARE_D, 0, 1));
-      _alQ.multiply(_alFlare);
-    }
-    state.quaternion.slerp(_alQ, Math.min(1, dt * (autoland.ph === 'CAPTURE' ? 2.2 : 3.5)));
-    state.throttle += (0.62 - state.throttle) * Math.min(1, dt * 2);
-    state.onGround = false;
-    if (autoland.ph === 'CAPTURE' && autoland.t >= autoland.T) autolandPhase('GLIDE');
-    if (autoland.ph === 'GLIDE' && autoland.d <= AL_FLARE_D) autolandPhase('FLARE');
-    if (autoland.ph === 'FLARE' && autoland.d <= 0) {
-      // Hook down: wire 2. Arrested from AL_VAPP relative to 0 over AL_TRAP_T.
-      autoland.vRel = AL_VAPP; autoland.d = 0;
-      audio.cableScreech(); onSfx('trap'); blastShake = Math.max(blastShake, 0.45);
-      onTouchdown(sinkFactor(vyPrev), 'CARRIER');
-      radioEvent('ON_CARRIER_TRAP');
-      combat.trapT = performance.now(); combat.trapWire = 2; combat.traps = (combat.traps || 0) + 1;
-      tele.event(EV.CARRIER_TRAP, state.position.x, state.position.z, simTime);
-      autolandPhase('TRAP');
+    return;
+  }
+  if (autoland.ph === 'GLIDE' || autoland.ph === 'FLARE') {
+    const shipSpd = a.vel.length();
+    const worldAppSpd = AL_VAPP + shipSpd;
+    if (autoland.ph === 'GLIDE') {
+      const lookAhead = THREE.MathUtils.clamp(autoland.d * 0.35, 110, 420);
+      const rabbitD = Math.max(0, autoland.d - lookAhead);
+      alSlope(a, rabbitD, _alTgtL);
+      alToWorld(a, _alTgtL, _alTgtW);
+      const maxBank = 32 * D2R * THREE.MathUtils.clamp((autoland.d - 180) / 600, 0.12, 1);
+      alFlyBTT(dt, _alTgtW, worldAppSpd, 2.8, maxBank, 7.5 * D2R, false);
+      if (autoland.d <= AL_FLARE_D) autolandPhase('FLARE');
+    } else {
+      alSlope(a, 0, _alTgtL);
+      alToWorld(a, _alTgtL, _alTgtW);
+      alFlyBTT(dt, _alTgtW, worldAppSpd, 2.4, 6 * D2R, 9.0 * D2R, false);
+      alToLocal(a, state.position, _alLocal);
+      const tdDist = _alLocal.z - autoland.tdZ;
+      if (tdDist <= 8 || (_alLocal.z <= autoland.tdZ + 12 && _alLocal.y <= a.deckY + GEAR_H + 5)) {
+        // Hook down: wire 2. Arrested from AL_VAPP relative to 0 over AL_TRAP_T.
+        autoland.vRel = AL_VAPP; autoland.d = 0;
+        audio.cableScreech(); onSfx('trap'); blastShake = Math.max(blastShake, 0.45);
+        onTouchdown(sinkFactor(vyPrev), 'CARRIER');
+        radioEvent('ON_CARRIER_TRAP');
+        combat.trapT = performance.now(); combat.trapWire = 2; combat.traps = (combat.traps || 0) + 1;
+        tele.event(EV.CARRIER_TRAP, state.position.x, state.position.z, simTime);
+        autolandPhase('TRAP');
+      }
     }
     return;
   }
