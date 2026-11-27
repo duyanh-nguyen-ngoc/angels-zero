@@ -3799,7 +3799,7 @@ const _bfmOut = aceBFM.bfmOut, _bfmLos = aceBFM.los, _bfmUp = aceBFM.up, _bfmMat
           if (!m.lostTrack && !(m.homingDelay > 0)) {
             _mLosRate.copy(_mLos).sub(m.losPrev).divideScalar(Math.max(dt, 1e-4));
             m.losPrev.copy(_mLos);
-            const vc = -_mRelVel.copy(tgt.vel).sub(m.vel).dot(_mLos);
+            const vc = -_mRelVel.copy(tgt.vel || _dlzZeroStatic).sub(m.vel).dot(_mLos);
             _mAcc.copy(_mLosRate).multiplyScalar(q.N * Math.max(vc, 200));
             if (q.noise) {                                          // low-passed seeker wander (soft locks)
               if (!m.jit) m.jit = new THREE.Vector3();
@@ -4498,7 +4498,7 @@ const _bfmOut = aceBFM.bfmOut, _bfmLos = aceBFM.los, _bfmUp = aceBFM.up, _bfmMat
           y = 6;                                              // pier top
         }
         t.g.position.set(x, y, z);
-        Object.assign(t, { pos: new THREE.Vector3(x, y + 2, z), alive: true, burn: 0, id: 'J' + (i + 1) });
+        Object.assign(t, { pos: new THREE.Vector3(x, y + 2, z), vel: new THREE.Vector3(), alive: true, burn: 0, id: 'J' + (i + 1) });
         scene.add(t.g); surface.push(t);
       }
     }
