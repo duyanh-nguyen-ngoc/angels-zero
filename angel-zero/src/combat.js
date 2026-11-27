@@ -3742,7 +3742,7 @@ const _bfmOut = aceBFM.bfmOut, _bfmLos = aceBFM.los, _bfmUp = aceBFM.up, _bfmMat
           }
         }
         // SAMs detonate on any terrain contact (a hard dive into the trench kills them).
-        if (m.sam && pos.y <= terrainHeight(pos.x, pos.z) + 1) {
+        if (m.sam && m.age > 0.45 && pos.y <= terrainHeight(pos.x, pos.z) + 1) {
           explosion(pos, 0.8, { kind: 'ground' }); m.active = false; m.mesh.visible = false; C.samLive = Math.max(0, C.samLive - 1);
           continue;
         }
@@ -5274,11 +5274,13 @@ const _bfmOut = aceBFM.bfmOut, _bfmLos = aceBFM.los, _bfmUp = aceBFM.up, _bfmMat
   // Surface-to-air launch from a mount: boost up and toward the player.
   function surfaceSAM(from, label, aim, lockDelay, brutal = false) {
     if (C.samLive >= CANYON_SAM_MAX) return false;
-    if (aim) _dv.copy(aim).sub(from).normalize();
-    else _dv.copy(S.position).sub(from).normalize().lerp(UP, 0.45).normalize();
+    _da.copy(from);
+    _da.y = Math.max(_da.y, terrainHeight(_da.x, _da.z) + 14);
+    if (aim) _dv.copy(aim).sub(_da).normalize();
+    else _dv.copy(S.position).sub(_da).normalize().lerp(UP, 0.45).normalize();
     _q.setFromUnitVectors(MSL_NOSE, _dv);
     const spd = brutal ? SAM_BRUTAL_V : SAM_V, q = brutal ? SAM_BRUTAL_Q : SAM_Q;
-    const m = launch(_da.copy(from), _q, _db.copy(_dv).multiplyScalar(spd), PLAYER_TGT, true, q, undefined, 'PN', 'SAM');
+    const m = launch(_da, _q, _db.copy(_dv).multiplyScalar(spd), PLAYER_TGT, true, q, undefined, 'PN', 'SAM');
     if (!m) return false;
     m.sam = true; m.kind = 'SAM'; m.life = SAM_LIFE; m.samLabel = label;
     m.samFlared = rand() < (brutal ? 0.45 : 0.85);                          // one decoy decision per missile
@@ -5852,7 +5854,8 @@ const _bfmOut = aceBFM.bfmOut, _bfmLos = aceBFM.los, _bfmUp = aceBFM.up, _bfmMat
     const base = R ? Math.hypot(S.position.x - R.x, S.position.z - clamp(S.position.z, R.z0, R.z1)) : Infinity;
     const approach = !!S.gearDown && aglFt < BASE_FT && base < BASE_R;
     const ground = !!S.onGround || !!(S.pit && S.pit.active);
-    const safe = playerActive && !C.dead && (lowSafe || approach || ground);
+    const canyonThreat = C.missionId === 'CANYON_RUN' && (C.climb.on || C.canyonBreach.active || C.canyonBreach.banditsSpawned);
+    const safe = playerActive && !C.dead && ((!canyonThreat && lowSafe) || approach || ground);
     if (safe && !C.playerSafe) {                                          // onset: break everything off at once
       enemyTracers.clear();
       for (const e of enemies) { e.bLock = 0; e.burst = 0; }

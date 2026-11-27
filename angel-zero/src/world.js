@@ -1179,22 +1179,6 @@ export function createWorld(THREE, env) {
       inst('cyl', tx2, ty2 + 7, tz2, 20, 18, 20, 0xd4d8d6, 0, 0, 0, 'gorge');
       addCyl(tx2, tz2, ty2, ty2 + 17, 10.5, 10.5, 'gorge');
     }
-    // 3 high-altitude truss bridges above the 1,200 ft radar ceiling; piers on the baked rims.
-    for (const { gi, bz, bcx, nx, nz, yaw: perpYaw, piers } of GS.bridges) {
-      const span = (GORGE_RAMP_W + 75) * 2, deckY = Math.max(CEIL_M + 38, ...piers.map(p => p.y + 24));
-      inst('box', bcx, deckY, bz, 16, 5, span, 0x525860, perpYaw, 0, 0, 'gorge');
-      inst('box', bcx, deckY + 11, bz, 14, 2.2, span - 20, 0xb23a29, perpYaw, 0, 0, 'gorge');
-      for (let k = -4; k <= 4; k++) {
-        const d = k * 42, px = bcx + nx * d, pz = bz + nz * d;
-        beam(px, deckY + 2, pz, px + nx * 21, deckY + 11, pz + nz * 21, 1.3, 0xb23a29, 'gorge');
-        beam(px, deckY + 11, pz, px + nx * 21, deckY + 2, pz + nz * 21, 1.3, 0xb23a29, 'gorge');
-      }
-      for (const { x: px, z: pz, y: py, sg } of piers) {
-        inst('box', px, (py - 4 + deckY) * 0.5, pz, 14, Math.max(12, deckY - py + 8), 14, 0x7e827d, perpYaw, 0, 0, 'gorge');
-        light(bcx + nx * sg * 80, deckY + 13.5, bz + nz * sg * 80, 0xff2020, 6.5, 2, gi * 0.17 + (sg > 0 ? 0.5 : 0), 1);
-      }
-      addBox(bcx, deckY + 5, bz, 8, 8, span * 0.5, perpYaw, 'gorge');
-    }
     for (const { x: rx, z: rzz, y: ry, i } of GS.casemates) {
       inst('box', rx, ry + 2, rzz, 16, 12, 16, 0x5c605c, 0, 0, 0, 'gorge');
       light(rx, ry + 10, rzz, 0xff3020, 4.5, 2, i * 0.11, 1);
@@ -1658,23 +1642,7 @@ export function createWorld(THREE, env) {
     }
     scSlab.computeVertexNormals();
   }
-  const scArch = new THREE.InstancedMesh(scSlab, new THREE.MeshStandardMaterial({ color: 0x4c5359, roughness: 0.96, metalness: 0, flatShading: true }), 3);
-  scArch.name = 'trenchArch'; scArch.visible = false; scArch.frustumCulled = true;
-  {
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), pos2 = new THREE.Vector3();
-    const put = (i, x, y, z, hx, hy, hz) => { pos2.set(x, y, z); sc.set(hx * 2, hy * 2, hz * 2); m.compose(pos2, q, sc); scArch.setMatrixAt(i, m); };
-    const deckY = (GORGE_SC_ARCH_Y0 + GORGE_SC_ARCH_Y1) / 2, pierY = (GORGE_SC_FLOOR_Y + GORGE_SC_ARCH_Y1) / 2;
-    put(0, GORGE_SC_X, deckY, GORGE_SC_ARCH_Z, GORGE_SC_ARCH_W / 2, (GORGE_SC_ARCH_Y1 - GORGE_SC_ARCH_Y0) / 2, GORGE_SC_ARCH_D / 2);
-    put(1, GORGE_SC_X - (GORGE_SC_HALF_W + 20), pierY, GORGE_SC_ARCH_Z, 20, (GORGE_SC_ARCH_Y1 - GORGE_SC_FLOOR_Y) / 2, GORGE_SC_ARCH_D / 2);
-    put(2, GORGE_SC_X + (GORGE_SC_HALF_W + 20), pierY, GORGE_SC_ARCH_Z, 20, (GORGE_SC_ARCH_Y1 - GORGE_SC_FLOOR_Y) / 2, GORGE_SC_ARCH_D / 2);
-    scArch.instanceMatrix.needsUpdate = true; scArch.computeBoundingSphere();
-  }
-  scene.add(scArch);
-  const scBoxes = [
-    { c: new THREE.Vector3(GORGE_SC_X, (GORGE_SC_ARCH_Y0 + GORGE_SC_ARCH_Y1) / 2, GORGE_SC_ARCH_Z), hx: GORGE_SC_ARCH_W / 2, hy: (GORGE_SC_ARCH_Y1 - GORGE_SC_ARCH_Y0) / 2, hz: GORGE_SC_ARCH_D / 2, yaw: 0 },
-    { c: new THREE.Vector3(GORGE_SC_X - (GORGE_SC_HALF_W + 20), (GORGE_SC_FLOOR_Y + GORGE_SC_ARCH_Y1) / 2, GORGE_SC_ARCH_Z), hx: 20, hy: (GORGE_SC_ARCH_Y1 - GORGE_SC_FLOOR_Y) / 2, hz: GORGE_SC_ARCH_D / 2, yaw: 0 },
-    { c: new THREE.Vector3(GORGE_SC_X + (GORGE_SC_HALF_W + 20), (GORGE_SC_FLOOR_Y + GORGE_SC_ARCH_Y1) / 2, GORGE_SC_ARCH_Z), hx: 20, hy: (GORGE_SC_ARCH_Y1 - GORGE_SC_FLOOR_Y) / 2, hz: GORGE_SC_ARCH_D / 2, yaw: 0 }
-  ];
+  const scBoxes = [];
 
   // --- map switching: reuse terrain geometry and materials, update vertex colors & collision sets.
   const baseBoxes = boxes.slice(), baseCyls = cyls.slice();
