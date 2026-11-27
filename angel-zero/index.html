@@ -840,7 +840,7 @@ import { createBlastFX } from './src/blastfx.js?v=s10vfx1';
 import { createHUD } from './src/hud.js?v=s11gfx1';
 import { createCockpit3D } from './src/cockpit3d.js?v=s9ex';
 import { createCockpitF22 } from './src/cockpit_f22.js?v=s9ex';
-import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s10can2';
+import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s10can3';
 import { createEjection } from './src/eject.js?v=s9ex';
 import { createAudio } from './src/audio.js?v=s9ex';
 import { createYouTubeMusic } from './src/ytmusic.js?v=s10fly7';
@@ -864,7 +864,7 @@ import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s10can1';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9ex';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9ex';
 import { createRadioQueue } from './src/radioQueue.js?v=s9ex';
-import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s10can1';
+import { MISSIONS, MISSION_ORDER, loadMission, saveMission } from './src/missions.js?v=s10can3';
 import { MAPS, gorgeCentreX, gorgeHeading, gorgeDist, FT, CEIL_M, GORGE_FLOOR_Y, GORGE_SPAWN_Z, GORGE_GATE_Z, GORGE_ARC_M,
   GORGE_HALF_W, RUNWAY_BBOX, GORGE_SC_X, GORGE_SC_ZA } from './src/maps.js?v=s10can1';
 import { createFreeFlight, FREE_FLIGHT_PRESETS, loadFreeFlightCity, saveFreeFlightCity, geocodePlace, loadCustomPlace, saveCustomPlace } from './src/freeflight.js?v=s9ex';
@@ -1013,7 +1013,7 @@ const _wt0 = performance.now();
 // Terrain v2: the archipelago pack (baked 2048^2 heightfield + splat, ~3 MB) is needed before
 // boot-time prop placement; gorge / strait packs are fetched lazily (prefetched after boot,
 // awaited by startSortie) — see world.prepare().
-const TERRAIN_PACK_TAG = 's10can1';
+const TERRAIN_PACK_TAG = 's10can3';
 const [terrainPackArch, metaGorge, metaStrait] = await Promise.all([
   loadTerrainPack('archipelago', 'assets/terrain', TERRAIN_PACK_TAG),
   loadTerrainMeta('gorge', 'assets/terrain', TERRAIN_PACK_TAG), loadTerrainMeta('strait', 'assets/terrain', TERRAIN_PACK_TAG)   // v3.1 DEM landmarks

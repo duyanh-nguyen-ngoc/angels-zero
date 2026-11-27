@@ -88,8 +88,8 @@
     "cargo"
    ],
    [
-    -6300,
-    10400,
+    -6900,
+    9800,
     0.393,
     "tanker"
    ],
@@ -227,16 +227,16 @@
   "floorUp": 150
  },
  "checksums": {
-  "height16": "1d2dd419834bf5dc",
+  "height16": "cbf8474732180fa3",
   "horizon16": "3cfbcec078cfa69e",
-  "splat": "026f02cc433c8280"
+  "splat": "8a74e0889994705b"
  },
  "stats": {
   "minH": -125.9,
   "maxH": 1084.3,
   "landPct": 78.2,
   "landUse": {
-   "water": 22.1,
+   "water": 22.2,
    "farm": 15.2,
    "forest": 43.3,
    "rock": 3,
@@ -250,15 +250,15 @@
    "maxAbs": 0
   },
   "bakeMs": {
-   "sample": 3501,
-   "erode": 180,
-   "total": 7231
+   "sample": 4031,
+   "erode": 155,
+   "total": 8085
   },
   "bytes": {
-   "height16": 2197149,
+   "height16": 2197538,
    "horizon16": 280095,
-   "splat": 631022,
-   "total": 3108266
+   "splat": 631005,
+   "total": 3108638
   }
  }
 }

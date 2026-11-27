@@ -12,7 +12,7 @@ import { createDroneSwarm } from './drones.js?v=s9ew';
 import { createAceBFM } from './ace_bfm.js?v=s9ew';
 import { DIFFICULTY_PRESETS } from './difficulty.js?v=s9c2';
 import { SPW } from './loadout.js?v=s9c2';
-import { missionConfig } from './missions.js?v=s10can1';
+import { missionConfig } from './missions.js?v=s10can3';
 import { gorgeCentreX, gorgeSlope, gorgeHeading, gorgeDist, GORGE_GATE_Z, GORGE_GATE_N, GORGE_FLOOR_Y, GORGE_RIM_Y,
   GORGE_CRATER_Z, GORGE_CRATER_R, GORGE_CRATER_WALL_Y, GORGE_FORT, GORGE_ARC_M, GORGE_SPAWN_Z, GORGE_Z0, GORGE_RAMP_W, CEIL_M,
   GORGE_SC_X, GORGE_SC_ZA, GORGE_SC_ZB, GORGE_SC_HALF_W, GORGE_SC_ARCH_Z, GORGE_SC_ARCH_Y0,
@@ -4995,6 +4995,27 @@ const _bfmOut = aceBFM.bfmOut, _bfmLos = aceBFM.los, _bfmUp = aceBFM.up, _bfmMat
       a.deckY = CARRIER_DECK_ASL;
       a.deckLocalY = medianY / (glb.scale.y || 1);
       a.deckWorldY = CARRIER_DECK_ASL;
+      // Static parked deck fighters along starboard/stern spots (stay visible on carrier at launch & RTB).
+      {
+        const deckJetMat = new THREE.MeshStandardMaterial({ color: 0x6c747c, roughness: 0.52, metalness: 0.35 });
+        const deckCanopyMat = new THREE.MeshStandardMaterial({ color: 0x1b232a, roughness: 0.2, metalness: 0.6 });
+        const parkSpots = [[19, -58, -0.55], [20, -24, -0.55], [21, 95, -0.45], [20, 128, -0.45]];
+        const fuseG = new THREE.BoxGeometry(2.2, 1.3, 14.5), wingG = new THREE.BoxGeometry(10.8, 0.25, 4.6),
+          tailG = new THREE.BoxGeometry(0.25, 2.2, 2.4), canG = new THREE.BoxGeometry(1.1, 0.75, 3.6);
+        for (const [px, pz, pyaw] of parkSpots) {
+          const py = rayAt(px, pz, 'park', true);
+          const jy = Number.isFinite(py) ? py : a.deckY;
+          const jg = new THREE.Group();
+          jg.position.set(px, jy + 1.1, pz); jg.rotation.y = pyaw;
+          const f = new THREE.Mesh(fuseG, deckJetMat);
+          const w = new THREE.Mesh(wingG, deckJetMat); w.position.set(0, -0.1, 1.2);
+          const tL = new THREE.Mesh(tailG, deckJetMat); tL.position.set(-1.1, 1.3, 5.2); tL.rotation.z = 0.26;
+          const tR = new THREE.Mesh(tailG, deckJetMat); tR.position.set(1.1, 1.3, 5.2); tR.rotation.z = -0.26;
+          const c = new THREE.Mesh(canG, deckCanopyMat); c.position.set(0, 0.85, -3.2);
+          jg.add(f, w, tL, tR, c);
+          root.add(jg);
+        }
+      }
       fastBounds(glb, hull);
       if (hull.min.y > 0.5 || a.deckY < CARRIER_MIN_FREEBOARD) {
         console.log('[ANGELS_ZERO] carrier waterline FAIL', +hull.min.y.toFixed(2), +a.deckY.toFixed(2));

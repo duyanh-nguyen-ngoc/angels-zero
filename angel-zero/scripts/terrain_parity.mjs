@@ -83,6 +83,9 @@ for (const map of ['archipelago', 'gorge', 'strait']) {
     check(wallOk, 'GORGE: no terrain above 80 m inside the floor half-width');
     const carrierH = S.heightAt(GORGE_X0, GORGE_Z0 + 5500);
     check(carrierH < -25, `GORGE: carrier spawn open water (h=${carrierH.toFixed(1)} m)`);
+    let mouthMax = -1e9;
+    for (let z = GORGE_Z0 + 5500; z >= GORGE_Z0; z -= 100) mouthMax = Math.max(mouthMax, S.heightAt(GORGE_X0, z));
+    check(mouthMax < 40, `GORGE: carrier-to-canyon mouth unobstructed (max=${mouthMax.toFixed(1)} m)`);
   }
   if (map === 'strait') {
     let worst = -1e9;

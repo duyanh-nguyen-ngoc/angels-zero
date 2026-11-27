@@ -39,7 +39,7 @@ export const MISSIONS = {
     spawn: { pos: [GORGE_X0, 18, GORGE_Z0 + 5500], hdg: 0, spd: 160, onDeck: true },
     waves: [],
     targets: [{ kind: 'FORT', pos: GORGE_FORT, hp: 2 }],
-    weapons: { gun: true, msl: true, spw: true }, enemyMsl: true, wingmen: 'FLIGHT',
+    weapons: { gun: true, msl: true, spw: true }, enemyMsl: true, wingmen: 'NONE',
     ceiling: { m: CEIL_M }, gatesPath: 'CANYON', ilsOnRtbOnly: false,
     stages: [
       { label: 'TRENCH RUN', targets: [{ kind: 'FORT', pos: GORGE_FORT, hp: 2 }], bandits: 0, clear: 'TARGETS' }

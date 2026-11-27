@@ -240,6 +240,15 @@ function applyClearance(map, x, z, hDem, harbour) {
       const seaK = ss(z, GORGE_Z0 + 300, GORGE_Z0 + 1400) * ss(Math.abs(x - GORGE_X0), 4200, 2600);
       h = h * (1 - seaK) + Math.min(h, -48) * seaK;
     }
+    // Seamless flaring fjord entrance funnel from open sea (z = GORGE_Z0 + 1400) into canyon mouth (z = GORGE_Z0)
+    if (z >= GORGE_Z0 - 200 && z <= GORGE_Z0 + 2200 && Math.abs(x - GORGE_X0) < 1200) {
+      const tOut = ss(z, GORGE_Z0, GORGE_Z0 + 1400);
+      const mouthHalf = GORGE_HALF_W * (1 + 2.4 * tOut);
+      const mouthRamp = mouthHalf + 220 + 200 * tOut;
+      const mouthFloor = 24 * (1 - tOut) - 48 * tOut;
+      const kM = (1 - ss(Math.abs(x - GORGE_X0), mouthHalf, mouthRamp)) * ss(z, GORGE_Z0 - 200, GORGE_Z0 + 100) * ss(z, GORGE_Z0 + 2200, GORGE_Z0 + 1600);
+      if (kM > 0 && h > mouthFloor) h = h * (1 - kM) + mouthFloor * kM;
+    }
     if (geo.inGorgeBox(x, z)) {
       // Organic glacial gorge carving: varying width, asymmetric river-bend banks, stepped cliff strata & undulating riverbed
       const gN1 = fbm(nGorge1, x * 0.00055, z * 0.00055, 3);
