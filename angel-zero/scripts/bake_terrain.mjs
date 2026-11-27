@@ -240,27 +240,37 @@ function applyClearance(map, x, z, hDem, harbour) {
       const seaK = ss(z, GORGE_Z0 + 300, GORGE_Z0 + 1400) * ss(Math.abs(x - GORGE_X0), 4200, 2600);
       h = h * (1 - seaK) + Math.min(h, -48) * seaK;
     }
-    // Seamless flaring fjord entrance funnel from open sea (z = GORGE_Z0 + 1400) into canyon mouth (z = GORGE_Z0)
+    // Seamless flaring fjord entrance funnel from open sea (z = GORGE_Z0 + 1400) into river estuary (z = GORGE_Z0)
     if (z >= GORGE_Z0 - 200 && z <= GORGE_Z0 + 2200 && Math.abs(x - GORGE_X0) < 1200) {
       const tOut = ss(z, GORGE_Z0, GORGE_Z0 + 1400);
       const mouthHalf = GORGE_HALF_W * (1 + 2.4 * tOut);
       const mouthRamp = mouthHalf + 220 + 200 * tOut;
-      const mouthFloor = 24 * (1 - tOut) - 48 * tOut;
+      const mouthFloor = -10 * (1 - tOut) - 48 * tOut;
       const kM = (1 - ss(Math.abs(x - GORGE_X0), mouthHalf, mouthRamp)) * ss(z, GORGE_Z0 - 200, GORGE_Z0 + 100) * ss(z, GORGE_Z0 + 2200, GORGE_Z0 + 1600);
       if (kM > 0 && h > mouthFloor) h = h * (1 - kM) + mouthFloor * kM;
     }
     if (geo.inGorgeBox(x, z)) {
-      // Organic glacial gorge carving: varying width, asymmetric river-bend banks, stepped cliff strata & undulating riverbed
+      // Organic glacial gorge carving: meandering sea-level fjord river, sloping beach banks, stepped cliff strata
       const gN1 = fbm(nGorge1, x * 0.00055, z * 0.00055, 3);
       const gN2 = fbm(nGorge2, x * 0.0022, z * 0.0022, 2);
-      const sl = gorgeSlope(z), sOff = x - gorgeCentreX(z);
+      const sl = gorgeSlope(z), sOff = x - gorgeCentreX(z), sd = sOff / Math.sqrt(1 + sl * sl);
       const outerBend = Math.abs(sl) > 0.05 ? Math.max(0, Math.min(1, 0.5 + 0.5 * Math.sign(sl) * Math.sign(sOff))) : 0.5;
       const effHalf = GORGE_HALF_W * Math.max(0.94, 1 + 0.24 * gN1);
       const effRamp = GORGE_RAMP_W * Math.max(0.94, 1 + 0.22 * gN1) * (1 + (1 - outerBend) * 0.28 + 0.10 * gN2);
       const crDX = x - gorgeCentreX(GORGE_CRATER_Z), crDZ = z - GORGE_CRATER_Z, cr = Math.hypot(crDX, crDZ);
-      const d = gorgeDist(x, z);
+      const d = Math.abs(sd);
       const corridor = 1 - ss(d, effHalf, effRamp);
-      const floorH = 22 + 10 * (0.5 + 0.5 * gN1) + 5 * gN2;
+      const rivOff = Math.max(-effHalf * 0.45, Math.min(effHalf * 0.45, Math.tanh(sl * 1.4) * 52 + 34 * Math.sin(z * 0.0017 + gN1 * 2.2)));
+      const dRiv = Math.abs(sd - rivOff);
+      const rivW = 48 + 26 * (0.5 + 0.5 * gN1) + 10 * gN2;
+      let floorH;
+      if (dRiv < rivW) {
+        const u = dRiv / rivW;
+        floorH = -11 * (1 - u * u) - 1.5;
+      } else {
+        const bankT = ss(dRiv, rivW, effHalf * 1.15);
+        floorH = -1.5 * (1 - bankT) + (28 + 10 * gN1 + 8 * gN2) * bankT * bankT + 4 * bankT;
+      }
       if (corridor > 0.001) {
         const wallWarp = corridor < 0.95 ? (14 * Math.sin(h * 0.045 + gN1 * 2.0) + 28 * gN2) * (1 - corridor) : 0;
         h = (h + wallWarp) * (1 - corridor) + floorH * corridor;
@@ -271,7 +281,17 @@ function applyClearance(map, x, z, hDem, harbour) {
       if (cr < GORGE_CRATER_R * 1.45) {
         const crWarp = cr * (1 + 0.14 * gN1 + 0.05 * gN2);
         const cut = d < effHalf && z > GORGE_CRATER_Z + GORGE_CRATER_R * 0.38;
-        const bowl = cut ? 22 : (22 + GORGE_CRATER_WALL_Y * Math.exp(-Math.pow((crWarp - GORGE_CRATER_R * 0.78) / 240, 2)) + 26 * gN2);
+        let bowl;
+        if (cut) {
+          bowl = floorH;
+        } else if (cr < 360) {
+          bowl = 20 + 2 * gN2;
+        } else if (cr < 660) {
+          const penT = ss(cr, 340, 440) * (1 - ss(cr, 560, 660));
+          bowl = (20 + 2 * gN2) * (1 - penT) + (-7 + 2 * gN2) * penT;
+        } else {
+          bowl = -4 + GORGE_CRATER_WALL_Y * Math.exp(-Math.pow((crWarp - GORGE_CRATER_R * 0.80) / 230, 2)) + 26 * gN2;
+        }
         const ck = ss(cr, GORGE_CRATER_R * 1.45, GORGE_CRATER_R * 0.92);
         h = h * (1 - ck) + bowl * ck;
       }

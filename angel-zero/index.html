@@ -1013,7 +1013,7 @@ const _wt0 = performance.now();
 // Terrain v2: the archipelago pack (baked 2048^2 heightfield + splat, ~3 MB) is needed before
 // boot-time prop placement; gorge / strait packs are fetched lazily (prefetched after boot,
 // awaited by startSortie) — see world.prepare().
-const TERRAIN_PACK_TAG = 's10can3';
+const TERRAIN_PACK_TAG = 's10can4';
 const [terrainPackArch, metaGorge, metaStrait] = await Promise.all([
   loadTerrainPack('archipelago', 'assets/terrain', TERRAIN_PACK_TAG),
   loadTerrainMeta('gorge', 'assets/terrain', TERRAIN_PACK_TAG), loadTerrainMeta('strait', 'assets/terrain', TERRAIN_PACK_TAG)   // v3.1 DEM landmarks
