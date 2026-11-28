@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.2.17', title: 'PHOTOREALISTIC CANOPY RAIN, DROPLET REFRACTION & STORM RAIN CURTAINS', bullets: [
+    'Overhauled 3D cockpit canopy rain with dense multi-scale beading and organic meandering gravity rivulets on the carrier deck that smoothly clear the center sightline into fast-whipping slipstream streaks above 140 kt.',
+    'Added real screen-space droplet refraction through the distortion pass so carrier deck lights, island floodlights, sky and clouds bend through water beads on the canopy, plus lightning-flash glints.',
+    'Upgraded exterior storm rain with a denser, lightning-lit rain volume (2,800 varied streaks), 6 drifting volumetric downpour curtains under the storm deck, and richer STORM OPS rainfall.'
+  ] },
   { version: 'v1.2.16', title: 'CARRIER COLD-START, DIEGETIC COCKPIT HUD, MUFFLED CABIN AUDIO & MACH 1 VAPOR', bullets: [
     'Carrier-launch sorties now begin cold & dark inside the cockpit with dark MFDs and open canopy: step through Battery & Avionics (I / 1), Canopy Seal (I / 2), and Engine Spool (I / 3) before catapult launch, or press Enter anytime for Quick Start.',
     'First-person cockpit now defaults to a clean Diegetic Minimal HUD (press O to toggle Full HUD), hiding floating radar and arcade overlays so you fly off the collimated HUD glass, physical 3D MFDs and brief single-line objective prompts.',
