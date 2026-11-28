@@ -500,6 +500,10 @@
     #ctrlBindHost .bind-grid { grid-template-columns:minmax(0,1fr); }
     #ctrlOverlay { padding:10px; }
   }
+#photoBar { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); z-index:45; display:none;
+  padding:7px 14px; border-radius:6px; background:rgba(8,14,18,0.72); border:1px solid rgba(95,232,255,0.38);
+  color:#d9f5ff; font:600 12px/1.3 'Share Tech Mono',monospace; letter-spacing:.08em; pointer-events:none; backdrop-filter:blur(6px); white-space:nowrap; }
+#photoFlash { position:fixed; inset:0; z-index:46; background:#fff; opacity:0; pointer-events:none; transition:opacity .22s ease-out; }
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -516,6 +520,8 @@
 <body>
   <canvas id="gl"></canvas>
   <canvas id="hud"></canvas>
+<div id="photoBar">PHOTO MODE — DRAG: ORBIT • SCROLL: ZOOM • Q/E: FOV • R: RESET • P / ENTER: CAPTURE PNG • SHIFT+C / ESC: EXIT</div>
+<div id="photoFlash"></div>
   <div id="crtBox" class="crt-box idle" hidden>
     <div id="crtTag" class="crt-tag">COMMS // STANDBY</div>
     <img id="activePortrait" width="110" height="104" alt="" decoding="async" hidden>
@@ -607,6 +613,8 @@
             <div class="bind"><span class="k"><kbd>RUDDER</kbd>+<kbd>OPP ROLL</kbd></span><span class="a">Flat spin at stall (neutral + opposite rudder recovers)</span></div>
             <div class="bind"><span class="k"><kbd>SPACE</kbd></span><span class="a">Cockpit / chase view</span></div>
             <div class="bind"><span class="k"><kbd>ALT</kbd> <kbd>MMB</kbd></span><span class="a">Free Look (hold + mouse)</span></div>
+            <div class="bind"><span class="k"><kbd>SHIFT</kbd>+<kbd>C</kbd></span><span class="a">Freeze-frame Photo Mode</span></div>
+            <div class="bind"><span class="k"><kbd>U</kbd></span><span class="a">Cruise Hold autopilot</span></div>
             <div class="bind"><span class="k"><kbd>P</kbd></span><span class="a">Eject bailout</span></div>
             <div class="bind"><span class="k"><kbd>H</kbd> <kbd>ESC</kbd></span><span class="a">Tactical menu</span></div>
             <div class="bind"><span class="k"><kbd>[</kbd> <kbd>]</kbd></span><span class="a">Cockpit MFD page</span></div>
@@ -856,11 +864,11 @@ import { mulberry32, createNoise2D, fbm } from './src/noise.js?v=s10ter2';
 import { loadTerrainPack, loadTerrainMeta } from './src/terrainpack.js?v=s10ter8';
 import { createSurfaces } from './src/surfaces.js?v=s9ex';
 import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s10fly2';
-import { createFreeLook } from './src/freelook.js?v=s9ex';
+import { createFreeLook } from './src/freelook.js?v=s11cam1';
 import { createCanopyGlass } from './src/canopyglass.js?v=s9ex';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9ex';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9ex';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s11wat2';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s11cam1';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9ex';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9ex';
 import { createRadioQueue } from './src/radioQueue.js?v=s9ex';
@@ -875,7 +883,7 @@ import { createTraining } from './src/training.js?v=s9ex';
 import { createInputExt } from './src/input_ext.js?v=s10gp1';
 import { createOcean } from './src/ocean.js?v=s11wat2';
 import { createWingmenFlight } from './src/wingmen.js?v=s9ex';
-import { createFlightPhysics } from './src/flight.js?v=s9ex';
+import { createFlightPhysics } from './src/flight.js?v=s11cam1';
 
 const Q = new URLSearchParams(location.search);
 // Persistent pilot record (localStorage `angels_zero_profile`) + live F-15C livery painter (set on GLB load).
@@ -3161,7 +3169,61 @@ for (const el of [menuEl, hBadge]) el.addEventListener('mousedown', e => e.stopP
 
 // Free look (hold Alt / MMB): mouse turns the view, stick frozen, keyboard flight live (src/freelook.js).
 const freeLook = createFreeLook(THREE, { mouse, canvas: renderer.domElement,
-  isEnabled: () => appMode === 'PLAY' && flightMode === 'FLY' && !uiModal, isFirstPerson: () => firstPerson });
+  isEnabled: () => appMode === 'PLAY' && flightMode === 'FLY' && !uiModal && !photo.on,
+  isFirstPerson: () => firstPerson, isCruise: () => cruise.on });
+const cruise = { on: false, alt: 0, hdg: 0, spd: 180 };
+function toggleCruise(force) {
+  const next = force !== undefined ? !!force : !cruise.on;
+  if (next) {
+    if (appMode !== 'PLAY' || flightMode !== 'FLY' || state.onGround || autoland.on) return;
+    cruise.alt = Math.max(80, state.position.y);
+    cruise.hdg = state.heading || 0;
+    cruise.spd = THREE.MathUtils.clamp(state.speed, 135, 245);
+    cruise.on = true; state.afterburner = 0;
+    combatSys.say('CRUISE HOLD — ' + Math.round(cruise.alt * 3.28084) + ' FT / ' + Math.round(cruise.spd * 1.94384) + ' KT', 2.0, '#5fe8ff');
+  } else if (cruise.on) {
+    cruise.on = false;
+    combatSys.say('CRUISE HOLD OFF', 1.4, '#ffbf3f');
+  }
+}
+const photo = { on: false, yaw: 0.65, pitch: 0.18, dist: 24, fov: 46, drag: false, prevCam: 'CHASE', prevFov: 60, prevHud: '', snapNext: false };
+const photoBar = document.getElementById('photoBar'), photoFlash = document.getElementById('photoFlash');
+const _phOff = new THREE.Vector3();
+function updatePhotoCam() {
+  const cp = Math.cos(photo.pitch), sp = Math.sin(photo.pitch);
+  _phOff.set(Math.sin(photo.yaw) * cp * photo.dist, sp * photo.dist, Math.cos(photo.yaw) * cp * photo.dist);
+  camera.position.copy(state.position).add(_phOff);
+  if (Math.abs(camera.fov - photo.fov) > 0.05) { camera.fov = photo.fov; camera.updateProjectionMatrix(); }
+  camera.lookAt(state.position);
+}
+function enterPhotoMode() {
+  if (photo.on || appMode !== 'PLAY' || !modelReady) return;
+  freeLook.release();
+  photo.prevCam = camMode; photo.prevFov = camera.fov;
+  const hudEl = document.getElementById('hud');
+  photo.prevHud = hudEl ? hudEl.style.display : '';
+  if (hudEl) hudEl.style.display = 'none';
+  if (camMode === 'COCKPIT' || camMode === 'NOSE') setView('CHASE');
+  photo.on = true; photo.drag = false; photo.snapNext = false;
+  photo.yaw = 0.65; photo.pitch = 0.18; photo.dist = 24; photo.fov = 46;
+  if (photoBar) photoBar.style.display = 'block';
+  updatePhotoCam();
+}
+function exitPhotoMode() {
+  if (!photo.on) return;
+  photo.on = false; photo.drag = false; photo.snapNext = false;
+  if (photoBar) photoBar.style.display = 'none';
+  const hudEl = document.getElementById('hud');
+  if (hudEl) hudEl.style.display = photo.prevHud;
+  camera.fov = photo.prevFov; camera.updateProjectionMatrix();
+  setView(photo.prevCam);
+  lastTime = performance.now();
+}
+function capturePhotoPNG() {
+  if (!photo.on) return;
+  if (photoBar) photoBar.style.display = 'none';
+  photo.snapNext = true;
+}
 // WASD flight keyboard: physical codes only (AZERTY safe), preallocated state, no per-frame allocations.
 const kbAxis = { pitch: 0, roll: 0 }, kbHeld = new Set(), KB_RATE = 4.0, KB_BLEND_OUT = 0.35;
 let kbActive = false, kbHold = 0, invertPitch = false;
@@ -3175,6 +3237,13 @@ function throttleDelta(dt) {
   return (up ? 1 : 0) - (down ? 1 : 0) ? ((up ? 1 : 0) - (down ? 1 : 0)) * 0.5 * dt : 0;
 }
 addEventListener('mousemove', e => {
+  if (photo.on) {
+    if (photo.drag || document.pointerLockElement === renderer.domElement) {
+      photo.yaw -= (e.movementX || 0) * 0.0055;
+      photo.pitch = THREE.MathUtils.clamp(photo.pitch + (e.movementY || 0) * 0.0045, -1.25, 1.35);
+    }
+    return;
+  }
   if (uiModal || appMode !== 'PLAY') return;
   if (freeLook.onMouseMove(e)) return;
   // While WASD flies the jet the mouse-aim target stays centred on the nose, so
@@ -3183,6 +3252,13 @@ addEventListener('mousemove', e => {
   mouse.nx = (e.clientX / innerWidth) * 2 - 1;
   mouse.ny = -((e.clientY / innerHeight) * 2 - 1);
 });
+addEventListener('mousedown', e => { if (photo.on && e.button === 0) { photo.drag = true; } });
+addEventListener('mouseup', e => { if (photo.on && e.button === 0) { photo.drag = false; } });
+addEventListener('wheel', e => {
+  if (!photo.on) return;
+  e.preventDefault();
+  photo.dist = THREE.MathUtils.clamp(photo.dist * (1 + Math.sign(e.deltaY) * 0.1), 8, 90);
+}, { passive: false });
 let fKeyEngine = false;                                // F currently held as the engine fire-bottle / relight switch
 // With Alt held (free look) read letter / digit keys by physical code: Alt can remap e.key
 // (macOS Option), and Alt+D / Alt+F etc. must not reach browser shortcuts mid-dogfight.
@@ -3256,6 +3332,15 @@ addEventListener('keydown', e => {
     }
     return;
   }
+  if (photo.on) {
+    if (!e.repeat && ((e.shiftKey && e.code === 'KeyC') || e.code === 'Escape')) { e.preventDefault(); exitPhotoMode(); return; }
+    if (!e.repeat && (e.code === 'KeyP' || e.code === 'Enter' || e.code === 'Space')) { e.preventDefault(); capturePhotoPNG(); return; }
+    if (!e.repeat && e.code === 'KeyR') { photo.yaw = 0.65; photo.pitch = 0.18; photo.dist = 24; photo.fov = 46; return; }
+    if (e.code === 'KeyQ') { photo.fov = Math.max(28, photo.fov - 2); return; }
+    if (e.code === 'KeyE') { photo.fov = Math.min(75, photo.fov + 2); return; }
+    return;
+  }
+  if (!e.repeat && e.shiftKey && e.code === 'KeyC' && appMode === 'PLAY' && !uiModal) { e.preventDefault(); enterPhotoMode(); return; }
   if ((k === 'h' || k === 'escape') && !e.repeat) { pauseSim(); return; }
   if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) setView(camMode === 'CHASE' ? 'COCKPIT' : camMode === 'COCKPIT' ? 'NOSE' : 'CHASE'); return; }
   // WASD fly the jet; Q/E are rudder, Shift/Ctrl and arrows set throttle.
@@ -3299,7 +3384,8 @@ addEventListener('keydown', e => {
   }
   // B: dorsal speedbrake / wheel brakes. Tap (< 0.35 s) toggles the latch; hold = momentary.
   if (k === 'b' && !e.repeat) { keys.b = true; state.brakeHeld = true; brakeTap = { t: performance.now(), was: state.brakeLatch }; state.brakeLatch = !state.brakeLatch; }
-  if (k === 'c' && !e.repeat && !freeFlight.active) combatSys.designateInSight();
+  if (e.code === 'KeyU' && !e.repeat) toggleCruise();
+  if (k === 'c' && !e.repeat && !e.shiftKey && !freeFlight.active) combatSys.designateInSight();
   if (e.code === 'KeyT' && !e.repeat) pad.held = true;
   if (e.code === 'KeyY' && !e.repeat) {
     const tag = hud.setRadarZoom(hud.radarZoom + 1);
@@ -6399,19 +6485,31 @@ function animate() {
   advanceTimeScale(realDt);
   const sdt = dt * timeScale;                                  // scaled time: sim + camera / vfx
   updateMissileCamState(realDt);
-  if (appMode !== 'PAUSED') simTime += dt;
+  if (appMode !== 'PAUSED' && !photo.on) simTime += dt;
   if (appMode === 'MENU') menuOrbit(dt);
-  else if (appMode === 'PLAY' && modelReady && !FREEZE) stepSim(sdt);
+  else if (appMode === 'PLAY' && modelReady && !FREEZE && !photo.on) stepSim(sdt);
   else if (appMode === 'DEBRIEF') radioPump();
-  if (appMode !== 'PAUSED') updateCameraAndVisuals(sdt, simTime);
-  if (appMode === 'PLAY') updateAudio();
+  if (photo.on) updatePhotoCam();
+  else if (appMode !== 'PAUSED') updateCameraAndVisuals(sdt, simTime);
+  if (appMode === 'PLAY' && !photo.on) updateAudio();
   audio.updateMusic(getMusicCtx());                          // BGM scenario resolve (one preallocated object)
   syncMusicScenario();                                      // forced switch on app/mission/phase transitions
   oceanUniforms.uTime.value = simTime;
   const t0 = performance.now();
   renderer.info.reset();
   renderOceanReflection();
-  nvg.render(scene, camera, simTime, firstPerson);
+  nvg.render(scene, camera, simTime, photo.on ? false : firstPerson);
+  if (photo.on && photo.snapNext) {
+    photo.snapNext = false;
+    try {
+      const a = document.createElement('a');
+      a.href = renderer.domElement.toDataURL('image/png');
+      a.download = 'angels-zero-' + Date.now() + '.png';
+      a.click();
+      if (photoFlash) { photoFlash.style.opacity = '0.75'; setTimeout(() => { photoFlash.style.opacity = '0'; }, 90); }
+    } catch (err) { /* ignore */ }
+    if (photoBar) photoBar.style.display = 'block';
+  }
   PERF_DEBUG.calls = renderer.info.render.calls;
   PERF_DEBUG.triangles = renderer.info.render.triangles;
   PERF_DEBUG.frameMs = +(performance.now() - t0).toFixed(2);
@@ -6681,6 +6779,8 @@ const flightPhysics = createFlightPhysics(THREE, {
   state,
   combat,
   combatSys,
+  cruise,
+  isFreeLook: () => freeLook.active,
   cat,
   carrier,
   man,

@@ -258,6 +258,23 @@ function updatePhysics(dt) {
       qCmd = clamp((waveoff.pitchBias - curPitch) * 2.0, -0.35, 0.45);
     }
   }
+  const cruiseHold = !!(E.cruise && E.cruise.on && flightMode === 'FLY' && !state.onGround);
+  if (cruiseHold) {
+    const manual = !(E.isFreeLook && E.isFreeLook()) && (Math.abs(kbAxis.pitch) > 0.25 || Math.abs(kbAxis.roll) > 0.25 || Math.hypot(mouse.nx, mouse.ny) > 0.42);
+    if (manual) {
+      E.cruise.on = false;
+      combatSys.say('CRUISE HOLD — MANUAL OVERRIDE', 1.5, '#ffbf3f');
+    } else {
+      const altErr = E.cruise.alt - state.position.y;
+      const wantVy = clamp(altErr * 0.25, -25, 25);
+      const wantPitch = Math.asin(clamp(wantVy / Math.max(speed, 40), -0.35, 0.35));
+      const curPitch = Math.asin(clamp(_fwd.y, -1, 1));
+      qCmd = clamp((wantPitch - curPitch) * 2.2 - state.pitchRate * 0.45, -0.45, 0.45);
+      const spdErr = E.cruise.spd - speed;
+      state.throttle = clamp(state.throttle + spdErr * 0.015 * dt, 0.28, 0.92);
+      state.afterburner = 0;
+    }
+  }
   // Pitch moment: control chases qCmd (inertia + q-scaled authority) with aero damping.
   const pitchGain = state.stalled ? 2.2 : (1.0 + 5.0 * authQ);             // stalled: heavy, critically damped
   let qDot = (qCmd - state.pitchRate) * pitchGain * kyy * machStiff * hydK * iceK * AC.pitchK;
@@ -281,6 +298,11 @@ function updatePhysics(dt) {
   // (high-AoA buffet is camera / airframe micro-vibration only -- see updateCameraAndVisuals)
   if (outSide) pCmd += outSide * 0.06;                                   // dead-engine roll-off (stick holds it)
   if (waveoff.pitchBias > 0) pCmd = clamp(-bank * 2.0, -0.5, 0.5);
+  if (E.cruise && E.cruise.on && flightMode === 'FLY' && !state.onGround) {
+    const hdgErr = (((E.cruise.hdg - (state.heading || 0)) + 540) % 360) - 180;
+    const wantBank = clamp(hdgErr * 0.8 * D2R, -22 * D2R, 22 * D2R);
+    pCmd = clamp((wantBank - bank) * 2.4 - state.rollRate * 0.4, -0.8, 0.8);
+  }
   // Stop-damping: with no roll stick and no rudder key the rate converges 1.8x faster,
   // so the jet stops rotating when the input is released instead of coasting.
   const rollIdle = roll.left <= 0 && Math.abs(rollIn) < 0.04 && rudderIn === 0;

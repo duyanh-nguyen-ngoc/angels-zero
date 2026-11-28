@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.2.15', title: 'PHOTO CAPTURE MODE, CRUISE HOLD & ZERO-DRIFT FREE CAM', bullets: [
+    'Press Shift+C in flight for instant freeze-frame Photo Mode: hides the HUD, lets you orbit 360°, zoom with the mouse wheel, adjust FOV with Q/E, and capture clean PNG screenshots with P or Enter.',
+    'Press U to engage Cruise Hold autopilot: levels wings and holds your current heading, altitude and cruise speed hands-free while looking around.',
+    'Free Cam (Alt / middle-click) now locks the cursor at its original spot and restores your exact pre-look stick aim on release with zero drift.'
+  ] },
   { version: 'v1.2.14', title: 'WATER REFLECTIONS, DIAMOND SPARKLE & JET-WASH PICKUP VFX', bullets: [
     'Your jet, glowing afterburners and nearby aircraft now reflect directly on the ocean and canyon river underneath you.',
     'Added multi-scale twinkling diamond sun sparkles dancing across sunlit wave crests.',

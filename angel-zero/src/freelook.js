@@ -35,7 +35,7 @@ export function createFreeLook(THREE, env) {
   const src = { alt: false, mmb: false };
   const tgt = { yaw: 0, pitch: 0 };
   const view = { yaw: 0, pitch: 0, lean: 0 };
-  let held = false, locked = false;
+  let held = false, locked = false, waitMove = false;
   const raw = { x: 0, y: 0 };     // last real cursor position (normalised, like mouse.nx / ny)
   let frozen = null;              // stick value captured at activation
   let blend = 0, blendFrom = { x: 0, y: 0 };
@@ -51,7 +51,8 @@ export function createFreeLook(THREE, env) {
     if (on === held) return;
     held = on;
     if (on) {
-      frozen = { x: mouse.nx, y: mouse.ny };
+      frozen = (env.isCruise && env.isCruise()) ? { x: 0, y: 0 } : { x: mouse.nx, y: mouse.ny };
+      waitMove = false;
       // Start from where the view currently is (re-grab during a spring-back is seamless).
       tgt.yaw = view.yaw; tgt.pitch = view.pitch;
       blend = 0;
@@ -60,17 +61,16 @@ export function createFreeLook(THREE, env) {
           const p = canvas.requestPointerLock();
           if (p && p.catch) p.catch(() => {});
         }
-      } catch (e) { /* lock refused: fall back to raw deltas + stick blend */ }
+      } catch (e) { /* lock refused: fall back to raw deltas */ }
     } else {
       // Spring home the short way round (a 340 deg chase orbit returns via 20 deg).
       view.yaw = wrapPi(view.yaw); tgt.yaw = 0; tgt.pitch = 0;
       if (document.pointerLockElement === canvas) { try { document.exitPointerLock(); } catch (e) { /* ignore */ } }
-      // Cursor moved while unlocked -> ease the stick to it instead of snapping.
-      if (frozen && !locked && (Math.abs(raw.x - frozen.x) > 0.01 || Math.abs(raw.y - frozen.y) > 0.01)) {
-        blendFrom = { x: frozen.x, y: frozen.y }; blend = 0.25;
+      if (frozen) {
         mouse.nx = frozen.x; mouse.ny = frozen.y;
+        waitMove = !locked;
       }
-      frozen = null;
+      frozen = null; blend = 0;
     }
   }
   function refresh() { setHeld(env.isEnabled() && (src.alt || src.mmb)); }
@@ -88,6 +88,7 @@ export function createFreeLook(THREE, env) {
       raw.y = -((e.clientY / innerHeight) * 2 - 1);
     }
     if (!held) {
+      if (waitMove) { waitMove = false; return true; }
       if (blend > 0) return true;          // stick is easing toward raw; update() writes it
       return false;
     }
