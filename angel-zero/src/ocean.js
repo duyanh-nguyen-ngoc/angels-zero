@@ -169,7 +169,9 @@ export function createOcean(THREE, env) {
     uDetOffA: { value: new THREE.Vector2() }, uDetOffB: { value: new THREE.Vector2() },
     uFoamOff: { value: new THREE.Vector2() }, uFoamOff2: { value: new THREE.Vector2() },
     uRefl: { value: null }, uReflMat: { value: new THREE.Matrix4() }, uReflOn: { value: 0 },
-    uShipA: { value: shipA }, uShipB: { value: shipB }, uShipN: { value: 0 }
+    uShipA: { value: shipA }, uShipB: { value: shipB }, uShipN: { value: 0 },
+    uJetPos: { value: new THREE.Vector4(0, 0, 0, 0) },
+    uJetDir: { value: new THREE.Vector4(0, -1, 0, 0) }
   };
   void aniso;
   const NW = waves.length;
@@ -199,6 +201,7 @@ export function createOcean(THREE, env) {
       uniform vec2 uDetOffA, uDetOffB, uFoamOff, uFoamOff2;
       uniform sampler2D uRefl; uniform mat4 uReflMat; uniform float uReflOn;
       uniform vec4 uShipA[MAXS]; uniform vec4 uShipB[MAXS]; uniform int uShipN;
+      uniform vec4 uJetPos; uniform vec4 uJetDir;
 
       // Gerstner sum with analytic partial derivatives; each wave fades at its own footprint.
       void gerstner(vec2 q, float foot, out vec3 dPdx, out vec3 dPdz, out float hgt) {
@@ -279,6 +282,22 @@ export function createOcean(THREE, env) {
           float wf = 1.0 - smoothstep(3500.0, 7000.0, dist);
           wk *= wf; kg *= wf;
         }
+        // Low-altitude jet-wash disturbance: V-wake, exhaust foam trench & surface shock ripples.
+        if (uJetPos.z > 0.01 && dist < 1800.0) {
+          vec2 jr = p - uJetPos.xy;
+          float ja = -dot(jr, uJetDir.xy);
+          float jd = abs(jr.x * uJetDir.y - jr.y * uJetDir.x);
+          if (ja > -12.0 && ja < 280.0 && jd < 24.0 + max(0.0, ja) * 0.42) {
+            float jk = uJetPos.z * (1.0 + 0.35 * uJetPos.w) * exp(-max(0.0, ja) / 115.0) * smoothstep(-10.0, 6.0, ja);
+            float armX = 5.0 + max(0.0, ja) * 0.24, armW = 3.0 + max(0.0, ja) * 0.045;
+            float jArm = exp(-pow((jd - armX) / armW, 2.0));
+            float jWash = exp(-pow(jd / (4.8 + max(0.0, ja) * 0.065), 2.0));
+            float jRip = sin(ja * 0.48 - jd * 0.95 - uTime * 15.0) * (jArm * 0.7 + jWash * 0.5) * jk;
+            wk.r = max(wk.r, jArm * jk * 0.9);
+            wk.g = max(wk.g, jWash * jk * 0.95);
+            kg += uJetDir.xy * (jRip * 0.35);
+          }
+        }
 
         // Normal detail: mid / far octaves (unchanged look from altitude) + baked micro tile.
         float nearK = 1.0 - smoothstep(350.0, 4000.0, dist);
@@ -346,26 +365,35 @@ export function createOcean(THREE, env) {
         vec3 R = reflect(-V, N);
         R.y = abs(R.y) + 0.002;
         vec3 refl = mix(uFog, uSky, smoothstep(-0.08, 0.58, R.y));
+        float reflAlpha = 0.0;
         if (uReflOn > 0.5) {
           vec4 rc = uReflMat * vec4(p.x, 0.0, p.y, 1.0);
           if (rc.w > 0.0) {
             vec2 ruv = rc.xy / rc.w + N.xz * vec2(0.06, 0.03) * clamp(30.0 / dist, 0.2, 1.0);
             if (ruv.x > 0.0 && ruv.x < 1.0 && ruv.y > 0.0 && ruv.y < 1.0) {
               vec4 rt = texture2D(uRefl, ruv);
-              refl = mix(refl, rt.rgb, clamp(rt.a, 0.0, 1.0) * 0.9);
+              reflAlpha = clamp(rt.a, 0.0, 1.0);
+              refl = mix(refl, rt.rgb, reflAlpha * 0.92);
             }
           }
         }
         float fres = (0.02 + 0.98 * pow(1.0 - NdV, 5.0)) * (1.0 - 0.34 * clamp(shoalTurq + seabedVis * 0.5, 0.0, 1.0));
-        vec3 col = mix(body, refl * 0.92, clamp(fres, 0.0, mix(0.62, 0.92, smoothstep(1500.0, 12000.0, dist))));
+        float nearObjRefl = reflAlpha * smoothstep(950.0, 140.0, dist) * (0.46 + 0.16 * (1.0 - NdV));
+        float reflMix = clamp(max(fres, nearObjRefl), 0.0, mix(0.72, 0.92, smoothstep(1500.0, 12000.0, dist)));
+        vec3 col = mix(body, refl * 0.96, reflMix);
 
-        // HDR sun glitter: broad sheen + sharp sparkles left for the bloom pass.
+        // HDR sun glitter: broad sheen + multi-scale twinkling diamond sparkles for the bloom pass.
         float rl = max(dot(R, L), 0.0);
         float widen = smoothstep(800.0, 16000.0, dist);
         float sheen = pow(rl, mix(90.0, 30.0, widen)) * 1.2 + pow(rl, 12.0) * 0.06;
         float sp = pow(rl, 1400.0) * 22.0 * (1.0 - widen);
+        vec2 spA = texture2D(uDetail, q / 4.1 + uDetOffB * 2.3).xy * 2.0 - 1.0;
+        vec2 spB = texture2D(uDetail, vec2(q.y, -q.x) / 2.4 - uDetOffA * 3.1).xy * 2.0 - 1.0;
+        vec3 Ns = normalize(N + vec3((spA.x - spB.y) * 0.28, 0.0, (spA.y + spB.x) * 0.28) * (1.0 - widen));
+        float rls = max(dot(reflect(-V, Ns), L), 0.0);
+        float diamond = (pow(rls, 380.0) * 6.5 + smoothstep(0.982, 0.998, rls) * 26.0) * (1.0 - smoothstep(450.0, 9500.0, dist)) * (0.65 + 0.55 * hk);
         float sunShadowK = mix(0.35, 1.0, mix(1.0, cMask, uCloudShadowK));
-        vec3 spec = uSunColor * (sheen * 0.55 + sp) * sunShadowK * clamp(uGlitter, 0.0, 1.3) * step(0.0, L.y) * mix(1.0, 0.4, wk.g);
+        vec3 spec = uSunColor * (sheen * 0.55 + sp + diamond) * sunShadowK * clamp(uGlitter, 0.0, 1.3) * step(0.0, L.y) * mix(1.0, 0.45, wk.g);
 
         // Foam: Jacobian crest mask thresholding the Worley lattice so it stays lacy.
         float crestFoam = smoothstep(0.62, 0.30, J) * smoothstep(0.15, 0.7, hgt + 0.3);
@@ -482,6 +510,10 @@ export function createOcean(THREE, env) {
   return {
     ocean, oceanUniforms, followOcean, OCEAN_SNAP, REFLECT_LAYER,
     markReflect, renderReflection,
+    setJetWash(x, z, fx, fz, k, spd, ab) {
+      oceanUniforms.uJetPos.value.set(x, z, k, ab);
+      oceanUniforms.uJetDir.value.set(fx, fz, spd, 0);
+    },
     setReflection(on, scale) { reflEnabled = !!on; if (scale) reflScale = scale; if (!reflEnabled) oceanUniforms.uReflOn.value = 0; },
     get reflectionOn() { return reflEnabled && oceanUniforms.uReflOn.value > 0.5; },
     reflectionCamera: reflCam, reflectionTarget: reflRT,

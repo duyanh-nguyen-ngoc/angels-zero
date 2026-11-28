@@ -443,8 +443,8 @@ export function createVFX(THREE, env) {
   // 22 m / 0.09 s sampling => the 96-sample ring covers ~9 s of trail.
   const CONTRAIL_N = 10;
   // Low-altitude sea-skim rooster tail + foam wake (all buffers allocated once).
-  const SPRAY_N = 180, SPRAY_ALT = 35, SPRAY_DENSE = 15, SPRAY_KT = 120;
-  const SPRAY_LIFE_MIN = 1.2, SPRAY_LIFE_MAX = 1.8, SPRAY_RATE_MAX = 140, SPRAY_Y = 0.5;
+  const SPRAY_N = 560, SPRAY_ALT = 55, SPRAY_DENSE = 15, SPRAY_KT = 110;
+  const SPRAY_LIFE_MIN = 1.1, SPRAY_LIFE_MAX = 2.1, SPRAY_RATE_MAX = 340, SPRAY_Y = 0.5;
   const WAKE_N = 48, WAKE_Y = 0.15, WAKE_STEP_M = 12, WAKE_LIFE = 3.0;
   const NOZ = isF22
     ? [new THREE.Vector3(-0.74, -1.08, 4.4), new THREE.Vector3(0.74, -1.08, 4.4)]
@@ -903,28 +903,40 @@ export function createVFX(THREE, env) {
 
   /* ------------------------------- sea-skim rooster tail + foam wake (pooled) */
   const rzGeo = new THREE.BufferGeometry();
-  const rzPos = new Float32Array(SPRAY_N * 3), rzSize = new Float32Array(SPRAY_N), rzAlpha = new Float32Array(SPRAY_N);
+  const rzPos = new Float32Array(SPRAY_N * 3), rzSize = new Float32Array(SPRAY_N), rzAlpha = new Float32Array(SPRAY_N), rzKind = new Float32Array(SPRAY_N);
   rzGeo.setAttribute('position', new THREE.BufferAttribute(rzPos, 3).setUsage(THREE.DynamicDrawUsage));
   rzGeo.setAttribute('aSize', new THREE.BufferAttribute(rzSize, 1).setUsage(THREE.DynamicDrawUsage));
   rzGeo.setAttribute('aAlpha', new THREE.BufferAttribute(rzAlpha, 1).setUsage(THREE.DynamicDrawUsage));
+  rzGeo.setAttribute('aKind', new THREE.BufferAttribute(rzKind, 1).setUsage(THREE.DynamicDrawUsage));
   const rzMat = new THREE.ShaderMaterial({
-    uniforms: { uFar: { value: new THREE.Vector2(1500, 4200) }, uScale: { value: 400 } },
+    uniforms: { uFar: { value: new THREE.Vector2(1800, 4800) }, uScale: { value: 400 } },
     vertexShader: LOG_V + `
-      attribute float aAlpha; attribute float aSize; uniform vec2 uFar; uniform float uScale; varying float vA;
+      attribute float aAlpha; attribute float aSize; attribute float aKind; uniform vec2 uFar; uniform float uScale; varying float vA; varying float vKind;
       void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0);
         vA = aAlpha * (1.0 - smoothstep(uFar.x, uFar.y, -mv.z));
+        vKind = aKind;
         gl_PointSize = aSize * uScale / max(1.0, -mv.z);
         gl_Position = projectionMatrix * mv;
         #include <logdepthbuf_vertex>
       }`,
     fragmentShader: LOG_F + `
-      varying float vA;
+      varying float vA; varying float vKind;
       void main() {
         #include <logdepthbuf_fragment>
-        float d = length(gl_PointCoord - 0.5) * 2.0;
-        float a = vA * pow(clamp(1.0 - d, 0.0, 1.0), 1.5);
-        if (a < 0.004) discard;
-        gl_FragColor = vec4(0.93, 0.95, 0.97, a);
+        vec2 uv = gl_PointCoord - 0.5;
+        float d = length(uv) * 2.0;
+        if (vKind >= 0.5) {
+          float a = vA * pow(clamp(1.0 - d, 0.0, 1.0), 2.2);
+          if (a < 0.004) discard;
+          gl_FragColor = vec4(1.0, 1.0, 1.0, a);
+        } else {
+          float ang = atan(uv.y, uv.x);
+          float wisp = 0.84 + 0.16 * sin(ang * 5.0 + uv.x * 6.0) * cos(ang * 3.0 - uv.y * 5.0);
+          float a = vA * pow(clamp(1.0 - d * wisp, 0.0, 1.0), 1.45);
+          if (a < 0.004) discard;
+          vec3 col = mix(vec3(0.76, 0.86, 0.90), vec3(0.97, 0.98, 1.0), clamp(0.65 - uv.y, 0.0, 1.0));
+          gl_FragColor = vec4(col, a);
+        }
       }`,
     transparent: true, depthWrite: false, blending: THREE.NormalBlending
   });
@@ -941,15 +953,19 @@ export function createVFX(THREE, env) {
       while (n-- > 0) {
         const i = rzHead; rzHead = (rzHead + 1) % SPRAY_N;
         if (rzAge[i] >= rzLife[i]) rzAlive++;
-        const side = (rzHead & 1) ? 1 : -1, lat = (3 + 3 * k) * side;
-        const px = x - fwdX * 9 + latX * lat, pz = z - fwdZ * 9 + latZ * lat;
+        const drop = (rzHead % 3) === 0;
+        rzKind[i] = drop ? 1 : 0;
+        const side = (rzHead & 1) ? 1 : -1;
+        const lat = drop ? (rand() - 0.5) * 6 : (4.5 + 5.5 * k) * side;
+        const px = x - fwdX * (drop ? 10 : 8) + latX * lat, pz = z - fwdZ * (drop ? 10 : 8) + latZ * lat;
         rzPos[i * 3] = px; rzPos[i * 3 + 1] = SPRAY_Y; rzPos[i * 3 + 2] = pz;
-        const out = side * (3 + 6 * k), back = speed * 0.22;
+        const out = drop ? (rand() - 0.5) * 8 : side * (6 + 14 * k);
+        const back = speed * (drop ? 0.16 : 0.24);
         rzVel[i * 3] = -fwdX * back + latX * out;
-        rzVel[i * 3 + 1] = 6 + 28 * k;
+        rzVel[i * 3 + 1] = drop ? (12 + 38 * k) : (8 + 34 * k);
         rzVel[i * 3 + 2] = -fwdZ * back + latZ * out;
-        rzAge[i] = 0; rzLife[i] = SPRAY_LIFE_MIN + rand() * (SPRAY_LIFE_MAX - SPRAY_LIFE_MIN); rzK[i] = k;
-        rzAlpha[i] = 0; rzSize[i] = 3;
+        rzAge[i] = 0; rzLife[i] = (drop ? 0.85 : SPRAY_LIFE_MIN) + rand() * (SPRAY_LIFE_MAX - SPRAY_LIFE_MIN); rzK[i] = k;
+        rzAlpha[i] = 0; rzSize[i] = drop ? 1.8 : 4.0;
       }
     },
     update(dt) {
@@ -960,14 +976,14 @@ export function createVFX(THREE, env) {
         rzAge[i] += dt;
         if (rzAge[i] >= rzLife[i]) { rzAlpha[i] = 0; continue; }
         live++;
-        const j = i * 3;
-        rzVel[j + 1] -= 9.8 * dt;
-        const drag = 1 - 1.4 * dt;
+        const j = i * 3, drop = rzKind[i] >= 0.5;
+        rzVel[j + 1] -= (drop ? 14.5 : 9.2) * dt;
+        const drag = 1 - (drop ? 0.9 : 1.55) * dt;
         rzVel[j] *= drag; rzVel[j + 2] *= drag;
         rzPos[j] += rzVel[j] * dt; rzPos[j + 1] = Math.max(SPRAY_Y, rzPos[j + 1] + rzVel[j + 1] * dt); rzPos[j + 2] += rzVel[j + 2] * dt;
         const t = Math.min(1, rzAge[i] / rzLife[i]), k = rzK[i];
-        rzSize[i] = 3 + (8 + 12 * k - 3) * t;
-        rzAlpha[i] = k * 0.75 * smooth(0, 0.08, rzAge[i]) * Math.pow(1 - t, 1.5);
+        rzSize[i] = drop ? (1.6 + 1.8 * k * (1 - 0.3 * t)) : (4.0 + (10 + 18 * k) * t);
+        rzAlpha[i] = k * (drop ? 0.92 : 0.68) * smooth(0, 0.07, rzAge[i]) * Math.pow(1 - t, 1.4);
       }
       rzAlive = live;
       rzPoints.visible = live > 0;
@@ -975,6 +991,7 @@ export function createVFX(THREE, env) {
         rzGeo.attributes.position.needsUpdate = true;
         rzGeo.attributes.aSize.needsUpdate = true;
         rzGeo.attributes.aAlpha.needsUpdate = true;
+        rzGeo.attributes.aKind.needsUpdate = true;
         if (live > 0) rzMat.uniforms.uScale.value = renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
       }
       rzWasLive = live > 0;

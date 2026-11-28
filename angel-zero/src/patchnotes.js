@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.2.14', title: 'WATER REFLECTIONS, DIAMOND SPARKLE & JET-WASH PICKUP VFX', bullets: [
+    'Your jet, glowing afterburners and nearby aircraft now reflect directly on the ocean and canyon river underneath you.',
+    'Added multi-scale twinkling diamond sun sparkles dancing across sunlit wave crests.',
+    'Skimming below 180 ft over sea or river now kicks up a 3-layer jet-wash: churning V-wake foam and ripples on the water surface, twin curling wingtip-vortex spray curtains, and sunlit water droplets.'
+  ] },
   { version: 'v1.2.13', title: 'CANYON RUN OVERHAUL — CARRIER LAUNCH, GLACIAL GORGE & BREACH AMBUSH', bullets: [
     'CANYON RUN now launches by catapult from the carrier task force 5.5 km south of the fjord mouth and recovers back aboard ship.',
     'The gorge is carved as an organic glacial canyon with varying width, asymmetric river-bend banks, cliff ledges, undulating riverbed and a wider 1.2 km target valley.',

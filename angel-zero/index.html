@@ -832,7 +832,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s10vfx3';
+import { createVFX } from './src/vfx.js?v=s11wat2';
 import { createAmbient } from './src/ambient.js?v=s9ex';
 import { createStormFX } from './src/stormfx.js?v=s9ex';
 import { createWetDeck } from './src/wetdeck.js?v=s9ex';
@@ -860,7 +860,7 @@ import { createFreeLook } from './src/freelook.js?v=s9ex';
 import { createCanopyGlass } from './src/canopyglass.js?v=s9ex';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9ex';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9ex';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s10can1';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s11wat2';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9ex';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9ex';
 import { createRadioQueue } from './src/radioQueue.js?v=s9ex';
@@ -873,7 +873,7 @@ import { fetchLeaderboard, submitScore } from './src/leaderboard.js?v=s9ex';
 import { collectPilotSnapshot, applyPilotSnapshot, exportPilotCode, importPilotCode, generateSyncId, getSyncId, setSyncId, isSyncEnabled, setSyncEnabled, pushCloudProfile, pullCloudProfile, syncNow, setRefreshCallback } from './src/profile_sync.js?v=s9ex';
 import { createTraining } from './src/training.js?v=s9ex';
 import { createInputExt } from './src/input_ext.js?v=s10gp1';
-import { createOcean } from './src/ocean.js?v=s11wat1';
+import { createOcean } from './src/ocean.js?v=s11wat2';
 import { createWingmenFlight } from './src/wingmen.js?v=s9ex';
 import { createFlightPhysics } from './src/flight.js?v=s9ex';
 
@@ -3999,21 +3999,22 @@ function updateCameraAndVisuals(dt, now) {
   // WARDEN echelon: real bank-to-turn jet flight (no teleport / rubber-banding).
   updateWingmanFlight(dt);
 
-  // --- sea-skim rooster tail: intensity gate, emitters, audio, micro-rumble ---
+  // --- sea-skim rooster tail + jet-wash water pickup ---
   const skimAlt = state.position.y, skimKt = state.speed * 1.94384;
-  skimTgt = THREE.MathUtils.clamp(1 - skimAlt / 35, 0, 1) * THREE.MathUtils.clamp((skimKt - 120) / 230, 0, 1);
-  skimTgt = Math.min(1, skimTgt * (1 + 0.6 * THREE.MathUtils.clamp((15 - skimAlt) / 15, 0, 1)));
+  skimTgt = THREE.MathUtils.clamp(1 - skimAlt / 55, 0, 1) * THREE.MathUtils.clamp((skimKt - 110) / 220, 0, 1);
+  skimTgt = Math.min(1, skimTgt * (1 + 0.75 * THREE.MathUtils.clamp((25 - skimAlt) / 25, 0, 1)) * (1 + 0.35 * (state.afterburner || 0)));
   if (appMode !== 'PLAY' || flightMode !== 'FLY' || carrier.phase || autoland.on || autoland.ph) skimTgt = 0;
-  if (world.heightAt(state.position.x, state.position.z) >= -1) skimTgt = 0;
+  if (world.heightAt(state.position.x, state.position.z) >= 0.5) skimTgt = 0;
   if (combat.carrierVisible !== false && combat.ally && combat.ally.root) {
     alToLocal(combat.ally, state.position, _skA);
     if (Math.abs(_skA.x) < 45 && Math.abs(_skA.z) < combat.ally.len / 2 + 20) skimTgt = 0;
   }
-  skimK += (skimTgt - skimK) * Math.min(1, dt * (skimTgt > skimK ? 4 : 12));
+  skimK += (skimTgt - skimK) * Math.min(1, dt * (skimTgt > skimK ? 5 : 10));
   if (skimK < 0.02) skimK = 0;
   audio.setSpray(skimK, skimKt);
   if (skimK > 0 && state.speed > 1) {
     _skB.copy(state.velocity).setY(0).normalize();
+    oceanSys.setJetWash(state.position.x, state.position.z, _skB.x, _skB.z, skimK, state.speed, state.afterburner || 0);
     vfx.spray.emit(state.position.x, state.position.z, _skB.x, _skB.z, state.speed, skimK, dt);
     vfx.wake.drop(state.position.x, state.position.z, state.heading * D2R, skimK, dt);
     // Wingmen / ace get a lighter wake, capped by distance to the camera.
@@ -4021,18 +4022,20 @@ function updateCameraAndVisuals(dt, now) {
     for (let i = 0; i < wingmen.length; i++) {
       const w = wingmen[i];
       if (!w || !w.alive || !w.mesh || w.mesh.position.distanceTo(camera.position) > 2500) continue;
-      if (world.heightAt(w.pos.x, w.pos.z) >= -1 || w.pos.y > 35) continue;
+      if (world.heightAt(w.pos.x, w.pos.z) >= 0.5 || w.pos.y > 55) continue;
       _skB.copy(w.vel).setY(0);
       const sp = Math.max(1, _skB.length()); _skB.multiplyScalar(1 / sp);
       vfx.spray.emit(w.pos.x, w.pos.z, _skB.x, _skB.z, sp, skimK * 0.6, budget);
     }
     for (const e of combatSys.enemies) {
       if (!e.alive || !e.aceFlight || !e.pos || e.pos.distanceTo(camera.position) > 2500) continue;
-      if (world.heightAt(e.pos.x, e.pos.z) >= -1 || e.pos.y > 35) continue;
+      if (world.heightAt(e.pos.x, e.pos.z) >= 0.5 || e.pos.y > 55) continue;
       _skB.copy(e.vel).setY(0);
       const sp = Math.max(1, _skB.length()); _skB.multiplyScalar(1 / sp);
       vfx.spray.emit(e.pos.x, e.pos.z, _skB.x, _skB.z, sp, skimK * 0.6, budget);
     }
+  } else {
+    oceanSys.setJetWash(0, 0, 0, -1, 0, 0, 0);
   }
 
   if (appMode === 'MENU') {
@@ -5538,6 +5541,7 @@ loader.load(AC.glb, async gltf => {
     w.mesh = i === 0 ? wingTemplate : wingTemplate.clone(true);
     w.mesh.visible = false;
     scene.add(w.mesh);
+    oceanSys.markReflect(w.mesh);
   }
 
   // Wingtip vortex emitters at the real outboard wing vertices + hide strictly under-floor belly meshes in cockpit.
@@ -5626,6 +5630,8 @@ loader.load(AC.glb, async gltf => {
   combatSys.update(0, 0, { playerActive: false, firing: false });   // place the wave before the first frame
   setLoadProgress(72, 'CARRIER', 'USS ENTERPRISE');
   setLoadProgress(88, 'SHADERS', 'COMPILING');
+  oceanSys.markReflect(jet);
+  if (combatSys && combatSys.enemies) for (const e of combatSys.enemies) if (e && e.g) oceanSys.markReflect(e.g);
   modelReady = true;
   bootMs = Math.round(performance.now() - bootT0);
   setView(appMode === 'PLAY' ? camMode : menuPreviewCockpit);
