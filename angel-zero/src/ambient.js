@@ -449,7 +449,6 @@ export function createAmbient(THREE, env) {
     const phase = C.missionPhase | 0, rtb = !!C.rtb;
     if (rtb && !lastRtb) {
       lastRtb = true; lastPhase = phase;
-      if (missionId !== 'AIR_SUPERIORITY') atmo.blendTo('GOLDEN_HOUR', RTB_BLEND_S);
       return;
     }
     if (!rtb) lastRtb = false;

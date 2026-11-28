@@ -500,7 +500,7 @@ const droneStats = droneSwarm.stats;
     m.mesh.position.copy(fromPos); m.mesh.quaternion.copy(fromQuat); m.mesh.visible = true; m.plume.visible = false;
     if (m.visual) { m.mesh.remove(m.visual); m.visual = null; }
     for (const p of m.parts) p.visible = !visual;
-    m.plume.position.z = 0; m.motorDelay = 0.18;
+    m.plume.position.z = 0; m.motorDelay = isSam ? 0.04 : 0.18;
     if (visual) {
       const v = cloneStore(visual.node);
       v.position.set(0, 0, 0);
@@ -510,7 +510,8 @@ const droneStats = droneSwarm.stats;
       m.motorDelay = 0.06;                                     // 0.06 s rail drop, then ignition
     }
     const down = new THREE.Vector3(0, -1, 0).applyQuaternion(fromQuat);
-    m.vel.copy(fromVel).addScaledVector(down, visual ? 4 : 9);
+    m.vel.copy(fromVel);
+    if (!isSam) m.vel.addScaledVector(down, visual ? 4 : 9);
     m.jit = null;
     if (m.q.err) {                                     // soft lock: seeker not settled, launch with a heading error
       const ax = new THREE.Vector3(rand() - 0.5, rand() - 0.5, rand() - 0.5).cross(m.vel).normalize();
@@ -3786,7 +3787,7 @@ const _bfmOut = aceBFM.bfmOut, _bfmLos = aceBFM.los, _bfmUp = aceBFM.up, _bfmMat
         if (tAlive) {
           const range = _mLos.copy(tgt.pos).sub(pos).length(); _mLos.divideScalar(range);
           // Seeker gimbal: if the target slips outside the FOV the missile goes ballistic.
-          if (Math.acos(clamp(fwd.dot(_mLos), -1, 1)) > q.fov * 0.5) { m.lostTrack = true; }
+          if ((!m.sam || m.age > 0.5) && Math.acos(clamp(fwd.dot(_mLos), -1, 1)) > q.fov * 0.5) { m.lostTrack = true; }
           // Defensive break: a high-G turn or barrel roll inside 900 m can spoof a bandit seeker.
           if (tgt.isPlayer && !m.breakChecked && range < 900 && (S.highG || S.barrelRoll || S.gLoad > 12)) {
             m.breakChecked = true;
@@ -4675,8 +4676,8 @@ const _bfmOut = aceBFM.bfmOut, _bfmLos = aceBFM.los, _bfmUp = aceBFM.up, _bfmMat
   const lockList = [];
   const FLEET_SPEED = 13, FLEET_A = 3500, FLEET_B = 1000, WAKE_L = 760;
   const SLOTS = [{ kind: 'CVN', along: 0, lat: 0 }, { kind: 'DDG', along: 950, lat: 0 }, { kind: 'DDG', along: -700, lat: -760 }, { kind: 'DDG', along: -700, lat: 760 }];
-  const SAM_Q = { turn: SAM_G * D2R, fov: 60 * D2R, N: 3.5, noise: 0.12, tag: 'SAM' };
-  const SAM_BRUTAL_Q = { turn: SAM_BRUTAL_G * D2R, fov: 65 * D2R, N: 4.0, noise: 0.08, tag: 'SAM' };
+  const SAM_Q = { turn: SAM_G * D2R, fov: 110 * D2R, N: 3.5, noise: 0.12, tag: 'SAM' };
+  const SAM_BRUTAL_Q = { turn: SAM_BRUTAL_G * D2R, fov: 120 * D2R, N: 4.0, noise: 0.08, tag: 'SAM' };
   let fleetTh = 0, fleetClock = 0, fleetSpotted = false, fleetHitSaid = false;
   const _fu = new THREE.Vector3(), _fn = new THREE.Vector3(), _fp = new THREE.Vector3(), _ft = new THREE.Vector3(), _flat = new THREE.Vector3();
   const _da = new THREE.Vector3(), _db = new THREE.Vector3(), _dv = new THREE.Vector3();
@@ -5277,7 +5278,10 @@ const _bfmOut = aceBFM.bfmOut, _bfmLos = aceBFM.los, _bfmUp = aceBFM.up, _bfmMat
     _da.copy(from);
     _da.y = Math.max(_da.y, terrainHeight(_da.x, _da.z) + 14);
     if (aim) _dv.copy(aim).sub(_da).normalize();
-    else _dv.copy(S.position).sub(_da).normalize().lerp(UP, 0.45).normalize();
+    else {
+      _dv.copy(S.position).sub(_da).normalize();
+      if (_dv.y > -0.1) _dv.lerp(UP, 0.14).normalize();
+    }
     _q.setFromUnitVectors(MSL_NOSE, _dv);
     const spd = brutal ? SAM_BRUTAL_V : SAM_V, q = brutal ? SAM_BRUTAL_Q : SAM_Q;
     const m = launch(_da, _q, _db.copy(_dv).multiplyScalar(spd), PLAYER_TGT, true, q, undefined, 'PN', 'SAM');

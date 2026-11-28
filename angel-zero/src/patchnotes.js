@@ -3,6 +3,11 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.2.18', title: 'STORM OPS FREEZE FIX, SAM TARGETING & LIGHTING PRESERVATION', bullets: [
+    'Fixed a WebGL shader/fog freeze when entering STORM OPS or heavy rain curtains.',
+    'Fixed Canyon Run SAM batteries lofting off-bore and losing lock on launch: SAMs now boost cleanly toward you with wider seeker tracking.',
+    'Destroying the mission objective and entering RTB no longer forces Golden Hour lighting, preserving your selected time of day.'
+  ] },
   { version: 'v1.2.17', title: 'PHOTOREALISTIC CANOPY RAIN, DROPLET REFRACTION & STORM RAIN CURTAINS', bullets: [
     'Overhauled 3D cockpit canopy rain with dense multi-scale beading and organic meandering gravity rivulets on the carrier deck that smoothly clear the center sightline into fast-whipping slipstream streaks above 140 kt.',
     'Added real screen-space droplet refraction through the distortion pass so carrier deck lights, island floodlights, sky and clouds bend through water beads on the canopy, plus lightning-flash glints.',

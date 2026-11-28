@@ -93,7 +93,11 @@ export function createWeather(THREE, env) {
         #include <common>
         #include <logdepthbuf_pars_vertex>
         varying vec2 vUv;
-        void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); #include <logdepthbuf_vertex> }`,
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          #include <logdepthbuf_vertex>
+        }`,
       fragmentShader: `
         #include <common>
         #include <logdepthbuf_pars_fragment>
@@ -113,7 +117,7 @@ export function createWeather(THREE, env) {
           vec3 col = mix(vec3(0.46, 0.54, 0.64), vec3(0.86, 0.92, 1.0), min(1.0, uFlash));
           gl_FragColor = vec4(col, a);
         }`,
-      transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: true
+      transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false
     });
     const m = new THREE.Mesh(curtainGeo, mat);
     m.frustumCulled = false; m.renderOrder = 2; m.visible = false;
