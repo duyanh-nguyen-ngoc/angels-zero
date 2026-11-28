@@ -845,12 +845,12 @@ import { createAmbient } from './src/ambient.js?v=s9ex';
 import { createStormFX } from './src/stormfx.js?v=s9ex';
 import { createWetDeck } from './src/wetdeck.js?v=s9ex';
 import { createBlastFX } from './src/blastfx.js?v=s10vfx1';
-import { createHUD } from './src/hud.js?v=s11gfx1';
-import { createCockpit3D } from './src/cockpit3d.js?v=s9ex';
-import { createCockpitF22 } from './src/cockpit_f22.js?v=s9ex';
+import { createHUD } from './src/hud.js?v=s12imm1';
+import { createCockpit3D } from './src/cockpit3d.js?v=s12imm1';
+import { createCockpitF22 } from './src/cockpit_f22.js?v=s12imm1';
 import { createCombat, carrierReady, CAT_VEND, CAT_T, CAT_ACC, CAT_LEN, CAT_ARM_T, CAT_ROT_DEG, CAT_BOW, CAT_WAIST, WING_CAT_DT } from './src/combat.js?v=s10can8';
 import { createEjection } from './src/eject.js?v=s9ex';
-import { createAudio } from './src/audio.js?v=s9ex';
+import { createAudio } from './src/audio.js?v=s12imm1';
 import { createYouTubeMusic } from './src/ytmusic.js?v=s10fly7';
 import { createRadio } from './src/radio.js?v=s9ex';
 import { createProfile, LIVERIES, liveryById, BW_KEY } from './src/profile.js?v=s9ex';
@@ -2362,6 +2362,40 @@ async function enterCarrierLaunch(m) {
   if (DEBUG && !catDiagEnterLogged) { catDiagEnterLogged = true; carrierDiag('catEnter'); }
   if (hintEl) hintEl.textContent = oldHint;
 }
+const coldStart = { active: false, step: 0, batt: true, hudPower: 1, canopyClosed: true, engStarted: true, engSpool: 1 };
+let hudMinimalFP = true;
+const hudModeToast = { text: '', t: 0 };
+function resetColdStartFull() {
+  coldStart.active = false; coldStart.step = 3; coldStart.batt = true; coldStart.hudPower = 1;
+  coldStart.canopyClosed = true; coldStart.engStarted = true; coldStart.engSpool = 1;
+  if (typeof cockpit !== 'undefined' && cockpit && cockpit.setPower) cockpit.setPower(1);
+}
+function skipColdStart() {
+  if (!coldStart.active) return;
+  if (!coldStart.canopyClosed) audio.canopyClose();
+  resetColdStartFull();
+  if (!radioEvent('CAT_ARMED')) onWing('Deck is clear. Catapult armed. Go when ready, Lead.', 'AWACS', '#00ff66', true);
+}
+function advanceColdStart(reqStep) {
+  if (!coldStart.active) return false;
+  if (reqStep !== undefined && reqStep !== coldStart.step) return false;
+  if (coldStart.step === 0) {
+    coldStart.batt = true; coldStart.step = 1;
+    audio.switchClick();
+    return true;
+  }
+  if (coldStart.step === 1) {
+    coldStart.canopyClosed = true; coldStart.step = 2;
+    audio.canopyClose();
+    return true;
+  }
+  if (coldStart.step === 2 && !coldStart.engStarted) {
+    coldStart.engStarted = true;
+    audio.spoolStart();
+    return true;
+  }
+  return false;
+}
 function catEnter() {
   const a = combat.ally;
   if (!a) return;
@@ -2374,7 +2408,18 @@ function catEnter() {
   state.pitchRate = state.rollRate = state.yawRate = 0;
   combatSys.updateJbd(a, true, 1);
   vfx.catSteam.reset();
-  if (!radioEvent('CAT_ARMED')) onWing('Deck is clear. Catapult armed. Go when ready, Lead.', 'AWACS', '#00ff66', true);
+  const useCold = !pitstopCat && !cat.forceAB && !Q.has('nocoldstart') && ((!DEBUG && !navigator.webdriver) || Q.has('coldstart'));
+  if (useCold) {
+    coldStart.active = true; coldStart.step = 0; coldStart.batt = false; coldStart.hudPower = 0;
+    coldStart.canopyClosed = false; coldStart.engStarted = false; coldStart.engSpool = 0;
+    setView('COCKPIT');
+    if (typeof cockpit !== 'undefined' && cockpit && cockpit.setPower) cockpit.setPower(0);
+    state.throttle = 0; state.afterburner = 0;
+  } else {
+    resetColdStartFull();
+    audio.canopyClose();
+    if (!radioEvent('CAT_ARMED')) onWing('Deck is clear. Catapult armed. Go when ready, Lead.', 'AWACS', '#00ff66', true);
+  }
   if (missionId === 'NAVAL_BATTLE' && !scramble.rolled && !(combat.traps > 0)) {
     scramble.rolled = true;
     const roll = NO_SCRAMBLE ? false : FORCE_SCRAMBLE || Math.random() < SCR_CHANCE;
@@ -2390,6 +2435,7 @@ function catEnter() {
   }
 }
 function catFire() {
+  resetColdStartFull();
   cat.ph = 'LAUNCH'; cat.t = 0;
   onCatFire();                                            // release squat + vibration, lift the camera
   audio.catapult(); blastShake = Math.max(blastShake, 0.6);
@@ -2514,13 +2560,30 @@ function updateWingCat(dt, a) {
 function catTick(dt) {
   const a = combat.ally;
   if (!a) return;
-  updateThrottle(dt);                                    // throttle + afterburner stay live in HOLD
+  if (coldStart.active) {
+    if (cat.forceAB) skipColdStart();
+    else {
+      if (coldStart.batt && coldStart.hudPower < 1) {
+        coldStart.hudPower = Math.min(1, coldStart.hudPower + dt / 0.7);
+        if (typeof cockpit !== 'undefined' && cockpit && cockpit.setPower) cockpit.setPower(coldStart.hudPower);
+      }
+      if (coldStart.engStarted && coldStart.engSpool < 1) {
+        coldStart.engSpool = Math.min(1, coldStart.engSpool + dt / 3.0);
+        if (coldStart.engSpool >= 0.98 && coldStart.step === 2) {
+          coldStart.engSpool = 1; coldStart.step = 3;
+          if (!radioEvent('CAT_ARMED')) onWing('Deck is clear. Catapult armed. Go when ready, Lead.', 'AWACS', '#00ff66', true);
+        }
+      }
+    }
+  }
+  if (!coldStart.active || coldStart.step >= 3) updateThrottle(dt); // throttle + afterburner live once engines spooled
+  else { state.throttle = 0; state.afterburner = 0; }
   if (cat.forceAB) { state.throttle = 1; state.afterburner = 1; }
   if (cat.grace > 0) cat.grace = Math.max(0, cat.grace - dt);
   const trk = CAT_BOW[cat.trackIdx];
   if (cat.ph === 'HOLD') {
     cat.t += dt;
-    cat.arm = (state.throttle >= 1 && state.afterburner) ? cat.arm + dt : 0;
+    cat.arm = (!coldStart.active || coldStart.step >= 3) && (state.throttle >= 1 && state.afterburner) ? cat.arm + dt : 0;
     if (cat.arm >= CAT_ARM_T) catFire();
     const deckNow = catDeckY(trk) + combatSys.allyRoot.position.y + JET_GEAR_DY;
     if (Math.abs(state.position.y - deckNow) > CAT_SNAP_TOL) {
@@ -2564,9 +2627,8 @@ async function startSortie() {
   await loadMissionScene(m);
   setTimeout(applyTextureQuality, 1500);                     // carrier GLB / mission props: capped anisotropy once
   radioReset(); preloadRadioOnce();
-  audio.canopyClose();
   if (m.launch === 'CATAPULT' || m.launchType === 'CARRIER') await enterCarrierLaunch(m);
-  else radioEvent('ON_TAKEOFF');
+  else { resetColdStartFull(); audio.canopyClose(); radioEvent('ON_TAKEOFF'); }
   if (hintEl) hintEl.textContent = oldHint;
   combat.styleCounts = {}; combat.comboPeak = 1;
   Object.assign(sortie, { active: true, t0: sortie.active ? sortie.t0 : simTime, ace0: combat.aceDowns || 0, endAt: null, failReason: '' });
@@ -3365,6 +3427,20 @@ addEventListener('keydown', e => {
     else if (!freeFlight.active) keys.fire = true;
   }
   if (k === 'm') { if (!e.repeat && !freeFlight.active) { combatSys.fireSelected(); mcam.held = true; } }
+  if (coldStart.active && appMode === 'PLAY' && !uiModal) {
+    if (e.code === 'KeyI' && !e.repeat) { advanceColdStart(); return; }
+    if (e.code === 'Digit1' && !e.repeat) { advanceColdStart(0); return; }
+    if (e.code === 'Digit2' && !e.repeat) { advanceColdStart(1); return; }
+    if (e.code === 'Digit3' && !e.repeat) { advanceColdStart(2); return; }
+    if (e.code === 'Enter' && !e.repeat) { e.preventDefault(); skipColdStart(); return; }
+  }
+  if (e.code === 'KeyO' && !e.repeat && appMode === 'PLAY' && !uiModal && !e.ctrlKey && !e.altKey && !e.metaKey) {
+    hudMinimalFP = !hudMinimalFP;
+    hudModeToast.text = hudMinimalFP ? '[ COCKPIT HUD: DIEGETIC ]' : '[ COCKPIT HUD: FULL ]';
+    hudModeToast.t = performance.now();
+    audio.mfdClick();
+    return;
+  }
   if (k === 'r' && !e.repeat) combatSys.toggleWeapon();
   if (k === '1' && !e.repeat) combatSys.setWeapon('MSL');
   if (k === '2' && !e.repeat) combatSys.setWeapon(SPW[selectedSPW].wpn);   // special weapon
@@ -4881,6 +4957,9 @@ function updateAudio() {
     wheelBrake: !!(state.onGround && state.wheelBrake),
     pitActive: !!(state.pit && state.pit.active),
     catHold: cat.ph === 'HOLD',
+    canopySealed: coldStart.canopyClosed,
+    engSpool: coldStart.engSpool,
+    avionicsOn: coldStart.batt,
     // Feel pass: transonic shear / supersonic quiet / high-AoA wing-rock creak.
     transK, superK, wrK, wrPhase
   });
@@ -5425,7 +5504,10 @@ const hud = createHUD(THREE, {
   isAutoland: () => autoland.on,
   autolandPrompt: () => autolandPrompt(),
   getCombinerOutline: () => (cockpit.active ? cockpit.glassOutlineWorld() : null),
-  missionClock: () => cockpit.missionClock(simTime)
+  missionClock: () => cockpit.missionClock(simTime),
+  isMinimalCockpit: () => hudMinimalFP,
+  getColdStart: () => coldStart,
+  getHudModeToast: () => hudModeToast
 });
 
 /* --------------------------------------------------------------------------

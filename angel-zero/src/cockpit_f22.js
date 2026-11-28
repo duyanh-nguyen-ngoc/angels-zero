@@ -457,8 +457,15 @@ export function createCockpitF22(THREE, env) {
     }
   }
 
+  let power = 1;
+  function setPower(k) {
+    power = Math.max(0, Math.min(1, Number.isFinite(k) ? k : 1));
+    for (const key in SCREENS) SCREENS[key].mat.color.setScalar(1.4 * power);
+  }
+
   return {
-    rig, setActive, update, missionClock, setNVG, setFreeLook,
+    rig, setActive, update, missionClock, setNVG, setFreeLook, setPower,
+    get power() { return power; },
     flash(kind) {
       matShroud.emissive.setHex(kind === 'GUN' ? 0xffd9a0 : 0xfff4e0);
       glareT = 0.08; glareK = kind === 'GUN' ? 0.55 : 0.85;

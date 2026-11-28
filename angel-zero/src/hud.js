@@ -2507,9 +2507,17 @@ export function createHUD(THREE, A) {
 
     let g = null;
     const nose = !!(A.isNoseView && A.isNoseView());
+    const minFp = fp && (!A.isMinimalCockpit || A.isMinimalCockpit());
+    const cs = A.getColdStart ? A.getColdStart() : null;
+    const hudPower = (fp && cs) ? cs.hudPower : 1;
     if (fp) {
       g = combinerPath();
-      if (g && !C.dead) drawCentralHUD(hctx, g, dt, true);
+      if (g && !C.dead && hudPower > 0.01) {
+        hctx.save();
+        hctx.globalAlpha *= hudPower;
+        drawCentralHUD(hctx, g, dt, true);
+        hctx.restore();
+      }
     } else if (nose) {
       g = noseLayout();
       if (!C.dead) drawNoseAC7HUD(hctx, g, dt);
@@ -2529,14 +2537,15 @@ export function createHUD(THREE, A) {
     }
 
     const ff = !!(C.mcfg && C.mcfg.freeFlight);
-    if (!C.dead && !ff) { drawTargets(hctx); drawWingmen(hctx); }
-    if (!ff) { drawStrikeTargets(hctx); drawWeakTargets(hctx); }
+    if (!C.dead && !ff && hudPower > 0.25) { drawTargets(hctx); drawWingmen(hctx); }
+    if (!ff && hudPower > 0.25) { drawStrikeTargets(hctx); drawWeakTargets(hctx); }
     drawRadio(hctx);
-    if (C.training) drawTrainingObjective(hctx, g);
-    drawTopLeft(hctx);
-    if (!C.dead && !ff) drawKillFlash(hctx, g);
-    drawStamps(hctx, dt); radarPulseT += dt;
-    if (!ff) {
+    if (C.training && !minFp) drawTrainingObjective(hctx, g);
+    if (!minFp) drawTopLeft(hctx);
+    if (!C.dead && !ff && !minFp) drawKillFlash(hctx, g);
+    if (!minFp) drawStamps(hctx, dt);
+    radarPulseT += dt;
+    if (!ff && !minFp) {
       if (C.jamming > 0) {
         // EW jitter: radar is painted directly on this canvas, so translate the
         // draw by +/-2 px instead of a drawImage source-offset.
@@ -2552,13 +2561,27 @@ export function createHUD(THREE, A) {
     }
     drawCenterBanners(hctx, fp ? g : null);
     if (!C.dead && !ff) drawApproach(hctx, g);
-    if (!ff) { drawStyleFeed(hctx, g); drawDangerPill(hctx); drawPrompt(hctx); }
+    if (!ff && !minFp) { drawStyleFeed(hctx, g); drawDangerPill(hctx); drawPrompt(hctx); }
+    if (minFp && !C.dead) drawCinematicPrompt(hctx, cs);
     drawCheat(hctx);
     drawComms(hctx, fp ? HH * 0.71 : HH * 0.84);
-    if (!A.isModal()) drawStickCue(hctx);
+    if (!A.isModal() && !minFp) drawStickCue(hctx);
     drawFreeLookTag(hctx);
     drawGLoc(hctx);
     if (!ff) drawJam(hctx);
+    if (fp && A.getHudModeToast) {
+      const mt = A.getHudModeToast();
+      if (mt && mt.text && mt.t) {
+        const age = (now - mt.t) / 1000;
+        if (age >= 0 && age < 1.5) {
+          hctx.save();
+          hctx.globalAlpha *= age > 1.1 ? (1.5 - age) / 0.4 : 1;
+          hctx.font = f(11, true); hctx.textAlign = 'center'; hctx.textBaseline = 'middle';
+          labelText(ctxOrH(hctx), mt.text, HW / 2, 42, G, 4);
+          hctx.restore();
+        }
+      }
+    }
     if (glitchT > 0 && !C.dead) {
       const k = Math.min(1, glitchT / 0.55), y = HH * (0.36 + 0.22 * Math.sin(now / 90));
       hctx.save(); hctx.globalAlpha = 0.35 * k;
@@ -2933,6 +2956,45 @@ export function createHUD(THREE, A) {
     noGlow(ctx); ctx.fillStyle = 'rgba(0, 12, 5, 0.55)'; ctx.fillRect(x - 6, y, w, 20);
     glow(ctx, G, 4); ctx.lineWidth = 1; ctx.strokeRect(x - 5.5, y + 0.5, w - 1, 19);
     labelText(ctx, '[ NVG ]', x, y + 10.5, G, 4);
+    ctx.restore();
+  }
+
+  let lastObjKey = '', objCueT = 0;
+  function ctxOrH(c) { return c; }
+  function drawCinematicPrompt(ctx, cs) {
+    let verb = '', rest = '', alpha = 1;
+    if (cs && cs.active) {
+      if (cs.step === 0) { verb = 'Power On'; rest = ' Battery & Avionics  [I / 1]   •   [ENTER] Quick Start'; }
+      else if (cs.step === 1) { verb = 'Close'; rest = ' Canopy  [I / 2]   •   [ENTER] Quick Start'; }
+      else if (cs.step === 2 && !cs.engStarted) { verb = 'Start'; rest = ' Engines  [I / 3]   •   [ENTER] Quick Start'; }
+      else if (cs.step === 2) { verb = 'Spooling'; rest = ' Turbines...  ' + Math.round((cs.engSpool || 0) * 100) + '%'; }
+      else { verb = 'Full Afterburner'; rest = '  [W / SHIFT] to Launch'; }
+    } else if (!(C.mcfg && C.mcfg.freeFlight)) {
+      const p = C.missionPhase || 1;
+      const key = (C.missionTitle || '') + ':' + p;
+      const now = performance.now();
+      if (key !== lastObjKey) { lastObjKey = key; objCueT = now; }
+      const age = (now - objCueT) / 1000;
+      if (age < 0 || age > 5.5) return;
+      alpha = age > 4.5 ? (5.5 - age) : 1;
+      const lbl = (MP_LABELS[p] || '').toUpperCase();
+      if (lbl.includes('FLEET') || lbl.includes('NAVAL') || lbl.includes('SHIP')) { verb = 'Destroy'; rest = ' the enemy ships!'; }
+      else if (lbl.includes('FORT') || lbl.includes('STRIKE') || lbl.includes('SITE') || lbl.includes('CANYON')) { verb = 'Destroy'; rest = ' the marked ground targets!'; }
+      else if (lbl.includes('ACE') || lbl.includes('CRIMSON')) { verb = 'Intercept'; rest = ' the enemy ace!'; }
+      else { verb = 'Destroy'; rest = ' the hostile aircraft!'; }
+    } else {
+      return;
+    }
+    ctx.save();
+    ctx.globalAlpha *= alpha;
+    ctx.font = f(15, true);
+    const w1 = ctx.measureText(verb).width;
+    const w2 = ctx.measureText(rest).width;
+    const x0 = HW / 2 - (w1 + w2) / 2, y = HH * 0.87;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0,0,0,0.88)'; ctx.shadowBlur = 6;
+    ctx.fillStyle = '#ffaa33'; ctx.fillText(verb, x0, y);
+    ctx.fillStyle = '#f2f7f4'; ctx.fillText(rest, x0 + w1, y);
     ctx.restore();
   }
 

@@ -1326,9 +1326,20 @@ export function createCockpit3D(THREE, env) {
     }
   }
 
+  let power = 1;
+  function setPower(k) {
+    power = Math.max(0, Math.min(1, Number.isFinite(k) ? k : 1));
+    gaugeMat.color.setScalar(0.06 + (EMISSIVE_LIFT - 0.06) * power);
+    dispMat.color.setScalar(EMISSIVE_LIFT * 1.1 * power);
+    ufcMat.color.setScalar(EMISSIVE_LIFT * power);
+    cautionMat2.color.setScalar(EMISSIVE_LIFT * power);
+    adiMat.emissiveIntensity = 0.6 * power;
+  }
+
   const _w = new THREE.Vector3();
   return {
-    rig, setActive, update, missionClock, setNVG, setFreeLook,
+    rig, setActive, update, missionClock, setNVG, setFreeLook, setPower,
+    get power() { return power; },
     flash(kind) {
       glareColor.setHex(kind === 'GUN' ? 0xffd9a0 : 0xfff4e0);
       shieldMat.emissive.copy(glareColor); bowMat.emissive.copy(glareColor);

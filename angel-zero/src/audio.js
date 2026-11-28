@@ -631,14 +631,15 @@ export function createAudio(opts = {}) {
     const run = live && !muted && kts >= 80 ? 1 : 0;            // runway idle / taxi / dead stick -> silent
     const q = Math.pow(cl((kts - 110) / 520), 1.6);              // dynamic pressure feel
     const slipHz = 220 + 930 * cl((kts - 150) / 500);
-    const view = p.cockpit ? 0.8 : 1.15;                         // brighter exterior rush in chase view
+    const sealed = p.canopySealed !== false;
+    const view = p.cockpit ? (sealed ? 0.42 : 0.85) : 1.15;     // hushed in sealed cockpit, open when canopy up
     // Supersonic cockpit quiet: wind / airflow gains drop smoothly above Mach 1.05.
     // Folded into the computed targets below (never re-multiply a live AudioParam).
     const quiet = 1 - 0.35 * Math.max(0, Math.min(1, p.superK || 0)) * (p.cockpit ? 1 : 0);
     const slipGain = run * 0.2 * q * view * quiet;
     const buffK = run * Math.max(sm(gl, 3.2, 7.5), sm(ak, 11, 24)) * sm(kts, 100, 220);
     const buffHz = 140 + 220 * buffK, buffGain = 0.26 * buffK * (0.85 + 0.25 * q) * (p.cockpit ? 1.1 : 0.9) * quiet;
-    const lp = p.cockpit ? 1800 : 16000;
+    const lp = p.cockpit ? (sealed ? 720 : 12000) : 16000;
     for (const s of N.slip) set(s.bp.frequency, slipHz, WT);
     set(N.slipGain.gain, slipGain, WT);
     set(N.windBuffBP.frequency, buffHz, WT); set(N.windBuffGain.gain, buffGain, WT);
@@ -725,6 +726,75 @@ export function createAudio(opts = {}) {
     clankCount++;
   }
 
+  // Cockpit hull concussion + temporary hearing-muffle dip on heavy hits and close blasts.
+  function concuss(intensity = 0.8) {
+    if (!ready || !master) return;
+    const t = ctx.currentTime, k = Math.min(1.2, Math.max(0.2, intensity));
+    // Heavy sub-bass hull thud routed past cockpitLP so it hits the chest directly.
+    const sub = ctx.createOscillator(); sub.type = 'sine';
+    sub.frequency.setValueAtTime(85, t); sub.frequency.exponentialRampToValueAtTime(32, t + 0.28);
+    const sg = gain(0); sg.gain.setValueAtTime(0, t);
+    sg.gain.linearRampToValueAtTime(0.62 * k, t + 0.008);
+    sg.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
+    sub.connect(sg).connect(master); sub.start(t); sub.stop(t + 0.34);
+
+    if (N.brown) {
+      const n = ctx.createBufferSource(); n.buffer = N.brown;
+      const lp = filt('lowpass', 180, 0.9);
+      const ng = gain(0); ng.gain.setValueAtTime(0, t);
+      ng.gain.linearRampToValueAtTime(0.55 * k, t + 0.01);
+      ng.gain.exponentialRampToValueAtTime(0.001, t + 0.26);
+      n.connect(lp).connect(ng).connect(master); n.start(t, Math.random()); n.stop(t + 0.28);
+    }
+
+    // Temporary hearing-muffle dip: sweep N.slowLP down to 280-380 Hz and duck world gain.
+    const hold = 0.35 + 0.5 * k;
+    if (N.slowLP) {
+      const f = N.slowLP.frequency;
+      f.cancelScheduledValues(t); f.setValueAtTime(f.value, t);
+      f.exponentialRampToValueAtTime(280 + 100 * (1 - k), t + 0.03);
+      f.setValueAtTime(280 + 100 * (1 - k), t + hold * 0.6);
+      f.exponentialRampToValueAtTime(20000, t + hold + 0.35);
+    }
+    duckWorld(Math.max(0.4, 0.68 - 0.26 * k), hold);
+
+    // Subtle ear-ring shimmer on heavy hits in sealed cockpit.
+    if (k >= 0.55 && N.tinG && N.inCockpit && N.canopySealed) {
+      const tg = N.tinG.gain;
+      tg.cancelScheduledValues(t); tg.setValueAtTime(tg.value, t);
+      tg.linearRampToValueAtTime(0.032 * k, t + 0.04);
+      tg.exponentialRampToValueAtTime(0.0005, t + 1.4);
+    }
+  }
+
+  // Cold-start tactile switch click + starter spool SFX.
+  function switchClick() {
+    if (!ready) return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator(); o.type = 'triangle';
+    o.frequency.setValueAtTime(1400, t); o.frequency.exponentialRampToValueAtTime(320, t + 0.035);
+    const g = gain(0); g.gain.setValueAtTime(0.26, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
+    o.connect(g).connect(N.body); o.start(t); o.stop(t + 0.05);
+    // Avionics relay hum tick
+    const h = ctx.createOscillator(); h.type = 'sine'; h.frequency.value = 400;
+    const hg = gain(0); hg.gain.setValueAtTime(0, t + 0.03);
+    hg.gain.linearRampToValueAtTime(0.045, t + 0.08);
+    hg.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+    h.connect(hg).connect(N.body); h.start(t + 0.03); h.stop(t + 0.48);
+  }
+  function spoolStart() {
+    if (!ready) return;
+    if (playSample('f15JfsStart', cockpitLP, 0.38) > 0) return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator(); o.type = 'sawtooth';
+    o.frequency.setValueAtTime(95, t); o.frequency.exponentialRampToValueAtTime(420, t + 2.4);
+    const lp = filt('lowpass', 900, 1.2);
+    const g = gain(0); g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.14, t + 0.35);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 2.6);
+    o.connect(lp).connect(g).connect(cockpitLP); o.start(t); o.stop(t + 2.65);
+  }
+
   /* ------------------------------------------------------- one-shot events */
   // Two-stage detonation: an immediate metallic warhead crack (white noise through a
   // band-pass sweeping 3,000 -> 850 Hz, 2 ms attack, ~0.12 s), then -- `delay` s later
@@ -735,6 +805,7 @@ export function createAudio(opts = {}) {
     if (!Number.isFinite(intensity)) intensity = 1;          // corrupt scale must never poison an AudioParam
     if (!Number.isFinite(delay)) delay = 0.02;
     const t = ctx.currentTime, k = Math.min(1.4, Math.max(0.05, intensity)), tb = t + Math.max(0, delay);
+    if (N.inCockpit && N.canopySealed && k >= 0.65 && delay <= 0.12) concuss(Math.min(1.1, k * 0.85));
     const cn = ctx.createBufferSource(); cn.buffer = N.white;
     const cbp = filt('bandpass', 3000, 1.6); cbp.frequency.setValueAtTime(3000, t); cbp.frequency.exponentialRampToValueAtTime(850, t + 0.11);
     const cg = gain(0); cg.gain.setValueAtTime(0, t); cg.gain.linearRampToValueAtTime(0.75 * k, t + 0.002); cg.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
@@ -810,19 +881,20 @@ export function createAudio(opts = {}) {
   function missileLaunch() {
     if (!ready) return;
     const t = ctx.currentTime;
+    const railDest = (N.inCockpit && N.canopySealed && master) ? master : cockpitLP;
     if (playSample('f15AimLaunch', cockpitLP, 0.45)) {
-      const thump = ctx.createOscillator(); thump.type = 'sine'; thump.frequency.setValueAtTime(140, t); thump.frequency.exponentialRampToValueAtTime(50, t + 0.25);
-      const tg = gain(0); tg.gain.setValueAtTime(0.35, t); tg.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
-      thump.connect(tg).connect(cockpitLP); thump.start(t); thump.stop(t + 0.32);
+      const thump = ctx.createOscillator(); thump.type = 'sine'; thump.frequency.setValueAtTime(95, t); thump.frequency.exponentialRampToValueAtTime(38, t + 0.25);
+      const tg = gain(0); tg.gain.setValueAtTime(0.42, t); tg.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+      thump.connect(tg).connect(railDest); thump.start(t); thump.stop(t + 0.32);
       return;
     }
     const n = ctx.createBufferSource(); n.buffer = N.white;
     const bp = filt('bandpass', 3200, 0.9); bp.frequency.setValueAtTime(3200, t); bp.frequency.exponentialRampToValueAtTime(500, t + 1.4);
     const g = gain(0); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.55, t + 0.05); g.gain.exponentialRampToValueAtTime(0.001, t + 1.6);
     n.connect(bp).connect(g).connect(cockpitLP); n.start(t, Math.random()); n.stop(t + 1.7);
-    const thump = ctx.createOscillator(); thump.type = 'sine'; thump.frequency.setValueAtTime(140, t); thump.frequency.exponentialRampToValueAtTime(50, t + 0.25);
-    const tg = gain(0); tg.gain.setValueAtTime(0.5, t); tg.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
-    thump.connect(tg).connect(cockpitLP); thump.start(t); thump.stop(t + 0.32);
+    const thump = ctx.createOscillator(); thump.type = 'sine'; thump.frequency.setValueAtTime(95, t); thump.frequency.exponentialRampToValueAtTime(38, t + 0.25);
+    const tg = gain(0); tg.gain.setValueAtTime(0.52, t); tg.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    thump.connect(tg).connect(railDest); thump.start(t); thump.stop(t + 0.32);
   }
 
   // Bomb rack release: ejector-cartridge crack + heavy metallic clunk of the hooks.
@@ -1824,12 +1896,18 @@ export function createAudio(opts = {}) {
     const g = N.gunBus.gain, t = ctx.currentTime;
     g.cancelScheduledValues(t); g.setValueAtTime(g.value, t);
     g.linearRampToValueAtTime(0.85, t + 0.08);
+    if (N.inCockpit && N.canopySealed && N.duck) {
+      const dg = N.duck.gain; dg.cancelScheduledValues(t); dg.setValueAtTime(dg.value, t); dg.linearRampToValueAtTime(0.84, t + 0.04);
+    }
   }
   // Trigger release: smooth 0.12 s decay; the convolver send rings on as the air tail.
   function gunTriggerOff() {
     const g = N.gunBus.gain, t = ctx.currentTime;
     g.cancelScheduledValues(t); g.setValueAtTime(g.value, t);
     g.linearRampToValueAtTime(0, t + 0.12);
+    if (N.inCockpit && N.canopySealed && N.duck) {
+      const dg = N.duck.gain; dg.cancelScheduledValues(t); dg.setValueAtTime(dg.value, t); dg.linearRampToValueAtTime(1, t + 0.18);
+    }
   }
   // Metallic 20 mm impact rattle: bright resonant pings plus a short noise tick.
   let lastHit = 0;
@@ -1840,6 +1918,7 @@ export function createAudio(opts = {}) {
     if (t - lastHit < 0.03) return;                  // cap the rate at ~33 Hz
     lastHit = t;
     const k = Math.min(1, Math.max(0.05, intensity));
+    if (N.inCockpit && N.canopySealed) concuss(Math.max(0.45, k));
     for (let i = 0; i < 3; i++) {
       const at = t + i * 0.018 + Math.random() * 0.01;
       const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = 2100 + Math.random() * 2400;
@@ -1920,12 +1999,15 @@ export function createAudio(opts = {}) {
     let dt = now - E.lastT;
     if (!(dt > 0)) dt = 0.016; else if (dt > 0.1) dt = 0.1;
     E.lastT = now;
+    const sealed = p.canopySealed !== false;
+    const spool = p.engSpool === undefined ? 1 : Math.max(0, Math.min(1, p.engSpool));
+    const runLive = live * spool;
     const th = Math.min(1, Math.max(0, Number.isFinite(p.throttle) ? p.throttle : 0));
-    abTarget = Math.min(1, Math.max(0, Number.isFinite(abTarget) ? abTarget : 0));
+    abTarget = Math.min(1, Math.max(0, Number.isFinite(abTarget) ? abTarget : 0)) * spool;
     const aliveL = p.engL !== false && p.engL !== 'OUT' && p.engL !== 0;
     const aliveR = p.engR !== false && p.engR !== 'OUT' && p.engR !== 0;
-    const tgtL = (live && aliveL) ? RPM_IDLE + (RPM_MIL - RPM_IDLE) * th : RPM_WINDMILL;
-    const tgtR = (live && aliveR) ? (RPM_IDLE + (RPM_MIL - RPM_IDLE) * th) * 1.015 : RPM_WINDMILL;
+    const tgtL = (live && aliveL) ? (RPM_IDLE + (RPM_MIL - RPM_IDLE) * th) * spool : RPM_WINDMILL;
+    const tgtR = (live && aliveR) ? (RPM_IDLE + (RPM_MIL - RPM_IDLE) * th) * 1.015 * spool : RPM_WINDMILL;
     E.rpmL += (tgtL - E.rpmL) * (1 - Math.exp(-dt / (tgtL > E.rpmL ? TAU_UP : TAU_DN)));
     E.rpmR += (tgtR - E.rpmR) * (1 - Math.exp(-dt / ((tgtR > E.rpmR ? TAU_UP : TAU_DN) * 1.015)));
     E.abK += (abTarget - E.abK) * (1 - Math.exp(-dt / (abTarget > E.abK ? AB_TAU_UP : AB_TAU_DN)));
@@ -1933,49 +2015,50 @@ export function createAudio(opts = {}) {
     const f0 = 650 * Math.pow(3400 / 650, Math.min(1, Math.max(0, (rpmL - RPM_IDLE) / (RPM_MIL - RPM_IDLE))));
     E.f0 = Math.min(12000, f0);
     // Per-frame gain Automation only (no node creations, no ramps stacking).
-    const choirK = 0.6 * Math.pow(rpmL, 1.5) * (1 - 0.35 * abK);
-    const exhGain = 0.08 + 0.42 * rpmL * rpmL + 0.55 * abK;
+    const choirK = 0.6 * Math.pow(rpmL, 1.5) * (1 - 0.35 * abK) * (p.cockpit && sealed ? 0.55 : 1);
+    const exhGain = (0.08 + 0.42 * rpmL * rpmL + 0.55 * abK) * (p.cockpit && sealed ? 0.62 : 1);
     const driveAmt = 0.6 + 1.1 * abK;
     const flutterHz = 16 + 14 * rpmL + 4 * abK;
     set(E.shearG.gain, 0.12 * Math.pow(Math.min(1, (p.speed || 0) / 400), 2) * (p.cockpit ? 0 : 1));
-    set(E.ecsG.gain, 0.025 + 0.015 * Math.min(1, (p.speed || 0) / 300) * live);
-    set(E.crackG.gain, 0.12 * Math.pow(abK, 1.4) * live);
+    const ecsOn = p.avionicsOn === false ? 0 : 1;
+    set(E.ecsG.gain, (p.cockpit && sealed ? 0.038 : 0.025) * ecsOn + 0.015 * Math.min(1, (p.speed || 0) / 300) * runLive);
+    set(E.crackG.gain, 0.12 * Math.pow(abK, 1.4) * runLive);
     E.sub.lp.frequency && set(E.sub.lp.frequency, 36 + 49 * (0.6 * rpmL + 0.4 * abK), 0.25);
-    set(E.sub.bus.gain, (0.12 * rpmL + 0.75 * Math.pow(abK, 1.3)) * live, 0.25);
+    set(E.sub.bus.gain, (0.12 * rpmL + 0.75 * Math.pow(abK, 1.3)) * runLive, 0.25);
     const bothAlive = (live && aliveL && aliveR) ? 1 : 0;
-    set(E.sub.ag.gain, 0.5 * bothAlive); set(E.sub.bg.gain, 0.5 * bothAlive);
+    set(E.sub.ag.gain, 0.5 * bothAlive * spool); set(E.sub.bg.gain, 0.5 * bothAlive * spool);
     for (let i = 0; i < 2; i++) {
       const ex = E.exh[i], rpm = i ? rpmR : rpmL;
       set(ex.form.frequency, 240 + 280 * rpm, 0.12);
       set(ex.drive.gain, driveAmt, 0.08);
-      set(ex.g.gain, exhGain * (i ? 0.97 : 1) * live, 0.12);
+      set(ex.g.gain, exhGain * (i ? 0.97 : 1) * runLive, 0.12);
       set(ex.flSum.gain, 0.25 + 0.2 * abK, 0.12);
       ex.fl1.frequency && set(ex.fl1.frequency, Math.min(12000, flutterHz * (i ? DETUNE : 1)), 0.08);
       ex.fl2.frequency && set(ex.fl2.frequency, Math.min(12000, flutterHz * 1.71 * (i ? DETUNE : 1)), 0.08);
     }
-    for (const c of E.choir) c.bus && set(c.bus.gain, choirK * (c.e ? 0.97 : 1), 0.12);
+    for (const c of E.choir) c.bus && set(c.bus.gain, choirK * (c.e ? 0.97 : 1) * runLive, 0.12);
     if (N.f15Whine) {
       set(N.f15Whine.playbackRate, 0.72 + 0.68 * rpmL, 0.1);
-      set(N.f15WhineG.gain, live ? (p.cockpit ? 0.08 : 0.12) * (0.35 + 0.65 * rpmL) * (1 - 0.35 * abK) : 0, 0.12);
+      set(N.f15WhineG.gain, runLive ? (p.cockpit ? (sealed ? 0.036 : 0.08) : 0.12) * (0.35 + 0.65 * rpmL) * (1 - 0.35 * abK) : 0, 0.12);
     }
     if (N.f15Exh) {
       set(N.f15Exh.playbackRate, 0.78 + 0.55 * rpmL, 0.1);
-      set(N.f15ExhG.gain, live ? (p.cockpit ? 0.14 : 0.28) * (0.2 + 0.8 * rpmL * rpmL) : 0, 0.12);
+      set(N.f15ExhG.gain, runLive ? (p.cockpit ? (sealed ? 0.077 : 0.14) : 0.28) * (0.2 + 0.8 * rpmL * rpmL) : 0, 0.12);
     }
     if (N.f15AbIn) {
       set(N.f15AbIn.playbackRate, 0.92 + 0.2 * abK, 0.1);
-      set(N.f15AbInG.gain, live && p.cockpit ? 0.32 * Math.pow(abK, 1.2) : 0, 0.12);
+      set(N.f15AbInG.gain, runLive && p.cockpit ? 0.32 * Math.pow(abK, 1.2) : 0, 0.12);
     }
     if (N.f15AbOut) {
       set(N.f15AbOut.playbackRate, 0.92 + 0.2 * abK, 0.1);
-      set(N.f15AbOutG.gain, live && !p.cockpit ? 0.38 * Math.pow(abK, 1.2) : 0, 0.12);
+      set(N.f15AbOutG.gain, runLive && !p.cockpit ? 0.38 * Math.pow(abK, 1.2) : 0, 0.12);
     }
-    if (N.f15Efflux) set(N.f15EffluxG.gain, live && !p.cockpit ? 0.24 * (0.3 + 0.7 * rpmL) * (0.4 + 0.6 * sm(p.mach || 0, 0.4, 1.2)) : 0, 0.12);
-    if (N.f15Intake) set(N.f15IntakeG.gain, live ? (p.cockpit ? 0.14 : 0.10) * (0.25 + 0.75 * rpmL) * (0.4 + 0.6 * sm(p.kts || 0, 80, 450)) : 0, 0.12);
+    if (N.f15Efflux) set(N.f15EffluxG.gain, runLive && !p.cockpit ? 0.24 * (0.3 + 0.7 * rpmL) * (0.4 + 0.6 * sm(p.mach || 0, 0.4, 1.2)) : 0, 0.12);
+    if (N.f15Intake) set(N.f15IntakeG.gain, runLive ? (p.cockpit ? 0.14 : 0.10) * (0.25 + 0.75 * rpmL) * (0.4 + 0.6 * sm(p.kts || 0, 80, 450)) : 0, 0.12);
     // View crossfade + run-state gate.
     set(E.ckMixG.gain, p.cockpit ? 1 : 0, 0.25);
     set(E.chMixG.gain, p.cockpit ? 0 : 1, 0.25);
-    set(E.out.gain, live ? 1 : 0, 0.3);
+    set(E.out.gain, runLive > 0.005 ? 1 : 0, 0.3);
     E.freqAcc += dt;
     if (E.freqAcc >= 1 / 30) {
       E.freqAcc = 0;
@@ -2034,10 +2117,13 @@ export function createAudio(opts = {}) {
     const ab = (p.ab === undefined ? p.afterburner : p.ab) || 0;
     const th = Math.min(1, Math.max(0, Number.isFinite(p.throttle) ? p.throttle : 0));
     const live = p.engineOn ? 1 : 0;
+    const sealed = p.canopySealed !== false;
+    N.inCockpit = !!p.cockpit;
+    N.canopySealed = sealed;
     const gl = p.gLoad || 1, aoa = p.aoa || 0, gs = p.gStrain || 0;
     const kts = p.kts || 0;
     const lugK = live * Math.max(sm(aoa, 10, 22), 0.6 * sm(gl, 3.2, 9));
-    set(cockpitLP.frequency, p.cockpit ? 2600 : 18000, 0.15);
+    set(cockpitLP.frequency, p.cockpit ? (sealed ? 480 : 14000) : 18000, p.cockpit && sealed ? 0.24 : 0.15);
     ensureSampleVoices();
     updateEngine(p, ab, live);
     // Airframe metal groan + creak: 3.2 G -> 9 G.
@@ -2187,10 +2273,10 @@ export function createAudio(opts = {}) {
     if (firing && !N.wasFiring) gunTriggerOn();
     if (!firing && N.wasFiring) gunTriggerOff();
     N.wasFiring = firing;
-    // Cockpit: crack muffled to 2.8 kHz, fuselage thump boosted at 120 Hz. Chase: open 5.5 kHz air crackle.
-    set(N.gunCrackLP.frequency, p.cockpit ? 2800 : 5500, 0.08);
-    set(N.gunThumpPeak.gain, p.cockpit ? 6 : 0, 0.08);
-    set(N.gunCrackGain.gain, p.cockpit ? 0.45 : 0.6, 0.08);
+    // Sealed cockpit: crack muffled to 980 Hz, fuselage thump boosted +10 dB at 120 Hz. Chase: open 5.5 kHz air crackle.
+    set(N.gunCrackLP.frequency, p.cockpit ? (sealed ? 980 : 2800) : 5500, 0.08);
+    set(N.gunThumpPeak.gain, p.cockpit ? (sealed ? 10 : 6) : 0, 0.08);
+    set(N.gunCrackGain.gain, p.cockpit ? (sealed ? 0.34 : 0.45) : 0.6, 0.08);
 
     // SCAN: steady low growl. ACQ: brighter growl pulsed at ~8 Hz. LOCK: continuous 950 Hz tone.
     const acqOn = p.seeker === 'ACQ' && (ctx.currentTime * 8) % 1 < 0.55;
@@ -2251,7 +2337,7 @@ export function createAudio(opts = {}) {
   }
 
   return {
-    init, resume, suspend, update, updateMusic, bgmCut, bgmDip, bgmStaticEnd, attachYouTubeMusic, setSpray, setFlagCharge, setDroneHum, enemyGun, gunhit, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, samLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, setMusic, setRadio, setBgmPause, bumpBgmDwell, setBgmForce, switchTo, selectTrack, skip, setAuto, onBgmChange, get bgmTracks() { return getBgmTracks(); }, radioSquelch, preloadRadio, playRadio, stopRadio, txOpen, txTail, txClose, preload, generateReactiveLine, textLineSecs, callsigns: CALLSIGNS, get reactive() { return rxStats; },
+    init, resume, suspend, update, updateMusic, bgmCut, bgmDip, bgmStaticEnd, attachYouTubeMusic, setSpray, setFlagCharge, setDroneHum, enemyGun, gunhit, explosion, sonicBoom, flybyWhoosh, fireBell, extinguisher, relightCrank, relightBoom, compressorStall, missileLaunch, samLaunch, hit, bombRelease, bombDetonation, flare, chaff, designate, lockDrop, nvg, rwrChirp, ecm, thunder, glocChime, overheat, flameout, masterCaution, mfdClick, aceWarning, cableScreech, catapult, slowMo, styleChime, missileWhoosh, steamHiss, flareClack, gearMotor, gearLock, tireScreech, switchClick, spoolStart, concuss, setMusic, setRadio, setBgmPause, bumpBgmDwell, setBgmForce, switchTo, selectTrack, skip, setAuto, onBgmChange, get bgmTracks() { return getBgmTracks(); }, radioSquelch, preloadRadio, playRadio, stopRadio, txOpen, txTail, txClose, preload, generateReactiveLine, textLineSecs, callsigns: CALLSIGNS, get reactive() { return rxStats; },
     get radioAnalyser() { return N.rAnalyser || null; }, get radioFreq() { return N.rFreq || null; }, get radioTime() { return N.rTime || null; },
     get radioCh() { return RADIO_CH; },
     get radioDsp() { return { pttOpen: !!N.pttOpen, pttTail: !!N.pttTail, static: !!N.rStatic, hp: N.rHP ? N.rHP.frequency.value : 0,
