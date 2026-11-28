@@ -377,9 +377,9 @@ export function createOcean(THREE, env) {
             }
           }
         }
-        float fres = (0.02 + 0.98 * pow(1.0 - NdV, 5.0)) * (1.0 - 0.34 * clamp(shoalTurq + seabedVis * 0.5, 0.0, 1.0));
-        float nearObjRefl = reflAlpha * smoothstep(950.0, 140.0, dist) * (0.46 + 0.16 * (1.0 - NdV));
-        float reflMix = clamp(max(fres, nearObjRefl), 0.0, mix(0.72, 0.92, smoothstep(1500.0, 12000.0, dist)));
+        float fres = (0.06 + 0.94 * pow(1.0 - NdV, 4.2)) * (1.0 - 0.34 * clamp(shoalTurq + seabedVis * 0.5, 0.0, 1.0));
+        float nearObjRefl = reflAlpha * smoothstep(140.0, 25.0, dist) * 0.26;
+        float reflMix = clamp(fres + nearObjRefl, 0.0, mix(0.68, 0.92, smoothstep(1500.0, 12000.0, dist)));
         vec3 col = mix(body, refl * 0.96, reflMix);
 
         // HDR sun glitter: broad sheen + multi-scale twinkling diamond sparkles for the bloom pass.

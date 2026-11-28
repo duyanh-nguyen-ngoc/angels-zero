@@ -915,7 +915,7 @@ export function createVFX(THREE, env) {
       void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0);
         vA = aAlpha * (1.0 - smoothstep(uFar.x, uFar.y, -mv.z));
         vKind = aKind;
-        gl_PointSize = aSize * uScale / max(1.0, -mv.z);
+        gl_PointSize = clamp(aSize * uScale / max(1.0, -mv.z), 1.0, 140.0);
         gl_Position = projectionMatrix * mv;
         #include <logdepthbuf_vertex>
       }`,
@@ -925,6 +925,7 @@ export function createVFX(THREE, env) {
         #include <logdepthbuf_fragment>
         vec2 uv = gl_PointCoord - 0.5;
         float d = length(uv) * 2.0;
+        if (d >= 1.0) discard;
         if (vKind >= 0.5) {
           float a = vA * pow(clamp(1.0 - d, 0.0, 1.0), 2.2);
           if (a < 0.004) discard;
@@ -932,7 +933,7 @@ export function createVFX(THREE, env) {
         } else {
           float ang = atan(uv.y, uv.x);
           float wisp = 0.84 + 0.16 * sin(ang * 5.0 + uv.x * 6.0) * cos(ang * 3.0 - uv.y * 5.0);
-          float a = vA * pow(clamp(1.0 - d * wisp, 0.0, 1.0), 1.45);
+          float a = vA * pow(clamp(1.0 - d * wisp, 0.0, 1.0), 1.45) * smoothstep(1.0, 0.45, d);
           if (a < 0.004) discard;
           vec3 col = mix(vec3(0.76, 0.86, 0.90), vec3(0.97, 0.98, 1.0), clamp(0.65 - uv.y, 0.0, 1.0));
           gl_FragColor = vec4(col, a);
@@ -1000,9 +1001,19 @@ export function createVFX(THREE, env) {
     get stats() { return { k: rzK[rzHead] || 0, alive: rzAlive }; }
   };
   // Foam wake: one additive instanced quad every 12 m travelled while skimming.
+  const wakeTex = (() => {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+    const g = cv.getContext('2d'), gr = g.createRadialGradient(32, 32, 2, 32, 32, 30);
+    gr.addColorStop(0, 'rgba(255,255,255,0.65)');
+    gr.addColorStop(0.45, 'rgba(235,248,255,0.28)');
+    gr.addColorStop(0.85, 'rgba(220,242,250,0)');
+    gr.addColorStop(1, 'rgba(220,242,250,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
+  })();
   const wakeGeo = new THREE.PlaneGeometry(1, 1); wakeGeo.rotateX(-Math.PI / 2);
-  const wakeMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending,
-    depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+  const wakeMat = new THREE.MeshBasicMaterial({ color: 0xffffff, map: wakeTex, transparent: true, opacity: 0.34,
+    blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
   const wakeMesh = new THREE.InstancedMesh(wakeGeo, wakeMat, WAKE_N);
   wakeMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   wakeMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(WAKE_N * 3), 3);
