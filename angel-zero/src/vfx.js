@@ -2201,19 +2201,22 @@ export function createVFX(THREE, env) {
     mist += (target - mist) * Math.min(1, dt * (target > mist ? 5.0 : 2.9));   // plunge ~0.2 s, clear ~0.8 s
   }
   const _sv = new THREE.Vector3(), _cf = new THREE.Vector3();
+  function syncCamera() {
+    deck.position.copy(camera.position);
+    deckMat.uniforms.uSun.value.copy(SUN).normalize();
+    deckMat.uniforms.uCamFwd.value.copy(camera.getWorldDirection(_cf));
+    cloudMat.uniforms.uSunV.value.copy(_sv.copy(SUN).normalize().transformDirection(camera.matrixWorldInverse));
+    const above = camera.position.y > deckBase + deckThick * 0.5;
+    deck.renderOrder = above ? 3 : 1; clouds.renderOrder = 2;
+    sortClouds(0.25, false);
+  }
   function updateWind(dt) {
     cloudTime += dt;
     if (!windDriven) windOff.copy(WIND).multiplyScalar(cloudTime);
     cloudMat.uniforms.uWind.value.copy(windOff);
     deckMat.uniforms.uWind.value.copy(windOff);
-    deck.position.copy(camera.position);
-    deckMat.uniforms.uSun.value.copy(SUN).normalize();
-    deckMat.uniforms.uCamFwd.value.copy(camera.getWorldDirection(_cf));
     deckMat.uniforms.uFrame.value = (frame++ % 64);
-    cloudMat.uniforms.uSunV.value.copy(_sv.copy(SUN).normalize().transformDirection(camera.matrixWorldInverse));
-    // Draw order: below the deck it is behind the banks; above it, the banks are under it.
-    const above = camera.position.y > deckBase + deckThick * 0.5;
-    deck.renderOrder = above ? 3 : 1; clouds.renderOrder = 2;
+    syncCamera();
   }
 
   /* ------------------------------------------------------------- update */
@@ -2505,6 +2508,7 @@ export function createVFX(THREE, env) {
     machPulse(k = 1) { machPulseK = Math.max(0, Math.min(1, k)); },
     get coneOpacity() { return machConeInner.material.uniforms.uOp.value; },
     get sprayCount() { return sprayP.filter(q => q.on).length; },
+    syncCamera,
     clouds
   };
 }

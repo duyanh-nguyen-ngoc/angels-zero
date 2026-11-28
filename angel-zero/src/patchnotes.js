@@ -3,6 +3,9 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.2.21', title: 'PHOTO MODE CLOUD DEPTH FIX', bullets: [
+    'Fixed distant clouds rendering in front of the jet when orbiting in Photo Mode (Shift+C) by keeping volumetric cloud depth, sun lighting, and ocean camera uniforms synced every frame.'
+  ] },
   { version: 'v1.2.20', title: 'L-KEY AUTOLAND SAFETY TOGGLE', bullets: [
     'Added a persistent [ L AUTOLAND: ON / OFF ] toggle in Controls & Audio / Pause menu: turning it OFF makes L strictly toggle landing gear so you never accidentally engage autoland (Shift+L still triggers manual autoland if desired).'
   ] },
