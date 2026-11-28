@@ -655,6 +655,7 @@
           <button class="mute music-btn" id="musicBtn" type="button" aria-pressed="true">[ MUSIC: ON ] K</button>
           <button class="mute" id="cinematicBtn" type="button" aria-pressed="true">[ CINEMATIC: ON ]</button>
           <button class="mute" id="gfxBtn" type="button" title="AUTO adapts resolution, sky rays and water reflections to hold the frame rate">[ GRAPHICS: AUTO ]</button>
+          <button class="mute" id="autolandKeyBtn" type="button" aria-pressed="true" title="When OFF, pressing L only toggles landing gear and never triggers autoland">[ L AUTOLAND: ON ]</button>
         </div>
         <div class="btns">
           <button class="secondary-btn" id="restartBtn" type="button">[ RESTART MISSION ]</button>
@@ -868,7 +869,7 @@ import { createFreeLook } from './src/freelook.js?v=s11cam1';
 import { createCanopyGlass } from './src/canopyglass.js?v=s12rain1';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9ex';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9ex';
-import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s12fix2';
+import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s12al1';
 import { RADIO_LINES, RADIO_BY_EVENT, RADIO_SPEAKERS, RADIO_HERO, RADIO_EVENTS } from './src/radioScript.js?v=s9ex';
 import { createTelemetry, EV, EV_MAX } from './src/telemetry.js?v=s9ex';
 import { createRadioQueue } from './src/radioQueue.js?v=s9ex';
@@ -1912,6 +1913,7 @@ const WO_CHANCE = 0.25, WO_D_MIN = 600, WO_D_MAX = 1200, WO_PITCH_DEG = 12, WO_B
 const WO_BANDITS_MIN = 2, WO_BANDITS_MAX = 3, WO_SPAWN_D = 6000, WO_SPAWN_ALT = 2500;
 const BUZZ_MACH = 1.0, BUZZ_R = 90, BUZZ_CD = 10, BUZZ_TOWER_PTS = 500, BUZZ_JET_PTS = 250;
 const BUZZ_SHAKE = 0.35, BUZZ_SHAKE_CP = 0.12;
+let autolandKeyOn = true;
 const autoland = { on: false, ph: '', t: 0, T: AL_CAPTURE_T, d: 0, off: new THREE.Vector3(), tdZ: 0, vRel: 0,
   prevLz: Infinity, q0: new THREE.Quaternion(), p0: new THREE.Vector3(), target: null, used: false,
   side: 1, wpIdx: 0, wpCount: 0, wps: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()],
@@ -3449,7 +3451,7 @@ addEventListener('keydown', e => {
   if (k === 'j' && !e.repeat) combatSys.activateECM();
   if (k === 'x' && !e.repeat) combatSys.dispenseFlares();
   if (k === 'l' && !e.repeat) {
-    if (autolandPrompt() && !autoland.on) engageAutoland();
+    if ((autolandKeyOn || e.shiftKey) && autolandPrompt() && !autoland.on) engageAutoland();
     else { gearAutoLock = true; toggleGear(); }
   }
   if (k === 'g' && !e.repeat && !freeFlight.active) combatSys.setWingOrder();
@@ -5082,6 +5084,18 @@ blast = createBlastFX(THREE, { scene, camera, terrainHeight, sunDir: SUN_DIR, wi
   setCinematicFx(cinOn);
   if (cinBtn) cinBtn.addEventListener('click', () => setCinematicFx(!cinOn));
 }
+{
+  const AL_KEY = 'angelsZero_autolandKey';
+  try { const sv = localStorage.getItem(AL_KEY); if (sv !== null) autolandKeyOn = sv !== '0'; } catch (e) { /* ignore */ }
+  const alBtn = document.getElementById('autolandKeyBtn');
+  const setAutolandKey = on => {
+    autolandKeyOn = !!on;
+    if (alBtn) { alBtn.textContent = autolandKeyOn ? '[ L AUTOLAND: ON ]' : '[ L AUTOLAND: OFF ]'; alBtn.setAttribute('aria-pressed', autolandKeyOn ? 'true' : 'false'); }
+    try { localStorage.setItem(AL_KEY, autolandKeyOn ? '1' : '0'); } catch (e) { /* ignore */ }
+  };
+  setAutolandKey(autolandKeyOn);
+  if (alBtn) alBtn.addEventListener('click', () => setAutolandKey(!autolandKeyOn));
+}
 // ---- v1.2.11 GRAPHICS: AUTO / HIGH / LOW + adaptive quality (optimize-threejs-games) ----
 //   HIGH  DPR <= 1.5 (1.25 mobile), planar reflections, 32-sample sky rays, distortion.
 //   LOW   DPR 1.0, reflections / sky rays / distortion off.
@@ -5245,7 +5259,7 @@ const inputExt = createInputExt(THREE, {
   onPause: () => { if (appMode === 'PLAY') pauseSim(); else if (appMode === 'PAUSED') resumeSim(); },
   onNVG: () => setNVG(!nvg.active),
   onECM: () => combatSys.activateECM(),
-  onGear: () => { if (autolandPrompt() && !autoland.on) engageAutoland(); else { gearAutoLock = true; toggleGear(); } },
+  onGear: () => { if (autolandKeyOn && autolandPrompt() && !autoland.on) engageAutoland(); else { gearAutoLock = true; toggleGear(); } },
   onWing: () => { if (!freeFlight.active) combatSys.setWingOrder(); },
   onRoll: () => startRoll(-1),
   onBrakeDown: () => { keys.b = true; state.brakeHeld = true; },
@@ -5503,7 +5517,7 @@ const hud = createHUD(THREE, {
   getCat: () => cat, getCatArmT: () => CAT_ARM_T, getCatMounted: () => !!(combat.ally && combat.ally.glbMounted),
   ilsVisible: () => ilsVisible(), getMissionT: () => missionT, inCutscene: () => inCutscene(),
   isAutoland: () => autoland.on,
-  autolandPrompt: () => autolandPrompt(),
+  autolandPrompt: () => autolandKeyOn && autolandPrompt(),
   getCombinerOutline: () => (cockpit.active ? cockpit.glassOutlineWorld() : null),
   missionClock: () => cockpit.missionClock(simTime),
   isMinimalCockpit: () => hudMinimalFP,
