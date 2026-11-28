@@ -242,22 +242,22 @@ export function createVFX(THREE, env) {
       if (k === i) p.light.intensity = 0;
     });
   }
-  function updatePlumes(s, now, visible = true, dt = 0.016, firstPerson = false) {
-    const t = s.throttle, ab = s.afterburner;
+  function updatePlumes(s, now, visible = true, dt = 0.016, firstPerson = false, engSpool = 1) {
+    const t = s.throttle * engSpool, ab = s.afterburner * engSpool;
     const pulse = 1 + ab * 0.24 * Math.sin(now * 17.0) + ab * 0.08 * Math.sin(now * 41.0);
-    const coreLen = 1.5 + 3.2 * t + 4.6 * ab;
+    const coreLen = (1.5 + 3.2 * t + 4.6 * ab) * engSpool;
     coreMat.uniforms.uLen.value = coreLen;
     coreMat.uniforms.uDiam.value = coreLen / (isF22 ? 0.92 : 1.05);
     coreMat.uniforms.uRad.value = 0.30 * (0.85 + 0.15 * t + 0.12 * ab);
     // Dry thrust stays below the 0.92 bloom threshold; burner level drives the HDR glare.
-    coreMat.uniforms.uInt.value = (((isF22 ? 0.12 : 0.2) + (isF22 ? 0.24 : 0.32) * t) * (1 - ab) + 1.25 * ab) * pulse;
-    outerMat.uniforms.uLen.value = (2.0 + 4.6 * t + 6.8 * ab) * (1 + 0.04 * Math.sin(now * 23));
+    coreMat.uniforms.uInt.value = ((((isF22 ? 0.12 : 0.2) + (isF22 ? 0.24 : 0.32) * t) * (1 - ab) + 1.25 * ab) * pulse) * engSpool;
+    outerMat.uniforms.uLen.value = (2.0 + 4.6 * t + 6.8 * ab) * (1 + 0.04 * Math.sin(now * 23)) * engSpool;
     outerMat.uniforms.uRad.value = 0.48 * (0.9 + 0.22 * ab);
-    outerMat.uniforms.uInt.value = ((isF22 ? 0.08 : 0.12) + (isF22 ? 0.22 : 0.3) * t + 1.15 * ab) * pulse;
+    outerMat.uniforms.uInt.value = (((isF22 ? 0.08 : 0.12) + (isF22 ? 0.22 : 0.3) * t + 1.15 * ab) * pulse) * engSpool;
     coreMat.uniforms.uTime.value = outerMat.uniforms.uTime.value = now;
     coreMat.uniforms.uAB.value = outerMat.uniforms.uAB.value = ab;
     // Per-engine thermal heat-soak (heats fast under thrust, cools gradually on idle).
-    const heatTarget = 0.35 * t + 0.65 * ab;
+    const heatTarget = (0.35 * t + 0.65 * ab) * engSpool;
     for (let k = 0; k < 2; k++) {
       const tgt = k === engineOut ? 0 : heatTarget;
       nozzleHeat[k] += (tgt - nozzleHeat[k]) * Math.min(1, dt / (tgt > nozzleHeat[k] ? 2.2 : 5.5));
@@ -265,13 +265,13 @@ export function createVFX(THREE, env) {
     const maxSoak = Math.max(nozzleHeat[0], nozzleHeat[1]);
     // Incandescent core: warm orange + thermal heat-soak, HDR white-peach in AB.
     const shimmer = 1 + ab * 0.08 * (0.6 * Math.sin(now * 2 * Math.PI * 23) + 0.4 * Math.sin(now * 2 * Math.PI * 31));
-    glowCoreMat.uniforms.uCol.value.copy(CORE_COOL).multiplyScalar((isF22 ? 0.28 : 0.4) + (isF22 ? 0.48 : 0.6) * t)
+    glowCoreMat.uniforms.uCol.value.copy(CORE_COOL).multiplyScalar(((isF22 ? 0.28 : 0.4) + (isF22 ? 0.48 : 0.6) * t) * engSpool)
       .lerp(CORE_SOAK, maxSoak * 0.45 * (1 - ab)).lerp(CORE_HOT, smooth(ab, 0, 1)).multiplyScalar(shimmer);
     const tvcPitch = isF22 ? THREE.MathUtils.clamp(((s.ctl && s.ctl.pitch) || 0) * 0.28, -0.32, 0.32) : 0;
     const buoy = 1 - smooth(s.speed || 0, 10, 85);
     heatMat.uniforms.uTime.value = now;
     heatMat.uniforms.uBuoy.value = buoy;
-    heatMat.uniforms.uStr.value = Math.max(0.42 + 0.45 * t + 0.65 * ab, maxSoak * 0.45);
+    heatMat.uniforms.uStr.value = Math.max(0.42 + 0.45 * t + 0.65 * ab, maxSoak * 0.45) * engSpool;
     const heatLen = 4.5 + 5.5 * t + 7.5 * ab;
     const heatRad = 1.25 + 0.45 * ab;
     if (jetOcclGroup) {
@@ -291,11 +291,12 @@ export function createVFX(THREE, env) {
     }
     for (let k = 0; k < plumes.length; k++) {
       const p = plumes[k];
+      p.g.visible = visible && engSpool > 0.02 && k !== engineOut;
       if (isF22) p.g.rotation.x += (tvcPitch - p.g.rotation.x) * 0.25;
       p.light.position.copy(p.lightOff).applyQuaternion(s.quaternion).add(s.position);
       if (p.heatMesh) {
         const hk = nozzleHeat[k] || 0;
-        const showHeat = cinematic && visible && k !== engineOut && (t > 0.08 || ab > 0.01 || hk > 0.12);
+        const showHeat = cinematic && visible && engSpool > 0.05 && k !== engineOut && (t > 0.08 || ab > 0.01 || hk > 0.12);
         p.heatMesh.visible = showHeat;
         if (showHeat) {
           p.heatMesh.position.copy(p.localOff).applyQuaternion(s.quaternion).add(s.position);
@@ -304,8 +305,8 @@ export function createVFX(THREE, env) {
           p.heatMesh.scale.set(p.bx * heatRad, p.by * heatRad, heatLen);
         }
       }
-      if (!visible || k === engineOut) { p.light.intensity = 0; continue; }
-      p.light.intensity = (0.8 + t * 2.0 + ab * 6.5) * pulse;
+      if (!visible || k === engineOut || engSpool <= 0.02) { p.light.intensity = 0; continue; }
+      p.light.intensity = (0.8 + t * 2.0 + ab * 6.5) * pulse * engSpool;
       p.light.color.setRGB(1.0, 0.55 + 0.15 * (1 - ab), 0.25 + 0.35 * (1 - ab));
     }
   }
@@ -2242,12 +2243,12 @@ export function createVFX(THREE, env) {
   const jbP = Array.from({ length: JB_N }, () => ({ on: false, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, age: 0, life: 1, s0: 2, s1: 12, r: 0.7, g: 0.65, b: 0.55 }));
   let jbAcc = 0, jbNext = 0;
   const _jbAft = new THREE.Vector3();
-  function updateJetBlast(s, dt, visible) {
+  function updateJetBlast(s, dt, visible, engSpool = 1) {
     const p = s.position;
     const gnd = terrainHeight(p.x, p.z);
     const surf = Math.max(gnd, 0);
     const agl = p.y - surf;
-    const thrust = Math.max(s.throttle || 0, s.afterburner || 0);
+    const thrust = Math.max(s.throttle || 0, s.afterburner || 0) * engSpool;
     const k = (visible && agl < 45 && thrust > 0.2) ? (1 - agl / 45) * (0.4 + 0.6 * thrust) : 0;
     jbAcc += 55 * k * dt;
     _jbAft.set(0, 0, 1).applyQuaternion(s.quaternion);
@@ -2355,7 +2356,8 @@ export function createVFX(THREE, env) {
   const _w = new THREE.Vector3();
   function update(dt, now, s, opts) {
     const q = s.quaternion;
-    updatePlumes(s, now, opts.visible, dt, opts.firstPerson);
+    const engSpool = opts.engSpool === undefined ? 1 : Math.max(0, Math.min(1, opts.engSpool));
+    updatePlumes(s, now, opts.visible, dt, opts.firstPerson, engSpool);
     updateMachCone(dt, s.mach, opts.firstPerson, s);
 
     // Wingtip condensation: brisk pulls / banks (> 2 G, |AoA| > 7.5 deg, |roll| > 1.2 rad/s)
@@ -2417,7 +2419,7 @@ export function createVFX(THREE, env) {
 
     updateSpeedLines(s, dt, opts.firstPerson, Math.max(opts.cloud || 0, mist));
     updateSpray(s, dt, opts.visible);
-    updateJetBlast(s, dt, opts.visible);
+    updateJetBlast(s, dt, opts.visible, engSpool);
     updateWindSpindrift(dt, opts.visible);
     catSteam.update(dt);
     aaTracer.update(dt);

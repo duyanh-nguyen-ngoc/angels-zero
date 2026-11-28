@@ -3,6 +3,9 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.2.19', title: 'COLD-START EXHAUST & DECK STEAM FIX', bullets: [
+    'Cold & dark jets on the carrier deck no longer emit idle exhaust plumes, nozzle glow, heat shimmer, or deck steam until you spool up the engines.'
+  ] },
   { version: 'v1.2.18', title: 'STORM OPS FREEZE FIX, SAM TARGETING & LIGHTING PRESERVATION', bullets: [
     'Fixed a WebGL shader/fog freeze when entering STORM OPS or heavy rain curtains.',
     'Fixed Canyon Run SAM batteries lofting off-bore and losing lock on launch: SAMs now boost cleanly toward you with wider seeker tracking.',
