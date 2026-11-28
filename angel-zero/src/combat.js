@@ -5183,11 +5183,13 @@ const _bfmOut = aceBFM.bfmOut, _bfmLos = aceBFM.los, _bfmUp = aceBFM.up, _bfmMat
           vec2 q = vec2(x * 0.09, (d - uTime * uSpeed) * 0.05);
           float n = vn(q * 3.0) * 0.6 + vn(q * 7.3 + 4.1) * 0.4;
           float arm = uBeam * 0.45 + d * 0.354, armW = 1.5 + d * 0.03;
-          float kelvin = exp(-pow((ax - arm) / armW, 2.0)) * exp(-d / 380.0) * smoothstep(0.0, 8.0, d);
-          float bow = exp(-pow(ax / (uBeam * 0.7), 2.0)) * exp(-d / 18.0);
+          float ka = (ax - arm) / armW, ba = ax / (uBeam * 0.7);
+          float kelvin = exp(-ka * ka) * exp(-d / 380.0) * smoothstep(0.0, 8.0, d);
+          float bow = exp(-ba * ba) * exp(-d / 18.0);
           float sd = d - uLen, sternW = uBeam * 0.55 + max(sd, 0.0) * 0.045;
-          float stern = smoothstep(-10.0, 15.0, sd) * exp(-pow(ax / sternW, 2.0)) * exp(-max(sd, 0.0) / 520.0);
-          float side = (1.0 - smoothstep(0.0, uLen, d)) * exp(-pow((ax - uBeam * 0.55) / 3.0, 2.0)) * 0.6;
+          float sa = ax / sternW, la = (ax - uBeam * 0.55) / 3.0;
+          float stern = smoothstep(-10.0, 15.0, sd) * exp(-sa * sa) * exp(-max(sd, 0.0) / 520.0);
+          float side = (1.0 - smoothstep(0.0, uLen, d)) * exp(-la * la) * 0.6;
           float foam = (kelvin * (0.55 + 0.6 * n) + bow * 0.9 + stern * (0.45 + 0.75 * n) + side * n) * uFade;
           float a = clamp(foam, 0.0, 0.92) * (1.0 - smoothstep(uWL * 0.8, uWL, d));
           if (a < 0.01) discard;

@@ -187,13 +187,15 @@ export function createCanopyGlass(THREE, env) {
         // zenith mirrored by the dome -> soft sweeping arcs that slide over the arch
         // as the jet banks and pitches (visible even with the sun behind).
         vec3 R = reflect(-V, N);
-        float horizonBand = exp(-pow(R.y / 0.09, 2.0)) * (0.25 + 0.75 * fres) * 0.16;
+        float hy = R.y / 0.09;
+        float horizonBand = exp(-hy * hy) * (0.25 + 0.75 * fres) * 0.16;
         float skyBand = pow(max(R.y, 0.0), 3.0) * fres * 0.3;
         // Micro-scratches: only visible where the broad glare catches them.
         float scr = scratches(vMet) * glareBroad * 2.4;
         vec3 add = uSunCol * (glareCrisp + glareBroad + scatter + scr) * sunUp + (uHor * horizonBand + uSky * skyBand) * uGain;
         // HUD bounce: faint emerald glow low on the windscreen beneath the combiner.
-        float hudZone = exp(-pow(vMet.x / 0.2, 2.0) - pow((vMet.y - 0.16) / 0.11, 2.0));
+        float hx = vMet.x / 0.2, hmy = (vMet.y - 0.16) / 0.11;
+        float hudZone = exp(-hx * hx - hmy * hmy);
         add += vec3(0.05, 1.0, 0.42) * hudZone * 0.045 * uHud;
 
         // ---- water on the glass ----

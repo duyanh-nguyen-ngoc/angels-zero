@@ -82,19 +82,21 @@ export function createVFX(THREE, env) {
       #include <logdepthbuf_fragment>
       // Soft limb falloff broadside, uniform glow when viewed down the axis (chase camera).
       float facing = mix(0.62, abs(dot(normalize(vN), normalize(vV))), smoothstep(0.15, 0.6, vSide));
+      float fPos = max(facing, 1e-4);
+      float tPos = max(1.0 - vT, 1e-4);
       float t = vT;
       #ifdef CORE
         float shock = pow(0.5 + 0.5 * cos(t * uDiam * 6.2831853), 4.0);
         float osc = 0.78 + 0.22 * sin(uTime * 45.0);
         vec3 col = mix(vec3(1.0, 0.96, 0.88), vec3(1.0, 0.56, 0.22), smoothstep(0.0, 0.72, t))
           + vec3(0.72, 0.88, 1.0) * shock * 0.45 * (1.0 - t);
-        float a = pow(facing, 1.6) * pow(1.0 - t, 1.25) * (0.28 + 1.15 * shock * osc) * smoothstep(0.0, 0.04, t);
+        float a = pow(fPos, 1.6) * pow(tPos, 1.25) * (0.28 + 1.15 * shock * osc) * smoothstep(0.0, 0.04, t);
       #else
         float flick = 0.74 + 0.26 * sin(t * 21.0 - uTime * 33.0 + vAng * 3.0) * sin(uTime * 9.0 + t * 7.0);
         // Bright peach at the nozzle lip -> translucent deep orange-red at the tip;
         // in afterburner the lip goes HDR (> 1) so it carries a little bloom.
         vec3 col = mix(vec3(1.0, 0.74, 0.40), vec3(0.9, 0.24, 0.05), smoothstep(0.0, 0.8, t)) * (1.0 + 0.9 * uAB * (1.0 - smoothstep(0.0, 0.35, t)));
-        float a = pow(facing, 2.4) * pow(1.0 - t, 1.7) * smoothstep(0.0, 0.10, t) * flick * 0.55;
+        float a = pow(fPos, 2.4) * pow(tPos, 1.7) * smoothstep(0.0, 0.10, t) * flick * 0.55;
       #endif
       #ifdef CORE
         col *= 1.0 + 1.2 * uAB;                                    // shock diamonds go HDR only in afterburner
@@ -795,12 +797,14 @@ export function createVFX(THREE, env) {
           if (uMode < 1.5) {
             float frontPerturb = 0.08 + (cloud - 0.5) * 0.11;
             float shockFront = smoothstep(frontPerturb, frontPerturb + 0.14, vUv.y);
-            float collar = exp(-pow((vUv.y - 0.30) / (uMode < 0.5 ? 0.19 : 0.25), 2.0));
+            float dc = (vUv.y - 0.30) / (uMode < 0.5 ? 0.19 : 0.25);
+            float collar = exp(-dc * dc);
             float tailFade = 1.0 - smoothstep(0.45, 1.0, vUv.y);
             float billow = smoothstep(0.24, 0.78, cloud * 0.72 + wisps * 0.28);
             profile = shockFront * (0.48 * collar + 0.52 * tailFade * billow) * (0.55 + 0.65 * billow);
           } else {
-            float ring = exp(-pow((vUv.y - 0.42) / 0.22, 2.0));
+            float dr = (vUv.y - 0.42) / 0.22;
+            float ring = exp(-dr * dr);
             float fine = smoothstep(0.20, 0.82, wisps * 0.6 + cloud * 0.4);
             profile = ring * (0.45 + 0.55 * fine);
           }

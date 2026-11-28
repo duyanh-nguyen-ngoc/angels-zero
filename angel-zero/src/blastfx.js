@@ -155,8 +155,9 @@ export function createBlastFX(THREE, env) {
     void main() {
       #include <logdepthbuf_fragment>
       float r = length(vQ);
+      float rs = (r - 0.86) / 0.07;
       float k = vVar < 0.5 ? exp(-r * r * 5.0) * (1.0 - smoothstep(0.8, 1.0, r))
-                           : exp(-pow((r - 0.86) / 0.07, 2.0)) * (0.75 + 0.25 * sin(atan(vQ.y, vQ.x) * 9.0 + r * 20.0));
+                           : exp(-rs * rs) * (0.75 + 0.25 * sin(atan(vQ.y, vQ.x) * 9.0 + r * 20.0));
       gl_FragColor = vec4(vC.rgb * vC.a * k, 1.0);
     }`;
   class Pool {

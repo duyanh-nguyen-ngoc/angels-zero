@@ -290,8 +290,9 @@ export function createOcean(THREE, env) {
           if (ja > -12.0 && ja < 280.0 && jd < 24.0 + max(0.0, ja) * 0.42) {
             float jk = uJetPos.z * (1.0 + 0.35 * uJetPos.w) * exp(-max(0.0, ja) / 115.0) * smoothstep(-10.0, 6.0, ja);
             float armX = 5.0 + max(0.0, ja) * 0.24, armW = 3.0 + max(0.0, ja) * 0.045;
-            float jArm = exp(-pow((jd - armX) / armW, 2.0));
-            float jWash = exp(-pow(jd / (4.8 + max(0.0, ja) * 0.065), 2.0));
+            float jaN = (jd - armX) / armW, jwN = jd / (4.8 + max(0.0, ja) * 0.065);
+            float jArm = exp(-jaN * jaN);
+            float jWash = exp(-jwN * jwN);
             float jRip = sin(ja * 0.48 - jd * 0.95 - uTime * 15.0) * (jArm * 0.7 + jWash * 0.5) * jk;
             wk.r = max(wk.r, jArm * jk * 0.9);
             wk.g = max(wk.g, jWash * jk * 0.95);

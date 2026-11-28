@@ -3,6 +3,9 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.2.22', title: 'BLACK-SCREEN FLICKER FIX', bullets: [
+    'Fixed full-screen black HDR bloom flickers on Windows GPUs by eliminating negative-base GLSL pow(x, 2.0) NaNs across the canopy glass, Mach cone, ocean jet-wash, blast, and wake shaders.'
+  ] },
   { version: 'v1.2.21', title: 'PHOTO MODE CLOUD DEPTH FIX', bullets: [
     'Fixed distant clouds rendering in front of the jet when orbiting in Photo Mode (Shift+C) by keeping volumetric cloud depth, sun lighting, and ocean camera uniforms synced every frame.'
   ] },
