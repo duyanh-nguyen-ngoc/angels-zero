@@ -3,6 +3,12 @@
 // The UI reads PATCH_NOTES[0].version for the briefing + button version chips.
 
 export const PATCH_NOTES = [
+  { version: 'v1.2.16', title: 'CARRIER COLD-START, DIEGETIC COCKPIT HUD, MUFFLED CABIN AUDIO & MACH 1 VAPOR', bullets: [
+    'Carrier-launch sorties now begin cold & dark inside the cockpit with dark MFDs and open canopy: step through Battery & Avionics (I / 1), Canopy Seal (I / 2), and Engine Spool (I / 3) before catapult launch, or press Enter anytime for Quick Start.',
+    'First-person cockpit now defaults to a clean Diegetic Minimal HUD (press O to toggle Full HUD), hiding floating radar and arcade overlays so you fly off the collimated HUD glass, physical 3D MFDs and brief single-line objective prompts.',
+    'Overhauled sealed-cockpit audio for calm-to-chaos contrast: deep 480 Hz cabin muffling in cruise, darker sub-bass Vulcan cannon and missile rail-kick thumps, plus heavy hull-impact concussion thuds and temporary hearing-muffle dips on hits and close blasts.',
+    'Replaced the hard-edged Mach 1 nose cone with a feathered, sun-lit mid-fuselage Prandtl-Glauert vapor cloud, expanding Mach 1.00 shock disc, altitude/humidity scaling and over-wing vapor surge, and cleaned up low-altitude water wake/spray artifacts.'
+  ] },
   { version: 'v1.2.15', title: 'PHOTO CAPTURE MODE, CRUISE HOLD & ZERO-DRIFT FREE CAM', bullets: [
     'Press Shift+C in flight for instant freeze-frame Photo Mode: hides the HUD, lets you orbit 360°, zoom with the mouse wheel, adjust FOV with Q/E, and capture clean PNG screenshots with P or Enter.',
     'Press U to engage Cruise Hold autopilot: levels wings and holds your current heading, altitude and cruise speed hands-free while looking around.',
