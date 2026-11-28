@@ -863,9 +863,9 @@ import { createWorld, WORLD, CORE } from './src/world.js?v=s10can7';
 import { mulberry32, createNoise2D, fbm } from './src/noise.js?v=s10ter2';
 import { loadTerrainPack, loadTerrainMeta } from './src/terrainpack.js?v=s10ter8';
 import { createSurfaces } from './src/surfaces.js?v=s9ex';
-import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s10fly2';
+import { createWeather, WEATHER, WEATHER_ORDER } from './src/weather.js?v=s12rain1';
 import { createFreeLook } from './src/freelook.js?v=s11cam1';
-import { createCanopyGlass } from './src/canopyglass.js?v=s9ex';
+import { createCanopyGlass } from './src/canopyglass.js?v=s12rain1';
 import { DIFFICULTY_PRESETS, DIFFICULTY_ORDER, loadDifficulty, saveDifficulty } from './src/difficulty.js?v=s9ex';
 import { SPW, SQUADRON, MODES, ROLES, ROLE_LABELS, loadSPW, saveSPW, loadLivery, saveLivery, loadMode, saveMode, loadRoles, saveRoles } from './src/loadout.js?v=s9ex';
 import { PATCH_NOTES, renderPatchNotes } from './src/patchnotes.js?v=s12imm2';
@@ -4482,7 +4482,8 @@ function updateCameraAndVisuals(dt, now) {
     frost: THREE.MathUtils.smoothstep(state.cloudIce, ICE_FROST_T, 1), punch: punchValue(),
     crack: { level: combat.crackLevel || 0, seed: combat.crackSeed || 0 },
     sunCol: sunLight.color, sunK: Math.min(1.3, sunLight.intensity / 3.4) * atmosphere.sunVisible, sky: atmosphere.sky.material.uniforms.uMid.value,
-    gain: 0.15 + 0.85 * Math.min(1, hemiLight.intensity / 1.5), nvg: nvg.active, visible: firstPerson && flightMode === 'FLY' });
+    gain: 0.15 + 0.85 * Math.min(1, hemiLight.intensity / 1.5), nvg: nvg.active, visible: firstPerson && flightMode === 'FLY',
+    flash: weather.flash || 0, cinematic: nvg.cinematic });
   updateNavLights(simTime);
   world.update(dt, simTime, Math.max(0.1, navLevel), renderer, camera);
   if (surfaces) surfaces.update(dt, { pitch: state.ctl.pitch, roll: state.ctl.roll, yaw: state.ctl.yaw, airbrake: state.ctl.airbrake,
@@ -5474,7 +5475,7 @@ if (DEBUG && Q.has('mfdpage')) {
   mfdPage = p; cockpit.setMfdPage(p);
   combat.mfdT = performance.now(); combat.mfdLabel = MFD_PAGES[p];
 }
-const canopyGlass = createCanopyGlass(THREE, { parent: cockpit.rig, sunDir: SUN_DIR, fogColor: scene.fog.color });
+const canopyGlass = createCanopyGlass(THREE, { parent: cockpit.rig, sunDir: SUN_DIR, fogColor: scene.fog.color, distortScene: nvg.distortScene });
 if (DEBUG && Q.has('noglass')) canopyGlass.glass.visible = false;     // A/B check of the 3D canopy glass
 audio.setVWSLog(DEBUG);
 if (window.__vwsMode) {

@@ -24,7 +24,7 @@ export const WEATHER = {
   // Theatre weather paired with the STORM_OPS lighting preset (selected together, like
   // CLOUD_SEA): full storm deck, moderate overcast so the moon key and god rays survive,
   // light rain, sheet lightning, heavy chop, mild gusts. Never rolled at random.
-  STORM_OPS:     { label: 'STORM OPS',         chip: 'STORM OPS // CARRIER WX', coverage: 1.0, overcast: 0.5, fogMul: 1.7, rain: 0.35, chop: 0.85, turb: 0.25, storm: 1 }
+  STORM_OPS:     { label: 'STORM OPS',         chip: 'STORM OPS // CARRIER WX', coverage: 1.0, overcast: 0.5, fogMul: 1.7, rain: 0.68, chop: 0.85, turb: 0.25, storm: 1 }
 };
 export const WEATHER_ORDER = ['CLOUD_SEA', 'CLEAR', 'SCATTERED', 'OVERCAST_RAIN', 'THUNDERSTORM', 'STORM_OPS'];
 const NUM = ['coverage', 'overcast', 'fogMul', 'rain', 'chop', 'turb', 'storm'];
@@ -59,11 +59,12 @@ export function createWeather(THREE, env) {
   // N drops in a 140 x 90 x 140 m box that wraps around the camera. Each drop
   // is a 2-vertex segment drawn along its velocity relative to the jet, so the
   // streaks tilt with airspeed and slip; the tail vertex is fully transparent.
-  const N = 1800, BX = 140, BY = 90, BZ = 140;
+  const N = 2800, BX = 140, BY = 90, BZ = 140;
   const pos = new Float32Array(N * 6), col = new Float32Array(N * 8);
-  const drops = new Float32Array(N * 3);
+  const drops = new Float32Array(N * 3), dropVar = new Float32Array(N);
   for (let i = 0; i < N; i++) {
     drops[i * 3] = (Math.random() - 0.5) * BX; drops[i * 3 + 1] = (Math.random() - 0.5) * BY; drops[i * 3 + 2] = (Math.random() - 0.5) * BZ;
+    dropVar[i] = 0.55 + Math.random() * 0.7;
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
@@ -72,8 +73,53 @@ export function createWeather(THREE, env) {
   const rainMesh = new THREE.LineSegments(geo, rainMat);
   rainMesh.frustumCulled = false; rainMesh.renderOrder = 3;
   scene.add(rainMesh);
-  const wind = new THREE.Vector3(), rel = new THREE.Vector3(), base = new THREE.Vector3();
+  const wind = new THREE.Vector3(), rel = new THREE.Vector3(), base = new THREE.Vector3(), _dir = new THREE.Vector3();
   let fallOff = 0;                                   // world-space drop drift, kept bounded
+
+  // Distant volumetric rain curtains under the storm deck (6 pre-allocated sheets).
+  const CURTAINS = [
+    { az: 0.15, d: 1550, w: 850, h: 2400, seed: 1.3 },
+    { az: 1.25, d: 2400, w: 1150, h: 2400, seed: 2.7 },
+    { az: 2.25, d: 1900, w: 920, h: 2400, seed: 4.1 },
+    { az: -2.6, d: 3100, w: 1300, h: 2400, seed: 5.5 },
+    { az: -1.45, d: 2150, w: 1000, h: 2400, seed: 7.2 },
+    { az: -0.55, d: 3500, w: 1250, h: 2400, seed: 8.9 }
+  ];
+  const curtainGeo = new THREE.PlaneGeometry(1, 1);
+  const curtainMeshes = CURTAINS.map(c => {
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { uTime: { value: 0 }, uAlpha: { value: 0 }, uFlash: { value: 0 }, uSeed: { value: c.seed } },
+      vertexShader: `
+        #include <common>
+        #include <logdepthbuf_pars_vertex>
+        varying vec2 vUv;
+        void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); #include <logdepthbuf_vertex> }`,
+      fragmentShader: `
+        #include <common>
+        #include <logdepthbuf_pars_fragment>
+        uniform float uTime; uniform float uAlpha; uniform float uFlash; uniform float uSeed;
+        varying vec2 vUv;
+        void main() {
+          #include <logdepthbuf_fragment>
+          float x = abs(vUv.x * 2.0 - 1.0);
+          float hFade = pow(max(1.0 - x, 0.0), 1.7);
+          float vFade = smoothstep(0.0, 0.25, vUv.y) * smoothstep(1.0, 0.72, vUv.y);
+          float slant = vUv.x + vUv.y * 0.14;
+          float s1 = 0.6 + 0.4 * sin(slant * 48.0 + uSeed + uTime * 2.1);
+          float s2 = 0.65 + 0.35 * sin(slant * 115.0 - uSeed * 1.7 + uTime * 3.8);
+          float sheet = 0.55 + 0.45 * sin(vUv.x * 9.0 + uSeed);
+          float a = uAlpha * hFade * vFade * s1 * s2 * sheet;
+          if (a < 0.004) discard;
+          vec3 col = mix(vec3(0.46, 0.54, 0.64), vec3(0.86, 0.92, 1.0), min(1.0, uFlash));
+          gl_FragColor = vec4(col, a);
+        }`,
+      transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: true
+    });
+    const m = new THREE.Mesh(curtainGeo, mat);
+    m.frustumCulled = false; m.renderOrder = 2; m.visible = false;
+    scene.add(m);
+    return { mesh: m, mat, cfg: c };
+  });
 
   /* ------------------------------------------------- lightning / gusts */
   const lightning = { next: 8, flash: 0, t: -1, pulses: [], thunder: [], count: 0, lastDist: 0 };
@@ -107,10 +153,10 @@ export function createWeather(THREE, env) {
       rel.set(wind.x - playerVel.x, -fall - playerVel.y, wind.z - playerVel.z);   // drop velocity seen from the jet
       const relLen = rel.length();
       const L = Math.min(11, Math.max(0.7, relLen * 0.014));                        // ~1/70 s exposure streak
-      const dir = rel.clone().divideScalar(Math.max(relLen, 1e-3));
-      const bright = 0.62 - 0.4 * nightK;
+      const dir = _dir.copy(rel).divideScalar(Math.max(relLen, 1e-3));
+      const bright = Math.min(1.0, (0.62 - 0.4 * nightK) + lightning.flash * 0.55);
       const cr = bright * 0.92, cg = bright * 0.96, cb = bright;
-      const aMax = (0.22 + 0.33 * rainLevelSmooth) * (1 - 0.35 * nightK);
+      const aMax = Math.min(0.85, (0.24 + 0.36 * rainLevelSmooth) * (1 - 0.3 * nightK) + lightning.flash * 0.25);
       base.copy(cam);
       culled = 0;
       for (let i = 0; i < N; i++) {
@@ -120,15 +166,15 @@ export function createWeather(THREE, env) {
         y = ((y - base.y) % BY + BY * 1.5) % BY - BY / 2 + base.y;
         z = ((z - base.z) % BZ + BZ * 1.5) % BZ - BZ / 2 + base.z;
         drops[i * 3] = x; drops[i * 3 + 1] = y; drops[i * 3 + 2] = z;
-        const o = i * 6, c = i * 8;
+        const o = i * 6, c = i * 8, v = dropVar[i], lDrop = L * v;
         pos[o] = x; pos[o + 1] = y; pos[o + 2] = z;
-        pos[o + 3] = x - dir.x * L; pos[o + 4] = y - dir.y * L; pos[o + 5] = z - dir.z * L;
+        pos[o + 3] = x - dir.x * lDrop; pos[o + 4] = y - dir.y * lDrop; pos[o + 5] = z - dir.z * lDrop;
         // Fade drops right at the eye (canopy) and toward the box edge.
         const dx = x - cam.x, dy = y - cam.y, dz = z - cam.z, d = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        let a = i < nDraw ? aMax * smooth(d, 3.5, 9) * (1 - smooth(d, 48, 66)) : 0;
+        let a = i < nDraw ? aMax * v * smooth(d, 3.5, 9) * (1 - smooth(d, 48, 66)) : 0;
         if (fp && a > 0) {
-          // Closest approach of the streak (head -> head - dir * L) to the eye.
-          const t = Math.min(L, Math.max(0, dx * dir.x + dy * dir.y + dz * dir.z));
+          // Closest approach of the streak (head -> head - dir * lDrop) to the eye.
+          const t = Math.min(lDrop, Math.max(0, dx * dir.x + dy * dir.y + dz * dir.z));
           const qx = dx - dir.x * t, qy = dy - dir.y * t, qz = dz - dir.z * t;
           if (qx * qx + qy * qy + qz * qz < EYE_CLEAR * EYE_CLEAR) { a = 0; culled++; }
         }
@@ -136,6 +182,22 @@ export function createWeather(THREE, env) {
         col[c + 4] = cr; col[c + 5] = cg; col[c + 6] = cb; col[c + 7] = 0;
       }
       geo.attributes.position.needsUpdate = true; geo.attributes.color.needsUpdate = true;
+    }
+
+    // Update distant volumetric rain curtains under the storm deck.
+    const showCurtains = rainLevelSmooth > 0.04;
+    for (let i = 0; i < curtainMeshes.length; i++) {
+      const ct = curtainMeshes[i], m = ct.mesh, cfg = ct.cfg;
+      m.visible = showCurtains;
+      if (!showCurtains) continue;
+      const az = cfg.az + time * 0.008;
+      const cx = cam.x + Math.sin(az) * cfg.d, cz = cam.z + Math.cos(az) * cfg.d;
+      m.position.set(cx, cfg.h * 0.45, cz);
+      m.scale.set(cfg.w, cfg.h, 1);
+      m.rotation.set(0, az, 0);
+      ct.mat.uniforms.uTime.value = time;
+      ct.mat.uniforms.uAlpha.value = Math.min(0.28, 0.22 * rainLevelSmooth * (1 - 0.35 * nightK) + lightning.flash * 0.14);
+      ct.mat.uniforms.uFlash.value = lightning.flash;
     }
 
     // Sheet lightning: a double / triple flicker, thunder after the sound delay.

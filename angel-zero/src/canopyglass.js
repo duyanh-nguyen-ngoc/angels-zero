@@ -21,7 +21,7 @@
 //     streaks that evaporate ~2.5 s after breaking out.
 
 export function createCanopyGlass(THREE, env) {
-  const { parent, sunDir, fogColor } = env;
+  const { parent, sunDir, fogColor, distortScene } = env;
   const ss = (x, a, b) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
   // Profile tables along z (rig frame): glass top height, rail / sill height, half-width.
   const Z0 = -1.42, Z1 = 0.62;
@@ -85,7 +85,8 @@ export function createCanopyGlass(THREE, env) {
     uGain: { value: 1 }, uGlare: { value: 1 }, uHud: { value: 1 },
     uTime: { value: 0 }, uRain: { value: 0 }, uMoist: { value: 0 }, uFrost: { value: 0 }, uPunch: { value: 0 },
     uCrack: { value: null }, uCrackK: { value: 0 },
-    uFlow: { value: new THREE.Vector2() }, uStretch: { value: 1 }
+    uFlow: { value: new THREE.Vector2() }, uStretch: { value: 1 },
+    uSpeedK: { value: 0 }, uFlash: { value: 0 }
   };
   const mat = new THREE.ShaderMaterial({
     uniforms: U, transparent: true, depthWrite: false, premultipliedAlpha: true, side: THREE.DoubleSide,
@@ -106,10 +107,11 @@ export function createCanopyGlass(THREE, env) {
       uniform vec3 uSun; uniform vec3 uSunCol; uniform vec3 uSky; uniform vec3 uHor;
       uniform float uGain; uniform float uGlare; uniform float uHud;
       uniform float uTime; uniform float uRain; uniform float uMoist; uniform float uFrost; uniform float uPunch; uniform float uCrackK; uniform sampler2D uCrack; uniform vec2 uFlow; uniform float uStretch;
+      uniform float uSpeedK; uniform float uFlash;
       varying vec3 vWPos; varying vec3 vWN; varying vec2 vUv; varying vec2 vMet;
       float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
       float ggx(float ndh, float a) { float a2 = a * a, d = ndh * ndh * (a2 - 1.0) + 1.0; return a2 / (3.14159265 * d * d); }
-      // One droplet layer in flow-scrolled glass space (metres). Returns (mask, rim, trail).
+      // One droplet layer in flow-scrolled glass space (metres). Returns (mask, dist, trail).
       vec3 drops(vec2 P, float cell, float density, float stretch, float seed, float rate) {
         vec2 q = (P - uFlow) / cell;
         vec2 id = floor(q), f = fract(q) - 0.5;
@@ -125,6 +127,26 @@ export function createCanopyGlass(THREE, env) {
         // Thin wet trail left upstream (toward the nose) of the moving drop.
         float back = (c.y - f.y) / 0.45;
         float trail = live * step(0.0, back) * (1.0 - smoothstep(0.0, 1.0, back)) * (1.0 - smoothstep(0.0, r * 0.35, abs(f.x - c.x)));
+        return vec3(m, dist, trail * (1.0 - m));
+      }
+      // Gravity-driven meandering rivulets when parked / slow on deck (1.0 - uSpeedK).
+      vec3 rivulet(vec2 P, float density, float seed) {
+        if (density < 0.01) return vec3(0.0);
+        float cell = 0.085;
+        vec2 q = P / cell;
+        q.y += uTime * 0.55;
+        vec2 id = floor(q), f = fract(q) - 0.5;
+        float h = h21(id + seed), h2 = h21(id + seed + 3.17);
+        float live = step(h, density);
+        float wiggle = sin(q.y * 5.5 + h2 * 6.2831) * 0.16;
+        vec2 c = vec2((h2 - 0.5) * 0.45 + wiggle, 0.0);
+        float r = mix(0.14, 0.22, h21(id + seed + 9.4));
+        vec2 d = (f - c) / vec2(r, r * 1.35);
+        float dist = length(d);
+        float m = (1.0 - smoothstep(0.74, 1.0, dist)) * live;
+        // Meandering wet trail + clinging micro-beads above the sliding drop
+        float above = clamp((f.y - c.y) / 0.5, 0.0, 1.0);
+        float trail = live * step(0.0, f.y - c.y) * (1.0 - smoothstep(0.0, r * 0.38, abs(f.x - c.x))) * (1.0 - above * 0.7);
         return vec3(m, dist, trail * (1.0 - m));
       }
       float scratches(vec2 p) {
@@ -180,30 +202,36 @@ export function createCanopyGlass(THREE, env) {
         if (uRain > 0.01 || uMoist > 0.05) {
           vec2 P = vMet;
           float fadeEdge = smoothstep(0.02, 0.12, vUv.x) * (1.0 - smoothstep(0.93, 1.0, vUv.x)) * (1.0 - smoothstep(0.9, 1.0, abs(vUv.y)));
-          vec3 A = drops(P, 0.05, uRain * 0.42, uStretch, 1.7, 0.45);
-          vec3 B = drops(P, 0.026, uRain * 0.55 + uMoist * 0.35, uStretch * 1.4, 9.3, 0.8);
-          float m = max(A.x, B.x) * fadeEdge;
-          float dist = A.x > B.x ? A.y : B.y;
-          float trail = max(A.z, B.z) * 0.5 * fadeEdge;
+          // On deck: dense full-windscreen beading. At combat speed: airflow clears the center sightline into fast side/arch streaks.
+          float sightClear = 0.32 + 0.68 * smoothstep(0.10, 0.42, length(P - vec2(0.0, 0.25)));
+          float centerFactor = mix(1.0, sightClear, uSpeedK);
+          vec3 R0 = rivulet(P, uRain * 0.42 * (1.0 - uSpeedK * 0.92), 3.1);
+          vec3 A = drops(P, 0.048, uRain * (0.72 - 0.25 * uSpeedK) * centerFactor, uStretch, 1.7, 0.45);
+          vec3 B = drops(P, 0.025, (uRain * 0.78 + uMoist * 0.35) * centerFactor, uStretch * 1.4, 9.3, 0.85);
+          vec3 C = drops(P, 0.013, uRain * (0.68 - 0.35 * uSpeedK), uStretch * 1.15, 14.7, 1.15);
+          float m = max(max(R0.x, A.x), max(B.x, C.x)) * fadeEdge;
+          float dist = R0.x > A.x ? R0.y : (A.x > B.x ? A.y : (B.x > C.x ? B.y : C.y));
+          float trail = max(max(R0.z * 0.75, A.z), B.z) * (0.45 + 0.35 * uSpeedK) * fadeEdge;
           // Cloud mist: very fine streaks raked along the slipstream.
           vec2 mq = (P - uFlow * 1.3) * vec2(110.0, 7.0);
           vec2 mid = floor(mq);
           float mist = uMoist * step(0.72, h21(mid + 4.1)) * (1.0 - smoothstep(0.0, 0.18, abs(fract(mq.x) - 0.5))) * fadeEdge;
-          // Drop body: a lens -> inverted, brightened sky; dark refraction rim; glint.
-          vec3 lens = mix(uHor, uSky, 0.3) * (0.95 + 0.3 * (1.0 - dist)) * uGain;
-          lens += vec3(0.05, 1.0, 0.42) * hudZone * 0.12 * uHud;
-          float rim = smoothstep(0.55, 0.95, dist);
-          vec3 dropC = mix(lens, lens * 0.4, rim);
-          float spark = pow(max(dot(reflect(-V, N), L), 0.0), 30.0) * sunUp;
-          dropC += uSunCol * (0.25 * smoothstep(0.45, 0.15, dist) + 1.2 * spark * (1.0 - rim));
-          float dA = m * (0.36 + 0.26 * rim);
+          // Drop body: inverted sky/horizon refraction, dark meniscus rim, crisp glint (sun + lightning).
+          vec3 lens = mix(uHor, uSky, 0.32) * (0.95 + 0.35 * (1.0 - dist)) * uGain;
+          lens += vec3(0.05, 1.0, 0.42) * hudZone * 0.14 * uHud;
+          float rim = smoothstep(0.52, 0.96, dist);
+          vec3 dropC = mix(lens, lens * 0.28, rim);
+          float spark = pow(max(dot(reflect(-V, N), L), 0.0), 28.0) * sunUp;
+          float flashGlint = uFlash * 0.85 * (1.0 - rim);
+          dropC += uSunCol * (0.28 * smoothstep(0.45, 0.12, dist) + 1.35 * spark * (1.0 - rim)) + vec3(0.82, 0.90, 1.0) * flashGlint;
+          float dA = m * (0.42 + 0.32 * rim);
           col = col * (1.0 - dA) + dropC * dA;
           alpha = alpha + dA * (1.0 - alpha);
-          vec3 wetC = mix(uHor, uSky, 0.5) * uGain * 0.9;
-          float wA = (trail * 0.35 + mist * 0.28) * (1.0 - dA);
+          vec3 wetC = mix(uHor, uSky, 0.5) * uGain * 0.92;
+          float wA = (trail * 0.38 + mist * 0.28) * (1.0 - dA);
           col += wetC * wA; alpha += wA * (1.0 - alpha);
           // A water film slightly hazes the whole pane while it is wet.
-          float film = wetK * 0.05;
+          float film = wetK * (0.05 + 0.03 * (1.0 - uSpeedK));
           col += wetC * film; alpha += film * (1.0 - alpha);
         }
         // Ice: procedural crystals creep inward from the canopy edge. Hash based,
@@ -240,6 +268,57 @@ export function createCanopyGlass(THREE, env) {
   glass.renderOrder = 5;                              // after exterior rain (3), before the HUD combiner (6)
   glass.frustumCulled = false;
   parent.add(glass);
+
+  let distortGlass = null;
+  if (distortScene) {
+    const distortMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: U.uTime, uRain: U.uRain, uMoist: U.uMoist,
+        uFlow: U.uFlow, uStretch: U.uStretch, uSpeedK: U.uSpeedK
+      },
+      vertexShader: `
+        attribute vec2 aMet;
+        varying vec2 vUv; varying vec2 vMet;
+        void main() { vUv = uv; vMet = aMet; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+      fragmentShader: `
+        uniform float uTime; uniform float uRain; uniform float uMoist;
+        uniform vec2 uFlow; uniform float uStretch; uniform float uSpeedK;
+        varying vec2 vUv; varying vec2 vMet;
+        float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+        vec3 dropOff(vec2 P, float cell, float density, float stretch, float seed, float rate) {
+          vec2 q = (P - uFlow) / cell;
+          vec2 id = floor(q), f = fract(q) - 0.5;
+          float h = h21(id + seed), h2 = h21(id + seed + 7.13), h3 = h21(id + seed + 3.71);
+          float life = fract(uTime * rate * (0.6 + 0.8 * h2) + h3);
+          float live = step(h, density) * smoothstep(0.0, 0.05, life) * (1.0 - smoothstep(0.7, 1.0, life));
+          vec2 c = (vec2(h2, h3) - 0.5) * 0.56;
+          float r = mix(0.12, 0.24, h21(id + seed + 5.9));
+          float st = min(stretch, (0.48 - abs(c.y)) / r);
+          vec2 d = f - c; d.y /= st;
+          float dist = length(d) / r;
+          float m = (1.0 - smoothstep(0.72, 1.0, dist)) * live;
+          return vec3(d / max(r, 1e-3), m);
+        }
+        void main() {
+          if (uRain <= 0.02 && uMoist <= 0.1) discard;
+          float fadeEdge = smoothstep(0.02, 0.12, vUv.x) * (1.0 - smoothstep(0.93, 1.0, vUv.x)) * (1.0 - smoothstep(0.9, 1.0, abs(vUv.y)));
+          float sightClear = 0.32 + 0.68 * smoothstep(0.10, 0.42, length(vMet - vec2(0.0, 0.25)));
+          float centerFactor = mix(1.0, sightClear, uSpeedK);
+          vec3 a = dropOff(vMet, 0.048, uRain * (0.72 - 0.25 * uSpeedK) * centerFactor, uStretch, 1.7, 0.45);
+          vec3 b = dropOff(vMet, 0.025, (uRain * 0.78 + uMoist * 0.35) * centerFactor, uStretch * 1.4, 9.3, 0.85);
+          vec2 off = (a.z >= b.z ? a.xy : b.xy) * 0.42;
+          float m = max(a.z, b.z) * fadeEdge;
+          if (m < 0.01) discard;
+          gl_FragColor = vec4(0.5 + off.x, 0.5 + off.y, 0.0, clamp(m * 0.68, 0.0, 0.75));
+        }`,
+      transparent: true, depthWrite: false, side: THREE.DoubleSide
+    });
+    distortGlass = new THREE.Mesh(geo, distortMat);
+    distortGlass.matrixAutoUpdate = false;
+    distortGlass.frustumCulled = false;
+    distortGlass.visible = false;
+    distortScene.add(distortGlass);
+  }
 
   // Canopy frame seal: dark rubberised / metallic strip where the glass meets the
   // rails, the nose coaming and the rear bulkhead.
@@ -331,11 +410,21 @@ export function createCanopyGlass(THREE, env) {
     if (flow.y > 1000) flow.y -= 1000;
     flow.x = ((flow.x % 1000) + 1000) % 1000;
     U.uStretch.value = 1 + 5.5 * ss(k, 150, 600);
+    U.uSpeedK.value = ss(k, 90, 240);
+    U.uFlash.value = o.flash || 0;
     U.uSunCol.value.copy(o.sunCol).multiplyScalar(o.sunK);
     U.uSky.value.copy(o.sky);
     U.uGain.value = o.gain;
     U.uGlare.value = o.nvg ? 0.15 : 1;
     U.uHud.value = o.nvg ? 0.4 : 1;
+    if (distortGlass) {
+      distortGlass.visible = !!(o.visible && o.cinematic !== false && (U.uRain.value > 0.02 || U.uMoist.value > 0.1));
+      if (distortGlass.visible) {
+        glass.updateWorldMatrix(true, false);
+        distortGlass.matrix.copy(glass.matrixWorld);
+        distortGlass.matrixWorld.copy(glass.matrixWorld);
+      }
+    }
   }
   return {
     glass, update,
