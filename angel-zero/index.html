@@ -840,7 +840,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // Bump the ?v= build tag on every release so CDN edges never mix module versions.
-import { createVFX } from './src/vfx.js?v=s11wat3';
+import { createVFX } from './src/vfx.js?v=s12mach1';
 import { createAmbient } from './src/ambient.js?v=s9ex';
 import { createStormFX } from './src/stormfx.js?v=s9ex';
 import { createWetDeck } from './src/wetdeck.js?v=s9ex';
@@ -1357,6 +1357,7 @@ let prevMach = 0, machArmed = true, machShake = null;
 function onMach1() {
   machShake = { t: 0, T: 0.25, k: 1 };
   combat.mach1T = performance.now();
+  if (vfx) vfx.machPulse(1);
   radioEvent('ON_MACH_1');
   onSfx('sonicboom');
 }
